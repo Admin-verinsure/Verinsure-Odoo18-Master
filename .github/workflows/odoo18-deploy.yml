@@ -1,0 +1,33 @@
+name: Deploy Odoo 18 to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  SERVER_IP: 120.138.30.170
+  SSH_USER: ubuntu
+  ODOO_PATH: /opt/odoo18
+  SERVICE_NAME: odoo18.service
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Server
+        run: |
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$SERVER_IP << 'EOF'
+            cd $ODOO_PATH
+            git pull origin main
+            sudo systemctl restart $SERVICE_NAME
+          EOF
