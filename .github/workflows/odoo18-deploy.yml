@@ -23,7 +23,7 @@ jobs:
 
       - name: 🔗 Test SSH Connection
         run: |
-          ssh -i private_key -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "echo '✅ SSH Connection Successful!'"
+          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo '✅ SSH Connection Successful!'"
 
       - name: 🧹 Cleanup
         run: rm -f private_key
