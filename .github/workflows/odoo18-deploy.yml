@@ -26,16 +26,24 @@ jobs:
             pip install --upgrade pip  
             pip install wheel cryptography  
 
-     
-
-      - name: Set up SSH key
+      - name: 🔑 Set Up SSH Connection
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+              SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/not4profit
-          chmod 600 ~/.ssh/not4profit
-          ssh-keyscan -H 120.138.30.170 >> ~/.ssh/known_hosts
+              echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+    
+      - name: 🔗 Test SSH Connection
+        run: |
+              ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo '✅ SSH Connection Successful!'"
+
+      #- name: Set up SSH key
+       # env:
+         # SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+       # run: |
+         # mkdir -p ~/.ssh
+         # echo "$SSH_PRIVATE_KEY" > ~/.ssh/not4profit
+        #  chmod 600 ~/.ssh/not4profit
+          #ssh-keyscan -H 120.138.30.170 >> ~/.ssh/known_hosts
 
       #- name: Deploy to Odoo Server
        # run: |
