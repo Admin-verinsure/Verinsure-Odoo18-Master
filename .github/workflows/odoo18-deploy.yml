@@ -1,33 +1,46 @@
-name: Deploy Odoo 18 to Production
+name: Deploy Odoo 18
 
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
-
-env:
-  SERVER_IP: 120.138.30.170
-  SSH_USER: ubuntu
-  ODOO_PATH: /opt/odoo18
-  SERVICE_NAME: odoo18.service
+      - main  # Change this if you're using another branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
 
-      - name: Setup SSH and Deploy
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 🛠️ Install Dependencies
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no ubuntu@120.138.30.170 << 'EOF'
-            cd /opt/odoo18
-            git pull origin main
-            sudo systemctl restart odoo18.service
-          EOF
+          sudo apt update
+          sudo apt install -y python3-pip python3-venv
+          pip install wheel
+
+      - name: 🔑 Set Up SSH Connection
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+
+      - name: 📂 Deploy Odoo 18 Modules
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" \
+          addons/ $SERVER_USER@$SERVER_IP:/opt/odoo18/odoo18-addons
+
+      - name: 🔄 Restart Odoo 18 Service
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -i private_key -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << 'EOF'
+          sudo systemctl restart odoo18
+          EOF
+
+      - name: 🧹 Cleanup
+        run: rm -f private_key
