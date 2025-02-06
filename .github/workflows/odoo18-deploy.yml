@@ -1,46 +1,29 @@
-name: Deploy Odoo 18
+name: Test SSH Connection to Odoo 18 Server
 
 on:
   push:
     branches:
-      - main  # Change this if you're using another branch
+      - main  # Change if using another branch
 
 jobs:
-  deploy:
+  test-ssh:
     runs-on: ubuntu-latest
 
     steps:
       - name: 🚀 Checkout Repository
         uses: actions/checkout@v3
 
-      - name: 🛠️ Install Dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y python3-pip python3-venv
-          pip install wheel
-
       - name: 🔑 Set Up SSH Connection
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
-
-      - name: 📂 Deploy Odoo 18 Modules
-        env:
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}#
-        run: |
-          rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" \
-          addons/ $SERVER_USER@$SERVER_IP:/opt/odoo18/odoo18-addons
-
-      - name: 🔄 Restart Odoo 18 Service
-        env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          ssh -i private_key -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << 'EOF'
-          sudo systemctl restart odoo18
-          EOF
+          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+
+      - name: 🔗 Test SSH Connection
+        run: |
+          ssh -i private_key -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "echo '✅ SSH Connection Successful!'"
 
       - name: 🧹 Cleanup
         run: rm -f private_key
