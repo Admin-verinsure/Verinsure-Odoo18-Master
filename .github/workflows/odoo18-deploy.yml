@@ -42,10 +42,10 @@ jobs:
         run: |
               ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 << 'EOF'
               python3 -m venv /home/ubuntu/venv
-                source /home/ubuntu/venv/bin/activate
-                pip install --upgrade pip
-                pip install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko
-                EOF
+              source /home/ubuntu/venv/bin/activate
+              pip install --upgrade pip
+              pip install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko
+              EOF
 
       #- name: Set up SSH key
        # env:
