@@ -1,4 +1,4 @@
-name: Test SSH Connection to Odoo 18 Server
+name: Odoo18 CICD
 
 on:
   push:
@@ -6,24 +6,52 @@ on:
       - main  # Change if using another branch
 
 jobs:
-  test-ssh:
+
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🚀 Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 🔑 Set Up SSH Connection
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget git python3-dev python3-pip build-essential libxslt1-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools node-less libjpeg-dev libpq-dev
+
+      - name: Create a virtual environment
+        run: |
+            python -m venv /opt/odoo/venv
+            source /opt/odoo/venv/bin/activate
+            pip install --upgrade pip  
+            pip install wheel cryptography  
+
+     
+
+      - name: Set up SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/not4profit
+          chmod 600 ~/.ssh/not4profit
+          ssh-keyscan -H 120.138.30.170 >> ~/.ssh/known_hosts
 
-      - name: 🔗 Test SSH Connection
+      #- name: Deploy to Odoo Server
+       # run: |
+        # scp -r ./addons/account_move_multi_cancel root@103.19.4.104:/opt/odoo/addons/Not4Profit.online/addons/
+       
+
+
+      - name: Install Python dependencies on Odoo server
         run: |
-          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo '✅ SSH Connection Successful!'"
+          ssh ubuntu@120.138.30.170 'pip3 install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko'
+          
+      #- name: Update Odoo Database
+      #  run: |
+       #   ssh root@103.19.4.104 "sudo -u odoo /odoo-venv/bin/python /opt/odoo/odoo-bin -c /opt/odoo/debian/odoo.conf -d Not4ProfitOrganisation -u all
+        #  "
 
-      - name: 🧹 Cleanup
-        run: rm -f private_key
+      - name: Start Odoo Server
+        run: |
+          ssh ubuntu@120.138.30.170 "sudo systemctl start odoo18"
