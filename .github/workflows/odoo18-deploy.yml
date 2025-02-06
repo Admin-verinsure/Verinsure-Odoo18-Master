@@ -28,7 +28,7 @@ jobs:
       - name: 📂 Deploy Odoo 18 Modules
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}#
         run: |
           rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" \
           addons/ $SERVER_USER@$SERVER_IP:/opt/odoo18/odoo18-addons
