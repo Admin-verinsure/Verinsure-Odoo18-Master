@@ -26,16 +26,21 @@ jobs:
             pip install --upgrade pip  
             pip install wheel cryptography  
 
-      - name: 🔑 Set Up SSH Key
+      - name: 🔑 Set Up SSH Connection
+        env:
+            SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-              mkdir -p ~/.ssh
-              echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/not4profit
-              chmod 600 ~/.ssh/not4profit
-              ssh-keyscan -H 120.138.30.170 >> ~/.ssh/known_hosts
-    
-      - name: 🔗 Test SSH Connection
+              echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+              eval "$(ssh-agent -s)"
+              ssh-add private_key
+          
+      - name: ✅ Test SSH Connection
         run: |
-              ssh -i ~/.ssh/not4profit -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo 'SSH Connection Successful!'"
+             ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo '✅ SSH Connection Successful!'"
+          
+      - name: Install Python dependencies on Odoo server
+        run: |
+              ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 'pip3 install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko'
 
       #- name: Set up SSH key
        # env:
@@ -50,11 +55,6 @@ jobs:
        # run: |
         # scp -r ./addons/account_move_multi_cancel root@103.19.4.104:/opt/odoo/addons/Not4Profit.online/addons/
        
-
-
-      - name: Install Python dependencies on Odoo server
-        run: |
-          ssh ubuntu@120.138.30.170 'pip3 install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko'
           
       #- name: Update Odoo Database
       #  run: |
