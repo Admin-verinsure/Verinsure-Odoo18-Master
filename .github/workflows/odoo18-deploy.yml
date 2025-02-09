@@ -66,6 +66,11 @@ jobs:
        #   ssh root@103.19.4.104 "sudo -u odoo /odoo-venv/bin/python /opt/odoo/odoo-bin -c /opt/odoo/debian/odoo.conf -d Not4ProfitOrganisation -u all
         #  "
 
+
+      - name: 📂 Deploy Module to Odoo Server
+        run: |
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/base_account_budget ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+
       - name: Start Odoo Server
         run: |
               ssh -i private_key -o StrictHostKeyChecking=no ubuntu@120.138.30.170 "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S systemctl start odoo18"
