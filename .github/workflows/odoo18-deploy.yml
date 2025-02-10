@@ -71,8 +71,10 @@ jobs:
         run: |
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/base_account_budget ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/base_accounting_kit ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
-              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/app_menu_alphabetical_order ubuntu@120.138.30.170:/opt/odoo18/odoo17-addons/odoo17-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/app_menu_alphabetical_order ubuntu@120.138.30.170:/opt/odoo18/odoo17-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/account_move_multi_cancel ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/bi_sms_client_generic ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+
 
 
       - name: Start Odoo Server
