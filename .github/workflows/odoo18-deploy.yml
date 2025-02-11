@@ -89,6 +89,9 @@ jobs:
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/database_delete_protection ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/excel_report_designer ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/master_search ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/odoo_dynamic_dashboard ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/odoo_google_meet_integration ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/user_login_alert ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
 
 
 
