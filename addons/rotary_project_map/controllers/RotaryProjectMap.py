@@ -1,4 +1,7 @@
-from flectra import http, api, SUPERUSER_ID
+from odoo import http
+from odoo import api, SUPERUSER_ID
+
+#from flectra import http, api, SUPERUSER_ID
 #import logging
 
 #_logger = logging.getLogger(__name__)
