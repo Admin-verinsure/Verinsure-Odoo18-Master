@@ -9,7 +9,7 @@
             <field name="arch" type="xml">
                 
                 <!-- If rotary_club_id is empty then make group invisible. -->
-                <xpath expr="//group[field[@name='type']]" position="before">
+                <xpath expr="//group[field[@name='email']]" position="before">
                     <group attrs="{'invisible': [('rotary_club_id', '=', False)]}">
                         <field name="rotary_club_id" options="{'no_open': True, 'no_create': True}" readonly="1" />
                     </group>

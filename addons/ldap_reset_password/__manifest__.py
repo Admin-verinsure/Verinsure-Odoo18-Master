@@ -1,13 +1,15 @@
 {
     'name': 'LDAP Reset Password',
+    'version': '18.0.1.0.0',
     'summary': 'Add LDAP Reset Password functionality',
-    'description': 'A module to allow for a User to reset their password in LDAP from the reset password form.',
-    'version': '1.0',
-    'author': 'Nathan Stocking',
-    'depends': ['auth_ldap','base', 'membership', 'rotary_project_map'],
+    'description': 'A module to allow a user to reset their password in LDAP from the reset password form.',
+    'author': 'Sangita Thummar',
+    'depends': ['auth_ldap', 'base'],
     'data': [
-        'reset_ldap_password.xml',
+        'views/reset_ldap_password.xml',
     ],
     'installable': True,
     'auto_install': False,
+    'application': False,
 }
+
