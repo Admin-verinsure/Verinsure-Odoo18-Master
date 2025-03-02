@@ -10,14 +10,14 @@
                 
                 <!-- If rotary_club_id is empty then make group invisible. -->
                 <xpath expr="//group[field[@name='email']]" position="before">
-                    <group attrs="{'invisible': [('rotary_club_id', '=', False)]}">
+                    <group odoo_condition="rotary_club_id == False">
                         <field name="rotary_club_id" options="{'no_open': True, 'no_create': True}" readonly="1" />
                     </group>
                 </xpath>
 
                 <!-- Add Club Information Group -->
                 <xpath expr="//page[@name='sales_purchases']" position="before">
-                    <page name="club_information" string="Club Information" attrs="{'invisible': [('rotary_club_id', '!=', False)]}">
+                    <page name="club_information" string="Club Information" odoo_condition="rotary_club_id != False">
                         <group>
                             <group>
                                 <field name="club_name"/>
@@ -35,7 +35,7 @@
 
                 <!-- If rotary_membership_id is empty then make group invisible. -->
                 <xpath expr="//page[@name='membership']/group/group[field[@name='free_member']]" position="before">                    
-                    <group attrs="{'invisible': [('rotary_membership_id', '=', False)]}">
+                    <group odoo_condition="rotary_membership_id == False">
                         <field name="rotary_membership_id" options="{'no_open': True, 'no_create': True}" readonly="1" />                        
                     </group>                
                 </xpath>
