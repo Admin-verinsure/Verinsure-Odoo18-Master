@@ -1,4 +1,4 @@
-from flectra import models, fields
+from odoo import models, fields
 
 class Otp(models.Model):
     _name = 'otp'

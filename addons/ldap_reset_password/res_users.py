@@ -1,5 +1,5 @@
-from flectra.exceptions import UserError
-from flectra import api, fields, models, tools, SUPERUSER_ID, _, http
+from odoo.exceptions import UserError
+from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 
 import logging
 from datetime import date
@@ -49,7 +49,7 @@ class ResUsers(models.Model):
             # Handle scenarios for a user who hasn't logged in before.
             # - For email addresses, define the unique process or functionality needed.
             # - Avoid updating the user role if an administrator is attempting to change the password.
-            #   Note: The user won't have an LDAP password; therefore, their Flectra password must be updated.
+            #   Note: The user won't have an LDAP password; therefore, their Odoo password must be updated.
             subject = "Welcome to " + user.company_id.name + " " + user.name
         
         # Fix for localhost (remove Host port if exists before using in email_from)

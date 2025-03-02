@@ -9,15 +9,15 @@ import json
 
 from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
-from flectra import api, fields, models, tools, SUPERUSER_ID, _, http
-from flectra.exceptions import AccessDenied, AccessError, UserError, ValidationError
-from flectra.tools.misc import str2bool
-from flectra.tools.pycompat import to_text
-from flectra.http import content_disposition, Controller, request, route
-from flectra.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
-from flectra.addons.mail.models.mail_mail import MailMail
-from flectra.addons.mail.models.mail_template import MailTemplate
-from flectra.addons.web.controllers.main import Home
+from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
+from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationError
+from odoo.tools.misc import str2bool
+from odoo.tools.pycompat import to_text
+from odoo.http import content_disposition, Controller, request, route
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
+from odoo.addons.mail.models.mail_mail import MailMail
+from odoo.addons.mail.models.mail_template import MailTemplate
+from odoo.addons.web.controllers.main import Home
 
 _logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class LDAPResetController(http.Controller):
                     if changed:
                         _logger.info("Password reset has succeeded for: " + username + ".")
 
-                        # Set Flectra password to nothing so that LDAP is primary form of authentication
+                        # Set Odoo password to nothing so that LDAP is primary form of authentication
                         user.password = ''
                         user.sudo()._set_password()
                         return http.request.render('ldap_reset_password.portal_thanks', {'message': 'Password reset has succeeded for {}'.format(username)})
@@ -670,7 +670,7 @@ class CompanyLDAP(models.Model):
 
         elif conf['create_user']:
 
-            _logger.debug("Creating new Flectra user \"%s\" from LDAP" % login)
+            _logger.debug("Creating new Odoo user \"%s\" from LDAP" % login)
             values = self._map_ldap_attributes(conf, login, ldap_entry)
             SudoUser = self.env['res.users'].sudo().with_context(no_reset_password=True)
             

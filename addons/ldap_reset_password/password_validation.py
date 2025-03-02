@@ -1,5 +1,5 @@
 from zxcvbn import zxcvbn
-from flectra import http
+from odoo import http
 
 import json
 import re
