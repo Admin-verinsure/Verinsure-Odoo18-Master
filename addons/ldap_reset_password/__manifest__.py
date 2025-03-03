@@ -6,7 +6,7 @@
     'author': 'Sangita Thummar',
     'depends': ['auth_ldap','base', 'membership', 'rotary_project_map'],
     'data': [
-        'views/reset_ldap_password.xml',
+        'reset_ldap_password.xml',
     ],
     'installable': True,
     'auto_install': False,
