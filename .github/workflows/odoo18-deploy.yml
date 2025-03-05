@@ -106,6 +106,9 @@ jobs:
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/membership_rotary_modifications ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/public_helpdesk ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/odoo_website_helpdesk_dashboard ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/subscription_package ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/ica_web_responsive ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+
 
 
       - name: Start Odoo Server
