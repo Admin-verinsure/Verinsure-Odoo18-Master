@@ -11,7 +11,7 @@ class ResUsers(models.Model):
 
     @classmethod
     def authenticate(cls, db, login, password, user_agent_env):
-        res = cls._login(db, login, password, user_agent_env=user_agent_env)
+        res = cls._login(db, login, password, user_agent_env)
         if isinstance(res, tuple):
             uid, _ = res
         else:
