@@ -1,12 +1,12 @@
 {
     'name': 'Membership Rotary Modifications',
-    'version': '1.0.0',
+    'version': '18.0.1.0.0',
     'category': 'Membership',
     'summary': 'Changes to membership module for Rotary NZ.',
     'sequence': '',
     'license': '',
-    'author': 'Nathan Stocking',
-    'website': 'techcertain.com',
+    'author': 'Verinsure',
+    'website': 'verinsure.online',
     'depends': ['base', 'membership', 'ldap_reset_password'],
     'data': [
         'views/res_partner_view.xml',
