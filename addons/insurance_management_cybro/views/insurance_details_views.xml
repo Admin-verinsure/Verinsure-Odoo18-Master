@@ -64,8 +64,9 @@
     <record id="insurance_details_view_tree" model="ir.ui.view">
         <field name="name">insurance.details.view.tree</field>
         <field name="model">insurance.details</field>
+        <field name="type">list</field>
         <field name="arch" type="xml">
-            <tree string="Insurance Details Tree">
+            <list string="Insurance Details Tree">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="policy_id"/>
@@ -73,14 +74,14 @@
                 <field name="currency_id" invisible="1"/>
                 <field name="amount"/>
                 <field name="state"/>
-            </tree>
+            </list>
         </field>
     </record>
     <!--    Action for insurance details-->
     <record id="insurance_details_action" model="ir.actions.act_window">
         <field name="name">Insurance Management</field>
         <field name="res_model">insurance.details</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="oe_view_nocontent_create">
                 You haven't created any insurance yet.
