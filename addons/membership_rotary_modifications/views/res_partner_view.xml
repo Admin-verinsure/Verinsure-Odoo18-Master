@@ -13,14 +13,13 @@
                     <group>
                         <field name="membership_club_type"/>
                         <field name="club_type_selected" invisible="1"/>
-                        <field name="membership_club_name" attrs="{'invisible': [('club_type_selected', '=', False)]}"/>
+                        <field name="membership_club_name" invisible="club_type_selected == False"/>
                     </group>
                 </xpath>
                 <xpath expr="//notebook/page[@name='club_information']" position="attributes">
-                    <attribute name="attrs">{'invisible': [('free_member','=',True)]}</attribute>
+                    <attribute name="invisible">free_member == True</attribute>
                 </xpath>
             </field>
         </record>
-
     </data>
 </odoo>
