@@ -3,7 +3,7 @@
     'version': '18.0.1.0.0',
     'category': 'Membership',
     'summary': 'Changes to membership module for Rotary NZ.',
-    'sequence': '',
+    'sequence': 10,
     'license': '',
     'author': 'Verinsure',
     'website': 'verinsure.online',
