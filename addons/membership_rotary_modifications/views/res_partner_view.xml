@@ -7,7 +7,7 @@
             <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='free_member']" position="attributes">
-                    <attribute name="string">Is Member</attribute>
+                    <attribute name="string">Is Honorary Member</attribute>
                 </xpath>
                 <xpath expr="//notebook/page[@name='membership']/group" position="inside">
                     <group>

@@ -17,17 +17,17 @@
 
                 <!-- Add Club Information Group -->
                 <xpath expr="//page[@name='sales_purchases']" position="before">
-                    <page name="club_information" string="Club Information" odoo_condition="rotary_club_id != False">
+                    <page name="club_information" string="Rotary Org Info" odoo_condition="rotary_club_id != False">
                         <group>
                             <group>
-                                <field name="club_name"/>
-                                <field name="club_id"/>
+                                <field name="club_name" string="Rotary Org Name"/>
+                                <field name="club_id" string="Rotary Org ID"/>
                                 <field name="charter_date"/>
-                                <field name="club_type"/>
+                                <field name="club_type" string="Rotary Org Type"/>
                             </group>
                             <group>
-                                <field name="club_longitude"/>
-                                <field name="club_latitude"/>
+                                <field name="club_longitude" string="Rotary Org Longitude"/>
+                                <field name="club_latitude" string="Rotary Org Latitude"/>
                             </group>
                         </group>
                     </page>
