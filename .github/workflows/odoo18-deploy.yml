@@ -3,7 +3,7 @@ name: Odoo18 CICD
 on:
   push:
     branches:
-      - main  # Change if using another branch
+      - main  # Change if using another 
 
 jobs:
 
