@@ -112,6 +112,9 @@ jobs:
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/app_menu_alphabetical_order ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/insurance_management_cybro ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
               scp -i private_key -o StrictHostKeyChecking=no -r ./addons/volunteers_donors_management ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+              scp -i private_key -o StrictHostKeyChecking=no -r ./addons/base_user_role ubuntu@120.138.30.170:/opt/odoo18/odoo18-addons/
+
+
 
       - name: Start Odoo Server
         run: |
