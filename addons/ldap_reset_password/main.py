@@ -43,7 +43,7 @@ class ChangePasswordWizard(models.TransientModel):
         user_ids = self._context.get('active_model') == 'res.users' and self._context.get('active_ids') or []
         return [
             (0, 0, {'user_id': user.id, 'user_login': user.login})
-            for user in self.env['res.users'].browse(user_ids)
+            for user in request.env['res.users'].browse(user_ids)
         ]
 
     user_ids = fields.One2many('change.password.user', 'wizard_id', string='Users', default=_default_user_ids)
@@ -52,7 +52,7 @@ class ChangePasswordWizard(models.TransientModel):
         # Ensure one record in set
         self.ensure_one()
         self.user_ids.change_password_button()
-        if self.env.user in self.user_ids.user_id:
+        if request.env.user in self.user_ids.user_id:
             return {'type': 'ir.actions.client', 'tag': 'reload'}
         return {'type': 'ir.actions.act_window_close'}
 
@@ -339,7 +339,7 @@ class LDAPSignupController(AuthSignupController):
                             return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
                         else:
                             # Delete user if LDAP fails
-                            delete_user = self.env['res.users'].browse(user_id)
+                            delete_user = request.env['res.users'].browse(user_id)
                             delete_user.unlink()
 
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'}) 
@@ -466,7 +466,7 @@ class LDAPSignupController(AuthSignupController):
                             return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
                         else:
                             # Delete user if LDAP fails
-                            delete_user = self.env['res.users'].browse(user_id)
+                            delete_user = request.env['res.users'].browse(user_id)
                             delete_user.unlink()
 
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'}) 
@@ -657,8 +657,8 @@ class CompanyLDAP(models.Model):
         existing_user = False
 
         login = tools.ustr(login.lower().strip())
-        self.env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login,))
-        res = self.env.cr.fetchone()
+        request.env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login,))
+        res = request.env.cr.fetchone()
         _logger.debug("Fetched user: %s", res)
         
         # If they exist
@@ -673,7 +673,7 @@ class CompanyLDAP(models.Model):
 
             _logger.debug("Creating new Odoo user \"%s\" from LDAP" % login)
             values = self._map_ldap_attributes(conf, login, ldap_entry)
-            SudoUser = self.env['res.users'].sudo().with_context(no_reset_password=True)
+            SudoUser = request.env['res.users'].sudo().with_context(no_reset_password=True)
             
             if conf['user']:
                 values['active'] = True
