@@ -91,7 +91,7 @@ class ChangePasswordUser(models.TransientModel):
             ldap_config = None
 
         if ldap_config:
-            changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_passwd)
+            changed, message = ldap_config._change_password_admin_exceptions(username, new_passwd)
 
             if changed:
                 _logger.info("Password reset has succeeded for: " + username + ".")
@@ -150,7 +150,7 @@ class LDAPResetController(http.Controller):
                 ldap_config = env['res.company.ldap'].search([], limit=1)
 
                 if ldap_config:
-                    changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_password)
+                    changed, message = ldap_config._change_password_admin_exceptions(username, new_password)
 
                     if changed:
                         _logger.info("Password reset has succeeded for: " + username + ".")
@@ -300,7 +300,7 @@ class LDAPSignupController(AuthSignupController):
                     }
                     
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
+                    user_id, existing_user = ldap_config._get_or_create_user(login, ldap_entry)
 
                     if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'}) 
@@ -308,7 +308,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):                       
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
 
-                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
+                        created, message = ldap_config._create_ldap_user(dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)                            
@@ -421,7 +421,7 @@ class LDAPSignupController(AuthSignupController):
                     }
                     
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
+                    user_id, existing_user = ldap_config._get_or_create_user(login, ldap_entry)
                     
                     if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'}) 
@@ -430,7 +430,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
                         
-                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
+                        created, message = ldap_config._create_ldap_user(dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
@@ -827,7 +827,7 @@ class CustomerPortal(Controller):
         else:
             ldap_config = None
         if ldap_config:
-            changed, message = ldap_config._change_password_exceptions(ldap_config, username, old_passwd, new_passwd)
+            changed, message = ldap_config._change_password_exceptions(username, old_passwd, new_passwd)
 
             if changed:
                 _logger.info("Password reset has succeeded for: " + username + ".")
