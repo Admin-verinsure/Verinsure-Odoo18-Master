@@ -254,7 +254,9 @@ class LDAPSignupController(AuthSignupController):
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup_non_member(self, *args, **kw):
         # qcontext = self.get_auth_signup_qcontext()
-        qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
+        #qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
+        qcontext = AuthSignupController().get_auth_signup_qcontext()
+
 
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
@@ -360,7 +362,9 @@ class LDAPSignupController(AuthSignupController):
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup(self, *args, **kw):
         # qcontext = self.get_auth_signup_qcontext()
-        qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
+        # qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
+        qcontext = AuthSignupController().get_auth_signup_qcontext()
+
 
 
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
