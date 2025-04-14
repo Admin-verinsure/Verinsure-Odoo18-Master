@@ -253,11 +253,7 @@ class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup_non_member(self, *args, **kw):
-        # qcontext = self.get_auth_signup_qcontext()
-        #qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
         qcontext = AuthSignupController().get_auth_signup_qcontext()
-
-
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
@@ -282,8 +278,9 @@ class LDAPSignupController(AuthSignupController):
                     ldap_config = None
                 
                 if ldap_config:
-                    sn = qcontext['last_name']
-                    fn = qcontext['first_name']
+                    sn = qcontext.get('last_name', '').strip()
+                    fn = qcontext.get('first_name', '').strip()
+
                     rotaryId = str(generate_random_number(5,8))
                     login = sn + rotaryId
                     cn = fn + ' ' + sn
@@ -302,7 +299,7 @@ class LDAPSignupController(AuthSignupController):
                     }
                     
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(login, ldap_entry)
+                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
 
                     if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'}) 
@@ -310,7 +307,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):                       
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
 
-                        created, message = ldap_config._create_ldap_user(dn, attrs)
+                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)                            
@@ -361,11 +358,7 @@ class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup(self, *args, **kw):
-        # qcontext = self.get_auth_signup_qcontext()
-        # qcontext = request.env['auth.signup'].sudo().get_auth_signup_qcontext()
         qcontext = AuthSignupController().get_auth_signup_qcontext()
-
-
 
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         clubs = []
@@ -403,8 +396,8 @@ class LDAPSignupController(AuthSignupController):
                     ldap_config = None
                 
                 if ldap_config:
-                    sn = qcontext['last_name']
-                    fn = qcontext['first_name']
+                    sn = qcontext.get('last_name', '').strip()
+                    fn = qcontext.get('first_name', '').strip()
                     rotaryId = qcontext['rotary_id']
                     login = sn + rotaryId
                     cn = fn + ' ' + sn
@@ -425,7 +418,7 @@ class LDAPSignupController(AuthSignupController):
                     }
                     
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(login, ldap_entry)
+                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
                     
                     if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'}) 
@@ -434,7 +427,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
                         
-                        created, message = ldap_config._create_ldap_user(dn, attrs)
+                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
