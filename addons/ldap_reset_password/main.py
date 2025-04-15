@@ -723,7 +723,7 @@ class CompanyLDAP(models.Model):
         values = super()._map_ldap_attributes(conf, login, ldap_entry)
 
         # Modify the values to return the company's ID instead of the company object
-        values['company_id'] = conf['company'].id
+        values['company_id'] = conf['company'][0]
 
         # Return the modified values
         return values
