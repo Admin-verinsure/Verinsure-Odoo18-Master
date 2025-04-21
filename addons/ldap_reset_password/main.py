@@ -340,7 +340,7 @@ class LDAPSignupController(AuthSignupController):
                             return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
                         else:
                             # Delete user if LDAP fails
-                            delete_user = request.env['res.users'].browse(user_id)
+                            delete_user = request.env['res.users'].sudo().browse(user_id)
                             delete_user.unlink()
 
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'}) 
@@ -723,7 +723,7 @@ class CompanyLDAP(models.Model):
         values = super()._map_ldap_attributes(conf, login, ldap_entry)
 
         # Modify the values to return the company's ID instead of the company object
-        values['company_id'] = conf['company'][0]
+        values['company_id'] = conf['company'][0].id
 
         # Return the modified values
         return values
