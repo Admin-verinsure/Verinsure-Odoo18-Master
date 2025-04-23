@@ -17,8 +17,7 @@ from odoo.http import content_disposition, Controller, request, route
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 from odoo.addons.mail.models.mail_mail import MailMail
 from odoo.addons.mail.models.mail_template import MailTemplate
-from odoo.addons.web.controllers.home import Home
-#from odoo.addons.web.controllers.main import Home
+from odoo.addons.web.controllers.main import Home
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class ChangePasswordWizard(models.TransientModel):
         user_ids = self._context.get('active_model') == 'res.users' and self._context.get('active_ids') or []
         return [
             (0, 0, {'user_id': user.id, 'user_login': user.login})
-            for user in request.env['res.users'].browse(user_ids)
+            for user in self.env['res.users'].browse(user_ids)
         ]
 
     user_ids = fields.One2many('change.password.user', 'wizard_id', string='Users', default=_default_user_ids)
@@ -52,7 +51,7 @@ class ChangePasswordWizard(models.TransientModel):
         # Ensure one record in set
         self.ensure_one()
         self.user_ids.change_password_button()
-        if request.env.user in self.user_ids.user_id:
+        if self.env.user in self.user_ids.user_id:
             return {'type': 'ir.actions.client', 'tag': 'reload'}
         return {'type': 'ir.actions.act_window_close'}
 
@@ -91,7 +90,7 @@ class ChangePasswordUser(models.TransientModel):
             ldap_config = None
 
         if ldap_config:
-            changed, message = ldap_config._change_password_admin_exceptions(username, new_passwd)
+            changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_passwd)
 
             if changed:
                 _logger.info("Password reset has succeeded for: " + username + ".")
@@ -150,12 +149,12 @@ class LDAPResetController(http.Controller):
                 ldap_config = env['res.company.ldap'].search([], limit=1)
 
                 if ldap_config:
-                    changed, message = ldap_config._change_password_admin_exceptions(username, new_password)
+                    changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_password)
 
                     if changed:
                         _logger.info("Password reset has succeeded for: " + username + ".")
 
-                        # Set Odoo password to nothing so that LDAP is primary form of authentication
+                        # Set Flectra password to nothing so that LDAP is primary form of authentication
                         user.password = ''
                         user.sudo()._set_password()
                         return http.request.render('ldap_reset_password.portal_thanks', {'message': 'Password reset has succeeded for {}'.format(username)})
@@ -253,104 +252,111 @@ class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup_non_member(self, *args, **kw):
-        qcontext = AuthSignupController().get_auth_signup_qcontext()
+        qcontext = self.get_auth_signup_qcontext()
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
+            
             try:
-                # ✅ Fetch values from form directly
-                sn = request.params.get('last_name', '').strip()
-                fn = request.params.get('first_name', '').strip()
-                email = request.params.get('email', '').strip()
-                password = request.params.get('password', '').strip()
-
-                # ✅ Validate input
-                if not fn or not sn:
-                    qcontext['error'] = _("First name and last name are required.")
-                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
-                    return request.render('ldap_reset_password.signup_non_member', qcontext)
-                if not email or '@' not in email:
-                    qcontext['error'] = _("A valid email is required.")
-                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
-                    return request.render('ldap_reset_password.signup_non_member', qcontext)
-                if not password:
-                    qcontext['error'] = _("Password is required.")
-                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
-                    return request.render('ldap_reset_password.signup_non_member', qcontext)
-
+                # Register LDAP
                 env = api.Environment(http.request.cr, SUPERUSER_ID, {})
+                
+                # Get LDAP Config and store in dictionary
                 ldap_records = env['res.company.ldap'].search([])
-                ldap_config = ldap_records[:1]
+                ldap_dict = {}
+                for record in ldap_records:
+                    ldap_dict[record.id] = record.read()
 
-                if not ldap_config:
-                    qcontext['error'] = _("No LDAP configuration found.")
-                    return request.render('ldap_reset_password.signup_non_member', qcontext)
-
-                ldap_config = ldap_config[0]
-                rotaryId = str(generate_random_number(5, 8))
-                login = sn + rotaryId
-                cn = fn + ' ' + sn
-                dn = f"uid={login}, {ldap_config.ldap_base}"
-
-                attrs = {
-                    "uid": [login.encode()],
-                    "givenname": [fn.encode()],
-                    "cn": [cn.encode()],
-                    "sn": [sn.encode()],
-                    "employeeNumber": [rotaryId.encode()],
-                    "mail": [email.encode()],
-                    "userPassword": [password.encode()],
-                    "objectclass": [b"top", b"inetOrgPerson"],
-                }
-
-                _logger.info("LDAP Entry Prepared: DN=%s, ATTRS=%s", dn, attrs)
-
-                user_id, existing_user = ldap_config._get_or_create_user(login, (dn, attrs))
-                if existing_user:
-                    return http.request.render('ldap_reset_password.web_error', {'message': 'User already exists.'})
-
-                if isinstance(user_id, int):
-                    created, message = ldap_config._create_ldap_user(dn, attrs)
-
-                    if created:
-                        user = request.env['res.users'].sudo().browse(user_id)
-                        role = env['res.users.role'].search([('name', '=', 'Guests')])
-
-                        user.partner_id.write({'rotary_membership_id': rotaryId})
-
-                        role_lines = env['res.users.role.line'].search([('user_id', '=', user_id)])
-                        role_lines.unlink()
-
-                        env['res.users.role.line'].create({
-                            'user_id': user.id,
-                            'role_id': role.id,
-                            'date_from': date.today(),
-                            'date_to': date(2099, 12, 31)
-                        })
-
-                        user.set_groups_from_roles()
-                        return http.request.render('ldap_reset_password.web_thanks', {'message': f'User created: {login}'})
-                    else:
-                        # LDAP failed: delete Odoo user
-                        request.env['res.users'].sudo().browse(user_id).unlink()
-                        return http.request.render('ldap_reset_password.web_error', {'message': message})
+                # Use LDAP Config to change password
+                if ldap_dict:
+                    first_ldap_id = next(iter(ldap_dict))
+                    ldap_config = env['res.company.ldap'].browse(first_ldap_id)
                 else:
-                    qcontext['error'] = _("Could not create user: " + str(user_id))
+                    ldap_config = None
+                
+                if ldap_config:
+                    sn = qcontext['last_name']
+                    fn = qcontext['first_name']
+                    rotaryId = str(generate_random_number(5,8))
+                    login = sn + rotaryId
+                    cn = fn + ' ' + sn
+                    dn = "uid=" + login + ", " + ldap_config.ldap_base  
+                    
+                    attrs = {
+                        "uid": [login.encode()],
+                        "givenname": [fn.encode()],
+                        "cn": [cn.encode()],
+                        "sn": [sn.encode()],
+                        #"ou": [qcontext['rotary_club'].encode()],
+                        "employeeNumber": [rotaryId.encode()],
+                        "mail": [qcontext['email'].encode()],
+                        "userPassword": [qcontext['password'].encode()],
+                        "objectclass": [b"top", b"inetOrgPerson"],
+                    }
+                    
+                    ldap_entry = (dn, attrs)
+                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
+
+                    if (existing_user):
+                        return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'}) 
+
+                    if isinstance(user_id, int):                       
+                        _logger.info('res_user created. Creating LDAP User for: ' + login)
+
+                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
+
+                        if (created):
+                            user = request.env['res.users'].sudo().browse(user_id)                            
+                            role = env['res.users.role'].search([('name', '=', 'Guests')])
+
+                            if rotaryId.isdigit():
+                                user.partner_id.write({
+                                    'rotary_membership_id': str(rotaryId)
+                                })
+                            else:
+                                _logger.info("User %s: provided rotaryId cannot be converted to an integer.", user.login)
+
+                            # Remove Current Role Lines
+                            role_lines = env['res.users.role.line'].search([('user_id', '=', user_id)])
+                            role_lines.unlink()
+
+                            start_date = date.today()
+                            end_date = date(2099, 12, 31)
+
+                            # If the role exists
+                            if role:
+                                env['res.users.role.line'].create({
+                                    'user_id': user.id,
+                                    'role_id': role.id,
+                                    'date_from': start_date,
+                                    'date_to': end_date
+                                })
+                                user.set_groups_from_roles()
+
+                            return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
+                        else:
+                            # Delete user if LDAP fails
+                            delete_user = self.env['res.users'].browse(user_id)
+                            delete_user.unlink()
+
+                            return http.request.render('ldap_reset_password.web_error', {'message': message + '.'}) 
+
+                    elif isinstance(user_id, str):
+                        qcontext['error'] = _("Could not create a new account. " + str(user_id))
 
             except Exception as e:
-                _logger.exception("Signup failed:")
-                qcontext['error'] = _("Unexpected error: " + str(e))
+                _logger.error("%s", e)
+                qcontext['error'] = _("Could not create account. " + str(e))
 
         response = request.render('ldap_reset_password.signup_non_member', qcontext)
         response.headers['X-Frame-Options'] = 'DENY'
         return response
 
-
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
     def web_auth_signup(self, *args, **kw):
-        qcontext = AuthSignupController().get_auth_signup_qcontext()
+        qcontext = self.get_auth_signup_qcontext()
 
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         clubs = []
@@ -388,8 +394,8 @@ class LDAPSignupController(AuthSignupController):
                     ldap_config = None
                 
                 if ldap_config:
-                    sn = qcontext.get('last_name', '').strip()
-                    fn = qcontext.get('first_name', '').strip()
+                    sn = qcontext['last_name']
+                    fn = qcontext['first_name']
                     rotaryId = qcontext['rotary_id']
                     login = sn + rotaryId
                     cn = fn + ' ' + sn
@@ -419,7 +425,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
                         
-                        created, message = ldap_config._create_ldap_user(dn, attrs)
+                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
@@ -459,7 +465,7 @@ class LDAPSignupController(AuthSignupController):
                             return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
                         else:
                             # Delete user if LDAP fails
-                            delete_user = request.env['res.users'].browse(user_id)
+                            delete_user = self.env['res.users'].browse(user_id)
                             delete_user.unlink()
 
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'}) 
@@ -650,8 +656,8 @@ class CompanyLDAP(models.Model):
         existing_user = False
 
         login = tools.ustr(login.lower().strip())
-        request.env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login,))
-        res = request.env.cr.fetchone()
+        self.env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login,))
+        res = self.env.cr.fetchone()
         _logger.debug("Fetched user: %s", res)
         
         # If they exist
@@ -666,7 +672,7 @@ class CompanyLDAP(models.Model):
 
             _logger.debug("Creating new Odoo user \"%s\" from LDAP" % login)
             values = self._map_ldap_attributes(conf, login, ldap_entry)
-            SudoUser = request.env['res.users'].sudo().with_context(no_reset_password=True)
+            SudoUser = self.env['res.users'].sudo().with_context(no_reset_password=True)
             
             if conf['user']:
                 values['active'] = True
@@ -715,7 +721,7 @@ class CompanyLDAP(models.Model):
         values = super()._map_ldap_attributes(conf, login, ldap_entry)
 
         # Modify the values to return the company's ID instead of the company object
-        values['company_id'] = conf['company'][0]
+        values['company_id'] = conf['company'].id
 
         # Return the modified values
         return values
@@ -816,7 +822,7 @@ class CustomerPortal(Controller):
         else:
             ldap_config = None
         if ldap_config:
-            changed, message = ldap_config._change_password_exceptions(username, old_passwd, new_passwd)
+            changed, message = ldap_config._change_password_exceptions(ldap_config, username, old_passwd, new_passwd)
 
             if changed:
                 _logger.info("Password reset has succeeded for: " + username + ".")
