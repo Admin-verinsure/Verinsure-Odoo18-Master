@@ -307,12 +307,12 @@ class LDAPSignupController(AuthSignupController):
 
                 _logger.info("LDAP Entry Prepared: DN=%s, ATTRS=%s", dn, attrs)
 
-                user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, (dn, attrs))
+                user_id, existing_user = ldap_config._get_or_create_user(login, (dn, attrs))
                 if existing_user:
                     return http.request.render('ldap_reset_password.web_error', {'message': 'User already exists.'})
 
                 if isinstance(user_id, int):
-                    created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
+                    created, message = ldap_config._create_ldap_user(dn, attrs)
 
                     if created:
                         user = request.env['res.users'].sudo().browse(user_id)
@@ -419,7 +419,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Creating LDAP User for: ' + login)
                         
-                        created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
+                        created, message = ldap_config._create_ldap_user(dn, attrs)
 
                         if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
