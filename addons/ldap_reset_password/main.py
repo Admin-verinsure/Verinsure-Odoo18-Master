@@ -260,20 +260,24 @@ class LDAPSignupController(AuthSignupController):
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
             try:
-                # Validate frontend fields before touching LDAP
-                fn = qcontext.get('first_name', '').strip()
-                sn = qcontext.get('last_name', '').strip()
-                email = qcontext.get('email', '').strip()
-                password = qcontext.get('password', '').strip()
+                # ✅ Fetch values from form directly
+                sn = request.params.get('last_name', '').strip()
+                fn = request.params.get('first_name', '').strip()
+                email = request.params.get('email', '').strip()
+                password = request.params.get('password', '').strip()
 
+                # ✅ Validate input
                 if not fn or not sn:
                     qcontext['error'] = _("First name and last name are required.")
+                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
                 if not email or '@' not in email:
                     qcontext['error'] = _("A valid email is required.")
+                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
                 if not password:
                     qcontext['error'] = _("Password is required.")
+                    qcontext.update({'first_name': fn, 'last_name': sn, 'email': email})
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
 
                 env = api.Environment(http.request.cr, SUPERUSER_ID, {})
@@ -334,6 +338,7 @@ class LDAPSignupController(AuthSignupController):
                         return http.request.render('ldap_reset_password.web_error', {'message': message})
                 else:
                     qcontext['error'] = _("Could not create user: " + str(user_id))
+
             except Exception as e:
                 _logger.exception("Signup failed:")
                 qcontext['error'] = _("Unexpected error: " + str(e))
@@ -710,7 +715,7 @@ class CompanyLDAP(models.Model):
         values = super()._map_ldap_attributes(conf, login, ldap_entry)
 
         # Modify the values to return the company's ID instead of the company object
-        values['company_id'] = conf['company'][0].id
+        values['company_id'] = conf['company'][0]
 
         # Return the modified values
         return values
