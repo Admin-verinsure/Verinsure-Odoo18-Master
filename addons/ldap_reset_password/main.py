@@ -17,7 +17,7 @@ from odoo.http import content_disposition, Controller, request, route
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 from odoo.addons.mail.models.mail_mail import MailMail
 from odoo.addons.mail.models.mail_template import MailTemplate
-from odoo.addons.web.controllers.main import Home
+#from odoo.addons.web.controllers.main import Home
 
 _logger = logging.getLogger(__name__)
 
