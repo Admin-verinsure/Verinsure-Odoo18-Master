@@ -12,10 +12,10 @@ on:
           - all
           - not4profit
           - rawcs
-  push:
-    branches:
-      - main
-      - dms-odoo18
+  #push:
+  #  branches:
+  #    - main
+  #    - dms-odoo18
 
 jobs:
   deploy:
