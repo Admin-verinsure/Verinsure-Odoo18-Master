@@ -38,7 +38,7 @@ jobs:
         if [ "${{ matrix.server }}" = "not4profit" ]; then
           echo "SSH_USER=${{ secrets.NFP_SSH_USER }}" >> $GITHUB_ENV
           echo "SERVER_IP=${{ secrets.NFP_SERVER_IP }}" >> $GITHUB_ENV
-          echo "${{ secrets.SSH_PRIVATE_KEY_NFP }}" > private_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
         else
           echo "SSH_USER=${{ secrets.RAWCS_SSH_USER }}" >> $GITHUB_ENV
           echo "SERVER_IP=${{ secrets.RAWCS_SERVER_IP }}" >> $GITHUB_ENV
