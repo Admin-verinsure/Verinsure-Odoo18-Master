@@ -1,0 +1,66 @@
+name: 🚀 Deploy Odoo18 Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_to:
+        description: "Select server to deploy"
+        required: true
+        default: "not4profit"
+        type: choice
+        options:
+          - all
+          - not4profit
+          - rawcs
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - server: not4profit
+          - server: rawcs
+      max-parallel: 1
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 👥 Show last 5 contributors
+        run: git log -n 5 --pretty=format:"%an <%ae>"
+
+      - name: 🔑 Set server details
+        id: set-vars
+        run: |
+          if [ "${{ matrix.server }}" = "not4profit" ]; then
+            echo "USER=${{ secrets.NOT4PROFIT_USER }}" >> $GITHUB_ENV
+            echo "IP=${{ secrets.NOT4PROFIT_IP }}" >> $GITHUB_ENV
+          elif [ "${{ matrix.server }}" = "rawcs" ]; then
+            echo "USER=${{ secrets.RAWCS_USER }}" >> $GITHUB_ENV
+            echo "IP=${{ secrets.RAWCS_IP }}" >> $GITHUB_ENV
+          fi
+
+      - name: 🚀 Deploy to server
+        if: ${{ inputs.deploy_to == 'all' || inputs.deploy_to == matrix.server }}
+        run: |
+          echo "Deploying to ${{ matrix.server }} ($IP)..."
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
+          chmod 600 private_key
+
+          # Backup current build
+          ssh -i private_key -o StrictHostKeyChecking=no $USER@$IP "
+            BACKUP_DIR=/opt/odoo18/backups/\$(date +'%Y%m%d_%H%M%S')
+            mkdir -p \$BACKUP_DIR
+            cp -r /opt/odoo18/odoo18-addons/* \$BACKUP_DIR
+            ls -1dt /opt/odoo18/backups/* | tail -n +6 | xargs -r rm -rf
+          "
+
+          # Deploy new code
+          ssh -i private_key -o StrictHostKeyChecking=no $USER@$IP "rm -rf /opt/odoo18/odoo18-addons/*"
+          scp -i private_key -o StrictHostKeyChecking=no -r ./odoo18-addons/* $USER@$IP:/opt/odoo18/odoo18-addons/
+
+          # Restart service
+          ssh -i private_key -o StrictHostKeyChecking=no $USER@$IP "sudo systemctl restart odoo18"
+          echo "✅ Deployment to ${{ matrix.server }} complete."
