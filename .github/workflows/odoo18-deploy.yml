@@ -1,72 +1,171 @@
-name: Odoo18 CI/CD
+name: Odoo18 Deploy
 
 on:
+  push:
+    branches: ["master"] # deploy on master updates
   workflow_dispatch:
     inputs:
-      deploy_to:
-        description: 'Choose server to deploy to'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - not4profit
-          - rawcs
-  #push:
-  #  branches:
-  #    - main
-  #    - dms-odoo18
+      rollback_to:
+        description: "Release folder name to rollback to (leave blank to deploy latest)"
+        required: false
+        default: ""
+
+env:
+  APP_ROOT: /opt/odoo # base directory on the server
+  APP_SUBDIR: "" # set to e.g. "odoo-18" if your code lives in a subfolder
+  PY_VENV: /opt/odoo/shared/venv # shared venv (reused across releases)
 
 jobs:
-  deploy:
+  deploy_or_rollback:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        server: [not4profit, rawcs]
-
     steps:
-    - name: ⏩ Skip if not selected server
-      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to != 'all' && github.event.inputs.deploy_to != matrix.server }}
-      run: echo "Skipping server ${{ matrix.server }}"
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to compute contributors between SHAs
 
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v3
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
 
-    - name: 🗝️ Set environment variables
-      run: |
-        if [ "${{ matrix.server }}" = "not4profit" ]; then
-          echo "SSH_USER=${{ secrets.NFP_SSH_USER }}" >> $GITHUB_ENV
-          echo "SERVER_IP=${{ secrets.NFP_SERVER_IP }}" >> $GITHUB_ENV
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
-        else
-          echo "SSH_USER=${{ secrets.RAWCS_SSH_USER }}" >> $GITHUB_ENV
-          echo "SERVER_IP=${{ secrets.RAWCS_SERVER_IP }}" >> $GITHUB_ENV
-          echo "${{ secrets.SSH_PRIVATE_KEY_RAWCS }}" > private_key
-        fi
-        chmod 600 private_key
+      - name: Trust host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.NFP_SSH_PORT }}" "${{ secrets.NFP_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-    - name: 🔐 Setup SSH Agent
-      run: |
-        eval "$(ssh-agent -s)"
-        ssh-add private_key
-        mkdir -p ~/.ssh
-        ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
+      # ----------------- ROLLBACK PATH -----------------
+      - name: Rollback if requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
+          set -e
+          cd "${APP_ROOT}"
+          rel="${{ inputs.rollback_to }}"
+          test -d "releases/$rel" || { echo "Release not found: $rel"; exit 1; }
+          ln -sfn "releases/$rel" current
+          # restart Odoo (try a few common service names unless SERVICE_NAME is provided)
+          svc="${SERVICE_NAME:-odoo18}"
+          for s in "$svc" odoo odoo-server; do
+            if systemctl list-units --type=service --all | grep -qE "^\s*${s}\.service"; then
+              sudo systemctl restart "$s"
+              sudo systemctl status --no-pager "$s" | tail -n 50
+              exit 0
+            fi
+          done
+          echo "No Odoo systemd service found to restart."
+          exit 1
+          EOF
+        env:
+          SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
 
-    - name: 📦 Install Python packages on remote
-      run: |
-        ssh -i private_key -o StrictHostKeyChecking=no $SSH_USER@$SERVER_IP << 'EOF'
-          python3 -m venv /home/$USER/venv
-          source /home/$USER/venv/bin/activate
-          pip install --upgrade pip
-          pip install openpyxl qifparse pyfcm httpagentparser dropbox pyncclient nextcloud-api-wrapper boto3 paramiko
-        EOF
+      - name: Stop after rollback
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
+        run: echo "Rollback completed."
 
-    - name: 🚚 Deploy modules to ${{ matrix.server }}
-      run: |
-        MODULE_PATH="/opt/odoo18/odoo18-addons/"
-        scp -i private_key -o StrictHostKeyChecking=no -r ./addons/* $SSH_USER@$SERVER_IP:$MODULE_PATH
+      # ----------------- DEPLOY PATH -----------------
+      - name: Compute release name
+        id: rel
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ts="$(date -u +%Y%m%d-%H%M%S)"
+          shortsha="$(git rev-parse --short HEAD)"
+          echo "name=${ts}-${shortsha}" >> $GITHUB_OUTPUT
+          echo "before=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          echo "after=${{ github.sha }}" >> $GITHUB_OUTPUT
 
-    - name: 🔁 Restart Odoo
-      run: |
-        ssh -i private_key -o StrictHostKeyChecking=no $SSH_USER@$SERVER_IP "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S systemctl restart odoo18"
+      - name: Ensure server directories
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+            "sudo mkdir -p '${APP_ROOT}/releases' '${APP_ROOT}/shared' && sudo chown -R \$USER:\$USER '${APP_ROOT}'"
+
+      - name: Upload code into new release
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} "mkdir -p '${APP_ROOT}/releases/${{ steps.rel.outputs.name }}'"
+          rsync -az --delete \
+            -e "ssh -p ${{ secrets.NFP_SSH_PORT }}" \
+            --exclude=".git" \
+            ./ ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/
+
+      - name: Install Python deps (if requirements.txt exists)
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
+          set -e
+          workdir="${APP_ROOT}/releases/${{ steps.rel.outputs.name }}${APP_SUBDIR:+/$APP_SUBDIR}"
+          if [ -f "$workdir/requirements.txt" ]; then
+            python3 -m venv "${PY_VENV}"
+            . "${PY_VENV}/bin/activate"
+            pip install --upgrade pip wheel
+            pip install -r "$workdir/requirements.txt"
+          else
+            echo "No requirements.txt; skipping pip install."
+          fi
+          EOF
+
+      - name: Contributors & change log
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          BEFORE="${{ steps.rel.outputs.before }}"
+          AFTER="${{ steps.rel.outputs.after }}"
+          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            git log --format='%an <%ae>' "$BEFORE..$AFTER" | sort -u > CONTRIBUTORS_PUSH.txt
+            git log --oneline "$BEFORE..$AFTER" > CHANGES.txt
+          else
+            git log -n 20 --format='%an <%ae>' | sort -u > CONTRIBUTORS_PUSH.txt
+            git log -n 20 --oneline > CHANGES.txt
+          fi
+          scp -P "${{ secrets.NFP_SSH_PORT }}" CONTRIBUTORS_PUSH.txt CHANGES.txt \
+            ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/
+
+      - name: Upload notes as artifact
+        if: ${{ inputs.rollback_to == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.rel.outputs.name }}-notes
+          path: |
+            CONTRIBUTORS_PUSH.txt
+            CHANGES.txt
+
+      - name: Point current -> new release
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+            "ln -sfn 'releases/${{ steps.rel.outputs.name }}' '${APP_ROOT}/current'"
+
+      - name: Restart Odoo service (systemd)
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
+          set -e
+          # Optionally write an env file that your systemd unit reads (e.g., VIRTUAL_ENV, WORKDIR)
+          if [ -d "${PY_VENV}" ]; then
+            echo "Using venv at ${PY_VENV}"
+          fi
+          # restart Odoo (try $SERVICE_NAME, else common names)
+          svc="${SERVICE_NAME:-odoo18}"
+          for s in "$svc" odoo odoo-server; do
+            if systemctl list-units --type=service --all | grep -qE "^\s*${s}\.service"; then
+              sudo systemctl restart "$s"
+              sudo systemctl status --no-pager "$s" | tail -n 50
+              exit 0
+            fi
+          done
+          echo "No Odoo systemd service found to restart."
+          exit 1
+          EOF
+        env:
+          SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
+
+      - name: Health check (TCP 8069, fallback 80)
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          # Try Odoo default port 8069 first
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+            "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
+          # If 8069 fails but you have a reverse proxy on 80, this may still pass:
+          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+            "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/80 && echo HTTP_80_OK || echo HTTP_80_FAIL'"
