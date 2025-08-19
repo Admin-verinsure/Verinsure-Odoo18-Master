@@ -97,20 +97,13 @@ jobs:
         shell: bash
         run: |
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
-          set -e; cd "${APP_ROOT}"; rel="${{ inputs.rollback_to }}";
-          test -d "releases/\$rel" || { echo "Release not found: \$rel"; exit 1; }
-          ln -sfn "releases/\$rel" current; svc="${SERVICE_NAME}";
-          for s in "\$svc" odoo odoo-server; do
-            if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
-              sudo systemctl restart "\$s";
-              echo "--- Waiting 5 seconds for service to stabilize ---";
-              sleep 5;
-              echo "--- Checking status (for logging purposes only) ---";
-              sudo systemctl status --no-pager "\$s" || true;
-              exit 0;
-            fi;
-          done;
-          echo "No Odoo systemd service found to restart."; exit 1;
+          set -e
+          echo "--- Rolling back to release: ${{ inputs.rollback_to }} ---"
+          test -d "${APP_ROOT}/releases/${{ inputs.rollback_to }}" || { echo "Release not found!"; exit 1; }
+          ln -sfn "${APP_ROOT}/releases/${{ inputs.rollback_to }}" "${APP_ROOT}/current"
+          echo "--- Restarting service: ${SERVICE_NAME} ---"
+          sudo systemctl restart "${SERVICE_NAME}"
+          echo "--- Rollback complete. ---"
           EOF
 
       - name: Stop after rollback
@@ -194,20 +187,14 @@ jobs:
           SERVICE_NAME: ${{ steps.creds.outputs.SERVICE_NAME }}
         shell: bash
         run: |
+          # <-- FIX: This script has been simplified to be more reliable.
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
-          set -e; ln -sfn "releases/${{ steps.rel.outputs.name }}" "${APP_ROOT}/current";
-          svc="${SERVICE_NAME}";
-          for s in "\$svc" odoo odoo-server; do
-            if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
-              # <-- FIX: The script is now more robust to prevent false failures.
-              echo "--- Restarting service: \$s ---";
-              sudo systemctl restart "\$s";
-              echo "--- Waiting 5 seconds for service to stabilize ---";
-              sleep 5;
-              echo "--- Checking status (for logging purposes only) ---";
-              sudo systemctl status --no-pager "\$s" || true;
-              exit 0;
-            fi;
-          done;
-          echo "No Odoo systemd service found to restart."; exit 1;
+          set -e
+          echo "--- Promoting release: ${{ steps.rel.outputs.name }} ---"
+          ln -sfn "${APP_ROOT}/releases/${{ steps.rel.outputs.name }}" "${APP_ROOT}/current"
+          echo "--- Restarting service: ${SERVICE_NAME} ---"
+          sudo systemctl restart "${SERVICE_NAME}"
+          echo "--- Promotion complete. Checking status for logs. ---"
+          sleep 5
+          sudo systemctl status --no-pager "${SERVICE_NAME}" || true
           EOF
