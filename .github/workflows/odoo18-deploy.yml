@@ -97,7 +97,6 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      # All subsequent steps are the same until the last one...
       - name: Rollback to existing release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
         env:
@@ -209,7 +208,7 @@ jobs:
           EOF
 
       - name: Health check (after promote)
-        if: ${{ ... }}
+        if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
         shell: bash
         run: |
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
