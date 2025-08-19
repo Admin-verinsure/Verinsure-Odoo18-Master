@@ -209,12 +209,8 @@ jobs:
           EOF
 
       - name: Health check (after promote)
-        if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
+        if: ${{ ... }}
         shell: bash
         run: |
-          # <-- FIX: Changed HOST to SSH_HOST
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
-          # <-- FIX: Changed HOST to SSH_HOST
-          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
-            "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/80 && echo HTTP_80_OK || echo HTTP_80_FAIL'"
