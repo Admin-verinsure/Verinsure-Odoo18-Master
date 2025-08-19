@@ -23,14 +23,11 @@ on:
         default: ""
 
 env:
-  # Server layout (already prepared on the host)
   APP_ROOT: /opt/odoo
   PY_VENV: /opt/odoo/shared/venv
-  # Keep pushes SAFE (no auto-promote on push)
   PROMOTE_ON_PUSH: "false"
 
 jobs:
-  # Precheck so runs show "Skipped" until secrets exist
   prereq:
     runs-on: ubuntu-latest
     outputs:
@@ -44,10 +41,7 @@ jobs:
           CHECK_SSH_USER: ${{ secrets.SSH_USER }}
           CHECK_SSH_PORT: ${{ secrets.SSH_PORT }}
         run: |
-          if [ -n "$CHECK_SSH_KEY" ] && \
-             [ -n "$CHECK_SSH_HOST" ] && \
-             [ -n "$CHECK_SSH_USER" ] && \
-             [ -n "$CHECK_SSH_PORT" ]; then
+          if [ -n "$CHECK_SSH_KEY" ] && [ -n "$CHECK_SSH_HOST" ] && [ -n "$CHECK_SSH_USER" ] && [ -n "$CHECK_SSH_PORT" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -64,7 +58,6 @@ jobs:
     needs: prereq
     if: ${{ needs.prereq.outputs.ready == 'true' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -211,5 +204,6 @@ jobs:
         if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
         shell: bash
         run: |
+          # This step now only checks port 8069, which is the correct Odoo port.
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
