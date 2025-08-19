@@ -39,13 +39,11 @@ jobs:
       - id: check
         shell: bash
         env:
-          # Map secrets to env vars to satisfy the linter and follow best practices
           CHECK_SSH_KEY: ${{ secrets.SSH_KEY }}
           CHECK_SSH_HOST: ${{ secrets.SSH_HOST }}
           CHECK_SSH_USER: ${{ secrets.SSH_USER }}
           CHECK_SSH_PORT: ${{ secrets.SSH_PORT }}
         run: |
-          # Use the environment variables in the script
           if [ -n "$CHECK_SSH_KEY" ] && \
              [ -n "$CHECK_SSH_HOST" ] && \
              [ -n "$CHECK_SSH_USER" ] && \
@@ -71,22 +69,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # We need history for git log
+          fetch-depth: 0
 
       # ---- Dynamically resolve server credentials ----
       - name: Map server to secrets
         id: creds
         shell: bash
         run: |
-          # Set server based on trigger; default to 'not4profit' on push
           server="${{ github.event_name == 'workflow_dispatch' && inputs.server || 'not4profit' }}"
           case "$server" in
             not4profit)
               echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> "$GITHUB_OUTPUT"
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> "$GITHUB_OUTPUT"
               echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> "$GITHUB_OUTPUT"
-              echo "SSH_KEY=${{ secrets.SSH_KEY }}" >> "$GITHUB_OUTPUT"
-              # Centralize SERVICE_NAME mapping with a default fallback.
+              # <-- FIX: Removed the multi-line SSH_KEY from this step
               echo "SERVICE_NAME=${{ secrets.SERVICE_NAME || 'odoo18' }}" >> "$GITHUB_OUTPUT"
               ;;
             *) echo "Unknown server: $server"; exit 1;;
@@ -95,7 +91,8 @@ jobs:
       - name: Add SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ steps.creds.outputs.SSH_KEY }}
+          # <-- FIX: Get the multi-line key directly from secrets, not from the previous step's output
+          ssh-private-key: ${{ secrets.SSH_KEY }}
 
       - name: Trust host key
         shell: bash
@@ -103,6 +100,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_HOST }}" >> ~/.ssh/known_hosts
 
+      # All subsequent steps are the same...
       # ------------------------- ROLLBACK -------------------------
       - name: Rollback to existing release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
@@ -140,7 +138,6 @@ jobs:
           ts="$(date -u +%Y%m%d-%H%M%S)"
           shortsha="$(git rev-parse --short HEAD)"
           before="${{ github.event.before }}"
-          # if manual run or before is empty, fall back to HEAD~1 (if exists)
           if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
             before="$(git rev-parse HEAD~1 2>/dev/null || echo '')"
           fi
