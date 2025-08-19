@@ -1,125 +1,185 @@
-name: Odoo18 Deploy
+name: Odoo18 Deploy (addons-only, safe promote + rollback)
 
 on:
   push:
-    branches: ["master"] # deploy on master updates
+    branches: ["master"]
+    paths:
+      - "addons/"
+      - ".github/workflows/odoo18-deploy.yml"
   workflow_dispatch:
     inputs:
+      server:
+        description: "Target server"
+        type: choice
+        required: true
+        default: "not4profit"
+        options: ["not4profit"]
+      promote:
+        description: "Switch /opt/odoo/current to new release & restart"
+        type: boolean
+        default: false
       rollback_to:
-        description: "Release folder name to rollback to (leave blank to deploy latest)"
-        required: false
+        description: "Release name to rollback to (skips build)"
         default: ""
 
 env:
-  APP_ROOT: /opt/odoo # base directory on the server
-  APP_SUBDIR: "" # set to e.g. "odoo-18" if your code lives in a subfolder
-  PY_VENV: /opt/odoo/shared/venv # shared venv (reused across releases)
+  # Server layout (already prepared on the host)
+  APP_ROOT: /opt/odoo
+  PY_VENV: /opt/odoo/shared/venv
+  # Keep pushes SAFE (no auto-promote on push)
+  PROMOTE_ON_PUSH: "false"
 
 jobs:
+  # Precheck so runs show "Skipped" until secrets exist
+  prereq:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        shell: bash
+        env:
+          CHECK_SSH_KEY: ${{ secrets.SSH_KEY }}
+          CHECK_SSH_HOST: ${{ secrets.SSH_HOST }}
+          CHECK_SSH_USER: ${{ secrets.SSH_USER }}
+          CHECK_SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          if [ -n "$CHECK_SSH_KEY" ] && \
+             [ -n "$CHECK_SSH_HOST" ] && \
+             [ -n "$CHECK_SSH_USER" ] && \
+             [ -n "$CHECK_SSH_PORT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Missing required secrets"
+              [ -n "$CHECK_SSH_KEY" ]  && echo "- SSH_KEY: set"  || echo "- SSH_KEY: MISSING"
+              [ -n "$CHECK_SSH_HOST" ] && echo "- SSH_HOST: set" || echo "- SSH_HOST: MISSING"
+              [ -n "$CHECK_SSH_USER" ] && echo "- SSH_USER: set" || echo "- SSH_USER: MISSING"
+              [ -n "$CHECK_SSH_PORT" ] && echo "- SSH_PORT: set" || echo "- SSH_PORT: MISSING"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   deploy_or_rollback:
+    needs: prereq
+    if: ${{ needs.prereq.outputs.ready == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout master
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # needed to compute contributors between SHAs
+          fetch-depth: 0
+
+      - name: Map server to secrets
+        id: creds
+        shell: bash
+        run: |
+          server="${{ github.event_name == 'workflow_dispatch' && inputs.server || 'not4profit' }}"
+          case "$server" in
+            not4profit)
+              echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> "$GITHUB_OUTPUT"
+              echo "SSH_USER=${{ secrets.SSH_USER }}" >> "$GITHUB_OUTPUT"
+              echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> "$GITHUB_OUTPUT"
+              echo "SERVICE_NAME=${{ secrets.SERVICE_NAME || 'odoo18' }}" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "Unknown server: $server"; exit 1;;
+          esac
 
       - name: Add SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      - name: Trust host
+      - name: Trust host key
+        shell: bash
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.NFP_SSH_PORT }}" "${{ secrets.NFP_SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      # ----------------- ROLLBACK PATH -----------------
-      - name: Rollback if requested
+      - name: Rollback to existing release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
-        run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
-          set -e
-          cd "${APP_ROOT}"
-          rel="${{ inputs.rollback_to }}"
-          test -d "releases/$rel" || { echo "Release not found: $rel"; exit 1; }
-          ln -sfn "releases/$rel" current
-          # restart Odoo (try a few common service names unless SERVICE_NAME is provided)
-          svc="${SERVICE_NAME:-odoo18}"
-          for s in "$svc" odoo odoo-server; do
-            if systemctl list-units --type=service --all | grep -qE "^\s*${s}\.service"; then
-              sudo systemctl restart "$s"
-              sudo systemctl status --no-pager "$s" | tail -n 50
-              exit 0
-            fi
-          done
-          echo "No Odoo systemd service found to restart."
-          exit 1
-          EOF
         env:
-          SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
+          SERVICE_NAME: ${{ steps.creds.outputs.SERVICE_NAME }}
+        shell: bash
+        run: |
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
+          set -e; cd "${APP_ROOT}"; rel="${{ inputs.rollback_to }}";
+          test -d "releases/\$rel" || { echo "Release not found: \$rel"; exit 1; }
+          ln -sfn "releases/\$rel" current; svc="${SERVICE_NAME}";
+          for s in "\$svc" odoo odoo-server; do
+            if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
+              sudo systemctl restart "\$s"; sudo systemctl status --no-pager "\$s" | tail -n 50; exit 0;
+            fi;
+          done;
+          echo "No Odoo systemd service found to restart."; exit 1;
+          EOF
 
       - name: Stop after rollback
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
-        run: echo "Rollback completed."
+        run: echo "Rollback done."
 
-      # ----------------- DEPLOY PATH -----------------
-      - name: Compute release name
+      - name: Compute release metadata
         id: rel
         if: ${{ inputs.rollback_to == '' }}
+        shell: bash
         run: |
-          ts="$(date -u +%Y%m%d-%H%M%S)"
-          shortsha="$(git rev-parse --short HEAD)"
-          echo "name=${ts}-${shortsha}" >> $GITHUB_OUTPUT
-          echo "before=${{ github.event.before }}" >> $GITHUB_OUTPUT
-          echo "after=${{ github.sha }}" >> $GITHUB_OUTPUT
+          ts="$(date -u +%Y%m%d-%H%M%S)"; shortsha="$(git rev-parse --short HEAD)";
+          before="${{ github.event.before }}";
+          if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            before="$(git rev-parse HEAD~1 2>/dev/null || echo '')";
+          fi;
+          echo "name=${ts}-${shortsha}" >> "$GITHUB_OUTPUT";
+          echo "before=${before}" >> "$GITHUB_OUTPUT";
+          echo "after=${{ github.sha }}" >> "$GITHUB_OUTPUT";
 
-      - name: Ensure server directories
+      - name: Ensure server dirs
         if: ${{ inputs.rollback_to == '' }}
+        shell: bash
         run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "sudo mkdir -p '${APP_ROOT}/releases' '${APP_ROOT}/shared' && sudo chown -R \$USER:\$USER '${APP_ROOT}'"
 
-      - name: Upload code into new release
+      - name: Upload ONLY addons to the new release
         if: ${{ inputs.rollback_to == '' }}
+        shell: bash
         run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} "mkdir -p '${APP_ROOT}/releases/${{ steps.rel.outputs.name }}'"
-          rsync -az --delete \
-            -e "ssh -p ${{ secrets.NFP_SSH_PORT }}" \
-            --exclude=".git" \
-            ./ ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
+            "mkdir -p '${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/addons'"
+          rsync -az --delete -e "ssh -p ${{ steps.creds.outputs.SSH_PORT }}" \
+            ./addons/ "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/addons/"
 
       - name: Install Python deps (if requirements.txt exists)
         if: ${{ inputs.rollback_to == '' }}
+        shell: bash
         run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
-          set -e
-          workdir="${APP_ROOT}/releases/${{ steps.rel.outputs.name }}${APP_SUBDIR:+/$APP_SUBDIR}"
-          if [ -f "$workdir/requirements.txt" ]; then
-            python3 -m venv "${PY_VENV}"
-            . "${PY_VENV}/bin/activate"
-            pip install --upgrade pip wheel
-            pip install -r "$workdir/requirements.txt"
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
+          set -e; reldir="${APP_ROOT}/releases/${{ steps.rel.outputs.name }}";
+          if [ -f "\$reldir/requirements.txt" ]; then
+            python3 -m venv "${PY_VENV}"; . "${PY_VENV}/bin/activate";
+            pip install --upgrade pip wheel; pip install -r "\$reldir/requirements.txt";
           else
-            echo "No requirements.txt; skipping pip install."
-          fi
+            echo "No requirements.txt; skipping pip install.";
+          fi;
           EOF
 
-      - name: Contributors & change log
+      - name: Record contributors & changes
         if: ${{ inputs.rollback_to == '' }}
+        env:
+          BEFORE: ${{ steps.rel.outputs.before }}
+          AFTER: ${{ steps.rel.outputs.after }}
+        shell: bash
         run: |
-          BEFORE="${{ steps.rel.outputs.before }}"
-          AFTER="${{ steps.rel.outputs.after }}"
-          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            git log --format='%an <%ae>' "$BEFORE..$AFTER" | sort -u > CONTRIBUTORS_PUSH.txt
-            git log --oneline "$BEFORE..$AFTER" > CHANGES.txt
+          set -euo pipefail;
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            git log --format='%an <%ae>' "$BEFORE..$AFTER" | sort -u > CONTRIBUTORS_PUSH.txt;
+            git log --oneline "$BEFORE..$AFTER" > CHANGES.txt;
           else
-            git log -n 20 --format='%an <%ae>' | sort -u > CONTRIBUTORS_PUSH.txt
-            git log -n 20 --oneline > CHANGES.txt
-          fi
-          scp -P "${{ secrets.NFP_SSH_PORT }}" CONTRIBUTORS_PUSH.txt CHANGES.txt \
-            ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/
+            git log -n 20 --format='%an <%ae>' | sort -u > CONTRIBUTORS_PUSH.txt;
+            git log -n 20 --oneline > CHANGES.txt;
+          fi;
+          scp -P "${{ steps.creds.outputs.SSH_PORT }}" CONTRIBUTORS_PUSH.txt CHANGES.txt \
+            "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/"
 
       - name: Upload notes as artifact
         if: ${{ inputs.rollback_to == '' }}
@@ -130,42 +190,26 @@ jobs:
             CONTRIBUTORS_PUSH.txt
             CHANGES.txt
 
-      - name: Point current -> new release
-        if: ${{ inputs.rollback_to == '' }}
-        run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
-            "ln -sfn 'releases/${{ steps.rel.outputs.name }}' '${APP_ROOT}/current'"
-
-      - name: Restart Odoo service (systemd)
-        if: ${{ inputs.rollback_to == '' }}
-        run: |
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} <<'EOF'
-          set -e
-          # Optionally write an env file that your systemd unit reads (e.g., VIRTUAL_ENV, WORKDIR)
-          if [ -d "${PY_VENV}" ]; then
-            echo "Using venv at ${PY_VENV}"
-          fi
-          # restart Odoo (try $SERVICE_NAME, else common names)
-          svc="${SERVICE_NAME:-odoo18}"
-          for s in "$svc" odoo odoo-server; do
-            if systemctl list-units --type=service --all | grep -qE "^\s*${s}\.service"; then
-              sudo systemctl restart "$s"
-              sudo systemctl status --no-pager "$s" | tail -n 50
-              exit 0
-            fi
-          done
-          echo "No Odoo systemd service found to restart."
-          exit 1
-          EOF
+      - name: Promote new release (switch symlink & restart)
+        if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
         env:
-          SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
-
-      - name: Health check (TCP 8069, fallback 80)
-        if: ${{ inputs.rollback_to == '' }}
+          SERVICE_NAME: ${{ steps.creds.outputs.SERVICE_NAME }}
+        shell: bash
         run: |
-          # Try Odoo default port 8069 first
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
+          set -e; ln -sfn "releases/${{ steps.rel.outputs.name }}" "${APP_ROOT}/current";
+          svc="${SERVICE_NAME}";
+          for s in "\$svc" odoo odoo-server; do
+            if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
+              sudo systemctl restart "\$s"; sudo systemctl status --no-pager "\$s" | tail -n 50; exit 0;
+            fi;
+          done;
+          echo "No Odoo systemd service found to restart."; exit 1;
+          EOF
+
+      - name: Health check (after promote)
+        if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
+        shell: bash
+        run: |
+          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
-          # If 8069 fails but you have a reverse proxy on 80, this may still pass:
-          ssh -p "${{ secrets.NFP_SSH_PORT }}" ${{ secrets.NFP_SSH_USER }}@${{ secrets.NFP_SSH_HOST }} \
-            "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/80 && echo HTTP_80_OK || echo HTTP_80_FAIL'"
