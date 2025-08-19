@@ -71,7 +71,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ---- Dynamically resolve server credentials ----
       - name: Map server to secrets
         id: creds
         shell: bash
@@ -82,7 +81,6 @@ jobs:
               echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> "$GITHUB_OUTPUT"
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> "$GITHUB_OUTPUT"
               echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> "$GITHUB_OUTPUT"
-              # <-- FIX: Removed the multi-line SSH_KEY from this step
               echo "SERVICE_NAME=${{ secrets.SERVICE_NAME || 'odoo18' }}" >> "$GITHUB_OUTPUT"
               ;;
             *) echo "Unknown server: $server"; exit 1;;
@@ -91,7 +89,6 @@ jobs:
       - name: Add SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          # <-- FIX: Get the multi-line key directly from secrets, not from the previous step's output
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
       - name: Trust host key
@@ -100,8 +97,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      # All subsequent steps are the same...
-      # ------------------------- ROLLBACK -------------------------
+      # All subsequent steps are the same until the last one...
       - name: Rollback to existing release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
         env:
@@ -109,41 +105,34 @@ jobs:
         shell: bash
         run: |
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
-          set -e
-          cd "${APP_ROOT}"
-          rel="${{ inputs.rollback_to }}"
+          set -e; cd "${APP_ROOT}"; rel="${{ inputs.rollback_to }}";
           test -d "releases/\$rel" || { echo "Release not found: \$rel"; exit 1; }
-          ln -sfn "releases/\$rel" current
-          svc="${SERVICE_NAME}"
+          ln -sfn "releases/\$rel" current; svc="${SERVICE_NAME}";
           for s in "\$svc" odoo odoo-server; do
             if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
-              sudo systemctl restart "\$s"
-              sudo systemctl status --no-pager "\$s" | tail -n 50
-              exit 0
-            fi
-          done
-          echo "No Odoo systemd service found to restart."; exit 1
+              sudo systemctl restart "\$s"; sudo systemctl status --no-pager "\$s" | tail -n 50; exit 0;
+            fi;
+          done;
+          echo "No Odoo systemd service found to restart."; exit 1;
           EOF
 
       - name: Stop after rollback
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_to != '' }}
         run: echo "Rollback done."
 
-      # -------------------- BUILD NEW RELEASE ---------------------
       - name: Compute release metadata
         id: rel
         if: ${{ inputs.rollback_to == '' }}
         shell: bash
         run: |
-          ts="$(date -u +%Y%m%d-%H%M%S)"
-          shortsha="$(git rev-parse --short HEAD)"
-          before="${{ github.event.before }}"
+          ts="$(date -u +%Y%m%d-%H%M%S)"; shortsha="$(git rev-parse --short HEAD)";
+          before="${{ github.event.before }}";
           if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
-            before="$(git rev-parse HEAD~1 2>/dev/null || echo '')"
-          fi
-          echo "name=${ts}-${shortsha}" >> "$GITHUB_OUTPUT"
-          echo "before=${before}" >> "$GITHUB_OUTPUT"
-          echo "after=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            before="$(git rev-parse HEAD~1 2>/dev/null || echo '')";
+          fi;
+          echo "name=${ts}-${shortsha}" >> "$GITHUB_OUTPUT";
+          echo "before=${before}" >> "$GITHUB_OUTPUT";
+          echo "after=${{ github.sha }}" >> "$GITHUB_OUTPUT";
 
       - name: Ensure server dirs
         if: ${{ inputs.rollback_to == '' }}
@@ -166,16 +155,13 @@ jobs:
         shell: bash
         run: |
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
-          set -e
-          reldir="${APP_ROOT}/releases/${{ steps.rel.outputs.name }}"
+          set -e; reldir="${APP_ROOT}/releases/${{ steps.rel.outputs.name }}";
           if [ -f "\$reldir/requirements.txt" ]; then
-            python3 -m venv "${PY_VENV}"
-            . "${PY_VENV}/bin/activate"
-            pip install --upgrade pip wheel
-            pip install -r "\$reldir/requirements.txt"
+            python3 -m venv "${PY_VENV}"; . "${PY_VENV}/bin/activate";
+            pip install --upgrade pip wheel; pip install -r "\$reldir/requirements.txt";
           else
-            echo "No requirements.txt; skipping pip install."
-          fi
+            echo "No requirements.txt; skipping pip install.";
+          fi;
           EOF
 
       - name: Record contributors & changes
@@ -185,14 +171,14 @@ jobs:
           AFTER: ${{ steps.rel.outputs.after }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -euo pipefail;
           if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            git log --format='%an <%ae>' "$BEFORE..$AFTER" | sort -u > CONTRIBUTORS_PUSH.txt
-            git log --oneline "$BEFORE..$AFTER" > CHANGES.txt
+            git log --format='%an <%ae>' "$BEFORE..$AFTER" | sort -u > CONTRIBUTORS_PUSH.txt;
+            git log --oneline "$BEFORE..$AFTER" > CHANGES.txt;
           else
-            git log -n 20 --format='%an <%ae>' | sort -u > CONTRIBUTORS_PUSH.txt
-            git log -n 20 --oneline > CHANGES.txt
-          fi
+            git log -n 20 --format='%an <%ae>' | sort -u > CONTRIBUTORS_PUSH.txt;
+            git log -n 20 --oneline > CHANGES.txt;
+          fi;
           scp -P "${{ steps.creds.outputs.SSH_PORT }}" CONTRIBUTORS_PUSH.txt CHANGES.txt \
             "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}:${APP_ROOT}/releases/${{ steps.rel.outputs.name }}/"
 
@@ -205,7 +191,6 @@ jobs:
             CONTRIBUTORS_PUSH.txt
             CHANGES.txt
 
-      # -------------------- PROMOTE ----------------------
       - name: Promote new release (switch symlink & restart)
         if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
         env:
@@ -213,24 +198,23 @@ jobs:
         shell: bash
         run: |
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
-          set -e
-          ln -sfn "releases/${{ steps.rel.outputs.name }}" "${APP_ROOT}/current"
-          svc="${SERVICE_NAME}"
+          set -e; ln -sfn "releases/${{ steps.rel.outputs.name }}" "${APP_ROOT}/current";
+          svc="${SERVICE_NAME}";
           for s in "\$svc" odoo odoo-server; do
             if systemctl list-units --type=service --all | grep -qE "^\s*\${s}\.service"; then
-              sudo systemctl restart "\$s"
-              sudo systemctl status --no-pager "\$s" | tail -n 50
-              exit 0
-            fi
-          done
-          echo "No Odoo systemd service found to restart."; exit 1
+              sudo systemctl restart "\$s"; sudo systemctl status --no-pager "\$s" | tail -n 50; exit 0;
+            fi;
+          done;
+          echo "No Odoo systemd service found to restart."; exit 1;
           EOF
 
       - name: Health check (after promote)
         if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
         shell: bash
         run: |
+          # <-- FIX: Changed HOST to SSH_HOST
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
+          # <-- FIX: Changed HOST to SSH_HOST
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
             "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/80 && echo HTTP_80_OK || echo HTTP_80_FAIL'"
