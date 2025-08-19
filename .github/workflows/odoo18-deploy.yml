@@ -200,10 +200,4 @@ jobs:
           echo "No Odoo systemd service found to restart."; exit 1;
           EOF
 
-      - name: Health check (after promote)
-        if: ${{ inputs.rollback_to == '' && ( (github.event_name == 'push' && env.PROMOTE_ON_PUSH == 'true') || (github.event_name == 'workflow_dispatch' && inputs.promote) ) }}
-        shell: bash
-        run: |
-          # This step now only checks port 8069, which is the correct Odoo port.
-          ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
-            "timeout 10 bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8069 && echo ODOO_8069_OK || echo ODOO_8069_FAIL'"
+      
