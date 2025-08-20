@@ -4,7 +4,7 @@ on:
   push:
     branches: ["master"]
     paths:
-      - "addons/"
+      - "addons/**"
       - ".github/workflows/odoo18-deploy.yml"
   workflow_dispatch:
     inputs:
@@ -128,8 +128,9 @@ jobs:
         if: ${{ inputs.rollback_to == '' }}
         shell: bash
         run: |
+          # <-- FIX: This command is simplified to be more robust.
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" \
-            "sudo mkdir -p '${APP_ROOT}/releases' '${APP_ROOT}/shared' && sudo chown -R \$USER:\$USER '${APP_ROOT}'"
+            "sudo mkdir -p /opt/odoo/releases /opt/odoo/shared && sudo chown -R ubuntu:ubuntu /opt/odoo"
 
       - name: Upload ONLY addons to the new release
         if: ${{ inputs.rollback_to == '' }}
@@ -187,7 +188,6 @@ jobs:
           SERVICE_NAME: ${{ steps.creds.outputs.SERVICE_NAME }}
         shell: bash
         run: |
-          # <-- FIX: This script has been simplified to be more reliable.
           ssh -p "${{ steps.creds.outputs.SSH_PORT }}" "${{ steps.creds.outputs.SSH_USER }}@${{ steps.creds.outputs.SSH_HOST }}" <<EOF
           set -e
           echo "--- Promoting release: ${{ steps.rel.outputs.name }} ---"
