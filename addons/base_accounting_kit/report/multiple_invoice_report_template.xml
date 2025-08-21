@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="report_header_alignment_css_fix" inherit_id="web.external_layout_standard">
-    <xpath expr="//div[@name='company_address']" position="attributes">
-        <attribute name="style">padding-top: 0px !important; margin-top: 0px !important;</attribute>
+    <template id="report_layout_structure_fix" inherit_id="web.external_layout_standard">
+    <xpath expr="//div[hasclass('header')]" position="replace">
+        <div class="header">
+            <div class="row">
+                <div class="col-6">
+                    <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" style="max-height: 45px;" alt="Logo"/>
+                </div>
+                <div class="col-6 text-end" name="company_address">
+                    <span t-field="company.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <hr/>
+                </div>
+            </div>
+        </div>
     </xpath>
 </template>
     <template id="report_multiple_invoice_new">
