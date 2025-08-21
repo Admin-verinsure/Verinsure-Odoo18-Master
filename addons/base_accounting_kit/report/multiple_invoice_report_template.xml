@@ -26,7 +26,7 @@
                     <span t-else="" t-field="o.move_type"/>
                     <span t-if="o.name != '/'" t-field="o.name"/>
                 </h2>
-
+                <h1 style="color: pink; font-size: 50px;">IS THIS CODE WORKING?</h1>
                 <table class="table table-sm table-borderless" style="width: 100%; margin-top: 32px; margin-bottom: 32px;">
                     <tr>
                         <td style="width: 25%;"><strong t-if="o.invoice_date">Invoice Date:</strong></td>
