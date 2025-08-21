@@ -1,29 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="report_layout_structure_fix" inherit_id="web.external_layout_standard">
-    <xpath expr="//div[hasclass('header')]" position="replace">
-        <div class="header">
-            <div class="row">
-                <div class="col-6">
-                    <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" style="max-height: 45px;" alt="Logo"/>
-                </div>
-                <div class="col-6 text-end" name="company_address">
-                    <span t-field="company.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-12">
-                    <hr/>
-                </div>
-            </div>
-        </div>
-    </xpath>
-</template>
     <template id="report_multiple_invoice_new">
         <t t-call="web.external_layout">
             <t t-set="o" t-value="o.with_context(lang=lang)"/>
             <div class="page">
                 <div class="row">
+                    <div class="col-6">
+                        <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)" style="max-height: 45px;" alt="Logo"/>
+                    </div>
+                    <div class="col-6 text-end" style="padding-top: 0px; margin-top: 0px;">
+                        <span t-field="o.company_id.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12"><hr/></div>
+                </div>
+                <div class="row" style="margin-top: 20px;">
                     <div class="col-xs-6">
                         <address t-field="o.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
                     </div>
