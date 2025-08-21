@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="report_header_alignment_css_fix" inherit_id="web.external_layout_standard">
+    <xpath expr="//div[@name='company_address']" position="attributes">
+        <attribute name="style">padding-top: 0px !important; margin-top: 0px !important;</attribute>
+    </xpath>
+</template>
     <template id="report_multiple_invoice_new">
         <t t-call="web.external_layout">
             <t t-set="o" t-value="o.with_context(lang=lang)"/>
