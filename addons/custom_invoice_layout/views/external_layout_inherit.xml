@@ -1,8 +1,8 @@
 <odoo>
   <data>
-    <!-- Inherit the base layout from module `web` -->
+    <!-- Inherit the standard external layout -->
     <template id="external_layout_standard_inherit" inherit_id="web.external_layout_standard">
-      
+
       <!-- Change tagline style -->
       <xpath expr="//div[@class='o_company_tagline']" position="attributes">
         <attribute name="class">o_company_tagline mw-50 fw-bold text-primary</attribute>
