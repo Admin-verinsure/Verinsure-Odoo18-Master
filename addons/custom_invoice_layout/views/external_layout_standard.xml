@@ -61,10 +61,9 @@
         </div>
     </template>
 
-    <!-- Customization: inherit your project’s external_layout_standard here -->
+    <!-- Customization: inherit your project’s external_layout_standard -->
     <template id="external_layout_standard_inherit"
-              inherit_id="your_project_module.external_layout_standard">
-        <!-- Example: Add horizontal line below tagline -->
+              inherit_id="my_project_module.external_layout_standard">
         <xpath expr="//div[@class='o_company_tagline mw-50 fw-bold']" position="after">
             <hr style="border: 1px solid #000; margin: 5px 0;"/>
         </xpath>
