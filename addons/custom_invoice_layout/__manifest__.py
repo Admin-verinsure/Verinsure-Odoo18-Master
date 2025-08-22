@@ -14,6 +14,7 @@ This module duplicates Odoo18’s external layout and inherits the project layou
         'views/external_layout_standard.xml',
         'views/external_layout_inherit.xml',
         'views/report_invoice_document.xml',
+        'views/custom_invoice_layout.xml',
     ],
     'installable': True,
     'application': False,
