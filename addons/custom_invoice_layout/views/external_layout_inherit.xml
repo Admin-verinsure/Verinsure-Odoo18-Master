@@ -1,20 +1,15 @@
 <odoo>
   <data>
-    <!-- Inherit the standard external layout -->
-    <template id="external_layout_standard_inherit" inherit_id="web.external_layout_standard">
 
-      <!-- Change tagline style -->
-      <xpath expr="//div[contains(@class, 'o_company_tagline')]" position="attributes">
-        <attribute name="class">o_company_tagline mw-50 fw-bold text-primary</attribute>
-      </xpath>
+    <!-- Inherit the standard invoice document -->
+    <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
 
-      <!-- Add custom note in footer -->
-      <xpath expr="//div[contains(@class, 'o_footer_content')]" position="inside">
-        <div class="text-center w-100 mt-1 text-muted">
-          <small>Customized Layout - For Internal Use Only</small>
-        </div>
+      <!-- Replace the default external layout -->
+      <xpath expr="//t[@t-call='web.external_layout']" position="replace">
+        <t t-call="custom_invoice_layout.external_layout_standard"/>
       </xpath>
 
     </template>
+
   </data>
 </odoo>
