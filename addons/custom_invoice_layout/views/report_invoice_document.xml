@@ -1,0 +1,20 @@
+<odoo>
+  <data>
+
+    <!-- Inherit the standard invoice document -->
+    <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
+
+      <!-- Replace the call to default external_layout_standard -->
+      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
+        <t t-call="custom_invoice.external_layout_standard"/>
+      </xpath>
+
+      <!-- OR if your DB uses project external_layout_standard -->
+      <xpath expr="//t[@t-call='your_project_module.external_layout_standard']" position="replace">
+        <t t-call="custom_invoice.external_layout_standard"/>
+      </xpath>
+
+    </template>
+
+  </data>
+</odoo>
