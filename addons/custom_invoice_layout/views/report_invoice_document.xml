@@ -5,7 +5,7 @@
     <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
 
       <!-- Replace the default external layout -->
-      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
+      <xpath expr="//t[@t-call='web.external_layout']" position="replace">
         <t t-call="custom_invoice_layout.external_layout_standard"/>
       </xpath>
 
