@@ -6,12 +6,10 @@
 
       <!-- Replace the default external layout -->
       <xpath expr="//t[@t-call='account.external_layout']" position="replace">
-        <t t-call="custom_invoice.external_layout_standard"/>
+        <t t-call="custom_invoice_layout.external_layout_standard"/>
       </xpath>
 
     </template>
 
   </data>
 </odoo>
-
-
