@@ -6,8 +6,6 @@
     <!-- ========================= -->
     <template id="external_layout_invoice_standard" name="Custom External Layout">
       <t t-name="custom_invoice_layout.external_layout_invoice_standard">
-        
-        <!-- Header -->
         <div t-attf-class="header o_company_#{company.id}_layout">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <!-- Logo -->
@@ -23,15 +21,18 @@
           </div>
         </div>
 
-        <!-- Page -->
+        <!-- Page container (required for reports) -->
         <div class="page">
+          <!-- Title (we will override in NZ invoice) -->
           <t t-set="layout_document_title">
             <h2 t-out="layout_document_title"/>
           </t>
+
           <div class="article o_report_layout_standard o_table_standard"
                t-att-data-oe-model="o and o._name"
                t-att-data-oe-id="o and o.id"
                t-att-data-oe-lang="o and o.env.context.get('lang')">
+            <!-- Render the body content -->
             <t t-out="0"/>
           </div>
         </div>
@@ -48,16 +49,44 @@
             </div>
           </div>
         </div>
-
       </t>
     </template>
 
     <!-- ========================================== -->
-    <!-- 2. Override NZ Localized Invoice Report    -->
+    <!-- 2. Override Generic Invoice Report Layout  -->
+    <!-- ========================================== -->
+    <template id="custom_invoice_layout_inherit"
+              inherit_id="account.report_invoice_document">
+      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+        <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
+      </xpath>
+    </template>
+
+    <!-- ========================================== -->
+    <!-- 3. Override NZ Localized Invoice Report    -->
     <!-- ========================================== -->
     <template id="custom_invoice_layout_inherit_nz"
               inherit_id="l10n_nz.report_invoice_document">
-      <xpath expr="//div[hasclass('page')]" position="replace">
+
+      <!-- Replace the document title logic -->
+      <xpath expr="//t[@t-set='layout_document_title']" position="replace">
+        <t t-set="layout_document_title">
+          <span t-if="not proforma"/>
+          <span t-else="">PROFORMA</span>
+          <span t-if="o.move_type == 'out_invoice' and o.state == 'posted'">Tax Invoice</span>
+          <span t-elif="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Tax Invoice</span>
+          <span t-elif="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Tax Invoice</span>
+          <span t-elif="o.move_type == 'out_refund' and o.state == 'posted'">Tax Credit Note</span>
+          <span t-elif="o.move_type == 'out_refund' and o.state == 'draft'">Draft Tax Credit Note</span>
+          <span t-elif="o.move_type == 'out_refund' and o.state == 'cancel'">Cancelled Tax Credit Note</span>
+          <span t-elif="o.move_type == 'in_refund'">Tax Vendor Credit Note</span>
+          <span t-elif="o.move_type == 'in_invoice'">Tax Vendor Bill</span>
+          <span t-if="o.name != '/'" t-field="o.name"/>
+        </t>
+      </xpath>
+
+      <!-- Replace the external layout -->
+      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
         <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
