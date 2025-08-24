@@ -6,6 +6,7 @@
     <!-- ========================= -->
     <template id="external_layout_invoice_standard" name="Custom External Layout">
       <t t-name="custom_invoice_layout.external_layout_invoice_standard">
+        
         <!-- Header -->
         <div t-attf-class="header o_company_#{company.id}_layout">
           <div class="d-flex justify-content-between align-items-center mb-2">
@@ -22,13 +23,15 @@
           </div>
         </div>
 
-        <!-- Page container -->
+        <!-- Page -->
         <div class="page">
+          <t t-set="layout_document_title">
+            <h2 t-out="layout_document_title"/>
+          </t>
           <div class="article o_report_layout_standard o_table_standard"
                t-att-data-oe-model="o and o._name"
                t-att-data-oe-id="o and o.id"
                t-att-data-oe-lang="o and o.env.context.get('lang')">
-            <!-- Render the body content -->
             <t t-out="0"/>
           </div>
         </div>
@@ -45,15 +48,16 @@
             </div>
           </div>
         </div>
+
       </t>
     </template>
 
     <!-- ========================================== -->
-    <!-- 2. Override Generic Invoice Report Layout  -->
+    <!-- 2. Override NZ Localized Invoice Report    -->
     <!-- ========================================== -->
-    <template id="custom_invoice_layout_inherit"
-              inherit_id="account.report_invoice_document">
-      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+    <template id="custom_invoice_layout_inherit_nz"
+              inherit_id="l10n_nz.report_invoice_document">
+      <xpath expr="//div[hasclass('page')]" position="replace">
         <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
