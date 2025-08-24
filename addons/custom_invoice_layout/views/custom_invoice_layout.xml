@@ -2,15 +2,17 @@
   <data>
 
     <!-- ========================= -->
-    <!-- 1. Custom Invoice Layout  -->
+    <!-- 1. Custom External Layout -->
     <!-- ========================= -->
-    <template id="external_layout_invoice_standard" name="Custom Invoice External Layout">
+    <template id="external_layout_invoice_standard" name="Custom External Layout">
       <t t-name="custom_invoice_layout.external_layout_invoice_standard">
         <div t-attf-class="header o_company_#{company.id}_layout">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <!-- Logo -->
-            <img t-if="company.logo" class="o_company_logo_small"
-                 t-att-src="image_data_uri(company.logo)" alt="Logo"/>
+            <img t-if="company.logo"
+                 class="o_company_logo_small"
+                 t-att-src="image_data_uri(company.logo)"
+                 alt="Logo"/>
 
             <!-- Tagline -->
             <div t-if="company.report_header"
@@ -50,21 +52,21 @@
     </template>
 
     <!-- ========================================== -->
-    <!-- 2. Override ONLY Invoice Report Layout     -->
+    <!-- 2. Override Generic Invoice Report Layout  -->
     <!-- ========================================== -->
     <template id="custom_invoice_layout_inherit"
               inherit_id="account.report_invoice_document">
-      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
         <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
 
     <!-- ========================================== -->
-    <!-- 3. Override ONLY NZ Invoice Report Layout  -->
+    <!-- 3. Override NZ Localized Invoice Report    -->
     <!-- ========================================== -->
     <template id="custom_invoice_layout_inherit_nz"
               inherit_id="l10n_nz.report_invoice_document">
-      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
         <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
