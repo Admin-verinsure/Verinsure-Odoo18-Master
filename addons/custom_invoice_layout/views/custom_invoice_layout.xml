@@ -2,10 +2,10 @@
   <data>
 
     <!-- ========================= -->
-    <!-- 1. Custom External Layout -->
+    <!-- 1. Custom Invoice Layout  -->
     <!-- ========================= -->
-    <template id="external_layout_standard" name="Custom External Layout">
-      <t t-name="custom_invoice_layout.external_layout_standard">
+    <template id="external_layout_invoice_standard" name="Custom Invoice External Layout">
+      <t t-name="custom_invoice_layout.external_layout_invoice_standard">
         <div t-attf-class="header o_company_#{company.id}_layout">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <!-- Logo -->
@@ -50,22 +50,22 @@
     </template>
 
     <!-- ========================================== -->
-    <!-- 2. Override Generic Invoice Report Layout  -->
+    <!-- 2. Override ONLY Invoice Report Layout     -->
     <!-- ========================================== -->
     <template id="custom_invoice_layout_inherit"
               inherit_id="account.report_invoice_document">
-      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
-        <t t-call="custom_invoice_layout.external_layout_standard"/>
+      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+        <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
 
     <!-- ========================================== -->
-    <!-- 3. Override NZ Localized Invoice Report    -->
+    <!-- 3. Override ONLY NZ Invoice Report Layout  -->
     <!-- ========================================== -->
     <template id="custom_invoice_layout_inherit_nz"
               inherit_id="l10n_nz.report_invoice_document">
-      <xpath expr="//t[@t-call='account.external_layout']" position="replace">
-        <t t-call="custom_invoice_layout.external_layout_standard"/>
+      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+        <t t-call="custom_invoice_layout.external_layout_invoice_standard"/>
       </xpath>
     </template>
 
