@@ -1,5 +1,6 @@
 <odoo>
-  <template id="custom_external_layout" name="Custom External Layout">
+  <!-- Standalone QWeb template -->
+  <template id="custom_external_layout" name="Custom External Layout" inherit_id="web.external_layout">
     <t t-name="custom_invoice_layout.custom_external_layout">
 
       <div class="header">
