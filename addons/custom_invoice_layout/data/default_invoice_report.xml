@@ -1,0 +1,28 @@
+<odoo>
+    <data noupdate="1">
+        <!--
+        Step 1: Define a new report action for your custom template.
+        This record makes the new template "printable" from an invoice record.
+        -->
+        <report
+            id="account_invoice_report_my_custom"
+            model="account.move"
+            string="My Custom Invoice"
+            report_type="qweb-pdf"
+            name="my_custom_invoice.my_custom_invoice_template"
+            file="my_custom_invoice.my_custom_invoice_template"
+            print_report_name="'Invoice - %s' % (object.name) if object.name else ''"
+            binding_model_id="account.model_account_move"
+            binding_type="report"
+        />
+
+        <!--
+        Step 2: Make your custom report the default.
+        This record "unbinds" the standard report from the invoice model,
+        so your new one is the only default.
+        -->
+        <record id="account.report_invoice" model="ir.actions.report">
+            <field name="binding_model_id" eval="False"/>
+        </record>
+    </data>
+</odoo>
