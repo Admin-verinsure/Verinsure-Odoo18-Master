@@ -1,11 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <!-- Inherit the standard external layout -->
-    <template id="external_layout_remove_address" inherit_id="web.external_layout_standard">
+    <!-- Inherit external layout to remove company address -->
+    <template id="external_layout_remove_address" inherit_id="web.external_layout">
+      
+      <!-- Remove the address block -->
+      <xpath expr="//div[contains(@class,'company_address')]" position="replace">
+        <!-- Empty block so address disappears -->
+      </xpath>
 
-      <!-- Remove the company address block from header -->
-      <xpath expr="//div[@name='company_address']" position="replace">
-        <!-- Empty block to completely remove company address -->
+      <!-- (Optional) Center the logo since address is gone -->
+      <xpath expr="//div[contains(@class,'o_company_#{company.id}_layout')]/div[contains(@class,'d-flex')]" position="attributes">
+        <attribute name="class">d-flex justify-content-center align-items-center</attribute>
       </xpath>
 
     </template>
