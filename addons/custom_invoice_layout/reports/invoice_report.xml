@@ -1,12 +1,6 @@
 <odoo>
     <data>
-        <!--
-        This is your custom, standalone invoice template.
-        All your edits and design changes will be made here.
-        This template does not inherit from any standard Odoo templates.
-        It starts with a fresh canvas but leverages the `web.external_layout_standard`
-        for a consistent header/footer look.
-        -->
+        
         <template id="my_custom_invoice_template">
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="o">
