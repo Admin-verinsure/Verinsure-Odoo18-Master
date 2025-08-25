@@ -8,183 +8,141 @@
             <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
             <t t-set="model" t-value="'account.move'"/>
             <div class="page" style="overflow: hidden;">
-                <br/>
-                <br/>
-                <br/>
-                <br/>
+                <br/><br/><br/><br/>
+
                 <!--Invoice details-->
                 <div class="row">
-                    <div t-attf-style=" background-color:#{o.theme_id.base_color};padding:2% ;color:#{o.theme_id.customer_text_color};">
-                        <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
+                    <div style="background-color:#f0f0f0; padding:2%; color:#000;">
+                        <h2 style="color:#000;">
                             <span t-if="o.move_type == 'out_invoice' and (o.state == 'draft' or o.state == 'posted')">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color};">
-                                    Invoice
-                                </font>
+                                <font style="color:#000;">Invoice</font>
                             </span>
                             <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                    PRO-FORMA
-                                </font>
+                                <font style="color:#000;">PRO-FORMA</font>
                             </span>
                             <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                    Draft Invoice
-                                </font>
+                                <font style="color:#000;">Draft Invoice</font>
                             </span>
                             <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                    Cancelled Invoice
-                                </font>
+                                <font style="color:#000;">Cancelled Invoice</font>
                             </span>
                             <span t-if="o.move_type == 'out_refund'">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                    Refund
-                                </font>
+                                <font style="color:#000;">Refund</font>
                             </span>
                             <span t-if="o.move_type == 'in_refund'">
-                                <font t-attf-style=" color:#{o.theme_id.heading_text_color}">
-                                    Vendor Refund
-                                </font>
+                                <font style="color:#000;">Vendor Refund</font>
                             </span>
                             <span t-if="o.move_type == 'in_invoice'">
-                                <font t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                    Vendor Bill
-                                </font>
+                                <font style="color:#000;">Vendor Bill</font>
                             </span>
-
                             <font>
-                                <span t-field="o.name"
-                                      t-attf-style="color:#{o.theme_id.heading_text_color};"/>
+                                <span t-field="o.name" style="color:#000;"/>
                             </font>
                         </h2>
                         <br/>
+
                         <!--Invoice information-->
                         <div id="invoice_information">
                             <div class="row mt32 mb32" id="informations">
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.invoice_date"
-                                     name="invoice_date">
-                                    <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                        Invoice Date:
-                                    </strong>
-                                    <p class="m-0"
-                                       t-attf-style="color:#{o.theme_id.text_color}"
-                                       t-field="o.invoice_date"/>
+                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_date" name="invoice_date">
+                                    <strong style="color:#000;">Invoice Date:</strong>
+                                    <p class="m-0" style="color:#000;" t-field="o.invoice_date"/>
                                 </div>
                                 <div class="col-auto col-3 mw-100 mb-2"
                                      t-if="o.invoice_date_due and o.move_type == 'out_invoice' and o.state == 'posted'"
                                      name="due_date">
-                                    <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                        Due Date:
-                                    </strong>
-                                    <p class="m-0"
-                                       t-attf-style="color:#{o.theme_id.text_color}"
-                                       t-field="o.invoice_date_due"/>
+                                    <strong style="color:#000;">Due Date:</strong>
+                                    <p class="m-0" style="color:#000;" t-field="o.invoice_date_due"/>
                                 </div>
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.invoice_payment_term_id"
-                                     name="payment_term">
-                                    <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                        Payment Term:
-                                    </strong>
-                                    <p class="m-0"
-                                       t-attf-style="color:#{o.theme_id.text_color}"
-                                       t-field="o.invoice_payment_term_id"/>
+                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_payment_term_id" name="payment_term">
+                                    <strong style="color:#000;">Payment Term:</strong>
+                                    <p class="m-0" style="color:#000;" t-field="o.invoice_payment_term_id"/>
                                 </div>
-                                <!--optional information-->
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.user_id">
-                                    <div t-if="o.theme_id.sales_person">
-                                        <font t-attf-style="color:#{o.theme_id.text_color}">
-                                            <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                                Sales Person:
-                                            </strong>
-                                            <p t-field="o.user_id"/>
-                                        </font>
-                                    </div>
+                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.user_id">
+                                    <strong style="color:#000;">Sales Person:</strong>
+                                    <p t-field="o.user_id" style="color:#000;"/>
                                 </div>
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.ref">
-                                    <div t-if="o.theme_id.reference">
-                                        <font t-attf-style="color:#{o.theme_id.text_color}">
-                                            <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                                Customer Reference:
-                                            </strong>
-                                            <p t-field="o.ref"/>
-                                        </font>
-                                    </div>
+                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.ref">
+                                    <strong style="color:#000;">Customer Reference:</strong>
+                                    <p t-field="o.ref" style="color:#000;"/>
                                 </div>
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.source_id">
-                                    <div t-if="o.theme_id.source">
-                                        <font t-attf-style="color:#{o.theme_id.text_color}">
-                                            <strong t-attf-style="color:#{o.theme_id.heading_text_color}">
-                                                Source:
-                                            </strong>
-                                            <p t-field="o.source_id"/>
-                                        </font>
-                                    </div>
+                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.source_id">
+                                    <strong style="color:#000;">Source:</strong>
+                                    <p t-field="o.source_id" style="color:#000;"/>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <br/>
+
                 <!--Customer Address-->
-                <div t-if="o.theme_id.address"
-                     id="customer address"
-                     t-attf-style="color:#{o.theme_id.customer_text_color}">
+                <div id="customer_address" style="color:#000;">
                     <div class="row">
-                        <div style="width:50%;"
-                             t-attf-class="{{'ms-auto' if o.theme_id.customer_position == 'right' else ''}}">
-                            <div itemprop="address"
-                                 class="address">
-                                <div>
-                                    <span t-if="o.partner_id">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id"/>
-                                    </span>
-                                </div>
-                                <div>
-                                    <span t-if="o.partner_id.street">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id.street"/>
-                                    </span>
-                                </div>
-                                <div>
-                                    <span t-if="o.partner_id.street2">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id.street2"/>
-                                    </span>
-                                </div>
-                                <div t-if="o.theme_id.city">
-                                    <span t-if="o.partner_id.city">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id.city"/>
-                                    </span>
-                                </div>
-                                <div t-if="o.theme_id.country">
-                                    <span t-if="o.partner_id.country_id">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id.country_id"/>
-                                    </span>
-                                </div>
-                                <div t-if="o.theme_id.vat">
-                                    <span t-if="o.partner_id.vat">
-                                        <span style="color:#{o.theme_id.customer_text_color} !important;"
-                                              t-field="o.partner_id.vat"/>
-                                    </span>
-                                </div>
+                        <div style="width:50%;">
+                            <div itemprop="address" class="address">
+                                <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
+                                <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
+                                <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
+                                <div><span t-if="o.partner_id.city" t-field="o.partner_id.city"/></div>
+                                <div><span t-if="o.partner_id.country_id" t-field="o.partner_id.country_id"/></div>
+                                <div><span t-if="o.partner_id.vat" t-field="o.partner_id.vat"/></div>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <!--Product Table-->
-                <!-- ... (rest of your code unchanged, omitted for brevity) ... -->
+                <div class="row mt32">
+                    <div class="col-12">
+                        <table class="table table-sm o_main_table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th class="text-end">Quantity</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Taxes</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="o.invoice_line_ids" t-as="line">
+                                    <td><span t-field="line.name"/></td>
+                                    <td class="text-end"><span t-field="line.quantity"/></td>
+                                    <td class="text-end"><span t-field="line.price_unit"/></td>
+                                    <td class="text-end"><span t-field="line.tax_ids"/></td>
+                                    <td class="text-end"><span t-field="line.price_subtotal"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!--Totals-->
+                <div class="row mt32">
+                    <div class="col-6"/>
+                    <div class="col-6">
+                        <table class="table table-sm" style="width:100%;">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Untaxed Amount</strong></td>
+                                    <td class="text-end"><span t-field="o.amount_untaxed"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Taxes</strong></td>
+                                    <td class="text-end"><span t-field="o.amount_tax"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total</strong></td>
+                                    <td class="text-end"><strong t-field="o.amount_total"/></strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </t>
     </template>
-
-
-
 </odoo>
