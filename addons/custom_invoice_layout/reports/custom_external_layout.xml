@@ -1,10 +1,9 @@
 <odoo>
     <template id="custom_external_layout" inherit_id="web.external_layout_standard">
-        <xpath expr="//div[@class='header']" position="replace">
-            <div class="header">
-                <div class="row">
-                    <!-- This section intentionally left blank to remove the company address -->
-                </div>
+        <!-- Replace the whole company address block -->
+        <xpath expr="//div[@name='company_address']" position="replace">
+            <div class="col-6" name="company_address">
+                <!-- Company address removed intentionally -->
             </div>
         </xpath>
     </template>
