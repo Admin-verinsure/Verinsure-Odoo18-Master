@@ -3,14 +3,10 @@
     <!-- Patch to remove document_layout_id (not available in your db) -->
     <template id="external_layout_bold_patch" inherit_id="web.external_layout_bold">
         
-        <!-- Replace company logo container (remove document_layout_id.logo_position) -->
+        <!-- Replace the problematic company logo container -->
         <xpath expr="//div[@style='width:50%;']" position="replace">
+            <!-- Force it to always align left -->
             <div style="width:50%;" class="d-flex justify-content-start"/>
-        </xpath>
-
-        <!-- (Optional) Patch other places where document_layout_id is used -->
-        <xpath expr="//t[contains(@t-attf-class, 'company.document_layout_id')]" position="attributes">
-            <attribute name="t-attf-class"/>
         </xpath>
 
     </template>
