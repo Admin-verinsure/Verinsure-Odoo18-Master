@@ -1,6 +1,7 @@
 <odoo>
   <template id="custom_external_layout" name="Custom External Layout">
     <t t-name="custom_invoice_layout.custom_external_layout">
+
       <div class="header">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <!-- Company Logo -->
@@ -13,6 +14,7 @@
       </div>
 
       <div class="article o_report_layout_standard">
+        <!-- This is where the report body (invoice content) will be injected -->
         <t t-out="0"/>
       </div>
 
@@ -28,6 +30,7 @@
           </div>
         </div>
       </div>
+
     </t>
   </template>
 </odoo>
