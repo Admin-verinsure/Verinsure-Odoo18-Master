@@ -2,7 +2,7 @@
   <template id="custom_external_layout" inherit_id="web.external_layout_standard" priority="2000">
 
     <!-- Remove the company address column but keep logo -->
-    <xpath expr="//div[@class='col-6'][@name='company_address']" position="replace">
+   <xpath expr="//div[contains(@class,'row')]/div[2]" position="replace"/>
     </xpath>
 
   </template>
