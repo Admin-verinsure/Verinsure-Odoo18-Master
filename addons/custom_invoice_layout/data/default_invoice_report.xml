@@ -1,18 +1,22 @@
 <odoo>
-  <data>
+  <data noupdate="1">
+
+    <!-- Create your custom invoice report -->
     <record id="action_report_my_custom_invoice" model="ir.actions.report">
       <field name="name">My Custom Invoice</field>
       <field name="model">account.move</field>
       <field name="report_type">qweb-pdf</field>
       <field name="report_name">custom_invoice_layout.my_custom_invoice_template</field>
       <field name="report_file">custom_invoice_layout.my_custom_invoice_template</field>
+      <field name="print_report_name">'Invoice - %s' % (object.name) if object.name else ''</field>
       <field name="binding_model_id" ref="account.model_account_move"/>
       <field name="binding_type">report</field>
     </record>
 
-    <!-- Disable default Odoo invoice -->
-    <record id="account.report_invoice" model="ir.actions.report">
+    <!-- Disable the DEFAULT Odoo invoice report -->
+    <record id="account.account_invoices" model="ir.actions.report">
       <field name="binding_model_id" eval="False"/>
     </record>
+
   </data>
 </odoo>
