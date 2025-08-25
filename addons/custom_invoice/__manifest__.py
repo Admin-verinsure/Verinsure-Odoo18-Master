@@ -13,8 +13,7 @@
     'website': 'https://www.not4profit.online',
     'depends': ['account', 'web', ],
     'data': [
-             'views/doc_layout_views.xml',
-             'views/base_document_layout_views.xml',
+
              'views/custom_external_layout_templates.xml',
              'reports/normal_invoice_templates.xml',
              'reports/modern_invoice_templates.xml',
