@@ -1,0 +1,59 @@
+<odoo>
+  <!-- Custom Invoice Template -->
+  <template id="my_custom_invoice_template" name="Custom Invoice Template">
+    <!-- Call our custom external layout -->
+    <t t-call="custom_invoice_layout.custom_external_layout">
+      <t t-foreach="docs" t-as="o">
+        <div class="page">
+          <h2 style="text-align:center;">Invoice <span t-field="o.name"/></h2>
+          <p><strong>Customer:</strong> <span t-field="o.partner_id"/></p>
+
+          <!-- Lines -->
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="text-right">Qty</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr t-foreach="o.invoice_line_ids" t-as="l">
+                <td><span t-field="l.name"/></td>
+                <td class="text-right"><span t-field="l.quantity"/></td>
+                <td class="text-right"><span t-field="l.price_unit"/></td>
+                <td class="text-right">
+                  <span t-field="l.price_subtotal"
+                        t-field-options="{'widget':'monetary','display_currency':'o.currency_id'}"/>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Totals -->
+          <table class="table table-sm" style="width:40%; float:right;">
+            <tr>
+              <td><strong>Total</strong></td>
+              <td class="text-right">
+                <span t-field="o.amount_total"
+                      t-field-options="{'widget':'monetary','display_currency':'o.currency_id'}"/>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </t>
+    </t>
+  </template>
+
+  <!-- Report Action -->
+  <report
+      id="my_custom_invoice_report"
+      model="account.move"
+      string="Invoice"
+      report_type="qweb-pdf"
+      name="custom_invoice_layout.my_custom_invoice_template"
+      file="custom_invoice_layout.my_custom_invoice_template"
+      print_report_name="'Invoice - %s' % (object.name)"
+  />
+</odoo>
