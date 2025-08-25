@@ -185,12 +185,6 @@
         </t>
     </template>
 
-    <!-- Backward compatibility aliases (old module name → new module name) -->
-    <template id="invoice_format_editor.custom_template_report_invoice_modern"
-              inherit_id="format_editor.custom_template_report_invoice_modern"/>
-    <template id="invoice_format_editor.custom_template_report_invoice_normal"
-              inherit_id="format_editor.custom_template_report_invoice_normal"/>
-    <template id="invoice_format_editor.old_std_report_invoice_document"
-              inherit_id="format_editor.old_std_report_invoice_document"/>
+
 
 </odoo>
