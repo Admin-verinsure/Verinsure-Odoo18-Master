@@ -1,46 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherit the standard invoice report -->
-    <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
-        
-        <!-- Replace the external layout call with our custom one -->
-        <xpath expr="//t[@t-call='web.external_layout']" position="replace">
-            <t t-call="custom_invoice_layout.external_layout_custom"/>
-        </xpath>
-
-        <!-- Example: Update the invoice title -->
-        <xpath expr="//div[hasclass('page')]/t[@t-set='layout_document_title']" position="replace">
-            <t t-set="layout_document_title">
-                <span t-if="not proforma"/>
-                <span t-else="">PROFORMA</span>
-                <span t-if="o.move_type == 'out_invoice' and o.state == 'posted'">Tax Invoice</span>
-                <span t-elif="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Tax Invoice</span>
-                <span t-elif="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Tax Invoice</span>
-                <span t-elif="o.move_type == 'out_refund' and o.state == 'posted'">Tax Credit Note</span>
-                <span t-elif="o.move_type == 'out_refund' and o.state == 'draft'">Draft Tax Credit Note</span>
-                <span t-elif="o.move_type == 'out_refund' and o.state == 'cancel'">Cancelled Tax Credit Note</span>
-                <span t-elif="o.move_type == 'in_refund'">Tax Vendor Credit Note</span>
-                <span t-elif="o.move_type == 'in_invoice'">Tax Vendor Bill</span>
-                <span t-if="o.name != '/'" t-field="o.name"/>
-            </t>
-        </xpath>
-
-    </template>
-
-    <!-- Define our custom external layout -->
-    <template id="external_layout_custom" inherit_id="web.external_layout_standard">
-        <xpath expr="//div[hasclass('header')]" position="replace">
-            <div class="header o_custom_header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <img t-if="company.logo" class="o_company_logo_small" 
-                         t-att-src="image_data_uri(company.logo)" 
-                         alt="Company Logo"/>
-                    <div>
-                        <h3 t-field="company.name"/>
-                        <div t-field="company.partner_id.contact_address"/>
-                        <div t-field="company.phone"/>
-                    </div>
-                </div>
-            </div>
-        </xpath>
-    </template>
+    <data>
+        <!-- Inherit the main invoice report and replace the title block -->
+        <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
+            <xpath expr="//div[contains(@class,'page')]/t[@t-set='layout_document_title']" position="replace">
+                <t t-set="layout_document_title">
+                    <span t-if="not proforma"></span>
+                    <span t-else="">PROFORMA</span>
+                    <span t-if="o.move_type == 'out_invoice' and o.state == 'posted'">Custom Invoice</span>
+                    <span t-elif="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Custom Invoice</span>
+                    <span t-elif="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Custom Invoice</span>
+                    <span t-elif="o.move_type == 'out_refund' and o.state == 'posted'">Custom Credit Note</span>
+                    <span t-elif="o.move_type == 'out_refund' and o.state == 'draft'">Draft Custom Credit Note</span>
+                </t>
+            </xpath>
+        </template>
+    </data>
 </odoo>
