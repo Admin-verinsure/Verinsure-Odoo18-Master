@@ -1,9 +1,6 @@
 <odoo>
     <data noupdate="1">
-        <!--
-        Step 1: Define a new report action for your custom template.
-        This record makes the new template "printable" from an invoice record.
-        -->
+        
         <report
             id="account_invoice_report_my_custom"
             model="account.move"
