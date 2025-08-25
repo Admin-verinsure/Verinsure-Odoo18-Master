@@ -1,6 +1,5 @@
 <odoo>
     <template id="custom_external_layout" name="Custom External Layout" t-name="custom_invoice_layout.custom_external_layout">
-
         <div class="header">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <img t-if="company.logo" class="o_company_logo_small"
@@ -10,11 +9,9 @@
                 </div>
             </div>
         </div>
-
         <div class="article o_report_layout_standard">
             <t t-out="0"/>
         </div>
-
         <div class="footer">
             <div class="o_footer_content d-flex border-top pt-2">
                 <div class="flex-grow-1 text-start me-2">
