@@ -16,6 +16,7 @@
     ],
     'data': [
         'reports/invoice_report.xml',
+        'reports/custom_external_layout.xml',
         'data/default_invoice_report.xml',
     ],
     'installable': True,
