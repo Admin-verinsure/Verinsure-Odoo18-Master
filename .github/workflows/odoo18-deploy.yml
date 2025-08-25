@@ -115,7 +115,7 @@ jobs:
         if: ${{ inputs.rollback_to == '' }}
         shell: bash
         run: |
-          ts="$(date -u +%Ym%d-%H%M%S)"; shortsha="$(git rev-parse --short HEAD)";
+          ts="$(date -u +%Y%m%d-%H%M%S)"; shortsha="$(git rev-parse --short HEAD)";
           before="${{ github.event.before }}";
           if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
             before="$(git rev-parse HEAD~1 2>/dev/null || echo '')";
