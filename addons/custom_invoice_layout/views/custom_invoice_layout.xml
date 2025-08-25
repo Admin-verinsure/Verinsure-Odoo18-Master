@@ -15,5 +15,12 @@
                 </t>
             </xpath>
         </template>
+
+        <!-- Inherit the external layout to remove company address -->
+        <template id="custom_external_layout_no_address" inherit_id="web.external_layout_standard">
+            <xpath expr="//div[contains(@class, 'company_address')]" position="replace">
+                <!-- Empty block to remove address -->
+            </xpath>
+        </template>
     </data>
 </odoo>
