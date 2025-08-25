@@ -15,7 +15,6 @@
             binding_model_id="account.model_account_move"
             binding_type="report"
         />
-
         <!--
         Step 2: Make your custom report the default.
         This record "unbinds" the standard report from the invoice model,
