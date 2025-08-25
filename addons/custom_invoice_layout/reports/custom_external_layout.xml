@@ -1,37 +1,32 @@
 <odoo>
-  <!-- Define standalone QWeb template for invoice external layout -->
-  <template id="custom_external_layout" name="Custom External Layout">
-    <t t-name="custom_invoice_layout.custom_external_layout">
-
-      <div class="header">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <!-- Company Logo -->
-          <img t-if="company.logo" class="o_company_logo_small"
-               t-att-src="image_data_uri(company.logo)" alt="Logo"/>
-          <div class="o_company_tagline fw-bold">
-            <t t-esc="company.report_header or ''"/>
-          </div>
-        </div>
-      </div>
-
-      <div class="article o_report_layout_standard">
-        <!-- This is where the report body (invoice content) will be injected -->
-        <t t-out="0"/>
-      </div>
-
-      <div class="footer">
-        <div class="o_footer_content d-flex border-top pt-2">
-          <div class="flex-grow-1 text-start me-2">
-            <t t-esc="company.report_footer or ''"/>
-          </div>
-          <div class="text-end text-muted">
-            <div t-if="report_type == 'pdf'">
-              Page <span class="page"/> / <span class="topage"/>
+    <template id="custom_external_layout" name="Custom External Layout">
+        
+        <div class="header">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <img t-if="company.logo" class="o_company_logo_small"
+                     t-att-src="image_data_uri(company.logo)" alt="Logo"/>
+                <div class="o_company_tagline fw-bold">
+                    <t t-esc="company.report_header or ''"/>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
 
-    </t>
-  </template>
+        <div class="article o_report_layout_standard">
+            <t t-out="0"/>
+        </div>
+
+        <div class="footer">
+            <div class="o_footer_content d-flex border-top pt-2">
+                <div class="flex-grow-1 text-start me-2">
+                    <t t-esc="company.report_footer or ''"/>
+                </div>
+                <div class="text-end text-muted">
+                    <div t-if="report_type == 'pdf'">
+                        Page <span class="page"/> / <span class="topage"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+    </template>
 </odoo>
