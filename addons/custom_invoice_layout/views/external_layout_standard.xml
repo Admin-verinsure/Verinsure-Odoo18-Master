@@ -1,28 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <!-- Inherit Odoo's standard external layout -->
-    <template id="external_layout_standard" inherit_id="web.external_layout_standard">
-
-      <!-- Remove company address -->
-      <xpath expr="//div[@name='company_address']" position="replace"/>
-
-      <!-- Change tagline style -->
-      <xpath expr="//div[contains(@class, 'o_company_tagline')]" position="attributes">
-        <attribute name="class">o_company_tagline mw-50 fw-bold text-primary</attribute>
-      </xpath>
-
-      <!-- Add custom note in footer -->
-      <xpath expr="//div[contains(@class, 'o_footer_content')]" position="inside">
-        <div class="text-center w-100 mt-1 text-muted">
-          <small>Customized Layout - For Internal Use Only</small>
+    <!-- Your custom external layout used by reports -->
+    <template id="external_layout_standard">
+      <!-- HEADER (company address removed) -->
+      <div t-attf-class="header o_company_#{company.id}_layout">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <img t-if="company.logo" class="o_company_logo_small" t-att-src="image_data_uri(company.logo)" alt="Logo"/>
+          <div t-if="company.report_header" t-field="company.report_header" class="o_company_tagline mw-50 fw-bold"/>
         </div>
-      </xpath>
+        <!-- NOTE: intentionally no company address block here -->
+      </div>
 
-      <!-- Add a horizontal line after tagline -->
-      <xpath expr="//div[contains(@class, 'o_company_tagline')]" position="after">
-        <hr style="border: 1px solid #000; margin: 5px 0;"/>
-      </xpath>
+      <!-- Background handling (kept same as stock behavior) -->
+      <t t-set="layout_background_url"
+         t-value="'data:image/png;base64,%s' % company.layout_background_image.decode('utf-8') if company.layout_background_image and company.layout_background == 'Custom' else
+                  '/base/static/img/demo_logo_report.png' if company.layout_background == 'Demo logo' else ''"/>
 
+      <!-- ARTICLE -->
+      <div t-attf-class="article o_report_layout_standard o_table_standard o_company_#{company.id}_layout o_snail_mail {{'o_report_layout_background' if company.layout_background != 'Blank' else ''}}"
+           t-attf-style="{{ 'background-image: url(%s);' % layout_background_url if layout_background_url else '' }}"
+           t-att-data-oe-model="o and o._name"
+           t-att-data-oe-id="o and o.id"
+           t-att-data-oe-lang="o and o.env.context.get('lang')">
+
+        <!-- Keep default address/layout block for document body (customer address etc.) -->
+        <t t-call="web.address_layout"/>
+
+        <!-- Document title injected by the called report -->
+        <h2 t-out="layout_document_title"/>
+        <!-- Report body gets injected via t-raw -->
+        <t t-raw="0"/>
+      </div>
+
+      <!-- FOOTER -->
+      <div t-attf-class="footer o_company_#{company.id}_layout {{report_type != 'pdf' and 'mt-auto'}}">
+        <div class="o_footer_content d-flex border-top pt-2">
+          <div class="flex-grow-1 text-start me-2" t-field="company.report_footer"/>
+          <div class="text-end text-muted">
+            <div t-if="report_type == 'pdf' and display_name_in_footer" t-out="o.name"/>
+            <div t-if="report_type == 'pdf'" class="text-nowrap">Page <span class="page"/> / <span class="topage"/></div>
+          </div>
+        </div>
+      </div>
     </template>
   </data>
 </odoo>
