@@ -12,13 +12,12 @@
     'license': 'LGPL-3',
     'depends': [
         'account',
-        'web',
     ],
     'data': [
-    'reports/custom_external_layout.xml',   
-    'reports/invoice_report.xml',
-    'data/default_invoice_report.xml',
-],
+        'reports/custom_external_layout.xml',   # load layout first
+        'reports/invoice_report.xml',           # load invoice template
+        'data/default_invoice_report.xml',      # override report action last
+    ],
     'installable': True,
     'application': False,
     'auto_install': False,
