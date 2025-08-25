@@ -1,15 +1,11 @@
 <odoo>
   <data>
-    <template id="external_layout_inherit" inherit_id="web.external_layout_standard">
-      
-      <!-- Example: Remove company address -->
-      <xpath expr="//div[@name='company_address']" position="replace"/>
-      
-      <!-- Example: Add custom footer note -->
-      <xpath expr="//div[contains(@class, 'o_footer_content')]" position="inside">
-        <div class="text-center w-100 mt-1 text-muted">
-          <small>Customized Layout - Internal Use Only</small>
-        </div>
+    <!-- Inherit the standard external layout -->
+    <template id="external_layout_remove_address" inherit_id="web.external_layout_standard">
+
+      <!-- Remove the company address block from header -->
+      <xpath expr="//div[@name='company_address']" position="replace">
+        <!-- Empty block to completely remove company address -->
       </xpath>
 
     </template>
