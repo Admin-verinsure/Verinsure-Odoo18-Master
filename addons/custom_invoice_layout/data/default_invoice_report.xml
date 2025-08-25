@@ -1,0 +1,18 @@
+<odoo>
+    <data noupdate="1">
+        <report
+            id="account_invoice_report_my_custom"
+            model="account.move"
+            string="My Custom Invoice"
+            report_type="qweb-pdf"
+            name="my_custom_invoice.my_custom_invoice_template"
+            file="my_custom_invoice.my_custom_invoice_template"
+            print_report_name="'Invoice - %s' % (object.name) if object.name else ''"
+            binding_model_id="account.model_account_move"
+            binding_type="report"
+        />
+        <record id="account.report_invoice" model="ir.actions.report">
+            <field name="binding_model_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

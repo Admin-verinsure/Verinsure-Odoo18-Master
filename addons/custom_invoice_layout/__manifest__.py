@@ -1,21 +1,24 @@
 {
-    'name': 'Custom Report Layout',
-    'version': '1.0',
-    'category': 'Reporting',
-    'summary': 'Custom external layout inherited from project web.external_layout_standard',
+    'name': 'My Custom Invoice',
+    'version': '18.0.1.0.0',
+    'summary': 'Provides a custom invoice template and makes it the default.',
     'description': """
-This module duplicates Odoo18’s external layout and inherits the project layout 
-(web.external_layout_standard) for applying custom changes without touching original code.
+        This module creates a new, standalone invoice template and
+        configures Odoo to use it as the main default invoice report.
     """,
-    'author': 'Your Company',
+    'author': 'Your Name',
+    'website': 'https://www.yourwebsite.com',
+    'category': 'Accounting/Invoicing',
     'license': 'LGPL-3',
-    'depends': ['web', 'account'],
+    'depends': [
+        'account',
+        'web',
+    ],
     'data': [
-        'views/external_layout_standard.xml',
-        'views/external_layout_inherit.xml',
-        'views/report_invoice_document.xml',
-        'views/custom_invoice_template.xml',
+        'reports/invoice_report.xml',
+        'data/default_invoice_report.xml',
     ],
     'installable': True,
     'application': False,
+    'auto_install': False,
 }
