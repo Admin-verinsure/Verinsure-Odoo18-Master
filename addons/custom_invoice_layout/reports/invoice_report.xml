@@ -1,6 +1,7 @@
 <odoo>
   <!-- Custom Invoice Template -->
-  <template id="my_custom_invoice_template">
+  <template id="my_custom_invoice_template" name="Custom Invoice Template">
+    <!-- Call our custom external layout -->
     <t t-call="custom_invoice_layout.custom_external_layout">
       <t t-foreach="docs" t-as="o">
         <div class="page">
@@ -51,8 +52,8 @@
       model="account.move"
       string="Invoice"
       report_type="qweb-pdf"
-      name="my_custom_invoice.my_custom_invoice_template"
-      file="my_custom_invoice.my_custom_invoice_template"
+      name="custom_invoice_layout.my_custom_invoice_template"
+      file="custom_invoice_layout.my_custom_invoice_template"
       print_report_name="'Invoice - %s' % (object.name)"
   />
 </odoo>
