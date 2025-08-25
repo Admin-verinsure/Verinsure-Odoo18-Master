@@ -19,7 +19,7 @@
         <!--
         Step 2: Make your custom report the default.
         This record "unbinds" the standard report from the invoice model,
-        so your new one is the only default.
+        so your new one is the  default.
         -->
         <record id="account.report_invoice" model="ir.actions.report">
             <field name="binding_model_id" eval="False"/>

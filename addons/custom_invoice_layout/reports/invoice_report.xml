@@ -4,13 +4,12 @@
         This is your custom, standalone invoice template.
         All your edits and design changes will be made here.
         This template does not inherit from any standard Odoo templates.
-        It starts with a fresh canvas but leverages the `web.external_layout_standard`
-        for a consistent header/footer look.
+        It now calls your custom external layout to remove the header address.
         -->
         <template id="my_custom_invoice_template">
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="o">
-                    <t t-call="web.external_layout_standard">
+                    <t t-call="my_custom_invoice.custom_external_layout">
                         <div class="page">
                             <h2 class="mt-3">
                                 <span t-if="o.move_type == 'out_invoice' and o.state == 'posted'">Invoice</span>
@@ -20,13 +19,9 @@
                             </h2>
                             <p>This invoice is a custom version with simplified styling and content.</p>
 
-                            <!-- Customer and Invoice Details -->
+                            <!-- Invoice Details only (Customer address has been removed) -->
                             <div class="row mt-4">
-                                <div class="col-6">
-                                    <strong>Bill To:</strong>
-                                    <address t-field="o.partner_id" t-options='{"widget": "contact", "fields": ["address", "name", "phone", "email"]}'/>
-                                </div>
-                                <div class="col-6 text-end">
+                                <div class="col-6 offset-6 text-end">
                                     <strong>Invoice #:</strong> <span t-field="o.name"/><br/>
                                     <strong>Date:</strong> <span t-field="o.invoice_date"/><br/>
                                     <t t-if="o.invoice_origin">
