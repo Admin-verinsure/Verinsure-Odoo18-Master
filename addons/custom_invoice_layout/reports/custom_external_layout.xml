@@ -1,6 +1,6 @@
 <odoo>
-    <template id="custom_external_layout" name="Custom External Layout">
-        
+    <template id="custom_external_layout" name="Custom External Layout" t-name="custom_invoice_layout.custom_external_layout">
+
         <div class="header">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <img t-if="company.logo" class="o_company_logo_small"
@@ -27,6 +27,5 @@
                 </div>
             </div>
         </div>
-    
     </template>
 </odoo>
