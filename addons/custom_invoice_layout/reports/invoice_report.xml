@@ -1,7 +1,7 @@
 <odoo>
   <!-- Custom Invoice Template -->
   <template id="my_custom_invoice_template">
-    <t t-call="custom_invoice_layout.custom_external_layout">
+    <t t-call="custom_external_layout">
       <t t-foreach="docs" t-as="o">
         <div class="page">
           <h2 style="text-align:center;">Invoice <span t-field="o.name"/></h2>
@@ -45,7 +45,7 @@
     </t>
   </template>
 
-  <!-- Report Action (Override Default Invoice) -->
+  <!-- Report Action -->
   <report
       id="my_custom_invoice_report"
       model="account.move"
