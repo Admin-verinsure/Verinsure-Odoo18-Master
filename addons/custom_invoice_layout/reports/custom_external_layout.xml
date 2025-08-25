@@ -1,8 +1,10 @@
 <odoo>
-  <template id="custom_external_layout" inherit_id="web.external_layout_standard">
-    <!-- Debug: Replace company address with TEST -->
+  <template id="custom_external_layout" inherit_id="web.external_layout_standard" priority="99">
+    
+    <!-- Completely remove the company address column -->
     <xpath expr="//div[@name='company_address']" position="replace">
-      <div name="company_address" style="color:red; font-weight:bold;">TEST ADDRESS BLOCK REMOVED</div>
+      <!-- Replace with nothing to keep logo only -->
     </xpath>
+
   </template>
 </odoo>
