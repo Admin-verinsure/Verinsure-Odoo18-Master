@@ -1,0 +1,88 @@
+<odoo>
+    <data>
+        <!--
+        This is your custom, standalone invoice template.
+        All your edits and design changes will be made here.
+        This template does not inherit from any standard Odoo templates.
+        It starts with a fresh canvas but leverages the `web.external_layout_standard`
+        for a consistent header/footer look.
+        -->
+        <template id="my_custom_invoice_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="o">
+                    <t t-call="web.external_layout_standard">
+                        <div class="page">
+                            <h2 class="mt-3">
+                                <span t-if="o.move_type == 'out_invoice' and o.state == 'posted'">Invoice</span>
+                                <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Invoice</span>
+                                <span t-if="o.move_type == 'out_refund'">Credit Note</span>
+                                <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                            </h2>
+                            <p>This invoice is a custom version with simplified styling and content.</p>
+
+                            <!-- Customer and Invoice Details -->
+                            <div class="row mt-4">
+                                <div class="col-6">
+                                    <strong>Bill To:</strong>
+                                    <address t-field="o.partner_id" t-options='{"widget": "contact", "fields": ["address", "name", "phone", "email"]}'/>
+                                </div>
+                                <div class="col-6 text-end">
+                                    <strong>Invoice #:</strong> <span t-field="o.name"/><br/>
+                                    <strong>Date:</strong> <span t-field="o.invoice_date"/><br/>
+                                    <t t-if="o.invoice_origin">
+                                        <strong>Source:</strong> <span t-field="o.invoice_origin"/>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Invoice Lines -->
+                            <table class="table table-sm mt-4">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th class="text-end">Quantity</th>
+                                        <th class="text-end">Unit Price</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.invoice_line_ids" t-as="line">
+                                        <tr>
+                                            <td><span t-field="line.name"/></td>
+                                            <td class="text-end"><span t-field="line.quantity"/></td>
+                                            <td class="text-end"><span t-field="line.price_unit"/></td>
+                                            <td class="text-end"><span t-field="line.price_subtotal" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Totals Section -->
+                            <div class="clearfix mt-4">
+                                <div id="total" class="row">
+                                    <div class="col-6"></div>
+                                    <div class="col-6">
+                                        <table class="table table-sm">
+                                            <tr class="border-top border-bottom">
+                                                <td><strong>Subtotal:</strong></td>
+                                                <td class="text-end"><span t-field="o.amount_untaxed" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Taxes:</strong></td>
+                                                <td class="text-end"><span t-field="o.amount_tax" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/></td>
+                                            </tr>
+                                            <tr class="fw-bold">
+                                                <td><strong>Total:</strong></td>
+                                                <td class="text-end"><span t-field="o.amount_total" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+    </data>
+</odoo>
