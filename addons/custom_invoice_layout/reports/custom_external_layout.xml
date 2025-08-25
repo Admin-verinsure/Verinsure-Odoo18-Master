@@ -1,10 +1,8 @@
 <odoo>
   <template id="custom_external_layout" inherit_id="web.external_layout_standard">
-    
-    <!-- Remove only the company address block (keep logo intact) -->
+    <!-- Debug: Replace company address with TEST -->
     <xpath expr="//div[@name='company_address']" position="replace">
-      <div name="company_address"/>
+      <div name="company_address" style="color:red; font-weight:bold;">TEST ADDRESS BLOCK REMOVED</div>
     </xpath>
-
   </template>
 </odoo>
