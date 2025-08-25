@@ -1,6 +1,6 @@
 
 {
-    'name': 'custom invoice',
+    'name': 'invoice format editor',
     'version': '18.0.1.0.0',
     'category': 'Accounting',
     'summary': 'Invoice Report, Report Editor, Customise Invoice Report, '
@@ -13,7 +13,7 @@
     'website': 'https://www.not4profit.online',
     'depends': ['account', 'web', ],
     'data': [
-
+        
              'views/custom_external_layout_templates.xml',
              'reports/normal_invoice_templates.xml',
              'reports/modern_invoice_templates.xml',
