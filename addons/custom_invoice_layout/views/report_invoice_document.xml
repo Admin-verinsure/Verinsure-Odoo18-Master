@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <!-- Override the invoice report to call our custom external layout -->
-    <template id="custom_invoice_layout_inherit" inherit_id="account.report_invoice_document">
+    <!-- Point the invoice report at our custom external layout -->
+    <template id="report_invoice_document_use_custom_layout"
+              inherit_id="account.report_invoice_document">
       <xpath expr="//t[@t-call='web.external_layout']" position="replace">
         <t t-call="custom_invoice_layout.external_layout_standard"/>
       </xpath>
