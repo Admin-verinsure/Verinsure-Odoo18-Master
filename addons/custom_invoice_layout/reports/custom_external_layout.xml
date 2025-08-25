@@ -1,8 +1,6 @@
 <odoo>
   <template id="custom_external_layout" inherit_id="web.external_layout_standard">
-    <!-- Remove company address block -->
-    <xpath expr="//div[@name='company_address']" position="replace">
-      <div class="col-6" name="company_address"/>
-    </xpath>
+    <!-- Remove the entire company_address column -->
+    <xpath expr="//div[@name='company_address']" position="replace"/>
   </template>
 </odoo>
