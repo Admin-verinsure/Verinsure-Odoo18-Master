@@ -1,9 +1,8 @@
 <odoo>
-  <template id="custom_external_layout" inherit_id="web.external_layout_standard" priority="99">
-    
-    <!-- Completely remove the company address column -->
-    <xpath expr="//div[@name='company_address']" position="replace">
-      <!-- Replace with nothing to keep logo only -->
+  <template id="custom_external_layout" inherit_id="web.external_layout_standard" priority="2000">
+
+    <!-- Remove the company address column but keep logo -->
+    <xpath expr="//div[@class='col-6'][@name='company_address']" position="replace">
     </xpath>
 
   </template>
