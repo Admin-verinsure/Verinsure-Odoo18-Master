@@ -1,17 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <!-- Inherit external layout to remove company address -->
-    <template id="external_layout_remove_address" inherit_id="web.external_layout">
+    <!-- Inherit Invoice Report -->
+    <template id="remove_customer_address_invoice" inherit_id="account.report_invoice_document">
       
-      <!-- Remove the address block -->
-      <xpath expr="//div[contains(@class,'company_address')]" position="replace">
-        <!-- Empty block so address disappears -->
+      <!-- Remove address when shipping address is different -->
+      <xpath expr="//div[@name='address_not_same_as_shipping']/t[@t-set='address']/address" position="replace">
+        <!-- Leave empty to remove -->
       </xpath>
 
-      <!-- (Optional) Center the logo since address is gone -->
-      <xpath expr="//div[contains(@class,'o_company_#{company.id}_layout')]/div[contains(@class,'d-flex')]" position="attributes">
-        <attribute name="class">d-flex justify-content-center align-items-center</attribute>
+      <!-- Remove address when shipping = customer -->
+      <xpath expr="//div[@name='address_same_as_shipping']/t[@t-set='address']/address" position="replace">
+        <!-- Leave empty -->
+      </xpath>
+
+      <!-- Remove address when no shipping -->
+      <xpath expr="//div[@name='no_shipping']/t[@t-set='address']/address" position="replace">
+        <!-- Leave empty -->
       </xpath>
 
     </template>
