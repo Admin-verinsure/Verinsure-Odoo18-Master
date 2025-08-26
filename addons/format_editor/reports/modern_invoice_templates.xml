@@ -2,15 +2,15 @@
 <odoo>
     <!-- Modern Invoice Template -->
     <template id="custom_template_report_invoice_modern">
+        <!-- Call external layout but suppress the default header -->
         <t t-call="web.external_layout">
             <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
             <t t-set="model" t-value="'account.move'"/>
             <t t-set="company" t-value="o.company_id"/>
 
-
             <div class="page" style="overflow: hidden;">
 
-                <!-- Header with Logo + Company Info -->
+                <!-- Custom Header with Logo + Company Info -->
                 <div class="row mb-4 align-items-center">
                     <div class="col-6">
                         <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
@@ -28,17 +28,16 @@
                 <div class="row mb-3">
                     <div class="col-12" style="background-color:#f0f0f0; padding:15px;">
                         <h2 class="m-0" style="color:#000;">
-    <span t-if="o.move_type == 'out_invoice' and (o.state == 'draft' or o.state == 'posted')">Invoice</span>
-    <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">Pro-Forma</span>
-    <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Invoice</span>
-    <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Invoice</span>
-    <span t-if="o.move_type == 'out_refund'">Refund</span>
-    <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-    <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-    <span> </span>
-    <span t-field="o.name"/>
-</h2>
-
+                            <span t-if="o.move_type == 'out_invoice' and (o.state == 'draft' or o.state == 'posted')">Invoice</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">Pro-Forma</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Invoice</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Invoice</span>
+                            <span t-if="o.move_type == 'out_refund'">Refund</span>
+                            <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                            <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                            <span> </span>
+                            <span t-field="o.name"/>
+                        </h2>
                     </div>
                 </div>
 
@@ -100,27 +99,6 @@
                         </table>
                     </div>
                 </div>
-
-                <!-- Totals -->
-                <!-- <div class="row mt-4">
-                    <div class="col-6"></div>
-                    <div class="col-6">
-                        <table class="table table-borderless">
-                            <tr>
-                                <td><strong>Total (excl. Tax):</strong></td>
-                                <td class="text-end" t-field="o.amount_untaxed"/>
-                            </tr>
-                            <tr>
-                                <td><strong>Tax:</strong></td>
-                                <td class="text-end" t-field="o.amount_tax"/>
-                            </tr>
-                            <tr style="background:#f0f0f0;">
-                                <td><strong>Grand Total:</strong></td>
-                                <td class="text-end" t-field="o.amount_total"/>
-                            </tr>
-                        </table>
-                    </div>
-                </div> -->
 
             </div>
         </t>
