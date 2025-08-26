@@ -133,9 +133,10 @@
 <t t-if="o.narration">
     <h5 style="margin-top:20px;">Additional Information</h5>
     <div style="white-space:pre-line;">
-        <t t-esc="o.narration.replace(u'\u00A0',' ').replace(u'\u00C2','').replace('&Acirc;','')"/>
+        <t t-esc="(o.narration or '').replace(u'\u00A0',' ').replace(u'\u00C2','').replace('Â','')"/>
     </div>
 </t>
+
 
 
 
