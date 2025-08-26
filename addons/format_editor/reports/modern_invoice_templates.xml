@@ -115,7 +115,7 @@
 </div>
 
             <!-- Totals -->
-            <!-- <div class="row mt-4">
+             <div class="row mt-4">
                 <div class="col-6"></div>
                 <div class="col-6">
                     <table class="table table-borderless">
@@ -133,7 +133,7 @@
                         </tr>
                     </table>
                 </div>
-            </div> -->
+            </div> 
 
             <!-- Footer -->
             <div class="row mt-5 pt-3 border-top" style="font-size:12px; color:#666;">
