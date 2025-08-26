@@ -103,4 +103,12 @@
             </div>
         </t>
     </template>
+
+    <template id="remove_default_header" inherit_id="web.external_layout">
+        <xpath expr="//div[@class='header']" position="replace">
+            <!-- Removed default header to avoid duplication -->
+        </xpath>
+    </template>
+</odoo>
+
 </odoo>
