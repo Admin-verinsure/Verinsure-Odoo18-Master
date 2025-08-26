@@ -4,17 +4,17 @@
         <t t-set="o" t-value="o.with_context({'lang': o.partner_id.lang})"/>
         <t t-set="company" t-value="o.company_id"/>
 
-        <!-- Whole Page (self-contained, no external_layout) -->
-        <div class="page" style="font-family:'DejaVu Sans',sans-serif; font-size:12px; color:#000;">
+        <!-- Whole Page (Self-contained, PDF-safe) -->
+        <div class="page" style="font-family:'DejaVu Sans', sans-serif; font-size:12px; color:#000;">
 
             <!-- HEADER -->
-            <table style="width:100%; margin-bottom:20px;">
+            <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
                 <tr>
-                    <td style="width:50%;">
+                    <td style="width:50%; vertical-align:top;">
                         <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
                              style="max-height:80px;" alt="Company Logo"/>
                     </td>
-                    <td style="width:50%; text-align:right;">
+                    <td style="width:50%; text-align:right; vertical-align:top;">
                         <h3 style="margin:0;" t-field="company.name"/>
                         <div><span t-field="company.street"/></div>
                         <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
@@ -36,7 +36,7 @@
             </h2>
 
             <!-- INVOICE INFO -->
-            <table style="width:100%; margin-bottom:20px;">
+            <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
                 <tr>
                     <td t-if="o.invoice_date"><strong>Date:</strong> <span t-field="o.invoice_date"/></td>
                     <td t-if="o.invoice_date_due"><strong>Due:</strong> <span t-field="o.invoice_date_due"/></td>
@@ -83,7 +83,7 @@
             </table>
 
             <!-- TOTALS -->
-            <table style="width:40%; margin-left:auto; margin-top:20px;">
+            <table style="width:40%; margin-left:auto; margin-top:20px; border-collapse:collapse;">
                 <tr>
                     <td><strong>Total (excl. Tax):</strong></td>
                     <td style="text-align:right;">
@@ -107,18 +107,22 @@
                 </tr>
             </table>
 
-            <!-- Notes -->
-<t t-foreach="o.invoice_line_ids" t-as="line" t-if="line.display_type == 'note'">
-    <h5>Notes</h5>
-    <div style="white-space: pre-line; margin-top:5px;">
-        <p t-field="line.name"/>
-    </div>
-</t>
-
+            <!-- NOTES (styled box after totals) -->
+            <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type in ['note','line_note'])"/>
+            <t t-if="note_lines">
+                <div style="margin-top:25px; border:1px solid #ccc; padding:10px; background:#f9f9f9;">
+                    <h5 style="margin:0 0 10px 0;">Notes</h5>
+                    <div style="white-space:pre-line;">
+                        <t t-foreach="note_lines" t-as="note_line">
+                            <p t-field="note_line.name"/>
+                        </t>
+                    </div>
+                </div>
+            </t>
 
             <!-- ADDITIONAL INFO -->
             <t t-if="o.narration">
-                <h5>Additional Information</h5>
+                <h5 style="margin-top:20px;">Additional Information</h5>
                 <div style="white-space:pre-line;" t-field="o.narration"/>
             </t>
 
