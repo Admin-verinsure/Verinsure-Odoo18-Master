@@ -48,12 +48,24 @@
             </table>
 
             <!-- CUSTOMER -->
-            <h1>Bill To:</h1>
-            <div><span t-field="o.partner_id"/></div>
-            <div><span t-field="o.partner_id.street"/></div>
-            <div><span t-field="o.partner_id.city"/> <span t-field="o.partner_id.zip"/></div>
-            <div><span t-field="o.partner_id.country_id"/></div>
-            <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div>
+<h3 style="font-size:16px; margin-bottom:8px;">Bill To:</h3>
+<div style="font-size:14px; line-height:1.4;">
+    <span t-esc="o._clean_text(o.partner_id.name)"/>
+</div>
+<div style="font-size:14px; line-height:1.4;">
+    <span t-esc="o._clean_text(o.partner_id.street)"/>
+</div>
+<div style="font-size:14px; line-height:1.4;">
+    <span t-esc="o._clean_text(o.partner_id.city)"/> 
+    <span t-esc="o._clean_text(o.partner_id.zip)"/>
+</div>
+<div style="font-size:14px; line-height:1.4;">
+    <span t-esc="o._clean_text(o.partner_id.country_id.display_name)"/>
+</div>
+<div style="font-size:14px; line-height:1.4;" t-if="o.partner_id.vat">
+    VAT: <span t-esc="o._clean_text(o.partner_id.vat)"/>
+</div>
+
 
             <!-- PRODUCT TABLE -->
             <table style="width:100%; margin-top:20px; border-collapse:collapse;" border="1">
@@ -118,12 +130,13 @@
             </t>
 
             <!-- ADDITIONAL INFO -->
-            <t t-if="o.narration">
+<t t-if="o.narration">
     <h5 style="margin-top:20px;">Additional Information</h5>
     <div style="white-space:pre-line;">
-        <t t-esc="o.narration.replace(u'\u00A0',' ')"/>
+        <t t-esc="o.narration.replace(u'\u00A0',' ').replace(u'\u00C2','').replace('&Acirc;','')"/>
     </div>
 </t>
+
 
 
             <!-- FOOTER -->
