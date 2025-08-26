@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Modern Invoice Template (table-based, PDF safe, with correct currency formatting) -->
+    <!-- Modern Invoice Template (PDF-safe with DejaVu Sans font and proper notes) -->
     <template id="custom_template_report_invoice_modern">
         <t t-set="o" t-value="o.with_context({'lang': o.partner_id.lang})"/>
         <t t-set="model" t-value="'account.move'"/>
         <t t-set="company" t-value="o.company_id"/>
 
-        <div class="page" style="overflow: hidden; font-family: Arial, sans-serif;">
+        <!-- Use DejaVu Sans for PDF consistency -->
+        <div class="page" style="overflow: hidden; font-family: 'DejaVu Sans', sans-serif;">
 
             <!-- Header with Logo + Company Info -->
             <table style="width:100%; margin-bottom:20px; border-collapse: collapse;">
@@ -91,15 +92,19 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr t-foreach="o.invoice_line_ids" t-as="line" t-if="not line.display_type or line.display_type == 'product'">
+                    <!-- Only product/service lines -->
+                    <tr t-foreach="o.invoice_line_ids" t-as="line" 
+                        t-if="not line.display_type or line.display_type == 'product'">
                         <td><span t-field="line.name"/></td>
                         <td style="text-align:right;"><span t-field="line.quantity"/></td>
                         <td style="text-align:right;">
-                            <span t-field="line.price_unit" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                            <span t-field="line.price_unit" 
+                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                         </td>
                         <td style="text-align:right;"><span t-field="line.tax_ids"/></td>
                         <td style="text-align:right;">
-                            <span t-field="line.price_subtotal" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                            <span t-field="line.price_subtotal" 
+                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                         </td>
                     </tr>
                 </tbody>
@@ -110,39 +115,46 @@
                 <tr>
                     <td><strong>Total (excl. Tax):</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_untaxed" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                        <span t-field="o.amount_untaxed" 
+                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Tax:</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_tax" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                        <span t-field="o.amount_tax" 
+                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                     </td>
                 </tr>
                 <tr style="background:#f0f0f0;">
                     <td><strong>Grand Total:</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_total" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                        <span t-field="o.amount_total" 
+                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                     </td>
                 </tr>
             </table>
 
-            <!-- Notes Section -->
-            <t t-if="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')">
+            <!-- Notes Section (fixed) -->
+            <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')"/>
+            <t t-if="note_lines">
                 <h5>Notes</h5>
                 <div style="white-space: pre-line;">
-                    <t t-foreach="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')" t-as="note_line">
+                    <t t-foreach="note_lines" t-as="note_line">
                         <p t-field="note_line.name"/>
                     </t>
                 </div>
             </t>
+
+            <!-- Additional Information -->
             <t t-if="o.narration">
                 <h5>Additional Information</h5>
                 <div style="white-space: pre-line;" t-field="o.narration"/>
             </t>
 
             <!-- Footer -->
-            <div style="margin-top:40px; padding-top:10px; border-top:1px solid #ccc; font-size:12px; color:#666; text-align:center;">
+            <div style="margin-top:40px; padding-top:10px; border-top:1px solid #ccc; 
+                        font-size:12px; color:#666; text-align:center;">
                 <span t-if="company.report_footer" t-field="company.report_footer"/>
             </div>
 
