@@ -5,6 +5,8 @@
         <t t-call="web.external_layout">
             <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
             <t t-set="model" t-value="'account.move'"/>
+            <t t-set="company" t-value="o.company_id"/>
+
 
             <div class="page" style="overflow: hidden;">
 
