@@ -5,7 +5,12 @@
         <t t-set="company" t-value="o.company_id"/>
 
         <!-- Whole Page (Self-contained, PDF-safe) -->
-        <div class="page" style="font-family:'DejaVu Sans', sans-serif; font-size:12px; color:#000;">
+        <div class="page"
+             style="font-family:'DejaVu Sans','Arial Unicode MS','Liberation Sans',sans-serif;
+                    font-size:12px; color:#000;">
+
+            <!-- Force UTF-8 Meta for wkhtmltopdf -->
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
             <!-- HEADER -->
             <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
