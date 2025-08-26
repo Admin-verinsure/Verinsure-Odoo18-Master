@@ -96,25 +96,7 @@
     </div>
 </div>
 
-<!-- Notes Section -->
-<div class="row mt-4">
-    <div class="col-12">
-        <t t-if="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')">
-            <h5>Notes</h5>
-            <div style="white-space: pre-line;">
-                <t t-foreach="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')" t-as="note_line">
-                    <p t-field="note_line.name"/>
-                </t>
-            </div>
-        </t>
-        <t t-if="o.narration">
-            <h5>Additional Information</h5>
-            <div style="white-space: pre-line;" t-field="o.narration"/>
-        </t>
-    </div>
-</div>
-
-            <!-- Totals -->
+  <!-- Totals -->
 <div class="row mt-4">
     <div class="col-6"></div>
     <div class="col-6">
@@ -141,6 +123,26 @@
     </div>
 </div>
 
+
+<!-- Notes Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <t t-if="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')">
+            <h5>Notes</h5>
+            <div style="white-space: pre-line;">
+                <t t-foreach="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')" t-as="note_line">
+                    <p t-field="note_line.name"/>
+                </t>
+            </div>
+        </t>
+        <t t-if="o.narration">
+            <h5>Additional Information</h5>
+            <div style="white-space: pre-line;" t-field="o.narration"/>
+        </t>
+    </div>
+</div>
+
+          
 
             <!-- Footer -->
             <div class="row mt-5 pt-3 border-top" style="font-size:12px; color:#666;">
