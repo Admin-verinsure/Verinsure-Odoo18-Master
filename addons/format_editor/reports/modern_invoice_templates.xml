@@ -105,8 +105,10 @@
     </template>
 
     <template id="remove_default_header" inherit_id="web.external_layout_standard">
-    <xpath expr="//div[contains(@class,'o_company_')]" position="replace"/>
-</template>
+        <xpath expr="//div[contains(@class,'header')]" position="replace">
+            
+        </xpath>
+    </template>
 
 </odoo>
 
