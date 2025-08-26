@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Override external layout to remove extra company name -->
-    <template id="custom_external_layout" inherit_id="web.external_layout_standard">
-        <xpath expr="//div[contains(@class,'header')]" position="replace">
-            <div class="header">
-                <div class="text-center">
-                    <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" 
-                         style="max-height:80px;" alt="Company Logo"/>
-                </div>
+    <!-- Full override of external_layout header -->
+    <template id="custom_external_layout_clean" inherit_id="web.external_layout_standard" priority="20">
+        <t t-jquery="div.header" t-operation="replace">
+            <div class="header text-center">
+                <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
+                     style="max-height:80px;" alt="Company Logo"/>
             </div>
-        </xpath>
+        </t>
     </template>
 
     <!-- Modern Invoice Template -->
@@ -104,7 +102,7 @@
                     </tr>
                 </table>
 
-                <!-- Notes (grouped properly) -->
+                <!-- Notes -->
                 <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')"/>
                 <t t-if="note_lines">
                     <h5>Notes</h5>
