@@ -1,103 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--modern Template View-->
+    <!-- Modern Invoice Template -->
     <template id="custom_template_report_invoice_modern">
-        <!--External layout template-->
         <t t-call="web.external_layout">
-            <!--Invoice Reference-->
             <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
             <t t-set="model" t-value="'account.move'"/>
+
             <div class="page" style="overflow: hidden;">
-                <br/><br/><br/><br/>
 
-                <!--Invoice details-->
-                <div class="row">
-                    <div style="background-color:#f0f0f0; padding:2%; color:#000;">
-                        <h2 style="color:#000;">
-                            <span t-if="o.move_type == 'out_invoice' and (o.state == 'draft' or o.state == 'posted')">
-                                <font style="color:#000;">Invoice</font>
-                            </span>
-                            <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">
-                                <font style="color:#000;">PRO-FORMA</font>
-                            </span>
-                            <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">
-                                <font style="color:#000;">Draft Invoice</font>
-                            </span>
-                            <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">
-                                <font style="color:#000;">Cancelled Invoice</font>
-                            </span>
-                            <span t-if="o.move_type == 'out_refund'">
-                                <font style="color:#000;">Refund</font>
-                            </span>
-                            <span t-if="o.move_type == 'in_refund'">
-                                <font style="color:#000;">Vendor Refund</font>
-                            </span>
-                            <span t-if="o.move_type == 'in_invoice'">
-                                <font style="color:#000;">Vendor Bill</font>
-                            </span>
-                            <font>
-                                <span t-field="o.name" style="color:#000;"/>
-                            </font>
+                <!-- Header with Logo + Company Info -->
+                <div class="row mb-4 align-items-center">
+                    <div class="col-6">
+                        <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
+                             style="max-height:80px;" alt="Company Logo"/>
+                    </div>
+                    <div class="col-6 text-end" style="color:#000;">
+                        <h4 t-field="company.name"/>
+                        <div><span t-field="company.street"/></div>
+                        <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
+                        <div><span t-field="company.country_id"/></div>
+                    </div>
+                </div>
+
+                <!-- Invoice Title -->
+                <div class="row mb-3">
+                    <div class="col-12" style="background-color:#f0f0f0; padding:15px;">
+                        <h2 class="m-0" style="color:#000;">
+                            <span t-if="o.move_type == 'out_invoice' and (o.state == 'draft' or o.state == 'posted')">Invoice</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">Pro-Forma</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'draft'">Draft Invoice</span>
+                            <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Invoice</span>
+                            <span t-if="o.move_type == 'out_refund'">Refund</span>
+                            <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                            <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                            &nbsp;<span t-field="o.name"/>
                         </h2>
-                        <br/>
-
-                        <!--Invoice information-->
-                        <div id="invoice_information">
-                            <div class="row mt32 mb32" id="informations">
-                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_date" name="invoice_date">
-                                    <strong style="color:#000;">Invoice Date:</strong>
-                                    <p class="m-0" style="color:#000;" t-field="o.invoice_date"/>
-                                </div>
-                                <div class="col-auto col-3 mw-100 mb-2"
-                                     t-if="o.invoice_date_due and o.move_type == 'out_invoice' and o.state == 'posted'"
-                                     name="due_date">
-                                    <strong style="color:#000;">Due Date:</strong>
-                                    <p class="m-0" style="color:#000;" t-field="o.invoice_date_due"/>
-                                </div>
-                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_payment_term_id" name="payment_term">
-                                    <strong style="color:#000;">Payment Term:</strong>
-                                    <p class="m-0" style="color:#000;" t-field="o.invoice_payment_term_id"/>
-                                </div>
-                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.user_id">
-                                    <strong style="color:#000;">Sales Person:</strong>
-                                    <p t-field="o.user_id" style="color:#000;"/>
-                                </div>
-                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.ref">
-                                    <strong style="color:#000;">Customer Reference:</strong>
-                                    <p t-field="o.ref" style="color:#000;"/>
-                                </div>
-                                <div class="col-auto col-3 mw-100 mb-2" t-if="o.source_id">
-                                    <strong style="color:#000;">Source:</strong>
-                                    <p t-field="o.source_id" style="color:#000;"/>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
-                <br/>
-
-                <!--Customer Address-->
-                <div id="customer_address" style="color:#000;">
-                    <div class="row">
-                        <div style="width:50%;">
-                            <div itemprop="address" class="address">
-                                <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
-                                <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
-                                <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
-                                <div><span t-if="o.partner_id.city" t-field="o.partner_id.city"/></div>
-                                <div><span t-if="o.partner_id.country_id" t-field="o.partner_id.country_id"/></div>
-                                <div><span t-if="o.partner_id.vat" t-field="o.partner_id.vat"/></div>
-                            </div>
-                        </div>
+                <!-- Invoice Information -->
+                <div class="row mb-4">
+                    <div class="col-3" t-if="o.invoice_date">
+                        <strong>Invoice Date:</strong><br/>
+                        <span t-field="o.invoice_date"/>
+                    </div>
+                    <div class="col-3" t-if="o.invoice_date_due and o.move_type == 'out_invoice' and o.state == 'posted'">
+                        <strong>Due Date:</strong><br/>
+                        <span t-field="o.invoice_date_due"/>
+                    </div>
+                    <div class="col-3" t-if="o.invoice_payment_term_id">
+                        <strong>Payment Term:</strong><br/>
+                        <span t-field="o.invoice_payment_term_id"/>
+                    </div>
+                    <div class="col-3" t-if="o.user_id">
+                        <strong>Sales Person:</strong><br/>
+                        <span t-field="o.user_id"/>
                     </div>
                 </div>
 
-                <!--Product Table-->
-                <div class="row mt32">
+                <!-- Customer Address -->
+                <div class="row mb-4">
+                    <div class="col-6" style="color:#000;">
+                        <h5>Bill To:</h5>
+                        <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
+                        <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
+                        <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
+                        <div><span t-if="o.partner_id.city" t-field="o.partner_id.city"/></div>
+                        <div><span t-if="o.partner_id.country_id" t-field="o.partner_id.country_id"/></div>
+                        <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div>
+                    </div>
+                </div>
+
+                <!-- Product Table -->
+                <div class="row mt-3">
                     <div class="col-12">
-                        <table class="table table-sm o_main_table">
-                            <thead>
+                        <table class="table table-sm o_main_table table-bordered">
+                            <thead style="background:#f9f9f9;">
                                 <tr>
                                     <th>Description</th>
                                     <th class="text-end">Quantity</th>
@@ -119,8 +97,26 @@
                     </div>
                 </div>
 
-                <!--Totals-->
-                
+                <!-- Totals -->
+                <!-- <div class="row mt-4">
+                    <div class="col-6"></div>
+                    <div class="col-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Total (excl. Tax):</strong></td>
+                                <td class="text-end" t-field="o.amount_untaxed"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Tax:</strong></td>
+                                <td class="text-end" t-field="o.amount_tax"/>
+                            </tr>
+                            <tr style="background:#f0f0f0;">
+                                <td><strong>Grand Total:</strong></td>
+                                <td class="text-end" t-field="o.amount_total"/>
+                            </tr>
+                        </table>
+                    </div>
+                </div> -->
 
             </div>
         </t>
