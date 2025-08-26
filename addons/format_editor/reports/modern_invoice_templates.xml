@@ -1,28 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Override external layout to remove extra company name -->
+    <template id="custom_external_layout" inherit_id="web.external_layout_standard">
+        <xpath expr="//div[contains(@class,'header')]" position="replace">
+            <div class="header">
+                <div class="text-center">
+                    <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" 
+                         style="max-height:80px;" alt="Company Logo"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Modern Invoice Template -->
     <template id="custom_template_report_invoice_modern">
-        <!-- Force DejaVu Sans via Odoo's external_layout -->
         <t t-call="web.external_layout">
             <t t-set="o" t-value="o.with_context({'lang': o.partner_id.lang})"/>
             <t t-set="company" t-value="o.company_id"/>
 
-            <div class="page">
-
-                <!-- Header -->
-                <table style="width:100%; margin-bottom:20px;">
-                    <tr>
-                        <td style="width:50%;">
-                            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
-                                 style="max-height:80px;" alt="Company Logo"/>
-                        </td>
-                        <td style="width:50%; text-align:right; color:#000;">
-                            <h4 style="margin:0;" t-field="company.name"/>
-                            <div><span t-field="company.street"/></div>
-                            <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
-                            <div><span t-field="company.country_id"/></div>
-                        </td>
-                    </tr>
-                </table>
+            <div class="page" style="font-family: 'DejaVu Sans', sans-serif;">
 
                 <!-- Invoice Title -->
                 <h2 style="background:#f0f0f0; padding:10px;">
@@ -108,12 +104,15 @@
                     </tr>
                 </table>
 
-                <!-- Notes -->
-                <t t-foreach="o.invoice_line_ids" t-as="line">
-                    <t t-if="line.display_type == 'note'">
-                        <h5>Notes</h5>
-                        <p t-field="line.name"/>
-                    </t>
+                <!-- Notes (grouped properly) -->
+                <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type == 'note')"/>
+                <t t-if="note_lines">
+                    <h5>Notes</h5>
+                    <div style="white-space: pre-line;">
+                        <t t-foreach="note_lines" t-as="note_line">
+                            <p t-field="note_line.name"/>
+                        </t>
+                    </div>
                 </t>
 
                 <!-- Additional Info -->
