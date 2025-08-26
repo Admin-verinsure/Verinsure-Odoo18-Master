@@ -48,7 +48,7 @@
             </table>
 
             <!-- CUSTOMER -->
-            <h5>Bill To:</h5>
+            <h1>Bill To:</h1>
             <div><span t-field="o.partner_id"/></div>
             <div><span t-field="o.partner_id.street"/></div>
             <div><span t-field="o.partner_id.city"/> <span t-field="o.partner_id.zip"/></div>
@@ -119,9 +119,12 @@
 
             <!-- ADDITIONAL INFO -->
             <t t-if="o.narration">
-                <h5 style="margin-top:20px;"></h5>
-                <div style="white-space:pre-line;" t-field="o.narration"/>
-            </t>
+    <h5 style="margin-top:20px;">Additional Information</h5>
+    <div style="white-space:pre-line;">
+        <t t-esc="o.narration.replace(u'\u00A0',' ')"/>
+    </div>
+</t>
+
 
             <!-- FOOTER -->
             <div style="margin-top:40px; padding-top:10px; border-top:1px solid #ccc;
