@@ -9,9 +9,6 @@
              style="font-family:'DejaVu Sans','Arial Unicode MS','Liberation Sans',sans-serif;
                     font-size:12px; color:#000;">
 
-            <!-- Force UTF-8 Meta for wkhtmltopdf -->
-            <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-
             <!-- HEADER -->
             <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
                 <tr>
@@ -75,13 +72,11 @@
                         <td><span t-field="line.name"/></td>
                         <td style="text-align:right;"><span t-field="line.quantity"/></td>
                         <td style="text-align:right;">
-                            <span t-field="line.price_unit"
-                                  t-options='{"widget":"monetary","display_currency":o.currency_id}'/>
+                            $ <t t-esc="'%.2f' % line.price_unit"/>
                         </td>
                         <td style="text-align:right;"><span t-field="line.tax_ids"/></td>
                         <td style="text-align:right;">
-                            <span t-field="line.price_subtotal"
-                                  t-options='{"widget":"monetary","display_currency":o.currency_id}'/>
+                            $ <t t-esc="'%.2f' % line.price_subtotal"/>
                         </td>
                     </tr>
                 </tbody>
@@ -92,22 +87,19 @@
                 <tr>
                     <td><strong>Total (excl. Tax):</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_untaxed"
-                              t-options='{"widget":"monetary","display_currency":o.currency_id}'/>
+                        $ <t t-esc="'%.2f' % o.amount_untaxed"/>
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Tax:</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_tax"
-                              t-options='{"widget":"monetary","display_currency":o.currency_id}'/>
+                        $ <t t-esc="'%.2f' % o.amount_tax"/>
                     </td>
                 </tr>
                 <tr style="background:#f0f0f0;">
                     <td><strong>Grand Total:</strong></td>
                     <td style="text-align:right;">
-                        <span t-field="o.amount_total"
-                              t-options='{"widget":"monetary","display_currency":o.currency_id}'/>
+                        $ <t t-esc="'%.2f' % o.amount_total"/>
                     </td>
                 </tr>
             </table>
@@ -127,7 +119,7 @@
 
             <!-- ADDITIONAL INFO -->
             <t t-if="o.narration">
-                <h5 style="margin-top:20px;">Additional Information</h5>
+                <h5 style="margin-top:20px;"></h5>
                 <div style="white-space:pre-line;" t-field="o.narration"/>
             </t>
 
