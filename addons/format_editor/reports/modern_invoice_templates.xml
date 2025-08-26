@@ -104,7 +104,7 @@
         </t>
     </template>
 
-    <template id="remove_default_header" inherit_id="web.external_layout_standard">
+    <template id="remove_default_header" inherit_id="web.external_layout">
         <xpath expr="//div[contains(@class,'header')]" position="replace">
             
         </xpath>
