@@ -59,7 +59,7 @@
             <div class="row mb-4">
                 <div class="col-6" style="color:#000;">
                     <h4>Bill To:</h4>
-                    <div style="font-size:20px;">
+                    <div style="font-size:15px;">
                     <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
                     <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
                     <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
@@ -120,7 +120,7 @@
             </table>
 
             <!-- NOTES (styled box after totals) -->
-            <div style="font-size:20px;">
+            <div style="font-size:13px;">
             <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type in ['note','line_note'])"/>
             <t t-if="note_lines">
                 <div style="margin-top:5px; border:1px solid #ccc; padding:10px; background:#f9f9f9;">
@@ -135,7 +135,7 @@
 
             <!-- ADDITIONAL INFO -->
             <t t-if="o.narration">
-    <h5 style="margin-top:20px;"></h5>
+    <h5 style="margin-top:10px;"></h5>
     <div style="white-space:pre-line;">
         <t t-esc="o.narration.replace(u'\u00A0',' ')"/>
     </div>
