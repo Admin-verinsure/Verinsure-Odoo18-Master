@@ -3,6 +3,7 @@
     <template id="custom_template_report_invoice_modern">
         <t t-set="o" t-value="o.with_context({'lang': o.partner_id.lang})"/>
         <t t-set="company" t-value="o.company_id"/>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
         <!-- Whole Page (Self-contained, PDF-safe) -->
         <div class="page"
