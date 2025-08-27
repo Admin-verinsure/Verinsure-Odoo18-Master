@@ -152,10 +152,11 @@
             }
         </style>
         <div style="white-space:pre-line; font-family:'DejaVuSans'; font-size:13px;">
-            <t t-esc="o.narration.replace(u'\u00A0',' ')"/>
+            <t t-esc="o.narration.replace('\xa0', ' ')"/>
         </div>
     </t>
 </div>
+
 
 
 
