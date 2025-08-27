@@ -107,8 +107,7 @@
             <!-- NOTES (styled box after totals) -->
             <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type in ['note','line_note'])"/>
             <t t-if="note_lines">
-                <div style="margin-top:25px; border:1px solid #ccc; padding:10px; background:#f9f9f9;">
-                    <h5 style="margin:0 0 10px 0;">Notes</h5>
+                <div style="margin-top:7px; border:1px solid #ccc; padding:10px; background:#f9f9f9;">
                     <div style="white-space:pre-line;">
                         <t t-foreach="note_lines" t-as="note_line">
                             <p t-field="note_line.name"/>
