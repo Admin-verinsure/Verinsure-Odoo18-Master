@@ -47,13 +47,26 @@
                 </tr>
             </table>
 
-            <!-- CUSTOMER -->
+            <!-- CUSTOMER
             <h3>Bill To:</h3>
             <div><span t-field="o.partner_id"/></div>
             <div><span t-field="o.partner_id.street"/></div>
             <div><span t-field="o.partner_id.city"/> <span t-field="o.partner_id.zip"/></div>
             <div><span t-field="o.partner_id.country_id"/></div>
-            <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div>
+            <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div> -->
+
+            <!-- CUSTOMER ADDRESS -->
+            <div class="row mb-4">
+                <div class="col-6" style="color:#000;">
+                    <h4>Bill To:</h4>
+                    <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
+                    <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
+                    <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
+                    <div><span t-if="o.partner_id.city" t-field="o.partner_id.city"/></div>
+                    <div><span t-if="o.partner_id.country_id" t-field="o.partner_id.country_id"/></div>
+                    <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div>
+                </div>
+            </div>
 
             <!-- PRODUCT TABLE -->
             <table style="width:100%; margin-top:20px; border-collapse:collapse;" border="1">
