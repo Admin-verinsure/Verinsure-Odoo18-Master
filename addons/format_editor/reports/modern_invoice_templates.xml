@@ -146,18 +146,22 @@
 <div>
     <t t-if="o.narration">
         <h5 style="margin-top:10px;"></h5>
+
+        <!-- Load DejaVuSans font for wkhtmltopdf compatibility -->
         <style>
             @font-face {
                 font-family: 'DejaVuSans';
                 src: url('/web/static/src/fonts/DejaVuSans.ttf') format('truetype');
             }
         </style>
-        <div style="font-family:'DejaVuSans'; font-size:13px;">
-             <t t-out="o.narration"/>
 
+        <!-- Use helper method to clean narration text -->
+        <div style="font-family:'DejaVuSans'; font-size:13px; white-space:pre-line;">
+            <t t-out="env['report.utils'].clean_text(o.narration)"/>
         </div>
     </t>
 </div>
+
 
 
 
