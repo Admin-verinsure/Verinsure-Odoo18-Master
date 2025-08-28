@@ -59,7 +59,7 @@
             <!-- CUSTOMER ADDRESS -->
             <div class="row mb-4">
                 <div class="col-6" style="color:#000;">
-                    <h4>Bill To:</h4>
+                    <h3>Bill To:</h3>
                     <div style="font-size:15px;">
                     <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
                     <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
@@ -153,10 +153,18 @@
             }
         </style>
         <div style="white-space:pre-line; font-family:'DejaVuSans'; font-size:13px;">
-            <t t-esc="o.narration.replace('\xa0', ' ')"/>
+            <t t-esc="(o.narration or '')
+                .replace('\xa0', ' ')
+                .replace(u'\u00A0',' ')
+                .replace(u'\u202F',' ')
+                .replace(u'\u2007',' ')
+                .replace(u'\u2060',' ')
+                .replace(u'\ufeff',' ')
+            "/>
         </div>
     </t>
 </div>
+
 
 
 
