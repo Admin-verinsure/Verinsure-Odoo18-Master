@@ -1,4 +1,3 @@
-import re
 import html
 from odoo import models
 
@@ -7,20 +6,14 @@ class ReportUtils(models.AbstractModel):
     _description = "Report Helper Utilities"
 
     def clean_text(self, text):
-        """Clean narration text for PDF output"""
+        """Clean narration text but keep HTML structure for rendering"""
         if not text:
             return ""
 
-        # Convert HTML entities (like &nbsp;)
+        # Decode HTML entities (&nbsp; -> space)
         text = html.unescape(text)
 
-        # Remove stray "Â" and replace non-breaking spaces
+        # Replace stray characters
         text = text.replace("Â", " ").replace(u"\xa0", " ")
 
-        # Remove *all* non-printable / control characters
-        text = re.sub(r"[^\x20-\x7E\n\r]", " ", text)
-
-        # Collapse multiple spaces
-        text = re.sub(r"\s+", " ", text).strip()
-
-        return text
+        return text.strip()
