@@ -153,7 +153,8 @@
             }
         </style>
         <div style="font-family:'DejaVuSans'; font-size:13px;">
-            <t t-raw="o.narration"/>
+            <t t-raw="__import__('html').unescape(o.narration or '')"/>
+
         </div>
     </t>
 </div>
