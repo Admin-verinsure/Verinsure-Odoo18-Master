@@ -1,15 +1,20 @@
 from odoo import models
 
 class ReportUtils(models.AbstractModel):
-    _name = "report.utils"   # short + generic
+    _name = "report.utils"
     _description = "Report Helper Utilities"
 
     def clean_text(self, text):
-        """Remove unwanted special characters from narration text"""
+        """Clean narration text for PDF output"""
         if not text:
             return ""
-        return (
-            text.replace(u"\xa0", " ")   # replace non-breaking space
-                .replace("&nbsp;", " ")  # replace HTML entity
+
+        # Ensure text is unicode, replace non-breaking spaces and similar chars
+        cleaned = (
+            text.replace(u"\xa0", " ")   # non-breaking space
+                .replace(u"\u202f", " ") # narrow non-breaking space
+                .replace("&nbsp;", " ")  # HTML entity
+                .replace("Â", " ")       # stray UTF-8 artifact
                 .strip()
         )
+        return cleaned
