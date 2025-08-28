@@ -152,15 +152,12 @@
                 src: url('/web/static/src/fonts/DejaVuSans.ttf') format('truetype');
             }
         </style>
-        <div style="white-space:pre-line; font-family:'DejaVuSans'; font-size:13px;">
-            <t t-esc="(o.narration or '')
-                .encode('latin-1', 'ignore')
-                .decode('utf-8', 'ignore')
-                .replace('\xa0', ' ')
-            "/>
+        <div style="font-family:'DejaVuSans'; font-size:13px;">
+            <t t-raw="o.narration"/>
         </div>
     </t>
 </div>
+
 
 
             <!-- FOOTER -->
