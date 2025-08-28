@@ -157,7 +157,7 @@
 
         <!-- Use helper method to clean narration text -->
         <div style="font-family:'DejaVuSans'; font-size:13px; white-space:pre-line;">
-            <t t-out="env['report.utils'].clean_text(o.narration)"/>
+            <t t-raw="env['report.utils'].clean_text(o.narration)"/>
         </div>
     </t>
 </div>
