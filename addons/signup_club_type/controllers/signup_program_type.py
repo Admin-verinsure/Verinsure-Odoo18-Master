@@ -1,11 +1,11 @@
 from odoo import http
 from odoo.http import request
 
-class SignupProgramType(http.Controller):
+class SignupClubTypeController(http.Controller):
 
-    @http.route('/signup/club_type_selection', type='json', auth='public', csrf=False, website=True)
+    @http.route('/signup/club_type_selection', type='json', auth='public', website=True, csrf=False)
     def club_type_selection(self):
-        """Return the res.partner.club_type selection as [{'value':..,'label':..}]"""
-        field_info = request.env['res.partner'].sudo().fields_get(['club_type'])
-        selection = field_info['club_type']['selection'] if field_info and 'club_type' in field_info else []
-        return [{'value': v, 'label': l} for (v, l) in selection]
+        # Read selection from res.partner.club_type
+        sel = request.env['res.partner']._fields['club_type'].selection
+        # Return list of dicts for the JS to render
+        return [{"value": value, "label": label} for value, label in sel]

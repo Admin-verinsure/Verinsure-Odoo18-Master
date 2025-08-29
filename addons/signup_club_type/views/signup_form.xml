@@ -1,43 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- Inject Program Type right after the email/login field -->
   <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
     <xpath expr="//div[@class='mb-3 field-login']" position="after">
       <div class="mb-3 field-program-type">
         <label for="club_type">Program Type</label>
-        <select name="club_type" id="club_type" class="form-select" required="required" data-filled="0">
+        <select name="club_type" id="club_type" class="form-select" required="required">
           <option value="">-- Select Program Type --</option>
+          <!-- options filled by JS -->
         </select>
       </div>
-
-      <!-- Populate options dynamically via jsonRpc -->
-      <script type="text/javascript"><![CDATA[
-        (function () {
-          function fillClubType() {
-            var el = document.getElementById('club_type');
-            if (!el || el.getAttribute('data-filled') === '1') return;
-            if (!(window.odoo && odoo.jsonRpc)) return;
-
-            odoo.jsonRpc('/signup/club_type_selection', 'call', {})
-              .then(function (rows) {
-                if (!rows || !rows.length) return;
-                rows.forEach(function (r) {
-                  var opt = document.createElement('option');
-                  opt.value = r.value;
-                  opt.appendChild(document.createTextNode(r.label));
-                  el.appendChild(opt);
-                });
-                el.setAttribute('data-filled', '1');
-              })
-              .catch(function () {
-                // keep silent on login page
-              });
-          }
-
-          document.addEventListener('DOMContentLoaded', fillClubType);
-          // safety fill in case of slow assets
-          setTimeout(fillClubType, 300);
-        })();
-      ]]></script>
     </xpath>
   </template>
 </odoo>
