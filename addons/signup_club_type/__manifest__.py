@@ -1,11 +1,14 @@
 {
-    'name': 'Signup Club Type',
-    'version': '1.0',
-    'summary': 'Adds Program Type (Club Type) field in signup form',
-    'depends': ['auth_signup'],   # depends on auth_signup
-    'data': [
-        'views/signup_form.xml',
+    "name": "Signup Club Type",
+    "version": "18.0.1.0",
+    "depends": ["auth_signup", "website"],
+    "data": [
+        "views/signup_form.xml",
     ],
-    'installable': True,
-    'application': False,
+    "assets": {
+        "web.assets_frontend": [
+            "signup_club_type/static/src/js/signup_club_type.js",
+        ],
+    },
+    "installable": True,
 }
