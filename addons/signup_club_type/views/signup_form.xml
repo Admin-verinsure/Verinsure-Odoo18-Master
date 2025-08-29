@@ -10,7 +10,7 @@
       </div>
 
       <!-- Populate options dynamically via jsonRpc -->
-      <script type="text/javascript">
+      <script type="text/javascript"><![CDATA[
         (function () {
           function fillClubType() {
             var el = document.getElementById('club_type');
@@ -37,8 +37,7 @@
           // safety fill in case of slow assets
           setTimeout(fillClubType, 300);
         })();
-      </script>
+      ]]></script>
     </xpath>
   </template>
 </odoo>
-
