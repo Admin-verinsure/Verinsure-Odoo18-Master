@@ -1,19 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_signup_form" inherit_id="auth_signup.fields">
-
-        <!-- Insert Program Type dropdown before Club Name -->
-        <xpath expr="//div[label[contains(text(),'Club Name')]]" position="before">
-            <div class="form-group field-club_type">
-                <label for="club_type">Program Type</label>
-                <select name="club_type" id="club_type" class="form-control" required="required">
-                    <option value="">-- Select Program Type --</option>
+    <!-- Inherit the form fields of signup -->
+    <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
+        <xpath expr="//div[@class='mb-3 field-login']" position="after">
+            <div class="mb-3 field-program-type">
+                <label for="program_type">Program Type</label>
+                <select name="program_type" id="program_type" class="form-select" required="required">
+                    <option value="">Select Program</option>
                     <option value="rotary">Rotary</option>
                     <option value="rotaract">Rotaract</option>
                     <option value="interact">Interact</option>
-                    <option value="rota-kids">Rota-Kids</option>
+                    <option value="inner_wheel">Inner Wheel</option>
                 </select>
             </div>
         </xpath>
-
     </template>
 </odoo>
