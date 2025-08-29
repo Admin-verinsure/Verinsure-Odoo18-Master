@@ -1,0 +1,19 @@
+<odoo>
+    <template id="custom_signup_form" inherit_id="auth_signup.login">
+        <xpath expr="//div[@id='signup_form']//div[@class='form-group']" position="after">
+
+            <!-- Program Type (reusing club_type field from res.partner) -->
+            <div class="form-group">
+                <label for="club_type">Program Type</label>
+                <select name="club_type" id="club_type" class="form-control">
+                    <option value="">Select...</option>
+                    <option value="rotary">Rotary</option>
+                    <option value="rotaract">Rotaract</option>
+                    <option value="interact">Interact</option>
+                    <option value="rota-kids">Rota-Kids</option>
+                </select>
+            </div>
+
+        </xpath>
+    </template>
+</odoo>
