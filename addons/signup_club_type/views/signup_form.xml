@@ -4,21 +4,41 @@
     <xpath expr="//div[@class='mb-3 field-login']" position="after">
       <div class="mb-3 field-program-type">
         <label for="club_type">Program Type</label>
-        <select name="club_type" id="club_type" class="form-select" required="required">
+        <select name="club_type" id="club_type" class="form-select" required="required" data-filled="0">
           <option value="">-- Select Program Type --</option>
-
-          <!-- Get selection from res.partner via fields_get (works well in website) -->
-          <t t-set="club_selection"
-             t-value="request.env['res.partner'].sudo().fields_get(['club_type'])['club_type']['selection']"/>
-
-          <t t-foreach="club_selection" t-as="opt">
-            <option t-att-value="opt[0]"
-                    t-att-selected="(club_type or '') == opt[0] and 'selected' or None">
-              <t t-esc="opt[1]"/>
-            </option>
-          </t>
         </select>
       </div>
+
+      <!-- Populate options dynamically via jsonRpc -->
+      <script type="text/javascript">
+        (function () {
+          function fillClubType() {
+            var el = document.getElementById('club_type');
+            if (!el || el.getAttribute('data-filled') === '1') return;
+            if (!(window.odoo && odoo.jsonRpc)) return;
+
+            odoo.jsonRpc('/signup/club_type_selection', 'call', {})
+              .then(function (rows) {
+                if (!rows || !rows.length) return;
+                rows.forEach(function (r) {
+                  var opt = document.createElement('option');
+                  opt.value = r.value;
+                  opt.appendChild(document.createTextNode(r.label));
+                  el.appendChild(opt);
+                });
+                el.setAttribute('data-filled', '1');
+              })
+              .catch(function () {
+                // keep silent on login page
+              });
+          }
+
+          document.addEventListener('DOMContentLoaded', fillClubType);
+          // safety fill in case of slow assets
+          setTimeout(fillClubType, 300);
+        })();
+      </script>
     </xpath>
   </template>
 </odoo>
+
