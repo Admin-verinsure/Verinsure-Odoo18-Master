@@ -3,13 +3,12 @@
     <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
         <xpath expr="//div[@class='mb-3 field-login']" position="after">
             <div class="mb-3 field-program-type">
-                <label for="program_type">Program Type</label>
-                <select name="program_type" id="program_type" class="form-select" required="required">
+                <label for="club_type">Program Type</label>
+                <select name="club_type" id="club_type" class="form-select" required="required">
                     <option value="">Select Program</option>
-                    <option value="rotary">Rotary</option>
-                    <option value="rotaract">Rotaract</option>
-                    <option value="interact">Interact</option>
-                    <option value="rota-kids">Rota-Kids</option>
+                    <t t-foreach="request.env['res.partner']._fields['club_type'].selection" t-as="opt">
+                        <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
+                    </t>
                 </select>
             </div>
         </xpath>
