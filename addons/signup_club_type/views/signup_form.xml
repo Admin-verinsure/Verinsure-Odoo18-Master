@@ -5,10 +5,12 @@
       <div class="mb-3 field-program-type">
         <label for="club_type">Program Type</label>
         <select name="club_type" id="club_type" class="form-select" required="required">
-          <!-- same "blank" option as backend -->
-          <option value="">Select Program</option>
-          <!-- dynamic options from res.partner.club_type -->
-          <t t-set="club_selection" t-value="request.env['res.partner'].sudo()._fields['club_type'].selection"/>
+          <option value="">-- Select Program Type --</option>
+
+          <!-- Get selection from res.partner via fields_get (works well in website) -->
+          <t t-set="club_selection"
+             t-value="request.env['res.partner'].sudo().fields_get(['club_type'])['club_type']['selection']"/>
+
           <t t-foreach="club_selection" t-as="opt">
             <option t-att-value="opt[0]"
                     t-att-selected="(club_type or '') == opt[0] and 'selected' or None">
