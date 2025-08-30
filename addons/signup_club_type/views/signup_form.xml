@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
+    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.signup">
         <xpath expr="//div[hasclass('field-login')]" position="after">
 
             <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
@@ -15,8 +15,7 @@
                             <option t-att-value="opt[0]" t-esc="opt[1]"/>
                         </t>
                     </t>
-                    
-                    </select>
+                </select>
             </div>
         </xpath>
     </template>
