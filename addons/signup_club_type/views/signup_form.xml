@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="signup_program_type_fill" inherit_id="ldap_reset_password.signup">
-        <!-- Target the div that contains label[@for='program_type'] and its select -->
-        <xpath expr="//div[label[@for='program_type']]/select" position="inside">
-            <t t-set="sel" t-value="request.env['res.partner']._fields['club_type'].selection"/>
-            <t t-foreach="sel" t-as="opt">
-                <option t-att-value="opt[0]">
-                    <t t-esc="opt[1]"/>
-                </option>
-            </t>
-        </xpath>
-    </template>
+    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.signup">
+    <xpath expr="//input[@name='rotary_id']" position="after">
+        <div class="form-group">
+            <label for="club_type">Program Type</label>
+            <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
+                <option value="">-- Select Program Type --</option>
+                <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
+                <t t-if="club_types">
+                    <t t-foreach="club_types" t-as="opt">
+                        <option t-att-value="opt[0]" t-esc="opt[1]"/>
+                    </t>
+                </t>
+            </select>
+        </div>
+    </xpath>
+</template>
 </odoo>
