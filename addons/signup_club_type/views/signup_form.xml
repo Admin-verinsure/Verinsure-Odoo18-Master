@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.fields">
-        <xpath expr="//div[@class='form-group'][input/@name='rotary_id']" position="after">
+    <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
+        <xpath expr="//select[@name='program_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
                 <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
@@ -16,5 +16,4 @@
             </div>
         </xpath>
     </template>
-
 </odoo>
