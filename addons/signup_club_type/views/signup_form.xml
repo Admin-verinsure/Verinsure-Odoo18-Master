@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.signup">
-    <xpath expr="//input[@name='rotary_id']" position="after">
-        <div class="form-group">
-            <label for="club_type">Program Type</label>
-            <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
-                <option value="">-- Select Program Type --</option>
-                <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
-                <t t-if="club_types">
-                    <t t-foreach="club_types" t-as="opt">
-                        <option t-att-value="opt[0]" t-esc="opt[1]"/>
+    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.fields">
+        <xpath expr="//div[@class='form-group'][input/@name='rotary_id']" position="after">
+            <div class="form-group">
+                <label for="club_type">Program Type</label>
+                <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
+                    <option value="">-- Select Program Type --</option>
+                    <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
+                    <t t-if="club_types">
+                        <t t-foreach="club_types" t-as="opt">
+                            <option t-att-value="opt[0]" t-esc="opt[1]"/>
+                        </t>
                     </t>
-                </t>
-            </select>
-        </div>
-    </xpath>
-</template>
+                </select>
+            </div>
+        </xpath>
+    </template>
+
 </odoo>
