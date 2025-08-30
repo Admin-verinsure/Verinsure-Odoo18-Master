@@ -1,22 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_signup_program_type" inherit_id="ldap_reset_password.signup">
-        <xpath expr="//div[hasclass('field-login')]" position="after">
-
-            <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
-
-            <div class="mb-3 field-program-type">
-                <label for="club_type">Program Type</label>
-                <select name="club_type" id="club_type" class="form-select" required="required">
-                    <option value="">-- Select Program Type --</option>
-                    
-                    <t t-if="club_types">
-                        <t t-foreach="club_types" t-as="opt">
-                            <option t-att-value="opt[0]" t-esc="opt[1]"/>
-                        </t>
-                    </t>
-                </select>
-            </div>
+    <!-- Inject options into the specific signup template you use -->
+    <template id="signup_program_type_fill" inherit_id="ldap_reset_password.signup">
+        <!-- Target the <select id="program_type"> and append options inside -->
+        <xpath expr="//select[@id='program_type']" position="inside">
+            <!-- Read the selection list from res.partner.club_type -->
+            <t t-set="sel" t-value="request.env['res.partner']._fields['club_type'].selection"/>
+            <option t-foreach="sel" t-as="opt" t-att-value="opt[0]">
+                <t t-esc="opt[1]"/>
+            </option>
         </xpath>
     </template>
 </odoo>
