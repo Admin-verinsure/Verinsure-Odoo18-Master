@@ -5,10 +5,6 @@
     "data": [
         "views/signup_form.xml",
     ],
-    "assets": {
-        "web.assets_frontend": [
-            "signup_club_type/static/src/js/signup_club_type.js",
-        ],
-    },
+    
     "installable": True,
 }

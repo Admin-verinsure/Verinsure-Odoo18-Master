@@ -1,1 +1,0 @@
-from . import signup_program_type

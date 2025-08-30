@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Inject Program Type right after the email/login field -->
-  <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
-    <xpath expr="//div[@class='mb-3 field-login']" position="after">
-      <div class="mb-3 field-program-type">
-        <label for="club_type">Program Type</label>
-        <select name="club_type" id="club_type" class="form-select" required="required">
-          <option value="">-- Select Program Type --</option>
-          <!-- options filled by JS -->
-        </select>
-      </div>
-    </xpath>
-  </template>
+    <template id="custom_signup_program_type" inherit_id="auth_signup.fields">
+        <xpath expr="//div[hasclass('field-login')]" position="after">
+
+            <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection" />
+
+            <div class="mb-3 field-program-type">
+                <label for="club_type">Program Type</label>
+                <select name="club_type" id="club_type" class="form-select" required="required">
+                    <option value="">-- Select Program Type --</option>
+                    
+                    <t t-if="club_types">
+                        <t t-foreach="club_types" t-as="opt">
+                            <option t-att-value="opt[0]" t-esc="opt[1]"/>
+                        </t>
+                    </t>
+                    
+                    </select>
+            </div>
+        </xpath>
+    </template>
 </odoo>
