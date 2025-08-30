@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inject options into the specific signup template you use -->
     <template id="signup_program_type_fill" inherit_id="ldap_reset_password.signup">
-        <!-- Target the <select id="program_type"> and append options inside -->
-        <xpath expr="//select[@id='program_type']" position="inside">
-            <!-- Read the selection list from res.partner.club_type -->
+        <!-- Target the div that contains label[@for='program_type'] and its select -->
+        <xpath expr="//div[label[@for='program_type']]/select" position="inside">
             <t t-set="sel" t-value="request.env['res.partner']._fields['club_type'].selection"/>
-            <option t-foreach="sel" t-as="opt" t-att-value="opt[0]">
-                <t t-esc="opt[1]"/>
-            </option>
+            <t t-foreach="sel" t-as="opt">
+                <option t-att-value="opt[0]">
+                    <t t-esc="opt[1]"/>
+                </option>
+            </t>
         </xpath>
     </template>
 </odoo>
