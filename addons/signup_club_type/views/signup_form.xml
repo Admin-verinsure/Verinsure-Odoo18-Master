@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Your existing customization -->
     <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
-    <xpath expr="//input[@name='rotary_id']" position="replace">
-                <input type="number" name="rotary_id" t-att-value="rotary_id" id="rotary_id" class="form-control form-control-sm" placeholder="e.g. 83314"
-                    required="required" t-att-autofocus="'autofocus' if login and not only_passwords else None" min="10000" max="99999999"/>
-            </xpath>
         <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
@@ -20,4 +17,16 @@
             </div>
         </xpath>
     </template>
+
+    <!-- New addition: make rotary_membership_id editable -->
+    <record id="view_partner_form_edit_rotary_id" model="ir.ui.view">
+        <field name="name">view.partner.form.edit.rotary.id</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
+        <field name="arch" type="xml">
+            <field name="rotary_membership_id" position="attributes">
+                <attribute name="readonly">0</attribute>
+            </field>
+        </field>
+    </record>
 </odoo>
