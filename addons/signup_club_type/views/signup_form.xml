@@ -15,13 +15,11 @@
                 </select>
             </div>
         </xpath>
-        <xpath expr="//input[@name='rotary_id']" position="replace">
-            <input type="number" name="rotary_id" 
-                   id="rotary_id" 
-                   class="form-control form-control-sm" 
-                   placeholder="e.g. 83314" 
-                   required="required" 
-                   min="10000" max="99999999"/>
-        </xpath>
+        <template id="custom_rotary_id_editable" inherit_id="ldap_reset_password.fields" name="Make Rotary ID Editable">
+            <xpath expr="//input[@name='rotary_id']" position="replace">
+                <input type="number" name="rotary_id" t-att-value="rotary_id" id="rotary_id" class="form-control form-control-sm" placeholder="e.g. 83314"
+                    required="required" t-att-autofocus="'autofocus' if login and not only_passwords else None" min="10000" max="99999999"/>
+            </xpath>
+        </template>
     </template>
 </odoo>
