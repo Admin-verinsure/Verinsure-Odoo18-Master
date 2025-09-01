@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_edit_rotary_id" model="ir.ui.view">
+        <field name="name">view.partner.form.edit.rotary.id</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
+        <field name="arch" type="xml">
+            <field name="rotary_membership_id" position="attributes">
+                <attribute name="readonly">False</attribute>
+            </field>
+        </field>
+    </record>
+</odoo>

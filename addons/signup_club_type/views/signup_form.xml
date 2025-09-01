@@ -19,18 +19,6 @@
             </div>
         </xpath>
 
-        <!-- Make Rotary Membership ID editable -->
-        <record id="view_partner_form_edit_rotary_id" model="ir.ui.view">
-        <field name="name">view.partner.form.edit.rotary.id</field>
-        <field name="model">res.partner</field>
-        <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
-        <field name="arch" type="xml">
-            <field name="rotary_membership_id" position="attributes">
-                <attribute name="readonly">False</attribute>
-                <attribute name="options">{}</attribute> <!-- remove no_open/no_create if present -->
-            </field>
-        </field>
-    </record>
-
+        
     </template>
 </odoo>
