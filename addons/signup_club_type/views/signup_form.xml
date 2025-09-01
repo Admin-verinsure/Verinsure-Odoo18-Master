@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Your existing customization -->
+    <!-- Keep your existing signup customization -->
     <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
         <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
             <div class="form-group">
@@ -18,7 +18,7 @@
         </xpath>
     </template>
 
-    <!-- New addition: make rotary_membership_id editable -->
+    <!-- Make rotary_membership_id editable on partner form -->
     <record id="view_partner_form_edit_rotary_id" model="ir.ui.view">
         <field name="name">view.partner.form.edit.rotary.id</field>
         <field name="model">res.partner</field>
