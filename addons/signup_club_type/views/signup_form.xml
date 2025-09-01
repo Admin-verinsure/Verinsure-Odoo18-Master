@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Keep your existing signup customization -->
     <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
+        
+        <!-- Replace program_type dropdown with club_type -->
         <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
@@ -15,5 +18,20 @@
                 </select>
             </div>
         </xpath>
+
+        <!-- Make Rotary Membership ID editable -->
+        <xpath expr="//input[@name='rotary_id']" position="replace">
+            <div class="form-group">
+                <label for="rotary_membership_id">Rotary Membership ID</label>
+                <input type="number" name="rotary_membership_id"
+                       t-att-value="rotary_membership_id"
+                       id="rotary_membership_id"
+                       class="form-control form-control-sm"
+                       placeholder="e.g. 83314"
+                       required="required"
+                       min="10000" max="99999999"/>
+            </div>
+        </xpath>
+
     </template>
 </odoo>
