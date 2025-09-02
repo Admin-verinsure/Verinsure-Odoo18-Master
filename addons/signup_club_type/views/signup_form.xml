@@ -18,7 +18,20 @@
                 </select>
             </div>
         </xpath>
-
+<xpath expr="//div[@class='form-group'][select/@name='program_type']" position="after">
+            <div class="form-group">
+                <label for="rotary_club_id">Club Name</label>
+                <select name="rotary_club_id" id="rotary_club_id" class="form-control form-control-sm" required="required">
+                    <option value="">-- Select a Club Name--</option>
+                    <t t-set="clubs" t-value="env['res.partner'].search([('club_name', '!=', False)])"/>
+                    <t t-if="clubs">
+                        <t t-foreach="clubs" t-as="club">
+                            <option t-att-value="club.id" t-esc="club.club_name"/>
+                        </t>
+                    </t>
+                </select>
+            </div>
+        </xpath>
         
     </template>
 </odoo>
