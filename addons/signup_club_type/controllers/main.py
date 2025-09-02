@@ -4,33 +4,7 @@ from odoo.addons.auth_signup.controllers.main import AuthSignupHome
 from odoo import http
 from odoo.http import request
 
-class SignupController(http.Controller):
 
-    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
-    def web_auth_signup(self, *args, **kw):
-        env = request.env
-
-        # Get selected Program Type (club_type) from request
-        club_type = kw.get("club_type")
-
-        # Default empty
-        clubs = []
-
-        # Fetch filtered clubs when club_type selected
-        if club_type:
-            clubs = env['res.partner'].sudo().search([
-                ('club_type', '=', club_type),
-                ('club_name', '!=', False)
-            ])
-
-        # Pass both to template
-        values = {
-            'club_type': club_type,
-            'clubs': clubs,
-        }
-        values.update(kw)
-
-        return request.render("ldap_reset_password.signup", values)
 
     
 class AuthSignupHomeExtended(AuthSignupHome):
