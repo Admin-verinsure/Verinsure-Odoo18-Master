@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Extend signup fields to add data-type -->
-    <template id="custom_add_datatype_to_clubs" inherit_id="ldap_reset_password.fields">
-        <xpath expr="//select[@name='rotary_club_id']/t/option" position="attributes">
-            <attribute name="t-att-data-type">club.club_type</attribute>
-        </xpath>
-    </template>
+    <data>
+        <template id="custom_add_datatype_to_clubs" inherit_id="ldap_reset_password.fields">
+            <xpath expr="//select[@name='rotary_club_id']/t/option" position="attributes">
+                <attribute name="t-att-data-type">club.club_type</attribute>
+            </xpath>
+        </template>
 
-    <!-- Load our JS into frontend -->
-    <template id="assets_frontend" inherit_id="web.assets_frontend">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/signup_club_type/static/src/js/club_filter.js"></script>
-        </xpath>
-    </template>
+        <template id="assets_frontend" inherit_id="web.assets_frontend">
+            <xpath expr="." position="inside">
+                <script type="text/javascript" src="/signup_club_type/static/src/js/club_filter.js"></script>
+            </xpath>
+        </template>
+    </data>
 </odoo>
