@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Extend signup fields template -->
-    <template id="custom_signup_program_type_and_club" inherit_id="ldap_reset_password.fields">
-
-        <!-- Replace Program Type dropdown -->
+    <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
+        
+        
         <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
@@ -18,18 +17,8 @@
                     </t>
                 </select>
             </div>
-
-            <!-- Club Name dropdown filtered by selected club_type -->
-            <div class="form-group">
-                <label for="club_name">Club Name</label>
-                <select name="club_name" id="club_name" class="form-control form-control-sm" required="required">
-                    <option value="">-- Select Club Name --</option>
-                    <t t-foreach="clubs" t-as="club">
-                        <option t-att-value="club.id" t-esc="club.name"/>
-                    </t>
-                </select>
-            </div>
         </xpath>
 
+        
     </template>
 </odoo>
