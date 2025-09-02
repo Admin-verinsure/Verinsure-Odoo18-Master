@@ -1,176 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_template_report_invoice_modern">
-        <t t-set="o" t-value="o.with_context({'lang': o.partner_id.lang})"/>
-        <t t-set="company" t-value="o.company_id"/>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-
-        <!-- Whole Page (Self-contained, PDF-safe) -->
-        <div class="page"
-             style="font-family:'DejaVu Sans','Arial Unicode MS','Liberation Sans',sans-serif;
-                    font-size:12px; color:#000;">
-
-            <!-- HEADER -->
-            <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
-                <tr>
-                    <td style="width:50%; vertical-align:top;">
-                        <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
-                             style="max-height:80px;" alt="Company Logo"/>
-                    </td>
-                    <td style="width:50%; text-align:right; vertical-align:top;">
-                        <h3 style="margin:0;" t-field="company.name"/>
-                        <div><span t-field="company.street"/></div>
-                        <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
-                        <div><span t-field="company.country_id"/></div>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- INVOICE TITLE -->
-            <h2 style="background:#f0f0f0; padding:10px; margin:0 0 20px 0;">
-                <span t-if="o.move_type == 'out_invoice' and o.state in ['draft','posted']">Invoice</span>
-                <span t-if="o.move_type == 'out_invoice' and o.state == 'proforma2'">Pro-Forma</span>
-                <span t-if="o.move_type == 'out_invoice' and o.state == 'cancel'">Cancelled Invoice</span>
-                <span t-if="o.move_type == 'out_refund'">Refund</span>
-                <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-                <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                <span> </span>
-                <span t-field="o.name"/>
-            </h2>
-
-            <!-- INVOICE INFO -->
-            <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
-                <tr>
-                    <td t-if="o.invoice_date"><strong>Date:</strong> <span t-field="o.invoice_date"/></td>
-                    <td t-if="o.invoice_date_due"><strong>Due:</strong> <span t-field="o.invoice_date_due"/></td>
-                    <td t-if="o.invoice_payment_term_id"><strong>Payment Term:</strong> <span t-field="o.invoice_payment_term_id"/></td>
-                    <td t-if="o.user_id"><strong>Salesperson:</strong> <span t-field="o.user_id"/></td>
-                </tr>
-            </table>
-
-            <!-- CUSTOMER
-            <h3>Bill To:</h3>
-            <div><span t-field="o.partner_id"/></div>
-            <div><span t-field="o.partner_id.street"/></div>
-            <div><span t-field="o.partner_id.city"/> <span t-field="o.partner_id.zip"/></div>
-            <div><span t-field="o.partner_id.country_id"/></div>
-            <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div> -->
-
-            <!-- CUSTOMER ADDRESS -->
-            <div class="row mb-4">
-                <div class="col-6" style="color:#000;">
-                    <h3>Bill To:</h3>
-                    <div style="font-size:15px;">
-                    <div><span t-if="o.partner_id" t-field="o.partner_id"/></div>
-                    <div><span t-if="o.partner_id.street" t-field="o.partner_id.street"/></div>
-                    <div><span t-if="o.partner_id.street2" t-field="o.partner_id.street2"/></div>
-                    <div><span t-if="o.partner_id.city" t-field="o.partner_id.city"/></div>
-                    <div><span t-if="o.partner_id.country_id" t-field="o.partner_id.country_id"/></div>
-                    <div><span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PRODUCT TABLE -->
-            <table style="width:100%; margin-top:20px; border-collapse:collapse;" border="1">
-                <thead style="background:#f9f9f9;">
+    <!-- Template to inherit the standard report layout to override only the header -->
+    <template id="custom_invoice_header_inheritance" inherit_id="web.external_layout_standard">
+        
+        <!-- The following xpath expression targets the standard header and replaces it
+             with your custom header content. This ensures the rest of the report
+             (body and footer) remains untouched. -->
+        <xpath expr="//div[@class='header']" position="replace">
+            <div class="header">
+                <!-- Your custom header content goes here -->
+                <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
                     <tr>
-                        <th>Description</th>
-                        <th style="text-align:right;">Qty</th>
-                        <th style="text-align:right;">Unit Price</th>
-                        <th style="text-align:right;">Taxes</th>
-                        <th style="text-align:right;">Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr t-foreach="o.invoice_line_ids" t-as="line"
-                        t-if="not line.display_type or line.display_type == 'product'">
-                        <td><span t-field="line.name"/></td>
-                        <td style="text-align:right;"><span t-field="line.quantity"/></td>
-                        <td style="text-align:right;">
-                            $ <t t-esc="'%.2f' % line.price_unit"/>
+                        <td style="width:50%; vertical-align:top;">
+                            <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"
+                                 style="max-height:80px;" alt="Company Logo"/>
                         </td>
-                        <td style="text-align:right;"><span t-field="line.tax_ids"/></td>
-                        <td style="text-align:right;">
-                            $ <t t-esc="'%.2f' % line.price_subtotal"/>
+                        <td style="width:50%; text-align:right; vertical-align:top;">
+                            <h3 style="margin:0;" t-field="o.company_id.name"/>
+                            <div><span t-field="o.company_id.street"/></div>
+                            <div><span t-field="o.company_id.city"/> <span t-field="o.company_id.zip"/></div>
+                            <div><span t-field="o.company_id.country_id"/></div>
                         </td>
                     </tr>
-                </tbody>
-            </table>
-
-            <!-- TOTALS -->
-            <table style="width:40%; margin-left:auto; margin-top:20px; border-collapse:collapse;">
-                <tr>
-                    <td><strong>Total (excl. Tax):</strong></td>
-                    <td style="text-align:right;">
-                        $ <t t-esc="'%.2f' % o.amount_untaxed"/>
-                    </td>
-                </tr>
-                <tr>
-                    <td><strong>Tax:</strong></td>
-                    <td style="text-align:right;">
-                        $ <t t-esc="'%.2f' % o.amount_tax"/>
-                    </td>
-                </tr>
-                <tr style="background:#f0f0f0;">
-                    <td><strong>Grand Total:</strong></td>
-                    <td style="text-align:right;">
-                        $ <t t-esc="'%.2f' % o.amount_total"/>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- NOTES (styled box after totals) -->
-            <div style="font-size:13px;">
-            <t t-set="note_lines" t-value="o.invoice_line_ids.filtered(lambda l: l.display_type in ['note','line_note'])"/>
-            <t t-if="note_lines">
-                <div style="margin-top:5px; border:1px solid #ccc; padding:10px; background:#f9f9f9;">
-                    <div style="white-space:pre-line;">
-                        <t t-foreach="note_lines" t-as="note_line">
-                            <p t-field="note_line.name"/>
-                        </t>
-                    </div>
-                </div>
-            </t>
+                </table>
             </div>
-
-            <!-- ADDITIONAL INFO -->
-            <!-- <div>
-            <t t-if="o.narration">
-    <h5 style="margin-top:10px;"></h5>
-    <div style="white-space:pre-line;">
-        <t t-esc="o.narration.replace(u'\u00A0',' ')"/>
-    </div>
-</t>
-</div> -->
-<div>
-    <t t-if="o.narration">
-        <h5 style="margin-top:10px;"></h5>
-
-        <!-- Load DejaVuSans font for wkhtmltopdf compatibility -->
-        <style>
-            @font-face {
-                font-family: 'DejaVuSans';
-                src: url('/web/static/src/fonts/DejaVuSans.ttf') format('truetype');
-            }
-        </style>
-
-        <!-- Use helper method to clean narration text -->
-        <div style="font-family:'DejaVuSans'; font-size:13px; white-space:pre-line;">
-            <t t-raw="env['report.utils'].clean_text(o.narration)"/>
-        </div>
-    </t>
-</div>
-
-
-
-
-            <!-- FOOTER -->
-            <div style="margin-top:40px; padding-top:10px; border-top:1px solid #ccc;
-                        font-size:12px; color:#666; text-align:center;">
-                <span t-if="company.report_footer" t-field="company.report_footer"/>
-            </div>
-
-        </div>
+        </xpath>
+        
     </template>
 </odoo>
