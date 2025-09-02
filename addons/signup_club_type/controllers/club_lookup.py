@@ -4,7 +4,7 @@ from odoo.http import request
 
 class ClubLookup(http.Controller):
 
-    @http.route('/clubs/by_program', type='json', auth='public', csrf=True, website=True)
+    @http.route('/clubs/by_program', type='json', auth='public', csrf=False, website=True)
     def clubs_by_program(self, club_type=None, **kw):
         if not club_type:
             return []
