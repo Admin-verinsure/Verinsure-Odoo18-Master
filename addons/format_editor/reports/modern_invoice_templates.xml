@@ -1,30 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Template to inherit the standard external layout to override only the header -->
-    <template id="custom_invoice_header_inheritance" inherit_id="web.external_layout_standard">
-        
-        <!-- The following xpath expression correctly targets the header div.
-             This change ensures that your custom header is properly inserted
-             into the standard Odoo report layout. -->
-        <xpath expr="//div[contains(@class, 'header')]" position="replace">
-            <!-- Your custom header content goes here -->
-            <div class="header">
-                <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:50%; vertical-align:top;">
-                            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
-                                 style="max-height:80px;" alt="Company Logo"/>
-                        </td>
-                        <td style="width:50%; text-align:right; vertical-align:top;">
-                            <h3 style="margin:0;" t-field="company.name"/>
-                            <div><span t-field="company.street"/></div>
-                            <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
-                            <div><span t-field="company.country_id"/></div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        </xpath>
-        
-    </template>
+  <!-- Replace the global external layout header -->
+  <template id="custom_external_layout_header" inherit_id="web.external_layout_header">
+    <xpath expr="." position="replace">
+      <t t-set="company" t-value="res_company"/>
+      <div class="header">
+        <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
+          <tr>
+            <td style="width:50%; vertical-align:top;">
+              <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
+                   style="max-height:80px;" alt="Company Logo"/>
+            </td>
+            <td style="width:50%; text-align:right; vertical-align:top;">
+              <h3 style="margin:0;" t-field="company.name"/>
+              <div><span t-field="company.street"/></div>
+              <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
+              <div><span t-field="company.country_id"/></div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </xpath>
+  </template>
 </odoo>
