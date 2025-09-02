@@ -17,15 +17,7 @@
                     </t>
                 </select>
             </div>
-            <div class="form-group">
-                <label for="club_name">Club Name</label>
-                <select name="club_name" id="club_name" class="form-control form-control-sm" required="required">
-                    <option value="">-- Select Club Name --</option>
-                    <t t-foreach="clubs" t-as="club">
-                        <option t-att-value="club.id" t-esc="club.name"/>
-                    </t>
-                </select>
-            </div>
+            
         </xpath>
 
         
