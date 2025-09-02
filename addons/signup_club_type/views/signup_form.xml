@@ -1,20 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- Inherit the same template you’re already customizing -->
-  <template id="custom_signup_program_type_replace"
-            inherit_id="ldap_reset_password.fields">
+  <!-- Keep your existing replace for Program Type -->
+  <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
 
-    <!-- Replace the original Program Type block -->
+    <!-- Replace Program Type field -->
     <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
-      <!-- Small GET form to pick Program Type and refresh the page -->
+      <!-- small GET form to reload with club_type; no JS -->
       <form method="get" class="mb-2">
         <div class="form-group">
           <label for="club_type">Program Type</label>
           <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
             <option value="">-- Select Program Type --</option>
-
-            <!-- Read the selection list from the res.partner field selection -->
             <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection"/>
             <t t-if="club_types">
               <t t-foreach="club_types" t-as="opt">
@@ -26,26 +23,35 @@
             </t>
           </select>
         </div>
-
-        <!-- “Load Clubs” button triggers a GET refresh; no JS used -->
         <button type="submit" class="btn btn-secondary btn-sm">Load Clubs</button>
       </form>
     </xpath>
 
-    <!-- Inject the Club Name select (populated from res.partner) -->
-    <xpath expr="//form[contains(@class, 'oe_signup_form')]" position="inside">
-      <!-- Determine selected program type from the request -->
+    <!-- Replace the Club Name block and populate from res.partner -->
+    <!-- Adjust the XPath below to match your actual HTML.
+         This one targets the DIV that contains the select[name='rotary_club_id'] -->
+    <xpath expr="//div[@class='form-group'][select/@name='rotary_club_id']" position="replace">
       <t t-set="sel_program" t-value="request.params.get('club_type')"/>
 
-      <!-- Server-side search in res.partner (DB) for clubs -->
-      <!-- Adjust domain to your real markers: is_club/club_type/etc. -->
+      <!-- Query DB: res.partner clubs filtered by program -->
+      <!-- Change 'is_club'/'club_type' to your real fields if different -->
       <t t-set="clubs"
-         t-value="sel_program and env['res.partner'].sudo().search([('is_club','=',True), ('club_type','=',sel_program)], order='name') or env['res.partner']browse([])"/>
+         t-value="sel_program and
+                  env['res.partner'].sudo().search(
+                    [('is_club','=',True), ('club_type','=', sel_program)],
+                    order='name'
+                  )
+                  or env['res.partner'].browse([])"/>
 
       <div class="form-group">
         <label for="rotary_club_id">Club Name</label>
         <select class="form-control form-control-sm" name="rotary_club_id" id="rotary_club_id" required="required">
-          <option value="">-- Select a Club Name --</option>
+          <t t-if="not sel_program">
+            <option value="">-- Select Program Type first --</option>
+          </t>
+          <t t-if="sel_program and not clubs">
+            <option value="">-- No clubs found for this program --</option>
+          </t>
           <t t-foreach="clubs" t-as="c">
             <option t-att-value="c.id"
                     t-att-selected="str(c.id) == (request.params.get('rotary_club_id') or '')">
