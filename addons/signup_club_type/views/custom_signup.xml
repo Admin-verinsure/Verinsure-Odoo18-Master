@@ -7,10 +7,5 @@
             </xpath>
         </template>
 
-        <template id="assets_frontend" inherit_id="web.assets_frontend">
-            <xpath expr="." position="inside">
-                <script type="text/javascript" src="/signup_club_type/static/src/js/club_filter.js"></script>
-            </xpath>
-        </template>
     </data>
 </odoo>
