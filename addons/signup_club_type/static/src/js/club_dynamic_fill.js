@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
-import publicWidget from "web.public.widget";
-import rpc from "web.rpc";
+import publicWidget from "@website/public_widget/public_widget";
+import { jsonRpc } from "@web/core/network/rpc";
 
 publicWidget.registry.ClubDynamicFill = publicWidget.Widget.extend({
   selector: ".oe_signup_form, form",
@@ -10,28 +10,17 @@ publicWidget.registry.ClubDynamicFill = publicWidget.Widget.extend({
   },
 
   start() {
-    const presetProgram = this._programSelect().val();
-    if (presetProgram) {
-      this._loadClubs(presetProgram, true);
-    }
+    const preset = this.$('select[name="club_type"]').val();
+    if (preset) this._loadClubs(preset, true);
     return this._super(...arguments);
   },
 
-  _programSelect() {
-    return this.$('select[name="club_type"]');
-  },
-
-  _clubSelect() {
-    return this.$('select[name="rotary_club_id"]');
-  },
-
   _onProgramChange(ev) {
-    const program = ev.currentTarget.value || "";
-    this._loadClubs(program, false);
+    this._loadClubs(ev.currentTarget.value || "", false);
   },
 
-  _loadClubs(program, keepSelection) {
-    const $club = this._clubSelect();
+  async _loadClubs(program, keepSelection) {
+    const $club = this.$('select[name="rotary_club_id"]');
     if (!$club.length) return;
 
     const prev = keepSelection ? $club.val() : null;
@@ -46,44 +35,41 @@ publicWidget.registry.ClubDynamicFill = publicWidget.Widget.extend({
         })
       );
 
-    if (!program) return;
+    if (!program) {
+      $club.prop("disabled", false);
+      return;
+    }
 
-    rpc
-      .query({
-        route: "/clubs/by_program",
-        params: { club_type: program },
-      })
-      .then((clubs) => {
-        $club.empty();
-        if (!clubs || !clubs.length) {
-          $club.append(
-            $("<option>", {
-              value: "",
-              text: "-- No clubs found for this program --",
-            })
-          );
-        } else {
-          $club.append(
-            $("<option>", { value: "", text: "-- Select a Club Name --" })
-          );
-          clubs.forEach((c) => {
-            $club.append($("<option>", { value: String(c.id), text: c.name }));
-          });
-          if (prev && $club.find(option[(value = "${prev}")]).length) {
-            $club.val(prev);
-          }
+    try {
+      const clubs = await jsonRpc("/clubs/by_program", { club_type: program });
+      $club.empty();
+      if (!clubs || !clubs.length) {
+        $club.append(
+          $("<option>", {
+            value: "",
+            text: "-- No clubs found for this program --",
+          })
+        );
+      } else {
+        $club.append(
+          $("<option>", { value: "", text: "-- Select a Club Name --" })
+        );
+        for (const c of clubs) {
+          $club.append($("<option>", { value: String(c.id), text: c.name }));
         }
-      })
-      .catch(() => {
-        $club
-          .empty()
-          .append(
-            $("<option>", { value: "", text: "-- Unable to load clubs --" })
-          );
-      })
-      .always(() => {
-        $club.prop("disabled", false);
-      });
+        if (prev && $club.find(option[(value = "${prev}")]).length)
+          $club.val(prev);
+      }
+    } catch (e) {
+      $club
+        .empty()
+        .append(
+          $("<option>", { value: "", text: "-- Unable to load clubs --" })
+        );
+      // optional: console.error(e);
+    } finally {
+      $club.prop("disabled", false);
+    }
   },
 });
 
