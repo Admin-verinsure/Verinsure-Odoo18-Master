@@ -2,9 +2,9 @@
 <odoo>
 
     <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
-        
-        
-        <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
+
+        <!-- Replace Program Type correctly -->
+        <xpath expr="//div[@class='form-group'][select/@name='club_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
                 <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
@@ -18,11 +18,13 @@
                 </select>
             </div>
         </xpath>
-<xpath expr="//div[@class='form-group'][select/@name='program_type']" position="after">
+
+        <!-- Add Club Name just after Program Type -->
+        <xpath expr="//div[@class='form-group'][select/@name='club_type']" position="after">
             <div class="form-group">
                 <label for="rotary_club_id">Club Name</label>
                 <select name="rotary_club_id" id="rotary_club_id" class="form-control form-control-sm" required="required">
-                    <option value="">-- Select a Club Name--</option>
+                    <option value="">-- Select a Club Name --</option>
                     <t t-set="clubs" t-value="env['res.partner'].search([('club_name', '!=', False)])"/>
                     <t t-if="clubs">
                         <t t-foreach="clubs" t-as="club">
@@ -32,6 +34,6 @@
                 </select>
             </div>
         </xpath>
-        
+
     </template>
 </odoo>
