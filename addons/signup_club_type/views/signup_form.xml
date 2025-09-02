@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
+    <!-- Extend signup fields template -->
+    <template id="custom_signup_program_type_and_club" inherit_id="ldap_reset_password.fields">
 
-        <!-- Replace Program Type correctly -->
-        <xpath expr="//div[@class='form-group'][select/@name='club_type']" position="replace">
+        <!-- Replace Program Type dropdown -->
+        <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
             <div class="form-group">
                 <label for="club_type">Program Type</label>
                 <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
@@ -17,19 +18,14 @@
                     </t>
                 </select>
             </div>
-        </xpath>
 
-        <!-- Add Club Name just after Program Type -->
-        <xpath expr="//div[@class='form-group'][select/@name='club_type']" position="after">
+            <!-- Club Name dropdown filtered by selected club_type -->
             <div class="form-group">
-                <label for="rotary_club_id">Club Name</label>
-                <select name="rotary_club_id" id="rotary_club_id" class="form-control form-control-sm" required="required">
-                    <option value="">-- Select a Club Name --</option>
-                    <t t-set="clubs" t-value="env['res.partner'].search([('club_name', '!=', False)])"/>
-                    <t t-if="clubs">
-                        <t t-foreach="clubs" t-as="club">
-                            <option t-att-value="club.id" t-esc="club.club_name"/>
-                        </t>
+                <label for="club_name">Club Name</label>
+                <select name="club_name" id="club_name" class="form-control form-control-sm" required="required">
+                    <option value="">-- Select Club Name --</option>
+                    <t t-foreach="clubs" t-as="club">
+                        <option t-att-value="club.id" t-esc="club.name"/>
                     </t>
                 </select>
             </div>
