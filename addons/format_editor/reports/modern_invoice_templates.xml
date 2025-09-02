@@ -1,54 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Inherit the standard invoice template -->
+    <template id="custom_template_report_invoice_modern"
+              inherit_id="account.report_invoice_document"
+              name="Custom Invoice Header">
 
-  <!-- 1) Keep your existing ID but make it a HEADER SNIPPET only -->
-  <template id="custom_template_report_invoice_modern" name="Custom Invoice Header">
-    <!-- Use res_company (standard layout context), not o.company_id -->
-    <t t-set="company" t-value="res_company"/>
-    <div class="header">
-      <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
-        <tr>
-          <td style="width:50%; vertical-align:top;">
-            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
-                 style="max-height:80px;" alt="Company Logo"/>
-          </td>
-          <td style="width:50%; text-align:right; vertical-align:top;">
-            <h3 style="margin:0;" t-field="company.name"/>
-            <div><span t-field="company.street"/></div>
-            <div><span t-field="company.city"/> <span t-field="company.zip"/></div>
-            <div><span t-field="company.country_id"/></div>
-          </td>
-        </tr>
-      </table>
-    </div>
-  </template>
-
-  <!-- 2) Hook your header into whichever outer layout your DB uses.
-         We include the 3 common variants; Odoo will apply whichever exists. -->
-
-  <!-- web.report_layout family -->
-  <template id="__hook_header_into_report_layout__"
-            inherit_id="web.report_layout" priority="20">
-    <xpath expr="//t[@t-call='web.report_layout_header']" position="replace">
-      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
-    </xpath>
-  </template>
-
-  <!-- web.external_layout family -->
-  <template id="__hook_header_into_external_layout__"
-            inherit_id="web.external_layout" priority="20">
-    <xpath expr="//t[@t-call='web.external_layout_header']" position="replace">
-      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
-    </xpath>
-  </template>
-
-  <!-- web.external_layout_standard variant -->
-  <template id="__hook_header_into_external_layout_standard__"
-            inherit_id="web.external_layout_standard" priority="20">
-    <xpath expr="//t[@t-call='web.external_layout_header' or @t-call='web.report_layout_header']"
-           position="replace">
-      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
-    </xpath>
-  </template>
-
+        <!-- Replace just the header -->
+        <xpath expr="//div[@class='header']" position="replace">
+            <div class="header">
+                <div class="row" style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
+                    <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
+                        <!-- Example custom header logic -->
+                        <span t-if="o.move_type == 'out_invoice'">Invoice</span>
+                        <span t-if="o.move_type == 'out_refund'">Refund</span>
+                        <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                        <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                        <span t-if="o.state == 'draft'">(Draft)</span>
+                        <br/>
+                        <span t-field="o.name"/>
+                    </h2>
+                </div>
+            </div>
+        </xpath>
+    </template>
 </odoo>
