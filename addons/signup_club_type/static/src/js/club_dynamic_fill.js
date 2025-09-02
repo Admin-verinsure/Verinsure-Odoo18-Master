@@ -2,6 +2,7 @@
 
 import publicWidget from "@website/public_widget/public_widget";
 import { jsonRpc } from "@web/core/network/rpc";
+console.log("publicWidget loaded?", !!publicWidget);
 
 publicWidget.registry.ClubDynamicFill = publicWidget.Widget.extend({
   selector: ".oe_signup_form, form",
