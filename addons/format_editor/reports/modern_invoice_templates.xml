@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <template id="n4p_custom_header">
+
+  <!-- 1) Keep your existing ID but make it a HEADER SNIPPET only -->
+  <template id="custom_template_report_invoice_modern" name="Custom Invoice Header">
+    <!-- Use res_company (standard layout context), not o.company_id -->
     <t t-set="company" t-value="res_company"/>
     <div class="header">
       <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
         <tr>
           <td style="width:50%; vertical-align:top;">
-            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" style="max-height:80px;" alt="Company Logo"/>
+            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)"
+                 style="max-height:80px;" alt="Company Logo"/>
           </td>
           <td style="width:50%; text-align:right; vertical-align:top;">
             <h3 style="margin:0;" t-field="company.name"/>
@@ -18,4 +22,33 @@
       </table>
     </div>
   </template>
+
+  <!-- 2) Hook your header into whichever outer layout your DB uses.
+         We include the 3 common variants; Odoo will apply whichever exists. -->
+
+  <!-- web.report_layout family -->
+  <template id="__hook_header_into_report_layout__"
+            inherit_id="web.report_layout" priority="20">
+    <xpath expr="//t[@t-call='web.report_layout_header']" position="replace">
+      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
+    </xpath>
+  </template>
+
+  <!-- web.external_layout family -->
+  <template id="__hook_header_into_external_layout__"
+            inherit_id="web.external_layout" priority="20">
+    <xpath expr="//t[@t-call='web.external_layout_header']" position="replace">
+      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
+    </xpath>
+  </template>
+
+  <!-- web.external_layout_standard variant -->
+  <template id="__hook_header_into_external_layout_standard__"
+            inherit_id="web.external_layout_standard" priority="20">
+    <xpath expr="//t[@t-call='web.external_layout_header' or @t-call='web.report_layout_header']"
+           position="replace">
+      <t t-call="your_module_name.custom_template_report_invoice_modern"/>
+    </xpath>
+  </template>
+
 </odoo>
