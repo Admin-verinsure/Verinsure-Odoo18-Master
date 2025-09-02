@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Template to inherit the standard report header to override its content -->
-    <template id="custom_invoice_header_inheritance" inherit_id="web.external_layout_standard_header">
+    <!-- Template to inherit the standard invoice document to override only the header -->
+    <template id="custom_invoice_header_inheritance" inherit_id="account.report_invoice_document">
         
-        <!-- The following xpath expression targets the standard header div and replaces it
-             with your custom header content. This is the correct way to modify only
-             the header while keeping the rest of the report untouched. -->
-        <xpath expr="//div[@class='header']" position="replace">
+        <!-- The following xpath expression correctly targets the header div from the inherited
+             template, ensuring only the header is modified while the rest of the report
+             remains untouched. This is more robust than targeting a generic table. -->
+        <xpath expr="//div[contains(@class, 'header')]" position="replace">
+            <!-- Your custom header content goes here -->
             <div class="header">
-                <!-- Your custom header content goes here -->
                 <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
                     <tr>
                         <td style="width:50%; vertical-align:top;">
