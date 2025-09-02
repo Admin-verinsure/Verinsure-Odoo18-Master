@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherit the standard invoice template -->
-    <template id="custom_template_report_invoice_modern"
-              inherit_id="account.report_invoice_document"
-              name="Custom Invoice Header">
+    <template id="custom_external_layout_header"
+              inherit_id="web.external_layout_standard"
+              name="Custom External Layout Header">
 
-        <!-- Replace just the header -->
-        <xpath expr="//div[@class='header']" position="replace">
-            <div class="header">
-                <div class="row" style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
+        <!-- Replace the full header block -->
+        <xpath expr="//div[contains(@class, 'header')]" position="replace">
+            <div class="header o_custom_header">
+                <div class="row"
+                     style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
                     <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
-                        <!-- Example custom header logic -->
+                        <!-- Example custom header -->
                         <span t-if="o.move_type == 'out_invoice'">Invoice</span>
                         <span t-if="o.move_type == 'out_refund'">Refund</span>
                         <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
