@@ -1,65 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
-  <!-- Keep your existing replace for Program Type -->
   <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
 
-    <!-- Replace Program Type field -->
+    <!-- Replace Program Type block (use the real selection from res.partner.club_type) -->
     <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
-      <!-- small GET form to reload with club_type; no JS -->
-      <form method="get" class="mb-2">
-        <div class="form-group">
-          <label for="club_type">Program Type</label>
-          <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
-            <option value="">-- Select Program Type --</option>
-            <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection"/>
-            <t t-if="club_types">
-              <t t-foreach="club_types" t-as="opt">
-                <option t-att-value="opt[0]"
-                        t-att-selected="request.params.get('club_type') == opt[0]">
-                  <t t-esc="opt[1]"/>
-                </option>
-              </t>
-            </t>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-secondary btn-sm">Load Clubs</button>
-      </form>
-    </xpath>
-
-    <!-- Replace the Club Name block and populate from res.partner -->
-    <!-- Adjust the XPath below to match your actual HTML.
-         This one targets the DIV that contains the select[name='rotary_club_id'] -->
-    <xpath expr="//div[@class='form-group'][select/@name='rotary_club_id']" position="replace">
-      <t t-set="sel_program" t-value="request.params.get('club_type')"/>
-
-      <!-- Query DB: res.partner clubs filtered by program -->
-      <!-- Change 'is_club'/'club_type' to your real fields if different -->
-      <t t-set="clubs"
-         t-value="sel_program and
-                  env['res.partner'].sudo().search(
-                    [('is_club','=',True), ('club_type','=', sel_program)],
-                    order='name'
-                  )
-                  or env['res.partner'].browse([])"/>
-
       <div class="form-group">
-        <label for="rotary_club_id">Club Name</label>
-        <select class="form-control form-control-sm" name="rotary_club_id" id="rotary_club_id" required="required">
-          <t t-if="not sel_program">
-            <option value="">-- Select Program Type first --</option>
-          </t>
-          <t t-if="sel_program and not clubs">
-            <option value="">-- No clubs found for this program --</option>
-          </t>
-          <t t-foreach="clubs" t-as="c">
-            <option t-att-value="c.id"
-                    t-att-selected="str(c.id) == (request.params.get('rotary_club_id') or '')">
-              <t t-esc="c.name"/>
+        <label for="club_type">Program Type</label>
+        <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
+          <option value="">-- Select Program Type --</option>
+          <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection"/>
+          <t t-foreach="club_types" t-as="opt">
+            <option t-att-value="opt[0]"
+                    t-att-selected="request.params.get('club_type') == opt[0]">
+              <t t-esc="opt[1]"/>
             </option>
           </t>
         </select>
       </div>
+    </xpath>
+
+    <!-- Replace ONLY the existing Club Name select (rotary_club_id) -->
+    <!-- If your DOM differs, you can target the parent div via //select[@name='rotary_club_id']/.. -->
+    <xpath expr="//select[@name='rotary_club_id']" position="replace">
+      <!-- Read chosen program type from the request -->
+      <t t-set="sel_program" t-value="request.params.get('club_type') or request.params.get('program_type')"/>
+
+      <!-- Fetch clubs from Contacts (res.partner) filtered by club_type -->
+      <!-- You can add ('company_type','=','company') if you want only organizations -->
+      <t t-set="clubs"
+         t-value="sel_program and
+                  env['res.partner'].sudo().search(
+                    [('club_type','=', sel_program), ('active','=', True)],
+                    order='name'
+                  )
+                  or env['res.partner'].browse([])"/>
+
+      <select class="form-control form-control-sm" name="rotary_club_id" id="rotary_club_id" required="required">
+        <t t-if="not sel_program">
+          <option value="">-- Select Program Type first --</option>
+        </t>
+        <t t-if="sel_program and not clubs">
+          <option value="">-- No clubs found for this program --</option>
+        </t>
+        <t t-foreach="clubs" t-as="c">
+          <option t-att-value="c.id"
+                  t-att-selected="str(c.id) == (request.params.get('rotary_club_id') or '')">
+            <t t-esc="c.name"/>
+          </option>
+        </t>
+      </select>
     </xpath>
 
   </template>
