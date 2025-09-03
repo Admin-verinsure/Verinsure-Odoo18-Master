@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Replace the global wrapper used by the Invoice report -->
+  <!-- Override the global wrapper used by the Invoice report.
+       No loop here; the custom template will handle the loop. -->
   <template id="account_report_invoice_override"
             t-name="account.report_invoice"
-            name="Invoice – Single Wrapper (format_editor)">
+            name="Invoice – wrapper override (format_editor)">
     <t t-call="web.html_container">
-      <t t-foreach="docs" t-as="o">
-        <t t-call="format_editor.custom_template_report_invoice_modern"
-           t-options-lang="o.partner_id.lang"/>
-        <div style="page-break-before:always;" t-if="not loop.last"/>
-      </t>
+      <t t-call="format_editor.custom_template_report_invoice_modern"/>
     </t>
   </template>
 </odoo>
