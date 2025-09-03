@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="custom_external_layout_standard" inherit_id="web.external_layout_standard">
-        <xpath expr="//div[hasclass('header')]" position="replace">
-            <div t-attf-class="header o_company_#{company.id}_layout">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <img t-if="company.logo" class="o_company_logo_small" t-att-src="image_data_uri(company.logo)" alt="Company Logo" style="max-height:80px;"/>
-                    <div t-if="company.report_header" t-field="company.report_header" class="o_company_tagline mw-50 fw-bold"/>
-                </div>
+        
+        <xpath expr="//div[contains(@class, 'd-flex justify-content-between')]" position="replace">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <img t-if="company.logo" class="o_company_logo_small" t-att-src="image_data_uri(company.logo)" alt="Company Logo" style="max-height:80px;"/>
             </div>
         </xpath>
         
-        <xpath expr="//t[@t-call='web.address_layout']" position="replace"/>
+        <xpath expr="//div[@name='company_address']" position="replace"/>
 
         <xpath expr="//h2[@t-out='layout_document_title']" position="replace"/>
 
