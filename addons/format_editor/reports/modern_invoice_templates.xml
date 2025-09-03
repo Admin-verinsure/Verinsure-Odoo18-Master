@@ -3,7 +3,7 @@
     <template id="custom_template_report_invoice_modern"
               inherit_id="account.report_invoice_document">
 
-        <xpath expr="//h2[@class='text-primary']" position="before">
+        <xpath expr="//div[@id='informations']" position="before">
             <table style="width:100%; margin-bottom:12px; border-collapse:collapse;">
                 <tr>
                     <td style="width:50%; vertical-align:middle;">
@@ -57,7 +57,6 @@
             </div>
         </xpath>
         
-        <xpath expr="//h2[@class='text-primary']" position="replace"/>
         <xpath expr="//div[@id='informations']" position="replace"/>
 
     </template>
