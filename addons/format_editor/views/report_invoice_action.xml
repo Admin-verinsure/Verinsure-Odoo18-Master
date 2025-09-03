@@ -1,0 +1,13 @@
+<odoo>
+    <template id="report_invoice_with_custom"
+              inherit_id="account.report_invoice"
+              name="Invoice Report with Custom Template">
+
+        <!-- Replace the template call -->
+        <xpath expr="//t[@t-call='account.report_invoice_document']" position="replace">
+            <t t-call="format_editor.custom_template_report_invoice_modern"
+               t-inner-content="True"
+               t-options-lang="o.partner_id.lang"/>
+        </xpath>
+    </template>
+</odoo>

@@ -1,0 +1,18 @@
+<odoo>
+    <!-- Base template for your modern invoice -->
+    <template id="custom_template_report_invoice_modern"
+              name="Custom Modern Invoice"
+              inherit_id="account.report_invoice_document">
+
+        <!-- Example: replace the header -->
+        <xpath expr="//div[hasclass('header')]" position="replace">
+            <div class="header o_custom_header">
+                <h2 style="color:#333; font-weight:bold;">
+                    Modern Invoice
+                    <span t-field="o.name"/>
+                </h2>
+            </div>
+        </xpath>
+
+    </template>
+</odoo>

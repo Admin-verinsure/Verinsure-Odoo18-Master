@@ -15,6 +15,8 @@
     'data': [
         
              'views/custom_external_layout_templates.xml',
+             'views/report_invoice_template.xml',
+             'views/report_invoice_action.xml',
              'reports/normal_invoice_templates.xml',
              'reports/modern_invoice_templates.xml',
              'reports/old_standard_invoice_templates.xml',
