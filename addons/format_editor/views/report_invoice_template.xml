@@ -1,18 +1,14 @@
 <odoo>
-    <!-- Base template for your modern invoice -->
-    <template id="custom_template_report_invoice_modern"
-              name="Custom Modern Invoice"
-              inherit_id="account.report_invoice_document">
+  <template id="custom_external_layout"
+            inherit_id="web.external_layout_standard"
+            name="Custom External Layout">
 
-        <!-- Example: replace the header -->
-        <xpath expr="//div[hasclass('header')]" position="replace">
-            <div class="header o_custom_header">
-                <h2 style="color:#333; font-weight:bold;">
-                    Modern Invoice
-                    <span t-field="o.name"/>
-                </h2>
-            </div>
-        </xpath>
+    <!-- safer: target the div with name="company_address" instead of class -->
+    <xpath expr="//div[@name='company_address']" position="replace">
+      <div name="company_address">
+         <p style="font-weight:bold;">My custom address block</p>
+      </div>
+    </xpath>
 
-    </template>
+  </template>
 </odoo>
