@@ -53,17 +53,23 @@
           </div>
         </div>
 
-        <!-- ===== kill the old address block (CSS only) ===== -->
+        <!-- ===== remove the OLD address row from the article (no XPath) ===== -->
         <style type="text/css">
-          /* Top partner address row rendered by web.address_layout */
-          .o_report_layout_standard .article .row.mt32.mb32,
-          .o_report_layout .article .row.mt32.mb32,
-          .article .row.mt32.mb32 { display: none !important; }
-
+          /* In external_layout_standard, web.address_layout is the FIRST child in .article */
+          .o_report_layout_standard.article > :first-child,
+          .o_report_layout_standard .article > :first-child,
+          .article > :first-child {
+            display: none !important;
+          }
           /* Extra guards across themes/variations */
+          .article #informations,
+          .article [name="informations"],
           .article [name="partner_address"],
-          .article .col-6.text-end .list-unstyled,
-          .article .col-6.text-end .o_address_format { display: none !important; }
+          .article .o_address_format,
+          .article .list-unstyled,
+          .article .row.mt32.mb32 {
+            display: none !important;
+          }
         </style>
 
         <!-- ===== NEW address block (LEFT) ===== -->
