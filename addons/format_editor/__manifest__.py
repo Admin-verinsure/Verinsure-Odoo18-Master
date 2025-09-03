@@ -23,7 +23,7 @@
         'views/custom_external_layout.xml',
         'views/custom_external_layout_templates.xml',
         'views/external_layout_patch.xml',
-        'reports/override.xml', # Overrides should be loaded last to ensure they apply correctly
+         # Overrides should be loaded last to ensure they apply correctly
     ],
     'license': 'AGPL-3',
     'installable': True,
