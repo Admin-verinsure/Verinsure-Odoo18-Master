@@ -28,7 +28,10 @@
                    style="max-height:80px;" alt="Company Logo"/>
             </td>
             <td style="width:50%; text-align:right; vertical-align:middle;">
-              <h2 style="margin:0; font-weight:700;" t-if="company" t-field="company.name"/>
+              <!-- explicit open/close to avoid XML mismatch -->
+              <h2 t-if="company" style="margin:0; font-weight:700;">
+                <span t-field="company.name"/>
+              </h2>
               <div t-if="company and company.country_id" style="font-size:13px;">
                 <span t-field="company.country_id"/>
               </div>
@@ -55,22 +58,22 @@
 
         <!-- ===== remove legacy address + built-in title (no XPath) ===== -->
         <style type="text/css">
-          /* 1) In external_layout_standard, web.address_layout is the FIRST child in .article */
+          /* In external_layout_standard, web.address_layout is the FIRST child of .article */
           .o_report_layout_standard.article > :first-child,
           .o_report_layout_standard .article > :first-child,
           .article > :first-child { display: none !important; }
 
-          /* 2) Hide layout_document_title <h2> inside .article (external layout title) */
+          /* Hide layout_document_title <h2> that external layout prints */
           .o_report_layout_standard .article > h2,
           .article > h2:first-of-type { display: none !important; }
 
-          /* 3) Hide the info row that sometimes follows the default title */
+          /* Info row that sometimes follows the default title */
           .article > h2:first-of-type + .row,
           .article > h2:first-of-type + div.row,
           .article .o_invoice_info,
           .article [name="invoice_info"] { display: none !important; }
 
-          /* 4) Extra guards across themes/variations */
+          /* Extra guards across themes */
           .article #informations,
           .article [name="informations"],
           .article [name="partner_address"],
@@ -78,7 +81,7 @@
           .article .list-unstyled,
           .article .row.mt32.mb32 { display: none !important; }
 
-          /* Keep OUR title bar visible (defensive) */
+          /* Ensure OUR title bar stays visible */
           #custom_title_bar * { display: initial !important; }
         </style>
 
