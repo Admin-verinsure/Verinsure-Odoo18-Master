@@ -17,6 +17,7 @@
              'views/custom_external_layout_templates.xml',
              'reports/normal_invoice_templates.xml',
              'reports/modern_invoice_templates.xml',
+             'reports/override.xml',
              'reports/old_standard_invoice_templates.xml',
              'reports/report_invoice_templates.xml',
              'reports/preview_layout_report_templates.xml',
