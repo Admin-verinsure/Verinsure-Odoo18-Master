@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <!-- Modern Invoice Template with Custom Header -->
     <template id="custom_template_report_invoice_modern">
-        <!-- Use external layout -->
+        <!-- Use standard external layout -->
         <t t-call="web.external_layout">
             
-            <!-- Set invoice object -->
-            <t t-set="o" t-value="doc"/>
+            <!-- Ensure 'o' is defined safely -->
+            <t t-set="o" t-value="o or doc"/>
             
-            <!-- PAGE START -->
             <div class="page">
                 
                 <!-- === Custom Header === -->
@@ -16,24 +14,26 @@
                     <div class="row">
                         <div class="col-6">
                             <h2 style="margin:0;color:#000;">
-                                <span t-if="o.move_type == 'out_invoice'">Invoice</span>
-                                <span t-if="o.move_type == 'out_refund'">Refund</span>
-                                <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                                <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                                <t t-if="o">
+                                    <span t-if="o.move_type == 'out_invoice'">Invoice</span>
+                                    <span t-if="o.move_type == 'out_refund'">Refund</span>
+                                    <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                                    <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                                </t>
                             </h2>
                         </div>
                         <div class="col-6 text-end">
-                            <span t-field="o.name" style="font-weight:bold;"/>
+                            <t t-if="o">
+                                <span t-field="o.name" style="font-weight:bold;"/>
+                            </t>
                         </div>
                     </div>
                 </div>
                 
-                <!-- === Original Invoice Content === -->
+                <!-- Call original invoice content -->
                 <t t-call="account.report_invoice_document"/>
                 
             </div>
-            <!-- PAGE END -->
-            
         </t>
     </template>
 </odoo>
