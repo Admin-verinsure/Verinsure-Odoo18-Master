@@ -1,36 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Custom layout template -->
-  <template id="custom_invoice_layout">
-      <t t-call="web.external_layout_standard">
-          <!-- Override header manually -->
-          <t t-set="header_content">
-              <div class="header o_custom_header">
-                  <div class="row"
-                       style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
-                      <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
-                          <span t-if="o.move_type == 'out_invoice'">Invoice</span>
-                          <span t-if="o.move_type == 'out_refund'">Refund</span>
-                          <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                          <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-                          <span t-if="o.state == 'draft'">(Draft)</span>
-                          <br/>
-                          <span t-field="o.name"/>
-                      </h2>
-                  </div>
-              </div>
-          </t>
 
-          <!-- Keep the rest of the standard layout -->
-          <t t-raw="0"/>
-      </t>
-  </template>
+    <!-- ============================= -->
+    <!-- Custom External Layout Wrapper -->
+    <!-- ============================= -->
+    <template id="custom_external_layout_invoice" name="Custom External Layout Invoice">
+        <!-- Call the original external layout -->
+        <t t-call="web.external_layout_standard">
+            
+            <!-- Custom header injected here -->
+            <t t-set="header_content">
+                <div class="o_custom_header" style="background-color:#f0f0f0;padding:10px;text-align:center;">
+                    <h2 style="margin:0;color:#333;">
+                        <span t-if="o.move_type == 'out_invoice'">Invoice</span>
+                        <span t-if="o.move_type == 'out_refund'">Refund</span>
+                        <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                        <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                        <span t-if="o.state == 'draft'">(Draft)</span>
+                        <br/>
+                        <span t-field="o.name"/>
+                    </h2>
+                </div>
+            </t>
 
-  <!-- Use this layout for invoices -->
-  <template id="custom_invoice_template" inherit_id="account.report_invoice_document">
-      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
-          <t t-call="format_editor.custom_invoice_layout">
-              <t t-raw="0"/>
-          </t>
-      </xpath>
-  </template>
+            <!-- Render custom header -->
+            <t t-raw="header_content"/>
+        </t>
+    </template>
+
+    <!-- ========================================= -->
+    <!-- Invoice Report Template Using Wrapper Layout -->
+    <!-- ========================================= -->
+    <template id="report_invoice_custom" inherit_id="account.report_invoice">
+        <t t-set="o" t-value="doc"/>
+        <t t-call="format_editor.custom_external_layout_invoice"/>
+    </template>
+
 </odoo>
