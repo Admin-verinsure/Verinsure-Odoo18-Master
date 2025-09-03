@@ -56,6 +56,57 @@
             </div>
           </div>
         </div>
+<!-- Address styling fixes (no XPath) -->
+<style type="text/css">
+  /* Scope to report body only */
+  .o_report_layout, .o_report_layout_standard, .o_table_standard {
+    /* nothing */
+  }
+
+  /* Standard contact widget containers */
+  .o_report_layout .address,
+  .o_report_layout .o_address_format {
+    text-align: right;          /* keep right alignment as in your layout */
+    line-height: 1.4;           /* tighter, consistent line height */
+    font-size: 13.5px;          /* slightly smaller for multi-line names */
+    word-break: normal;         /* avoid aggressive breaking */
+    overflow-wrap: anywhere;    /* but still prevent overflow if needed */
+    hyphens: manual;            /* no auto-hyphenation weirdness */
+  }
+
+  /* Remove extra gaps that sometimes appear between lines/spans */
+  .o_report_layout .o_address_format div,
+  .o_report_layout .o_address_format span {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Name bolder, but not oversized */
+  .o_report_layout .o_address_format .o_name,
+  .o_report_layout .o_address_format .name,
+  .o_report_layout .address .name {
+    font-weight: 600;
+    font-size: 14px;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* Tidy each line’s spacing */
+  .o_report_layout .o_address_format br {
+    line-height: 1.3;
+  }
+
+  /* Kill empty spans that produce blank lines */
+  .o_report_layout .o_address_format span:empty,
+  .o_report_layout .address span:empty {
+    display: none !important;
+  }
+
+  
+  .o_report_layout .row.mt32.mb32 .col-6:last-child {
+    padding-left: 24px;
+  }
+</style>
 
         <!-- Standard invoice body (addresses, lines, totals, etc.) -->
         <t t-call="account.report_invoice_document"/>
