@@ -19,7 +19,8 @@
         'reports/report_invoice_templates.xml',
         'reports/preview_layout_report_templates.xml',
         
-        # Files that perform a simple inheritance/patch should be loaded after their parent views
+        # Files that perform a simple inheritance/patch should be loaded after their parent 
+        'views/custom_external_layout.xml',
         'views/custom_external_layout_templates.xml',
         'views/external_layout_patch.xml',
         'reports/override.xml', # Overrides should be loaded last to ensure they apply correctly
