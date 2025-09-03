@@ -46,7 +46,6 @@
       </div>
     </xpath>
 
-    <!-- remove the stock “informations” row -->
-    <xpath expr="//div[@id='informations']" position="replace"/>
+    <xpath expr="//div[@name='informations']" position="replace"/>
   </template>
 </odoo>
