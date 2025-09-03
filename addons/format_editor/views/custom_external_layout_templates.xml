@@ -1,7 +1,7 @@
 <!-- <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="custom_external_layout_standard" inherit_id="web.external_layout_standard">
-        <!-- <xpath expr="//div[hasclass('header')]" position="replace"> -->
+        <xpath expr="//div[hasclass('header')]" position="replace">
             <div class="row">
                 <div style="width:50%;">
                     <div class="d-flex justify-content-start">
