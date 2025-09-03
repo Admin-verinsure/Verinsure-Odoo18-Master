@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!-- <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="custom_external_layout_standard" inherit_id="web.external_layout_standard">
         <!-- <xpath expr="//div[hasclass('header')]" position="replace"> -->
@@ -21,7 +21,7 @@
                     </div>
                 </t>
             </div>
-        </xpath>
+        
 
         <xpath expr="//div[@name='company_address']" position="replace">
             <div class="row">
@@ -135,4 +135,4 @@
             </div>
         </xpath>
     </template>
-</odoo>
+</odoo> -->
