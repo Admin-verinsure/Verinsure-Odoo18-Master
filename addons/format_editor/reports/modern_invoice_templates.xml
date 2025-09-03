@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="custom_template_report_invoice_modern">
-        <!-- Use standard external layout -->
         <t t-call="web.external_layout">
             
             <!-- Ensure 'o' is defined safely -->
@@ -10,23 +9,40 @@
             <div class="page">
                 
                 <!-- === Custom Header === -->
-                <div class="header o_custom_header" style="background-color:#f2f2f2;padding:10px;">
-                    <div class="row">
+                <div class="header o_custom_header" style="padding:10px;">
+                    <div class="row align-items-center">
+                        <!-- Logo on left -->
                         <div class="col-6">
-                            <h2 style="margin:0;color:#000;">
-                                <t t-if="o">
-                                    <span t-if="o.move_type == 'out_invoice'">Invoice</span>
-                                    <span t-if="o.move_type == 'out_refund'">Refund</span>
-                                    <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                                    <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-                                </t>
-                            </h2>
+                            <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"
+                                 style="max-height:50px;"/>
                         </div>
+                        <!-- Company Info on right -->
                         <div class="col-6 text-end">
-                            <t t-if="o">
-                                <span t-field="o.name" style="font-weight:bold;"/>
+                            <t t-if="o.company_id">
+                                <div style="font-weight:bold;font-size:14px;color:#000;">
+                                    <span t-field="o.company_id.name"/>
+                                </div>
+                                <div style="font-size:12px;color:#555;">
+                                    <span t-field="o.company_id.street"/><br/>
+                                    <span t-field="o.company_id.city"/> <span t-field="o.company_id.zip"/><br/>
+                                    <span t-field="o.company_id.country_id"/>
+                                </div>
                             </t>
                         </div>
+                    </div>
+
+                    <!-- Invoice title with light background -->
+                    <div style="background-color:#f2f2f2;padding:5px;margin-top:10px;">
+                        <h2 style="margin:0;font-weight:bold;color:#000;">
+                            <t t-if="o">
+                                <span t-if="o.move_type == 'out_invoice'">Invoice</span>
+                                <span t-if="o.move_type == 'out_refund'">Refund</span>
+                                <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                                <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                            </t>
+                            &nbsp;
+                            <span t-field="o.name"/>
+                        </h2>
                     </div>
                 </div>
                 
