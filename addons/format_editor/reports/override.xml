@@ -1,7 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+<!-- <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Override the global wrapper used by the Invoice report.
-       No loop here; the custom template will handle the loop. -->
+  
   <template id="account_report_invoice_override"
             t-name="account.report_invoice"
             name="Invoice – wrapper override (format_editor)">
@@ -9,4 +8,4 @@
       <t t-call="format_editor.custom_template_report_invoice_modern"/>
     </t>
   </template>
-</odoo>
+</odoo> -->
