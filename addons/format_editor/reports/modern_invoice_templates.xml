@@ -55,24 +55,18 @@
 
         <!-- ===== kill the old address block (CSS only) ===== -->
         <style type="text/css">
-          /* common address widgets used by Odoo report header/body */
-          .o_report_layout .o_address_format,
-          .o_report_layout .address { display:none !important; }
+          /* Top partner address row rendered by web.address_layout */
+          .o_report_layout_standard .article .row.mt32.mb32,
+          .o_report_layout .article .row.mt32.mb32,
+          .article .row.mt32.mb32 { display: none !important; }
 
-          /* typical partner block containers near top of invoice document */
-          #informations, [id="informations"] { display:none !important; }
-
-          /* some databases render partner address in a right column wrapper */
-          .o_report_layout_standard .row.mt32.mb32 .col-6.text-end .list-unstyled,
-          .o_report_layout_standard .row.mt32.mb32 .col-6.text-end .o_address_format {
-            display:none !important;
-          }
-
-          /* extremely defensive: hide a block explicitly named partner_address if present */
-          [name="partner_address"], #partner_address, .o_partner_address { display:none !important; }
+          /* Extra guards across themes/variations */
+          .article [name="partner_address"],
+          .article .col-6.text-end .list-unstyled,
+          .article .col-6.text-end .o_address_format { display: none !important; }
         </style>
 
-        <!-- ===== NEW address block on the LEFT ===== -->
+        <!-- ===== NEW address block (LEFT) ===== -->
         <div class="o_custom_billto" style="margin:12px 24px 18px 24px; display:flex; justify-content:flex-start;">
           <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
             <div style="font-weight:700; font-size:15px;">
