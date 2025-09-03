@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Override the STANDARD layout’s header only -->
-  <template id="external_layout_standard_custom"
-            inherit_id="web.external_layout_standard"
-            priority="30">
-    <!-- The header is the first div under the template root -->
+  <!-- Patch the STANDARD layout header only -->
+  <template id="external_layout_standard_header_patch"
+            inherit_id="web.external_layout_standard" priority="30">
+    <!-- Header is the first <div> under the template root -->
     <xpath expr="/t/div[1]" position="replace">
       <div class="header">
         <div style="text-align:right; margin-bottom:12px;">
