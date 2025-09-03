@@ -2,7 +2,7 @@
 <odoo>
 
     <template id="custom_external_layout_no_header" inherit_id="web.external_layout">
-        <xpath expr="//div[hasclass('header')]" position="replace">
+        <xpath expr="//*[hasclass('header')]" position="replace">
             <div class="header"/>
         </xpath>
     </template>
