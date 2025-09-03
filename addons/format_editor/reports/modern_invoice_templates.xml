@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Replace only the header inside the stock external layout -->
-  <template id="external_layout_custom" inherit_id="web.external_layout" priority="20">
-    <!-- Target the header container robustly -->
-    <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' header ')]" position="replace">
+  <!-- Override the STANDARD layout’s header only -->
+  <template id="external_layout_standard_custom"
+            inherit_id="web.external_layout_standard"
+            priority="30">
+    <!-- The header is the first div under the template root -->
+    <xpath expr="/t/div[1]" position="replace">
       <div class="header">
         <div style="text-align:right; margin-bottom:12px;">
           <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
