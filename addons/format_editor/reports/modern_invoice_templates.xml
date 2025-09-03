@@ -4,13 +4,13 @@
               inherit_id="web.external_layout_standard"
               name="Custom External Layout Header">
 
-        <!-- Replace the full header block -->
-        <xpath expr="//div[contains(@class, 'header')]" position="replace">
+        <!-- Replace first div inside template (the header container) -->
+        <xpath expr="//t[@t-name='web.external_layout_standard']/div[1]" position="replace">
             <div class="header o_custom_header">
                 <div class="row"
                      style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
                     <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
-                        <!-- Example custom header -->
+                        <!-- Custom header -->
                         <span t-if="o.move_type == 'out_invoice'">Invoice</span>
                         <span t-if="o.move_type == 'out_refund'">Refund</span>
                         <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
