@@ -1,26 +1,36 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="custom_external_layout_header"
-              inherit_id="web.external_layout_standard"
-              name="Custom External Layout Header">
+  <!-- Custom layout template -->
+  <template id="custom_invoice_layout">
+      <t t-call="web.external_layout_standard">
+          <!-- Override header manually -->
+          <t t-set="header_content">
+              <div class="header o_custom_header">
+                  <div class="row"
+                       style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
+                      <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
+                          <span t-if="o.move_type == 'out_invoice'">Invoice</span>
+                          <span t-if="o.move_type == 'out_refund'">Refund</span>
+                          <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
+                          <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
+                          <span t-if="o.state == 'draft'">(Draft)</span>
+                          <br/>
+                          <span t-field="o.name"/>
+                      </h2>
+                  </div>
+              </div>
+          </t>
 
-        <!-- Replace first div inside template (the header container) -->
-        <xpath expr="//t[@t-name='web.external_layout_standard']/div[1]" position="replace">
-            <div class="header o_custom_header">
-                <div class="row"
-                     style="background-color:#{o.theme_id.base_color};padding:2%;color:#{o.theme_id.customer_text_color};">
-                    <h2 t-attf-style="color:#{o.theme_id.heading_text_color};">
-                        <!-- Custom header -->
-                        <span t-if="o.move_type == 'out_invoice'">Invoice</span>
-                        <span t-if="o.move_type == 'out_refund'">Refund</span>
-                        <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                        <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-                        <span t-if="o.state == 'draft'">(Draft)</span>
-                        <br/>
-                        <span t-field="o.name"/>
-                    </h2>
-                </div>
-            </div>
-        </xpath>
-    </template>
+          <!-- Keep the rest of the standard layout -->
+          <t t-raw="0"/>
+      </t>
+  </template>
+
+  <!-- Use this layout for invoices -->
+  <template id="custom_invoice_template" inherit_id="account.report_invoice_document">
+      <xpath expr="//t[@t-call='web.external_layout_standard']" position="replace">
+          <t t-call="format_editor.custom_invoice_layout">
+              <t t-raw="0"/>
+          </t>
+      </xpath>
+  </template>
 </odoo>
