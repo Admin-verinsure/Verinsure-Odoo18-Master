@@ -1,4 +1,4 @@
-<odoo>
+<!-- <odoo>
   <template id="custom_external_layout"
             inherit_id="web.external_layout_standard"
             name="Custom External Layout">
@@ -11,4 +11,4 @@
     </xpath>
 
   </template>
-</odoo>
+</odoo> -->
