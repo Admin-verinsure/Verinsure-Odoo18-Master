@@ -1,55 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <template id="custom_template_report_invoice_modern">
-        <t t-call="web.external_layout">
-            
-            <!-- Ensure 'o' is defined safely -->
-            <t t-set="o" t-value="o or doc"/>
-            
-            <div class="page">
-                
-                <!-- === Custom Header === -->
-                <div class="header o_custom_header" style="padding:10px;">
-                    <div class="row align-items-center">
-                        <!-- Logo on left -->
-                        <div class="col-6">
-                            <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"
-                                 style="max-height:50px;"/>
-                        </div>
-                        <!-- Company Info on right -->
-                        <div class="col-6 text-end">
-                            <t t-if="o.company_id">
-                                <div style="font-weight:bold;font-size:14px;color:#000;">
-                                    <span t-field="o.company_id.name"/>
-                                </div>
-                                <div style="font-size:12px;color:#555;">
-                                    <span t-field="o.company_id.street"/><br/>
-                                    <span t-field="o.company_id.city"/> <span t-field="o.company_id.zip"/><br/>
-                                    <span t-field="o.company_id.country_id"/>
-                                </div>
-                            </t>
-                        </div>
-                    </div>
+  <!-- Keep SAME id you're already using in account.report_invoice -->
+  <template id="custom_template_report_invoice_modern">
+    <t t-call="web.external_layout">
 
-                    <!-- Invoice title with light background -->
-                    <div style="background-color:#f2f2f2;padding:5px;margin-top:10px;">
-                        <h2 style="margin:0;font-weight:bold;color:#000;">
-                            <t t-if="o">
-                                <span t-if="o.move_type == 'out_invoice'">Invoice</span>
-                                <span t-if="o.move_type == 'out_refund'">Refund</span>
-                                <span t-if="o.move_type == 'in_invoice'">Vendor Bill</span>
-                                <span t-if="o.move_type == 'in_refund'">Vendor Refund</span>
-                            </t>
-                            &nbsp;
-                            <span t-field="o.name"/>
-                        </h2>
-                    </div>
+      <!-- make both o and company safe -->
+      <t t-set="o" t-value="o or doc"/>
+      <t t-set="company" t-value="company or (o and o.company_id)"/>
+
+      <div class="page" style="overflow:hidden;">
+
+        <!-- ===== Header (with your table + grey title strip) ===== -->
+        <div class="header o_custom_header" style="padding:0 24px 8px 24px;">
+
+          <!-- your header table -->
+          <table style="width:100%; margin-bottom:20px; border-collapse:collapse;">
+            <tr>
+              <td style="width:50%; vertical-align:top;">
+                <img t-if="company and company.logo"
+                     t-att-src="image_data_uri(company.logo)"
+                     style="max-height:80px;" alt="Company Logo"/>
+              </td>
+              <td style="width:50%; text-align:right; vertical-align:top;">
+                <h3 style="margin:0;" t-if="company" t-field="company.name"/>
+                <div t-if="company and company.street"><span t-field="company.street"/></div>
+                <div t-if="company and (company.city or company.zip)">
+                  <span t-field="company.city"/> <span t-field="company.zip"/>
                 </div>
-                
-                <!-- Call original invoice content -->
-                <t t-call="account.report_invoice_document"/>
-                
+                <div t-if="company and company.country_id"><span t-field="company.country_id"/></div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- grey title bar with number on right (like your screenshot) -->
+          <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:32px; font-weight:700; color:#111;">
+              <t t-if="o">
+                <t t-if="o.move_type == 'out_invoice'">Invoice</t>
+                <t t-elif="o.move_type == 'out_refund'">Refund</t>
+                <t t-elif="o.move_type == 'in_invoice'">Vendor&nbsp;Bill</t>
+                <t t-elif="o.move_type == 'in_refund'">Vendor&nbsp;Refund</t>
+                <t t-else="">Invoice</t>
+              </t>
             </div>
-        </t>
-    </template>
+            <div style="font-weight:700; color:#111;">
+              <t t-if="o"><span t-field="o.name"/></t>
+            </div>
+          </div>
+        </div>
+        <!-- ===== End Header ===== -->
+
+        <!-- keep standard invoice body (addresses, lines, totals, etc.) -->
+        <t t-call="account.report_invoice_document"/>
+      </div>
+    </t>
+  </template>
 </odoo>
