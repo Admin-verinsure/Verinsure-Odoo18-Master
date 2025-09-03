@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Only customizes the stock invoice body; does NOT call any report -->
   <template id="customize_report_invoice_document"
             inherit_id="account.report_invoice_document">
 
-    <!-- Add custom header/blocks inside the page -->
     <xpath expr="//div[contains(@class,'page')]" position="inside">
       <div style="text-align:right; margin-bottom:12px;">
         <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
@@ -19,8 +17,8 @@
           <t t-if="o">
             <t t-if="o.move_type == 'out_invoice'">Invoice</t>
             <t t-elif="o.move_type == 'out_refund'">Refund</t>
-            <t t-elif="o.move_type == 'in_invoice'">Vendor Bill</t>
-            <t t-elif="o.move_type == 'in_refund'">Vendor Refund</t>
+            <t t-elif="o.move_type == 'in_invoice'">Vendor&#160;Bill</t>
+            <t t-elif="o.move_type == 'in_refund'">Vendor&#160;Refund</t>
             <t t-else="">Invoice</t>
           </t>
         </div>
@@ -29,7 +27,6 @@
         </div>
       </div>
 
-      <!-- Your custom recipient address at LEFT -->
       <div style="margin:12px 0 14px 0;">
         <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
           <div style="font-weight:700; font-size:15px;"><span t-field="o.partner_id.name"/></div>
@@ -43,13 +40,13 @@
           </div>
           <div t-if="o.partner_id.country_id"><span t-field="o.partner_id.country_id"/></div>
           <div t-if="o.partner_id.vat" style="margin-top:4px;">
-            <span>Tax ID:&nbsp;</span><span t-field="o.partner_id.vat"/>
+            <span>Tax ID:&#160;</span><span t-field="o.partner_id.vat"/>
           </div>
         </div>
       </div>
     </xpath>
 
-    <!-- Remove the stock “informations” row -->
+    <!-- remove the stock “informations” row -->
     <xpath expr="//div[@id='informations']" position="replace"/>
   </template>
 </odoo>
