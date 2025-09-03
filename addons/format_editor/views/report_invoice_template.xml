@@ -1,9 +1,9 @@
-<!-- <odoo>
+  <!-- <odoo>
   <template id="custom_external_layout"
             inherit_id="web.external_layout_standard"
             name="Custom External Layout">
 
-    <!-- safer: target the div with name="company_address" instead of class -->
+    
     <xpath expr="//div[@name='company_address']" position="replace">
       <div name="company_address">
          <p style="font-weight:bold;">My custom address block</p>
@@ -11,4 +11,4 @@
     </xpath>
 
   </template>
-</odoo> -->
+</odoo>   -->
