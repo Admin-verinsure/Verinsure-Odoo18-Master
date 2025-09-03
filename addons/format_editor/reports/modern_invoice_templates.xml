@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- 1) Custom layout: header-in-body + Bill To on the left -->
+  <!-- 1) Custom layout: header-in-body + Bill To (calls body ONCE) -->
   <template id="custom_template_report_invoice_modern">
     <t t-call="web.external_layout">
-
-      <!-- safe vars -->
       <t t-set="o" t-value="o or doc"/>
       <t t-set="company" t-value="company or (o and o.company_id)"/>
 
-      <!-- hide the external header (no XPath) -->
+      <!-- Hide external header & its built-in title/address -->
       <t t-if="company">
         <style type="text/css"><![CDATA[
           .header.o_company_]]><t t-out="company.id"/><![CDATA[_layout{
             display:none !important; height:0 !important; padding:0 !important;
             margin:0 !important; border:0 !important; overflow:hidden !important;
           }
-          /* hide built-in title <h2> from external layout just in case */
           .o_report_layout_standard .article > h2 { display:none !important; }
-          /* hide the external first block (web.address_layout) */
           .o_report_layout_standard.article > :first-child,
           .o_report_layout_standard .article > :first-child,
           .article > :first-child { display:none !important; }
@@ -27,7 +23,7 @@
 
       <div class="page" style="overflow:hidden;">
 
-        <!-- header in body -->
+        <!-- Header in body -->
         <table style="width:100%; margin-bottom:15px; border-collapse:collapse;">
           <tr>
             <td style="width:50%; vertical-align:middle;">
@@ -47,9 +43,8 @@
         </table>
         <hr style="border:1px solid #000; margin:0 0 10px 0;"/>
 
-        <!-- title bar -->
-        <div id="custom_title_bar"
-             style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <!-- Title bar -->
+        <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <div style="font-size:32px; font-weight:700; color:#111;">
             <t t-if="o">
               <t t-if="o.move_type == 'out_invoice'">Invoice</t>
@@ -64,7 +59,7 @@
           </div>
         </div>
 
-        <!-- hide default body title + information row (from account.report_invoice_document) -->
+        <!-- (Optional) hide the body’s default title/info row from account.report_invoice_document -->
         <style type="text/css"><![CDATA[
           .article h2.text-primary { display:none !important; }
           .article h2.text-primary + .row,
@@ -73,15 +68,11 @@
           .article [name="informations"] { display:none !important; }
         ]]></style>
 
-        <!-- Bill To (LEFT) -->
-        <div class="o_custom_billto" style="margin:12px 24px 18px 24px; display:flex; justify-content:flex-start;">
+        <!-- Bill To (left) -->
+        <div style="margin:12px 24px 18px 24px; display:flex; justify-content:flex-start;">
           <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
-            <div style="font-weight:700; font-size:15px;">
-              <span t-field="o.partner_id.name"/>
-            </div>
-            <div t-if="o.partner_id.parent_id">
-              <span t-field="o.partner_id.parent_id.name"/>
-            </div>
+            <div style="font-weight:700; font-size:15px;"><span t-field="o.partner_id.name"/></div>
+            <div t-if="o.partner_id.parent_id"><span t-field="o.partner_id.parent_id.name"/></div>
             <div t-if="o.partner_id.street"><span t-field="o.partner_id.street"/></div>
             <div t-if="o.partner_id.street2"><span t-field="o.partner_id.street2"/></div>
             <div t-if="o.partner_id.city or o.partner_id.state_id or o.partner_id.zip">
@@ -96,22 +87,28 @@
           </div>
         </div>
 
-        <!-- render the standard invoice body ONCE -->
+        <!-- Render the standard invoice body ONCE -->
         <t t-call="account.report_invoice_document"/>
 
       </div>
     </t>
   </template>
 
-  <!-- 2) Replace the wrapper by NAME so only our template is called (no inner content) -->
-  <template id="override_report_invoice_wrapper"
-            name="Invoice (Custom Wrapper Only)"
-            t-name="account.report_invoice">
-    <t t-foreach="docs" t-as="o">
-      <t t-call="format_editor.custom_template_report_invoice_modern"
-         t-options-lang="o.partner_id.lang"/>
-      <div style="page-break-before:always;" t-if="not loop.last"/>
+  <!-- 2) New wrapper: renders ONLY our layout once per doc -->
+  <template id="report_invoice_single_wrapper" t-name="format_editor.report_invoice_single">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="o">
+        <t t-call="format_editor.custom_template_report_invoice_modern"
+           t-options-lang="o.partner_id.lang"/>
+        <div style="page-break-before:always;" t-if="not loop.last"/>
+      </t>
     </t>
   </template>
+
+  <!-- 3) Override the REPORT ACTION to use our wrapper (so the standard wrapper is never used) -->
+  <record id="account.action_report_invoice" model="ir.actions.report">
+    <field name="report_name">format_editor.report_invoice_single</field>
+    <field name="report_file">format_editor.report_invoice_single</field>
+  </record>
 
 </odoo>
