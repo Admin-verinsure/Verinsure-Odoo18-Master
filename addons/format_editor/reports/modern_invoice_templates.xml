@@ -1,51 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <template id="customize_report_invoice_document"
-            inherit_id="account.report_invoice_document">
 
-    <xpath expr="//div[contains(@class,'page')]" position="inside">
-      <div style="text-align:right; margin-bottom:12px;">
-        <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
-        <div>Pty Limited</div>
-        <div>25 / 1 Maitland Place</div>
-        <div>Norwest NSW 2153</div>
-        <div>Australia</div>
-      </div>
+    <template id="custom_external_layout_no_header" inherit_id="web.external_layout">
+        <xpath expr="//div[hasclass('header')]" position="replace">
+            <div class="header"/>
+        </xpath>
+    </template>
 
-      <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-        <div style="font-size:32px; font-weight:700; color:#111;">
-          <t t-if="o">
-            <t t-if="o.move_type == 'out_invoice'">Invoice</t>
-            <t t-elif="o.move_type == 'out_refund'">Refund</t>
-            <t t-elif="o.move_type == 'in_invoice'">Vendor&#160;Bill</t>
-            <t t-elif="o.move_type == 'in_refund'">Vendor&#160;Refund</t>
-            <t t-else="">Invoice</t>
-          </t>
-        </div>
-        <div style="font-weight:700; color:#111;">
-          <span t-field="o.name"/>
-        </div>
-      </div>
+    <template id="modern_invoice_template">
+        <t t-call="your_module_name.custom_external_layout_no_header">
+            <t t-set="o" t-value="doc.with_context(lang=doc.partner_id.lang)"/>
+            <div class="page">
+                <div style="text-align:right; margin-bottom:12px;">
+                    <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
+                    <div>Pty Limited</div>
+                    <div>25 / 1 Maitland Place</div>
+                    <div>Norwest NSW 2153</div>
+                    <div>Australia</div>
+                </div>
 
-      <div style="margin:12px 0 14px 0;">
-        <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
-          <div style="font-weight:700; font-size:15px;"><span t-field="o.partner_id.name"/></div>
-          <div t-if="o.partner_id.parent_id"><span t-field="o.partner_id.parent_id.name"/></div>
-          <div t-if="o.partner_id.street"><span t-field="o.partner_id.street"/></div>
-          <div t-if="o.partner_id.street2"><span t-field="o.partner_id.street2"/></div>
-          <div t-if="o.partner_id.city or o.partner_id.state_id or o.partner_id.zip">
-            <t t-if="o.partner_id.city"><span t-field="o.partner_id.city"/></t>
-            <t t-if="o.partner_id.state_id"><span t-field="o.partner_id.state_id"/></t>
-            <t t-if="o.partner_id.zip"><span t-field="o.partner_id.zip"/></t>
-          </div>
-          <div t-if="o.partner_id.country_id"><span t-field="o.partner_id.country_id"/></div>
-          <div t-if="o.partner_id.vat" style="margin-top:4px;">
-            <span>Tax ID:&#160;</span><span t-field="o.partner_id.vat"/>
-          </div>
-        </div>
-      </div>
-    </xpath>
+                <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <div style="font-size:32px; font-weight:700; color:#111;">
+                        <t t-if="o.move_type == 'out_invoice'">Invoice</t>
+                        <t t-elif="o.move_type == 'out_refund'">Refund</t>
+                        <t t-else="">Document</t>
+                    </div>
+                    <div style="font-weight:700; color:#111;">
+                        <span t-field="o.name"/>
+                    </div>
+                </div>
 
-    <xpath expr="//div[@name='informations']" position="replace"/>
-  </template>
+                <div style="margin:12px 0 14px 0;">
+                    <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
+                        <div style="font-weight:700; font-size:15px;"><span t-field="o.partner_id.name"/></div>
+                        <div t-if="o.partner_id.parent_id"><span t-field="o.partner_id.parent_id.name"/></div>
+                        <div t-if="o.partner_id.street"><span t-field="o.partner_id.street"/></div>
+                        <div t-if="o.partner_id.street2"><span t-field="o.partner_id.street2"/></div>
+                        <div t-if="o.partner_id.city or o.partner_id.state_id or o.partner_id.zip">
+                            <t t-if="o.partner_id.city"><span t-field="o.partner_id.city"/></t>
+                            <t t-if="o.partner_id.state_id"> <span t-field="o.partner_id.state_id"/></t>
+                            <t t-if="o.partner_id.zip"> <span t-field="o.partner_id.zip"/></t>
+                        </div>
+                        <div t-if="o.partner_id.country_id"><span t-field="o.partner_id.country_id"/></div>
+                        <div t-if="o.partner_id.vat" style="margin-top:4px;">
+                            <span>Tax ID:&#160;</span><span t-field="o.partner_id.vat"/>
+                        </div>
+                    </div>
+                </div>
+                <t t-call="account.report_invoice_document"/>
+
+            </div>
+        </t>
+    </template>
+
+    <record id="action_report_modern_invoice" model="ir.actions.report">
+        <field name="name">Invoice (Modern)</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">your_module_name.modern_invoice_template</field>
+        <field name="report_file">your_module_name.modern_invoice_template</field>
+        <field name="print_report_name">'Invoice - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+    </record>
+
 </odoo>
