@@ -1,42 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Custom Invoice Report -->
   <template id="custom_template_report_invoice_modern">
-
-    <!-- Start with external layout but keep header empty -->
     <t t-call="web.external_layout">
-      <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
-      <t t-set="model" t-value="'account.move'"/>
 
-      <div class="page" style="overflow: hidden;">
+      <!-- Safe guards -->
+      <t t-set="o" t-value="o or doc"/>
+      <t t-set="company" t-value="company or (o and o.company_id)"/>
 
-        <!-- ===== Custom Header in Body ===== -->
+      <!-- Hide the external header for this company (no XPath) -->
+      <t t-if="company">
+        <style type="text/css">
+          .header.o_company_<t t-out="company.id"/>_layout{
+            display:none !important; height:0 !important; padding:0 !important;
+            margin:0 !important; border:0 !important; overflow:hidden !important;
+          }
+        </style>
+      </t>
+
+      <div class="page" style="overflow:hidden;">
+
+        <!-- ===== Custom header in BODY ===== -->
         <table style="width:100%; margin-bottom:15px; border-collapse:collapse;">
           <tr>
-            <!-- Company Logo -->
             <td style="width:50%; vertical-align:middle;">
-              <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"
+              <img t-if="company and company.logo"
+                   t-att-src="image_data_uri(company.logo)"
                    style="max-height:80px;" alt="Company Logo"/>
             </td>
-            <!-- Company Name & Country -->
             <td style="width:50%; text-align:right; vertical-align:middle;">
-              <h2 style="margin:0; font-weight:600;" t-field="o.company_id.name"/>
-              <div t-if="o.company_id.country_id" style="font-size:13px;">
-                <span t-field="o.company_id.country_id"/>
+              <h2 style="margin:0; font-weight:600;" t-if="company" t-field="company.name"/>
+              <div t-if="company and company.country_id" style="font-size:13px;">
+                <span t-field="company.country_id"/>
               </div>
             </td>
           </tr>
         </table>
         <hr style="border:1px solid #000; margin:0 0 15px 0;"/>
 
-        <!-- ===== Invoice Title Bar ===== -->
-        <div style="background:#f1f1f1; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-          <h2 style="margin:0; font-weight:700;">Invoice</h2>
-          <h3 style="margin:0;" t-field="o.name"/>
+        <!-- ===== Invoice title bar ===== -->
+        <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:15px;">
+          <div style="font-size:32px; font-weight:700; color:#111;">
+            <t t-if="o">
+              <t t-if="o.move_type == 'out_invoice'">Invoice</t>
+              <t t-elif="o.move_type == 'out_refund'">Refund</t>
+              <t t-elif="o.move_type == 'in_invoice'">Vendor&#160;Bill</t>
+              <t t-elif="o.move_type == 'in_refund'">Vendor&#160;Refund</t>
+              <t t-else="">Invoice</t>
+            </t>
+          </div>
+          <div style="font-weight:700; color:#111;">
+            <t t-if="o"><span t-field="o.name"/></t>
+          </div>
         </div>
 
-        <!-- ===== Custom Address Block ===== -->
-        <!-- Hide default address block -->
+        <!-- ===== Custom right-aligned Bill To ===== -->
+        <!-- Hide standard address widgets to avoid duplicates -->
         <style type="text/css">
           .o_report_layout .o_address_format,
           .o_report_layout .address {
@@ -52,21 +70,25 @@
             <div t-if="o.partner_id.parent_id">
               <span t-field="o.partner_id.parent_id.name"/>
             </div>
+
             <div t-if="o.partner_id.street"><span t-field="o.partner_id.street"/></div>
             <div t-if="o.partner_id.street2"><span t-field="o.partner_id.street2"/></div>
+
             <div t-if="o.partner_id.city or o.partner_id.state_id or o.partner_id.zip">
               <t t-if="o.partner_id.city"><span t-field="o.partner_id.city"/></t>
               <t t-if="o.partner_id.state_id"> <span t-field="o.partner_id.state_id"/></t>
               <t t-if="o.partner_id.zip"> <span t-field="o.partner_id.zip"/></t>
             </div>
+
             <div t-if="o.partner_id.country_id"><span t-field="o.partner_id.country_id"/></div>
+
             <div t-if="o.partner_id.vat" style="margin-top:4px;">
-              <span>Tax ID:&nbsp;</span><span t-field="o.partner_id.vat"/>
+              <span>Tax ID:&#160;</span><span t-field="o.partner_id.vat"/>
             </div>
           </div>
         </div>
 
-        <!-- ===== Call Standard Invoice Body ===== -->
+        <!-- ===== Standard invoice content (lines, totals, etc.) ===== -->
         <t t-call="account.report_invoice_document"/>
 
       </div>
