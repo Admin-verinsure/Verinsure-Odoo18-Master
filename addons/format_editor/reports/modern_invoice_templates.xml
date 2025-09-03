@@ -3,25 +3,18 @@
     <template id="custom_template_report_invoice_modern"
               inherit_id="account.report_invoice_document">
 
-        <xpath expr="//div[@id='informations']" position="before">
-            <table style="width:100%; margin-bottom:12px; border-collapse:collapse;">
-                <tr>
-                    <td style="width:50%; vertical-align:middle;">
-                        <img t-if="o.company_id and o.company_id.logo"
-                             t-att-src="image_data_uri(o.company_id.logo)"
-                             style="max-height:80px;" alt="Company Logo"/>
-                    </td>
-                    <td style="width:50%; text-align:right; vertical-align:middle;">
-                        <div style="margin:0; font-weight:700; font-size:24px;" t-if="o.company_id">
-                            <span t-field="o.company_id.name"/>
-                        </div>
-                        <div t-if="o.company_id and o.company_id.country_id" style="font-size:13px;">
-                            <span t-field="o.company_id.country_id"/>
-                        </div>
-                    </td>
-                </tr>
-            </table>
-            <hr style="border:1px solid #000; margin:10px 0 12px 0;"/>
+        <xpath expr="//t[@t-call='web.external_layout']" position="attributes">
+            <attribute name="t-call">your_module.custom_external_layout_standard</attribute>
+        </xpath>
+
+        <xpath expr="//div[hasclass('article')]/div[@class='page']" position="inside">
+            <div style="text-align:right; margin-bottom:12px;">
+                <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
+                <div>Pty Limited</div>
+                <div>25 / 1 Maitland Place</div>
+                <div>Norwest NSW 2153</div>
+                <div>Australia</div>
+            </div>
 
             <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                 <div style="font-size:32px; font-weight:700; color:#111;">
@@ -56,7 +49,7 @@
                 </div>
             </div>
         </xpath>
-        
+
         <xpath expr="//div[@id='informations']" position="replace"/>
 
     </template>
