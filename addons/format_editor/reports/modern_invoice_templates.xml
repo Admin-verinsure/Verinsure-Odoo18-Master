@@ -3,11 +3,11 @@
   <template id="custom_template_report_invoice_modern">
     <t t-call="web.external_layout">
 
-      <!-- Safe guards -->
+      <!-- safe vars -->
       <t t-set="o" t-value="o or doc"/>
       <t t-set="company" t-value="company or (o and o.company_id)"/>
 
-      <!-- Hide the external header for this company (no XPath) -->
+      <!-- hide the external header (no XPath) -->
       <t t-if="company">
         <style type="text/css">
           .header.o_company_<t t-out="company.id"/>_layout{
@@ -19,7 +19,7 @@
 
       <div class="page" style="overflow:hidden;">
 
-        <!-- ===== Custom header in BODY ===== -->
+        <!-- ===== header in body ===== -->
         <table style="width:100%; margin-bottom:15px; border-collapse:collapse;">
           <tr>
             <td style="width:50%; vertical-align:middle;">
@@ -28,17 +28,17 @@
                    style="max-height:80px;" alt="Company Logo"/>
             </td>
             <td style="width:50%; text-align:right; vertical-align:middle;">
-              <h2 style="margin:0; font-weight:600;" t-if="company" t-field="company.name"/>
+              <h2 style="margin:0; font-weight:700;" t-if="company" t-field="company.name"/>
               <div t-if="company and company.country_id" style="font-size:13px;">
                 <span t-field="company.country_id"/>
               </div>
             </td>
           </tr>
         </table>
-        <hr style="border:1px solid #000; margin:0 0 15px 0;"/>
+        <hr style="border:1px solid #000; margin:0 0 10px 0;"/>
 
-        <!-- ===== Invoice title bar ===== -->
-        <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:15px;">
+        <!-- title bar -->
+        <div style="background:#efefef; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <div style="font-size:32px; font-weight:700; color:#111;">
             <t t-if="o">
               <t t-if="o.move_type == 'out_invoice'">Invoice</t>
@@ -53,20 +53,32 @@
           </div>
         </div>
 
-        <!-- ===== Custom right-aligned Bill To ===== -->
-        <!-- Hide standard address widgets to avoid duplicates -->
+        <!-- ===== kill the old address block (CSS only) ===== -->
         <style type="text/css">
+          /* common address widgets used by Odoo report header/body */
           .o_report_layout .o_address_format,
-          .o_report_layout .address {
-            display: none !important;
+          .o_report_layout .address { display:none !important; }
+
+          /* typical partner block containers near top of invoice document */
+          #informations, [id="informations"] { display:none !important; }
+
+          /* some databases render partner address in a right column wrapper */
+          .o_report_layout_standard .row.mt32.mb32 .col-6.text-end .list-unstyled,
+          .o_report_layout_standard .row.mt32.mb32 .col-6.text-end .o_address_format {
+            display:none !important;
           }
+
+          /* extremely defensive: hide a block explicitly named partner_address if present */
+          [name="partner_address"], #partner_address, .o_partner_address { display:none !important; }
         </style>
 
-        <div class="o_custom_billto" style="margin:0 24px 24px 24px; display:flex; justify-content:flex-end;">
-          <div style="max-width:360px; text-align:right; line-height:1.45; font-size:13.5px;">
-            <div style="font-weight:600; font-size:14px;">
+        <!-- ===== NEW address block on the LEFT ===== -->
+        <div class="o_custom_billto" style="margin:12px 24px 18px 24px; display:flex; justify-content:flex-start;">
+          <div style="max-width:420px; text-align:left; line-height:1.45; font-size:13.5px;">
+            <div style="font-weight:700; font-size:15px;">
               <span t-field="o.partner_id.name"/>
             </div>
+
             <div t-if="o.partner_id.parent_id">
               <span t-field="o.partner_id.parent_id.name"/>
             </div>
@@ -88,7 +100,7 @@
           </div>
         </div>
 
-        <!-- ===== Standard invoice content (lines, totals, etc.) ===== -->
+        <!-- ===== rest of standard invoice ===== -->
         <t t-call="account.report_invoice_document"/>
 
       </div>
