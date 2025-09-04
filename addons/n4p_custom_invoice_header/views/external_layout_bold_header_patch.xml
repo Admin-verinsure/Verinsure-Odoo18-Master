@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    This view ONLY replaces the header of the bold external layout.
+    The rest of the report (address block, title, body, footer) remains standard.
+  -->
+  <template id="external_layout_bold_header_patch"
+            inherit_id="web.external_layout_bold"
+            priority="199">
+    <!-- In your layout, the header is the FIRST <div> under the template root -->
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout" t-att-style="report_header_style">
+        <div class="row">
+          <!-- LEFT: logo (keep standard behavior) -->
+          <div class="col-6">
+            <img t-if="company.logo"
+                 class="o_company_logo_big"
+                 t-att-src="image_data_uri(company.logo)"
+                 alt="Logo"/>
+          </div>
+
+          <!-- RIGHT: your custom header content -->
+          <div class="col-5 offset-1">
+            <!-- Example: use company fields (future-proof) -->
+            <ul class="list-unstyled">
+              <li>
+                <span t-field="company.partner_id"
+                      t-options='{"widget":"contact","fields":["name"],"no_marker": true}'/>
+              </li>
+              <li>
+                <span t-field="company.partner_id"
+                      t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
+              </li>
+              <li t-if="company.phone"><t>Phone:</t> <span t-field="company.phone"/></li>
+              <li t-if="company.email"><t>Email:</t> <span t-field="company.email"/></li>
+              <li t-if="company.website"><t>Website:</t> <span t-field="company.website"/></li>
+              <li t-if="forced_vat or company.vat">
+                <t t-esc="company.country_id.vat_label or 'Tax ID'"/>:
+                <span t-esc="forced_vat or company.vat"/>
+              </li>
+            </ul>
+
+            <!--
+              If you prefer hard-coded branding (e.g., Rotary Australia ...), replace the UL above with:
+              <div style="text-align:right; line-height:1.35;">
+                <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
+                <div>Pty Limited</div>
+                <div>25 / 1 Maitland Place</div>
+                <div>Norwest NSW 2153</div>
+                <div>Australia</div>
+              </div>
+            -->
+          </div>
+        </div>
+      </div>
+    </xpath>
+  </template>
+</odoo>
