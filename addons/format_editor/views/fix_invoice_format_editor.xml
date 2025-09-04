@@ -1,10 +1,5 @@
-<odoo>
-  <template id="fix_remove_bad_header_jquery"
-            inherit_id="format_editor.custom_template_report_invoice_modern"
-            priority="999">
-    <xpath expr="//t[@t-jquery='div.header' and @t-operation='replace']"
-           position="replace">
+<data inherit_id="format_editor.custom_template_report_invoice_modern" priority="999">
+    <xpath expr="//div[hasclass('header')]" position="replace">
       <t/>
     </xpath>
-  </template>
-</odoo>
+  </data>
