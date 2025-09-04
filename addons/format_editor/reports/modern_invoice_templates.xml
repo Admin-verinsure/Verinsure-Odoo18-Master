@@ -1,6 +1,6 @@
 <odoo>
 <template id="external_layout_inherit"
-            inherit_id="web.external_layout_standard"
+            inherit_id="web.external_layout_bold"
             priority="20">
 <!-- Replace the header block -->
 <xpath expr="//div[contains(@t-attf-class,'header o_company_')]" position="replace">
