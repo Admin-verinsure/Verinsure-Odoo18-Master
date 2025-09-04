@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Patch the STANDARD layout header only -->
-  <template id="external_layout_standard_header_patch"
-            inherit_id="web.external_layout_standard" priority="30">
-    <!-- Header is the first <div> under the template root -->
-    <xpath expr="/t/div[1]" position="replace">
+  <!-- Apply header change to the ACTIVE variant -->
+  <template id="external_layout_bold_header_patch"
+            inherit_id="web.external_layout_bold"
+            priority="30">
+    <t t-jquery="div.header" t-operation="replace">
       <div class="header">
         <div style="text-align:right; margin-bottom:12px;">
           <div style="font-weight:700; font-size:16px;">Rotary Australia World Community Services</div>
@@ -14,6 +14,6 @@
           <div>Australia</div>
         </div>
       </div>
-    </xpath>
+    </t>
   </template>
 </odoo>
