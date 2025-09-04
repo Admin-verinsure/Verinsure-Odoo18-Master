@@ -1,45 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Inherit the Bold external layout -->
   <template id="layout_bold_move_header_into_body"
             inherit_id="web.external_layout_bold"
             priority="199">
 
-    <!-- 1) Make the header EMPTY (keep container to preserve layout spacing) -->
+    <!-- 1) Collapse the top header area completely -->
     <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout" t-att-style="report_header_style"/>
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="height:0; line-height:0; padding:0; margin:0; border:0;"/>
     </xpath>
 
-    <!-- 2) Insert your header table INSIDE the body (article), ABOVE the title -->
-    <!-- We place it just before <h2 t-out="layout_document_title"/> -->
+    <!-- 2) Trim the body’s top spacing -->
+    <xpath expr="/t" position="inside">
+      <style type="text/css">
+        .o_report_layout_bold.article { margin-top: 0 !important; padding-top: 0 !important; }
+        /* Scoped styles for our header-in-body block */
+        .n4p-head td { vertical-align: top; }
+        .n4p-head .name { font-weight: 700; font-size: 18px; margin: 0 0 4px 0; }
+        .n4p-head .line { font-size: 12px; line-height: 1.35; margin: 0; }
+      </style>
+    </xpath>
+
+    <!-- 3) Place the custom header block at the very top of the body -->
+    <!--    Right before the document title -->
     <xpath expr="//h2[@t-out='layout_document_title']" position="before">
-      <!-- Custom Header block now in the body -->
-      <table style="width:100%; margin-bottom:20px;">
+      <table class="n4p-head" style="width:100%; margin-bottom:10px;">
         <tr>
-          <td style="width:50%;">
+          <!-- LEFT: logo -->
+          <td style="width:45%;">
             <img t-if="company.logo"
                  t-att-src="image_data_uri(company.logo)"
                  style="max-height:80px;"
                  alt="Company Logo"/>
           </td>
-          <td style="width:50%; text-align:right; color:#000;">
-            <h4 style="margin:0;" t-field="company.name"/>
-            <div><span t-field="company.street"/></div>
-            <div>
-              <span t-field="company.city"/> <span t-field="company.zip"/>
+
+          <!-- RIGHT: elegant address/details (only show lines that exist) -->
+          <td style="width:55%; text-align:right; color:#000;">
+            <!-- Prefer report header if set; fallback to company name -->
+            <div class="name">
+              <t t-esc="company.report_header or company.name"/>
             </div>
-            <div><span t-field="company.country_id"/></div>
+
+            <div class="line" t-if="company.street"><t t-esc="company.street"/></div>
+            <div class="line" t-if="company.street2"><t t-esc="company.street2"/></div>
+
+            <div class="line" t-if="company.city or company.state_id or company.zip">
+              <t t-if="company.city"><t t-esc="company.city"/></t>
+              <t t-if="company.state_id">, <t t-esc="company.state_id.name"/></t>
+              <t t-if="company.zip"> <t t-esc="company.zip"/></t>
+            </div>
+
+            <div class="line" t-if="company.country_id"><t t-esc="company.country_id.name"/></div>
+
+            <!-- Optional contact lines; keep if you want them -->
+            <!-- <div class="line" t-if="company.phone"><t t-esc="company.phone"/></div>
+            <div class="line" t-if="company.email"><t t-esc="company.email"/></div>
+            <div class="line" t-if="company.website"><t t-esc="company.website"/></div> -->
+
+            <!-- Optional GST/VAT -->
+            <!-- <div class="line" t-if="company.vat or forced_vat">
+              <t t-esc="company.country_id.vat_label or 'Tax ID'"/>:
+              <t t-esc="forced_vat or company.vat"/>
+            </div> -->
           </td>
         </tr>
       </table>
     </xpath>
 
-    <!-- OPTIONAL: if you want to hide the default address block that Bold prints above the title,
-         uncomment the block below (it removes web.address_layout call).
+    <!-- 4) OPTIONAL: if you don’t want the stock address band the Bold layout prints,
+           uncomment this to hide it so your header is the only one on top.
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
       <t/>
     </xpath>
     -->
-
   </template>
 </odoo>
