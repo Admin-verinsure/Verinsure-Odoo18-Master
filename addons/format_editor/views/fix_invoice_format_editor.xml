@@ -1,6 +1,6 @@
 <odoo>
   <template id="fix_remove_bad_header_jquery"
-            inherit_id="format_editor.some_header_on_wrapper"
+            inherit_id="format_editorcustom_template_report_invoice_modern"
             priority="999">
     <xpath expr="//t[@t-jquery='div.header' and @t-operation='replace']"
            position="replace">
