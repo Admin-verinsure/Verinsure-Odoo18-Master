@@ -1,31 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Only override the HEADER of the bold layout -->
-  <template id="external_layout_bold_header_patch"
+  <!-- Inherit the Bold external layout -->
+  <template id="layout_bold_move_header_into_body"
             inherit_id="web.external_layout_bold"
             priority="199">
-    <!-- Header is the first <div> under the template -->
+
+    <!-- 1) Make the header EMPTY (keep container to preserve layout spacing) -->
     <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout" t-att-style="report_header_style">
-        <div class="row align-items-center">
-          <!-- LEFT: Logo -->
-          <div class="col-6">
-            <img t-if="company.logo"
-                 class="o_company_logo_big"
-                 t-att-src="image_data_uri(company.logo)"
-                 alt="Logo"/>
-          </div>
-          <!-- RIGHT: Two centered lines (tagline + country) -->
-          <div class="col-6 text-center">
-            <!-- First line: use report_header if set; fall back to company.name -->
-            <strong class="h5 d-block">
-              <t t-esc="company.report_header or company.name"/>
-            </strong>
-            <!-- Second line: country -->
-            <span t-if="company.country_id" class="d-block" t-field="company.country_id"/>
-          </div>
-        </div>
-      </div>
+      <div t-attf-class="header o_company_#{company.id}_layout" t-att-style="report_header_style"/>
     </xpath>
+
+    <!-- 2) Insert your header table INSIDE the body (article), ABOVE the title -->
+    <!-- We place it just before <h2 t-out="layout_document_title"/> -->
+    <xpath expr="//h2[@t-out='layout_document_title']" position="before">
+      <!-- Custom Header block now in the body -->
+      <table style="width:100%; margin-bottom:20px;">
+        <tr>
+          <td style="width:50%;">
+            <img t-if="company.logo"
+                 t-att-src="image_data_uri(company.logo)"
+                 style="max-height:80px;"
+                 alt="Company Logo"/>
+          </td>
+          <td style="width:50%; text-align:right; color:#000;">
+            <h4 style="margin:0;" t-field="company.name"/>
+            <div><span t-field="company.street"/></div>
+            <div>
+              <span t-field="company.city"/> <span t-field="company.zip"/>
+            </div>
+            <div><span t-field="company.country_id"/></div>
+          </td>
+        </tr>
+      </table>
+    </xpath>
+
+    <!-- OPTIONAL: if you want to hide the default address block that Bold prints above the title,
+         uncomment the block below (it removes web.address_layout call).
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t/>
+    </xpath>
+    -->
+
   </template>
 </odoo>
