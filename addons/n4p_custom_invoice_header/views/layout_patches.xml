@@ -12,6 +12,7 @@
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
       <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
+    <!-- Tighten spacing -->
     <xpath expr="/t" position="inside">
       <style>
         .o_report_layout_bold.article{margin-top:0!important;padding-top:0!important}
@@ -20,62 +21,28 @@
     </xpath>
   </template>
 
-  
-
   <!-- BUBBLE -->
-  
-  <template id="layout_bold_move_header_into_body"
-            inherit_id="web.external_layout_bubble"
-            priority="199">
-
-    <!-- Collapse the original header completely -->
+  <template id="patch_external_layout_bubble" inherit_id="web.external_layout_bubble" priority="199">
+    <!-- Collapse original header -->
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
-
-    <!-- Replace the stock address band with our header block (wizard-safe) -->
+    <!-- Replace the stock address band with our header block, then add a normal H2 title -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <table style="width:100%; margin:0 0 8px 0;">
-        <tr>
-          <!-- LEFT: logo -->
-          <td style="width:50%; vertical-align:top;">
-            <img t-if="company.logo"
-                 t-att-src="image_data_uri(company.logo)"
-                 style="max-height:80px;"
-                 alt="Company Logo"/>
-          </td>
-
-          <!-- RIGHT: title + details (no direct street/city/zip) -->
-          <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
-            <!-- Title line: prefer report_header, fallback to name -->
-            <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
-              <t t-esc="company.report_header or company.name or ''"/>
-            </div>
-
-            <!-- Use the same safe pattern as Odoo's layout -->
-            <t t-if="company.is_company_details_empty">
-              <span t-field="company.partner_id"
-                    t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
-            </t>
-            <t t-else="">
-              <span t-field="company.company_details"/>
-            </t>
-          </td>
-        </tr>
-      </table>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
+      <h2 t-out="layout_document_title"/>
     </xpath>
-
-    <!-- Tighten top spacing -->
+    <!-- Bubble-specific tweaks -->
     <xpath expr="/t" position="inside">
-      <style type="text/css">
-        .o_report_layout_bold.article { margin-top: 0 !important; padding-top: 0 !important; }
-        .o_report_layout_bold.article h2 { margin-top: 0 !important; }
+      <style>
+        /* Hide Bubble’s overlay title safely */
+        .o_report_layout_bubble .o_bubble_title{display:none!important}
+        /* Compact spacing for the injected H2 */
+        .o_report_layout_bubble h2{margin:6px 0 8px 0!important}
       </style>
     </xpath>
   </template>
-
-
 
   <!-- FOLDER -->
   <template id="patch_external_layout_folder" inherit_id="web.external_layout_folder" priority="199">
