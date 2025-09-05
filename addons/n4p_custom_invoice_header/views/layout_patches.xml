@@ -27,32 +27,31 @@
           inherit_id="web.external_layout_bubble"
           priority="199">
 
-  <!-- Collapse the built-in header -->
+  <!-- Hide the stock header completely -->
   <xpath expr="/t/div[1]" position="replace">
     <div t-attf-class="header o_company_#{company.id}_layout"
          style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
   </xpath>
 
-  <!-- Use your shared header block -->
+  <!-- Replace ANY call to web.address_layout with your header + the normal title -->
   <xpath expr="//t[@t-call='web.address_layout']" position="replace">
     <t t-call="n4p_header_in_body.n4p_header_block"/>
-  </xpath>
-
-  <!-- Add a normal H2 title at the top of the article -->
-  <xpath expr="//div[contains(@class,'article')]" position="inside">
     <h2 t-out="layout_document_title"/>
   </xpath>
 
-  <!-- Robust styling: hide overlay title; tighten space; size logo -->
+  <!-- Bubble tweaks via CSS (no XPath to .o_bubble_title) -->
   <xpath expr="/t" position="inside">
     <style>
-      .o_report_layout_bubble .o_bubble_title{ display:none !important; }
-      .o_report_layout_bubble.article{ margin-top:0!important; padding-top:0!important; }
-      .o_report_layout_bubble.article h2{ margin:6px 0 8px 0!important; }
-      .o_report_layout_bubble .n4p-header img{ height:auto!important; max-height:60px!important; }
+      /* Hide Bubble’s overlay title safely */
+      .o_report_layout_bubble .o_bubble_title { display: none !important; }
+      /* Compact spacing */
+      .o_report_layout_bubble h2 { margin: 6px 0 8px 0 !important; }
+      /* Keep header compact */
+      .o_report_layout_bubble .n4p-header img { max-height: 60px !important; height: auto !important; }
     </style>
   </xpath>
 </template>
+
 
 
   <!-- FOLDER -->
