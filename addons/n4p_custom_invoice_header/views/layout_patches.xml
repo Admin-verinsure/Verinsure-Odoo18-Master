@@ -27,38 +27,49 @@
           inherit_id="web.external_layout_bubble"
           priority="199">
 
-  <!-- Hide the stock header entirely -->
+  <!-- Hide the stock header completely -->
   <xpath expr="/t/div[1]" position="replace">
     <div t-attf-class="header o_company_#{company.id}_layout"
          style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
   </xpath>
 
-  <!-- Replace the address band (robust: try inside bubble header OR anywhere) -->
+  <!-- Replace the address band with our reusable header block (robust selector) -->
   <xpath expr="//div[contains(@class,'o_bubble_header')]//t[@t-call='web.address_layout'] 
                | //t[@t-call='web.address_layout']"
          position="replace">
     <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
   </xpath>
 
+  <!-- Remove Bubble's overlay title (top-right badge) -->
+  <xpath expr="//div[contains(@class,'o_bubble_title')]" position="replace">
+    <t/>
+  </xpath>
+
+  <!-- Add a standard H2 title AFTER the bubble header, like other layouts -->
+  <xpath expr="//div[contains(@class,'o_bubble_header')]" position="after">
+    <h2 t-out="layout_document_title"/>
+  </xpath>
+
   <!-- Bubble-specific spacing and image sizing -->
   <xpath expr="/t" position="inside">
     <style>
       .o_report_layout_bubble.article{margin-top:0!important;padding-top:0!important}
-      .o_report_layout_bubble.article h2{margin-top:0!important}
+      .o_report_layout_bubble.article h2{margin:6px 0 8px 0!important}
 
-      /* Prefer targeting your reusable block */
+      /* Style your reusable header in Bubble */
       .o_report_layout_bubble .n4p-header{margin:0 0 6px 0; width:100%}
       .o_report_layout_bubble .n4p-header td{padding:0; vertical-align:top}
-      .o_report_layout_bubble .n4p-header img{height:auto !important; max-height:60px !important}
+      .o_report_layout_bubble .n4p-header img{height:auto!important; max-height:60px!important}
 
-      /* Fallback if the class isn't present (first table in header area) */
+      /* Fallback if the class isn't present (first table in bubble header) */
       .o_report_layout_bubble .o_bubble_header > table:first-child img{
-        height:auto !important; max-height:60px !important;
+        height:auto!important; max-height:60px!important;
       }
       .o_report_layout_bubble .o_bubble_header > table:first-child{margin:0 0 6px 0}
     </style>
   </xpath>
 </template>
+
 
 
   <!-- FOLDER -->
