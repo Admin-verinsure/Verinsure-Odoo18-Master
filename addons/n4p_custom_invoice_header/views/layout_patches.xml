@@ -10,7 +10,7 @@
     </xpath>
     <!-- Insert our block at top of body -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
@@ -29,7 +29,7 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
@@ -46,7 +46,7 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
@@ -63,7 +63,7 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
@@ -80,7 +80,7 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
@@ -97,7 +97,7 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.header_block"/>
+      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
     <xpath expr="/t" position="inside">
       <style>
