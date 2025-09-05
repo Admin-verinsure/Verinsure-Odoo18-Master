@@ -4,15 +4,15 @@
             inherit_id="web.external_layout_bold"
             priority="199">
 
-    <!-- 1) Collapse the original HEADER completely -->
+    <!-- 1) Collapse original HEADER completely -->
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
 
-    <!-- 2) Replace the stock address band in the body with YOUR header table  -->
+    <!-- 2) Replace stock address band with OUR header table (wizard-safe) -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <table class="n4p-head" style="width:100%; margin:0 0 8px 0;">
+      <table style="width:100%; margin:0 0 8px 0;">
         <tr>
           <!-- LEFT: logo -->
           <td style="width:50%; vertical-align:top;">
@@ -22,37 +22,34 @@
                  alt="Company Logo"/>
           </td>
 
-          <!-- RIGHT: neat address/details (only show lines that exist) -->
+          <!-- RIGHT: clean, wizard-safe details -->
           <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
             <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
-              <t t-esc="company.report_header or company.name"/>
+              <t t-esc="(hasattr(company, 'report_header') and company.report_header) or (hasattr(company, 'name') and company.name) or ''"/>
             </div>
 
-            <div t-if="company.street" style="font-size:12px; line-height:1.35;"><t t-esc="company.street"/></div>
-            <div t-if="company.street2" style="font-size:12px; line-height:1.35;"><t t-esc="company.street2"/></div>
-            <div t-if="company.city or company.state_id or company.zip" style="font-size:12px; line-height:1.35;">
-              <t t-if="company.city"><t t-esc="company.city"/></t>
-              <t t-if="company.state_id">, <t t-esc="company.state_id.name"/></t>
-              <t t-if="company.zip"> <t t-esc="company.zip"/></t>
-            </div>
-            <div t-if="company.country_id" style="font-size:12px; line-height:1.35;"><t t-esc="company.country_id.name"/></div>
+            <!-- Use the stock-safe blocks -->
+            <t t-if="hasattr(company, 'is_company_details_empty') and company.is_company_details_empty">
+              <span t-field="company.partner_id"
+                    t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
+            </t>
+            <t t-else="">
+              <span t-field="company.company_details"/>
+            </t>
 
-            <!-- Optional contact lines (remove if not wanted) -->
-            <div t-if="company.phone"   style="font-size:12px; line-height:1.35;"><t t-esc="company.phone"/></div>
-            <div t-if="company.email"   style="font-size:12px; line-height:1.35;"><t t-esc="company.email"/></div>
-            <div t-if="company.website" style="font-size:12px; line-height:1.35;"><t t-esc="company.website"/></div>
-
-            <!-- Optional GST/VAT -->
-            <div t-if="company.vat or forced_vat" style="font-size:12px; line-height:1.35;">
-              <t t-esc="company.country_id.vat_label or 'Tax ID'"/>:
-              <t t-esc="forced_vat or company.vat"/>
-            </div>
+            <!-- Optional GST/VAT (guarded) -->
+            <t t-if="(hasattr(company,'country_id') and company.country_id) and (typeof(forced_vat) != 'undefined' and forced_vat)">
+              <div style="font-size:12px; line-height:1.35;">
+                <t t-esc="company.country_id.vat_label or 'Tax ID'"/>:
+                <t t-esc="forced_vat"/>
+              </div>
+            </t>
           </td>
         </tr>
       </table>
     </xpath>
 
-    <!-- 3) Tighten top spacing around the article & title -->
+    <!-- 3) Trim top spacing -->
     <xpath expr="/t" position="inside">
       <style type="text/css">
         .o_report_layout_bold.article { margin-top: 0 !important; padding-top: 0 !important; }
@@ -60,10 +57,5 @@
       </style>
     </xpath>
 
-    <!-- (Optional) If you want a thin rule after your header table, add it:
-    <xpath expr="//h2[@t-out='layout_document_title']" position="before">
-      <hr style="border:0;border-top:1px solid #222;margin:4px 0 8px 0;"/>
-    </xpath>
-    -->
   </template>
 </odoo>
