@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <template id="layout_bold_move_header_into_body"
-            inherit_id="web.external_layout_bold"
+            inherit_id="web.external_layout_box"
             priority="199">
 
     <!-- Collapse the original header completely -->
