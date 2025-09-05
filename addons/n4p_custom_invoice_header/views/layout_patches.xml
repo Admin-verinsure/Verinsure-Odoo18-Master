@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- BOLD -->
+  <template id="patch_external_layout_bold" inherit_id="web.external_layout_bold" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_bold.article{margin-top:0!important;padding-top:0!important}.o_report_layout_bold.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- BOXED -->
+  <template id="patch_external_layout_boxed" inherit_id="web.external_layout_boxed" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_boxed.article{margin-top:0!important;padding-top:0!important}.o_report_layout_boxed.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- STRIPED -->
+  <template id="patch_external_layout_striped" inherit_id="web.external_layout_striped" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_striped.article{margin-top:0!important;padding-top:0!important}.o_report_layout_striped.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- LIGHT -->
+  <template id="patch_external_layout_light" inherit_id="web.external_layout_light" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_light.article{margin-top:0!important;padding-top:0!important}.o_report_layout_light.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- BUBBLE -->
+  <template id="patch_external_layout_bubble" inherit_id="web.external_layout_bubble" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_bubble.article{margin-top:0!important;padding-top:0!important}.o_report_layout_bubble.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- WAVE -->
+  <template id="patch_external_layout_wave" inherit_id="web.external_layout_wave" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_wave.article{margin-top:0!important;padding-top:0!important}.o_report_layout_wave.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+  <!-- FOLDER -->
+  <template id="patch_external_layout_folder" inherit_id="web.external_layout_folder" priority="199">
+    <xpath expr="/t/div[1]" position="replace">
+      <div t-attf-class="header o_company_#{company.id}_layout"
+           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+    </xpath>
+    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+      <t t-call="n4p_header_in_body.n4p_header_block"/>
+    </xpath>
+    <xpath expr="/t" position="inside">
+      <style>.o_report_layout_folder.article{margin-top:0!important;padding-top:0!important}.o_report_layout_folder.article h2{margin-top:0!important}</style>
+    </xpath>
+  </template>
+
+</odoo>
