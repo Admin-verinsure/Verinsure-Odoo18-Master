@@ -15,19 +15,7 @@
     </xpath>
   </template>
 
-  <!-- BOXED -->
-  <template id="patch_external_layout_boxed" inherit_id="web.external_layout_boxed" priority="199">
-    <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout"
-           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
-    </xpath>
-    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_header_in_body.n4p_header_block"/>
-    </xpath>
-    <xpath expr="/t" position="inside">
-      <style>.o_report_layout_boxed.article{margin-top:0!important;padding-top:0!important}.o_report_layout_boxed.article h2{margin-top:0!important}</style>
-    </xpath>
-  </template>
+
 
   <!-- STRIPED -->
   <template id="patch_external_layout_striped" inherit_id="web.external_layout_striped" priority="199">

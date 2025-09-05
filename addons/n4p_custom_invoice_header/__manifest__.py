@@ -8,6 +8,7 @@
     "data": [
         "views/header_block.xml",
         "views/layout_patches.xml",
+        "views/external_layout_bold_header_patch.xml",
     ],
     "installable": True,
     "application": False,
