@@ -35,7 +35,7 @@
 
   <!-- Replace ANY call to web.address_layout with your header + the normal title -->
   <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-    <t t-call="n4p_header_in_body.n4p_header_block"/>
+    <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     <h2 t-out="layout_document_title"/>
   </xpath>
 
