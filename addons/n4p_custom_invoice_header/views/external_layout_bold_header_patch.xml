@@ -4,13 +4,13 @@
             inherit_id="web.external_layout_bold"
             priority="199">
 
-    <!-- 1) Collapse original HEADER completely -->
+    <!-- Collapse the original header completely -->
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
 
-    <!-- 2) Replace stock address band with OUR header table (wizard-safe) -->
+    <!-- Replace the stock address band with our header block (wizard-safe) -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
       <table style="width:100%; margin:0 0 8px 0;">
         <tr>
@@ -22,34 +22,27 @@
                  alt="Company Logo"/>
           </td>
 
-          <!-- RIGHT: clean, wizard-safe details -->
+          <!-- RIGHT: title + details (no direct street/city/zip) -->
           <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
+            <!-- Title line: prefer report_header, fallback to name -->
             <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
-              <t t-esc="(hasattr(company, 'report_header') and company.report_header) or (hasattr(company, 'name') and company.name) or ''"/>
+              <t t-esc="company.report_header or company.name or ''"/>
             </div>
 
-            <!-- Use the stock-safe blocks -->
-            <t t-if="hasattr(company, 'is_company_details_empty') and company.is_company_details_empty">
+            <!-- Use the same safe pattern as Odoo's layout -->
+            <t t-if="company.is_company_details_empty">
               <span t-field="company.partner_id"
                     t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
             </t>
             <t t-else="">
               <span t-field="company.company_details"/>
             </t>
-
-            <!-- Optional GST/VAT (guarded) -->
-            <t t-if="(hasattr(company,'country_id') and company.country_id) and (typeof(forced_vat) != 'undefined' and forced_vat)">
-              <div style="font-size:12px; line-height:1.35;">
-                <t t-esc="company.country_id.vat_label or 'Tax ID'"/>:
-                <t t-esc="forced_vat"/>
-              </div>
-            </t>
           </td>
         </tr>
       </table>
     </xpath>
 
-    <!-- 3) Trim top spacing -->
+    <!-- Tighten top spacing -->
     <xpath expr="/t" position="inside">
       <style type="text/css">
         .o_report_layout_bold.article { margin-top: 0 !important; padding-top: 0 !important; }
