@@ -24,20 +24,36 @@
 
   <!-- BUBBLE -->
   <template id="patch_external_layout_bubble" inherit_id="web.external_layout_bubble" priority="199">
-    <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout"
-           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
-    </xpath>
-    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
-    </xpath>
-    <xpath expr="/t" position="inside">
-      <style>
-        .o_report_layout_bubble.article{margin-top:0!important;padding-top:0!important}
-        .o_report_layout_bubble.article h2{margin-top:0!important}
-      </style>
-    </xpath>
-  </template>
+  <!-- Hide original header -->
+  <xpath expr="/t/div[1]" position="replace">
+    <div t-attf-class="header o_company_#{company.id}_layout"
+         style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+  </xpath>
+
+  <!-- Put our header inside the bubble header container -->
+  <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' o_bubble_header ')]//t[@t-call='web.address_layout']"
+         position="replace">
+    <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
+  </xpath>
+
+  <!-- Bubble-specific spacing & image size -->
+  <xpath expr="/t" position="inside">
+    <style>
+      .o_report_layout_bubble.article{margin-top:0!important;padding-top:0!important}
+      .o_report_layout_bubble.article h2{margin-top:0!important}
+
+      /* Prefer the class on your block… */
+      .o_report_layout_bubble .o_bubble_header table.n4p-header{margin:0 0 6px 0; width:100%}
+      .o_report_layout_bubble .o_bubble_header table.n4p-header td{padding:0; vertical-align:top}
+      .o_report_layout_bubble .o_bubble_header table.n4p-header img{height:auto !important; max-height:60px !important}
+
+      /* …fallback if you didn’t add the class (targets first table in bubble header) */
+      .o_report_layout_bubble .o_bubble_header > table:first-child img{height:auto !important; max-height:60px !important}
+      .o_report_layout_bubble .o_bubble_header > table:first-child{margin:0 0 6px 0}
+    </style>
+  </xpath>
+</template>
+
 
   <!-- FOLDER -->
   <template id="patch_external_layout_folder" inherit_id="web.external_layout_folder" priority="199">
