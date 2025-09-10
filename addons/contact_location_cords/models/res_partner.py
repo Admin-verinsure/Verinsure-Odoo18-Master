@@ -16,14 +16,22 @@ class ResPartner(models.Model):
         return ", ".join(p for p in parts if p).strip(", ")
 
     def action_locate_from_address(self):
-      for rec in self:
-          rec.write({
-              "club_latitude": 37.4219983,   # Googleplex 🙂
-              "club_longitude": -122.084
-          })
-      return True
-
-
+        """Called by the button: geocode postal address -> write lat/lng."""
+        for rec in self:
+            addr = rec._geo_address_line()
+            if not addr:
+                continue
+            coords = None
+            if hasattr(rec, "geo_find"):
+                coords = rec.geo_find(addr)
+            elif hasattr(rec, "_geo_find"):
+                coords = rec._geo_find(addr)
+            if coords and len(coords) >= 2:
+                rec.write({
+                    "club_latitude": float(coords[0]),
+                    "club_longitude": float(coords[1]),
+                })
+        return True
 
     @api.onchange("street", "street2", "city", "state_id", "zip", "country_id")
     def _onchange_autofill_coords(self):
