@@ -1,48 +1,30 @@
 <odoo>
   <data>
-
-    <!-- 1) Hide MEMBERSHIP tab only for Companies -->
-    <!-- We inherit the view that adds the Membership page -->
-    <record id="hide_membership_for_companies" model="ir.ui.view">
-      <field name="name">res.partner: hide membership for companies</field>
+    <record id="res_partner_toggle_org_membership" model="ir.ui.view">
+      <field name="name">res.partner: toggle Membership/Org tabs by company_type</field>
       <field name="model">res.partner</field>
-      <field name="inherit_id" ref="membership.view_partner_form"/>
-      <field name="priority">200</field>
+      <field name="inherit_id" ref="base.view_partner_form"/>
+      <!-- ensure we run after membership & rotary views -->
+      <field name="priority">999</field>
       <field name="arch" type="xml">
-        <!-- 'membership' is the technical page name (you saw it in the inspector) -->
+
+        <!-- Hide MEMBERSHIP for Companies -->
         <xpath expr="//page[@name='membership']" position="attributes">
           <attribute name="invisible">[('company_type', '=', 'company')]</attribute>
         </xpath>
-      </field>
-    </record>
 
-    <!-- 2) Hide ROTARY ORG INFO tab only for Individuals -->
-    <!-- We inherit the Rotary view that adds the Org Info page -->
-    <record id="hide_orginfo_for_individuals" model="ir.ui.view">
-      <field name="name">res.partner: hide org info for individuals</field>
-      <field name="model">res.partner</field>
-      <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
-      <field name="priority">200</field>
-      <field name="arch" type="xml">
-
-        <!-- Give the first page in this view a stable name if it doesn't have one -->
-        <xpath expr="//notebook/page[1][not(@name)]" position="attributes">
-          <attribute name="name">rotary_org_info</attribute>
-        </xpath>
-
-        <!-- Prefer targeting by the name we just ensured -->
-        <xpath expr="//page[@name='rotary_org_info']" position="attributes">
-          <attribute name="invisible">[('company_type', '=', 'person')]</attribute>
-        </xpath>
-
-        <!-- Fallback: if the technical name is different, target by a unique field inside the tab. 
-             Adjust the field names below if needed. -->
-        <xpath expr="//page[.//field[@name='club_type'] or .//field[@name='club_type_id'] or .//field[@name='club_id']]" position="attributes">
+        <!-- Hide ROTARY ORG INFO for Individuals
+             We don't rely on @string or exact @name; we anchor by fields that tab contains. -->
+        <xpath expr="//page[
+                        .//field[contains(@name,'rotary')]
+                        or .//field[contains(@name,'club')]
+                        or .//field[contains(@name,'district')]
+                     ]"
+               position="attributes">
           <attribute name="invisible">[('company_type', '=', 'person')]</attribute>
         </xpath>
 
       </field>
     </record>
-
   </data>
 </odoo>
