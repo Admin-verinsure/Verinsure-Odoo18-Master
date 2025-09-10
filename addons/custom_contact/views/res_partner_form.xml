@@ -3,35 +3,24 @@
     <record id="res_partner_hide_tabs_by_type" model="ir.ui.view">
       <field name="name">res.partner: hide Membership/Org tabs by partner type</field>
       <field name="model">res.partner</field>
-
-      <!-- Use the base form you showed -->
       <field name="inherit_id" ref="base.view_partner_form"/>
-
-      <!-- Make sure this runs AFTER the views that add those pages -->
+      <!-- run after the views that add the tabs -->
       <field name="priority">200</field>
 
       <field name="arch" type="xml">
 
         <!-- MEMBERSHIP: hide only for Companies -->
-        <xpath expr="//page[@name='membership' or @string='Membership']"
-               position="attributes">
+        <xpath expr="//page[@name='membership']" position="attributes">
           <attribute name="attrs">
-            {
-              "invisible": ["|", ("company_type", "=", "company"), ("is_company", "=", True)]
-            }
+            {'invisible': [('company_type', '=', 'company')]}
           </attribute>
         </xpath>
 
         <!-- ORG INFO: hide only for Individuals -->
-        <!-- If your page has a stable @name, add it below (e.g., @name='rotary_org_info'). -->
-        <xpath expr="//page[@name='rotary_org_info' or @name='org_info'
-                           or contains(translate(@string,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),
-                                       'org info')]"
-               position="attributes">
+        <!-- Replace/add the exact technical name of your Org tab if different -->
+        <xpath expr="//page[@name='rotary_org_info' or @name='org_info']" position="attributes">
           <attribute name="attrs">
-            {
-              "invisible": ["|", ("company_type", "=", "person"), ("is_company", "=", False)]
-            }
+            {'invisible': [('company_type', '=', 'person')]}
           </attribute>
         </xpath>
 
