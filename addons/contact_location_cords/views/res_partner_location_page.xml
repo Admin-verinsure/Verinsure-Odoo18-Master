@@ -1,0 +1,30 @@
+<odoo>
+  <data>
+    <record id="view_partner_location_page" model="ir.ui.view">
+      <field name="name">res.partner: Location tab for all contacts</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="base.view_partner_form"/>
+      <field name="priority">500</field>
+      <field name="arch" type="xml">
+        <xpath expr="//notebook" position="inside">
+          <page name="location" string="Location">
+            <group>
+              <group>
+                <!-- reuse existing fields from rotary_project_map -->
+                <field name="club_latitude" string="Latitude"/>
+                <field name="club_longitude" string="Longitude"/>
+              </group>
+              <group>
+                <button name="action_locate_from_address"
+                        type="object"
+                        class="btn btn-secondary"
+                        string="Locate from Address"/>
+                <label string="Uses the postal address above (Settings → Contacts → Geolocation)."/>
+              </group>
+            </group>
+          </page>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>
