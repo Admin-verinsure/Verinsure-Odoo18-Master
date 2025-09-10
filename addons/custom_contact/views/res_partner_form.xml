@@ -1,41 +1,33 @@
 <odoo>
   <data>
-    <record id="res_partner_toggle_org_membership" model="ir.ui.view">
-      <field name="name">res.partner: toggle Membership/Org tabs by company_type</field>
-      <field name="model">res.partner</field>
-      <field name="inherit_id" ref="base.view_partner_form"/>
-      <!-- run after membership & rotary views -->
-      <field name="priority">999</field>
-      <field name="arch" type="xml">
 
-        <!-- Hide MEMBERSHIP for companies -->
+    <!-- Hide MEMBERSHIP only for Companies -->
+    <record id="hide_membership_for_companies" model="ir.ui.view">
+      <field name="name">res.partner: hide membership for companies</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="membership.view_partner_form"/>
+      <field name="priority">200</field>
+      <field name="arch" type="xml">
         <xpath expr="//page[@name='membership']" position="attributes">
           <attribute name="invisible">['|', ('company_type', '=', 'company'), ('is_company', '=', True)]</attribute>
         </xpath>
-
-        <!-- Hide ORG INFO for individuals
-             Anchor by typical Rotary fields so we don't need the page's @name. -->
-        <xpath expr="//page[
-                        .//field[contains(@name,'rotary')]
-                        or .//field[contains(@name,'club')]
-                        or .//field[contains(@name,'district')]
-                        or .//field[contains(@name,'ri_')]
-                        or .//field[@name='club_type']
-                        or .//field[@name='club_type_id']
-                        or .//field[@name='club_id']
-                        or .//field[@name='district_id']
-                        or .//field[@name='rotary_id']
-                        or .//field[@name='rotary_member_id']
-                        or .//field[@name='rotary_club_id']
-                        or .//field[@name='club_number']
-                        or .//field[@name='club_name']
-                        or .//field[@name='club_code']
-                     ]"
-               position="attributes">
-          <attribute name="invisible">['|', ('company_type', '=', 'person'), ('is_company', '=', False)]</attribute>
-        </xpath>
-
       </field>
     </record>
+
+    <!-- Hide ORG INFO only for Individuals -->
+    <record id="hide_orginfo_for_individuals" model="ir.ui.view">
+      <field name="name">res.partner: hide org info for individuals</field>
+      <field name="model">res.partner</field>
+      <!-- Inherit the Rotary view that ADDS the page -->
+      <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
+      <field name="priority">200</field>
+      <field name="arch" type="xml">
+        <!-- The tab's technical name is club_information (from your server file) -->
+        <xpath expr="//page[@name='club_information']" position="attributes">
+          <attribute name="invisible">['|', ('company_type', '=', 'person'), ('is_company', '=', False)]</attribute>
+        </xpath>
+      </field>
+    </record>
+
   </data>
 </odoo>
