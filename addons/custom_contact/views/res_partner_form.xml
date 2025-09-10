@@ -2,18 +2,16 @@
   <data>
 
     <!-- 1) Hide MEMBERSHIP tab only for Companies -->
-    <!-- We inherit the view that actually adds the Membership page -->
+    <!-- We inherit the view that adds the Membership page -->
     <record id="hide_membership_for_companies" model="ir.ui.view">
       <field name="name">res.partner: hide membership for companies</field>
       <field name="model">res.partner</field>
       <field name="inherit_id" ref="membership.view_partner_form"/>
       <field name="priority">200</field>
       <field name="arch" type="xml">
-        <!-- 'membership' is the technical page name you've seen in the inspector -->
+        <!-- 'membership' is the technical page name (you saw it in the inspector) -->
         <xpath expr="//page[@name='membership']" position="attributes">
-          <attribute name="attrs">
-            {'invisible': [('company_type', '=', 'company')]}
-          </attribute>
+          <attribute name="invisible">[('company_type', '=', 'company')]</attribute>
         </xpath>
       </field>
     </record>
@@ -27,25 +25,20 @@
       <field name="priority">200</field>
       <field name="arch" type="xml">
 
-        <!-- If the page has no 'name', give it one first (safe no-op if it already has a name) -->
-        <xpath expr="//page[not(@name)][1]" position="attributes">
+        <!-- Give the first page in this view a stable name if it doesn't have one -->
+        <xpath expr="//notebook/page[1][not(@name)]" position="attributes">
           <attribute name="name">rotary_org_info</attribute>
         </xpath>
 
-        <!-- Hide the page by name. If the view didn't have a name and we just set it,
-             this will match; if it already had a name, the fallback below handles it. -->
+        <!-- Prefer targeting by the name we just ensured -->
         <xpath expr="//page[@name='rotary_org_info']" position="attributes">
-          <attribute name="attrs">
-            {'invisible': [('company_type', '=', 'person')]}
-          </attribute>
+          <attribute name="invisible">[('company_type', '=', 'person')]</attribute>
         </xpath>
 
-        <!-- Fallback: if the page already had a different technical name and no rename is desired,
-             apply attrs to the first page this view adds (most Rotary views add a single page). -->
-        <xpath expr="//page[1]" position="attributes">
-          <attribute name="attrs">
-            {'invisible': [('company_type', '=', 'person')]}
-          </attribute>
+        <!-- Fallback: if the technical name is different, target by a unique field inside the tab. 
+             Adjust the field names below if needed. -->
+        <xpath expr="//page[.//field[@name='club_type'] or .//field[@name='club_type_id'] or .//field[@name='club_id']]" position="attributes">
+          <attribute name="invisible">[('company_type', '=', 'person')]</attribute>
         </xpath>
 
       </field>
