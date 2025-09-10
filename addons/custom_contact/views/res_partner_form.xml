@@ -1,24 +1,43 @@
 <odoo>
   <data>
-    <record id="res_partner_hide_tabs_by_type" model="ir.ui.view">
-      <field name="name">res.partner: hide Membership/Org tabs by partner type</field>
+    <!-- 1) Hide MEMBERSHIP for Companies -->
+    <!-- Replace the ref with the External ID of the view that adds the Membership tab -->
+    <record id="hide_membership_for_companies" model="ir.ui.view">
+      <field name="name">res.partner: hide membership for companies</field>
       <field name="model">res.partner</field>
-      <field name="inherit_id" ref="base.view_partner_form"/>
-      <!-- run after the views that add the tabs -->
+      <field name="inherit_id" ref="MEMBERSHIP_VIEW_XMLID"/>  <!-- e.g. membership.view_partner_form_membership -->
       <field name="priority">200</field>
-
       <field name="arch" type="xml">
-
-        <!-- MEMBERSHIP: hide only for Companies -->
         <xpath expr="//page[@name='membership']" position="attributes">
           <attribute name="attrs">
             {'invisible': [('company_type', '=', 'company')]}
           </attribute>
         </xpath>
+      </field>
+    </record>
 
-        <!-- ORG INFO: hide only for Individuals -->
-        <!-- Replace/add the exact technical name of your Org tab if different -->
-        <xpath expr="//page[@name='rotary_org_info' or @name='org_info']" position="attributes">
+    <!-- 2) Hide ORG INFO for Individuals -->
+    <!-- Replace with the External ID of the view that adds Rotary Org Info -->
+    <record id="hide_orginfo_for_individuals" model="ir.ui.view">
+      <field name="name">res.partner: hide org info for individuals</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="ORG_INFO_VIEW_XMLID"/>   <!-- e.g. your_rotary_module.view_partner_form_org_info -->
+      <field name="priority">200</field>
+      <field name="arch" type="xml">
+
+        <!-- If the page ALREADY has a name, just use it here -->
+        <xpath expr="//page[@name='ORG_PAGE_NAME']" position="attributes">
+          <attribute name="attrs">
+            {'invisible': [('company_type', '=', 'person')]}
+          </attribute>
+        </xpath>
+
+        <!-- If the page has NO name, add one first, then apply attrs -->
+        <!-- (Keep only if needed; otherwise remove this block.) -->
+        <xpath expr="//notebook/page[1]" position="attributes">
+          <attribute name="name">rotary_org_info</attribute>
+        </xpath>
+        <xpath expr="//page[@name='rotary_org_info']" position="attributes">
           <attribute name="attrs">
             {'invisible': [('company_type', '=', 'person')]}
           </attribute>
