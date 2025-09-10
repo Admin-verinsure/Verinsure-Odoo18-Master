@@ -1,13 +1,15 @@
 <odoo>
   <data>
-    <!-- 1) Hide MEMBERSHIP for Companies -->
-    <!-- Replace the ref with the External ID of the view that adds the Membership tab -->
+
+    <!-- 1) Hide MEMBERSHIP tab only for Companies -->
+    <!-- We inherit the view that actually adds the Membership page -->
     <record id="hide_membership_for_companies" model="ir.ui.view">
       <field name="name">res.partner: hide membership for companies</field>
       <field name="model">res.partner</field>
-      <field name="inherit_id" ref="MEMBERSHIP_VIEW_XMLID"/>  <!-- e.g. membership.view_partner_form_membership -->
+      <field name="inherit_id" ref="membership.view_partner_form"/>
       <field name="priority">200</field>
       <field name="arch" type="xml">
+        <!-- 'membership' is the technical page name you've seen in the inspector -->
         <xpath expr="//page[@name='membership']" position="attributes">
           <attribute name="attrs">
             {'invisible': [('company_type', '=', 'company')]}
@@ -16,28 +18,31 @@
       </field>
     </record>
 
-    <!-- 2) Hide ORG INFO for Individuals -->
-    <!-- Replace with the External ID of the view that adds Rotary Org Info -->
+    <!-- 2) Hide ROTARY ORG INFO tab only for Individuals -->
+    <!-- We inherit the Rotary view that adds the Org Info page -->
     <record id="hide_orginfo_for_individuals" model="ir.ui.view">
       <field name="name">res.partner: hide org info for individuals</field>
       <field name="model">res.partner</field>
-      <field name="inherit_id" ref="ORG_INFO_VIEW_XMLID"/>   <!-- e.g. your_rotary_module.view_partner_form_org_info -->
+      <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
       <field name="priority">200</field>
       <field name="arch" type="xml">
 
-        <!-- If the page ALREADY has a name, just use it here -->
-        <xpath expr="//page[@name='ORG_PAGE_NAME']" position="attributes">
+        <!-- If the page has no 'name', give it one first (safe no-op if it already has a name) -->
+        <xpath expr="//page[not(@name)][1]" position="attributes">
+          <attribute name="name">rotary_org_info</attribute>
+        </xpath>
+
+        <!-- Hide the page by name. If the view didn't have a name and we just set it,
+             this will match; if it already had a name, the fallback below handles it. -->
+        <xpath expr="//page[@name='rotary_org_info']" position="attributes">
           <attribute name="attrs">
             {'invisible': [('company_type', '=', 'person')]}
           </attribute>
         </xpath>
 
-        <!-- If the page has NO name, add one first, then apply attrs -->
-        <!-- (Keep only if needed; otherwise remove this block.) -->
-        <xpath expr="//notebook/page[1]" position="attributes">
-          <attribute name="name">rotary_org_info</attribute>
-        </xpath>
-        <xpath expr="//page[@name='rotary_org_info']" position="attributes">
+        <!-- Fallback: if the page already had a different technical name and no rename is desired,
+             apply attrs to the first page this view adds (most Rotary views add a single page). -->
+        <xpath expr="//page[1]" position="attributes">
           <attribute name="attrs">
             {'invisible': [('company_type', '=', 'person')]}
           </attribute>
@@ -45,5 +50,6 @@
 
       </field>
     </record>
+
   </data>
 </odoo>
