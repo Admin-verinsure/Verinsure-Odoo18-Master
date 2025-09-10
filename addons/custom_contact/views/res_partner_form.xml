@@ -1,30 +1,36 @@
 <odoo>
   <data>
 
-    <!-- Hide MEMBERSHIP only for Companies -->
-    <record id="hide_membership_for_companies" model="ir.ui.view">
-      <field name="name">res.partner: hide membership for companies</field>
+    <!-- FINAL, HIGH-PRIORITY OVERRIDES ON THE PAGES THEMSELVES -->
+
+    <!-- Membership: VISIBLE for Individuals, HIDDEN for Companies -->
+    <record id="final_fix_membership_visibility" model="ir.ui.view">
+      <field name="name">res.partner: membership visible for individuals</field>
       <field name="model">res.partner</field>
+      <!-- inherit the view that DEFINES the membership page -->
       <field name="inherit_id" ref="membership.view_partner_form"/>
-      <field name="priority">200</field>
+      <!-- win over everything else -->
+      <field name="priority">100000</field>
       <field name="arch" type="xml">
         <xpath expr="//page[@name='membership']" position="attributes">
-          <attribute name="invisible">['|', ('company_type', '=', 'company'), ('is_company', '=', True)]</attribute>
+          <!-- Odoo 17/18 expression (no attrs/states) -->
+          <attribute name="invisible">is_company or company_type == 'company'</attribute>
         </xpath>
       </field>
     </record>
 
-    <!-- Hide ORG INFO only for Individuals -->
-    <record id="hide_orginfo_for_individuals" model="ir.ui.view">
-      <field name="name">res.partner: hide org info for individuals</field>
+    <!-- Org Info: VISIBLE for Companies, HIDDEN for Individuals -->
+    <record id="final_fix_orginfo_visibility" model="ir.ui.view">
+      <field name="name">res.partner: org info visible for companies</field>
       <field name="model">res.partner</field>
-      <!-- Inherit the Rotary view that ADDS the page -->
+      <!-- inherit the Rotary view that DEFINES the org tab -->
       <field name="inherit_id" ref="rotary_project_map.view_partner_form_inherit_club_type"/>
-      <field name="priority">200</field>
+      <field name="priority">100000</field>
       <field name="arch" type="xml">
-        <!-- The tab's technical name is club_information (from your server file) -->
+        <!-- exact technical name from your server file -->
         <xpath expr="//page[@name='club_information']" position="attributes">
-          <attribute name="invisible">['|', ('company_type', '=', 'person'), ('is_company', '=', False)]</attribute>
+          <!-- HIDE on Individuals -->
+          <attribute name="invisible">not is_company or company_type == 'person'</attribute>
         </xpath>
       </field>
     </record>
