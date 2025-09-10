@@ -1,15 +1,20 @@
 <odoo>
   <data>
-
-    <!-- Inherit the Contacts form (change inherit_id if your DB uses base.view_partner_form) -->
-    <record id="view_partner_form_hide_two_tabs" model="ir.ui.view">
+    <record id="res_partner_hide_tabs_by_type" model="ir.ui.view">
       <field name="name">res.partner: hide Membership/Org tabs by partner type</field>
       <field name="model">res.partner</field>
-      <field name="inherit_id" ref="contacts.view_partner_form"/>
+
+      <!-- Use the base form you showed -->
+      <field name="inherit_id" ref="base.view_partner_form"/>
+
+      <!-- Make sure this runs AFTER the views that add those pages -->
+      <field name="priority">200</field>
+
       <field name="arch" type="xml">
 
-        <!-- MEMBERSHIP: visible only for Individuals -->
-        <xpath expr="//page[@name='membership' or @string='Membership']" position="attributes">
+        <!-- MEMBERSHIP: hide only for Companies -->
+        <xpath expr="//page[@name='membership' or @string='Membership']"
+               position="attributes">
           <attribute name="attrs">
             {
               "invisible": ["|", ("company_type", "=", "company"), ("is_company", "=", True)]
@@ -17,10 +22,11 @@
           </attribute>
         </xpath>
 
-        <!-- ORG INFO: visible only for Companies -->
-        <!-- Adjust @name once you confirm it in debug (e.g., 'rotary_org_info'). 
-             The @string fallback keeps it working even if name is unknown. -->
-        <xpath expr="//page[@name='rotary_org_info' or @name='org_info' or @string='Rotary Org Info']"
+        <!-- ORG INFO: hide only for Individuals -->
+        <!-- If your page has a stable @name, add it below (e.g., @name='rotary_org_info'). -->
+        <xpath expr="//page[@name='rotary_org_info' or @name='org_info'
+                           or contains(translate(@string,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),
+                                       'org info')]"
                position="attributes">
           <attribute name="attrs">
             {
@@ -31,6 +37,5 @@
 
       </field>
     </record>
-
   </data>
 </odoo>
