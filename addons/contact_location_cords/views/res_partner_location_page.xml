@@ -11,7 +11,7 @@
             <group>
               <group>
                 <!-- reuse existing fields from rotary_project_map -->
-                <field name="club_latitude" string="Latitude"/>
+                <field name="club_latitude"  string="Latitude"/>
                 <field name="club_longitude" string="Longitude"/>
               </group>
               <group>
@@ -19,7 +19,7 @@
                         type="object"
                         class="btn btn-secondary"
                         string="Locate from Address"/>
-                <label string="Uses the postal address above (Settings → Contacts → Geolocation)."/>
+                <label string="Uses the postal address above (configure Geolocation in Settings → Contacts)."/>
               </group>
             </group>
           </page>
