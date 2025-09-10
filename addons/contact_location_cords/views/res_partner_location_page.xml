@@ -10,7 +10,6 @@
           <page name="location" string="Location">
             <group>
               <group>
-                <!-- reuse existing fields from rotary_project_map -->
                 <field name="club_latitude"  string="Latitude"/>
                 <field name="club_longitude" string="Longitude"/>
               </group>
@@ -19,7 +18,8 @@
                         type="object"
                         class="btn btn-secondary"
                         string="Locate from Address"/>
-                <label string="Uses the postal address above (configure Geolocation in Settings → Contacts)."/>
+                <!-- Use a span/div with class instead of a <label> without 'for' -->
+                <span class="o_form_label">Uses the postal address above (configure in Settings → Contacts → Geolocation).</span>
               </group>
             </group>
           </page>
