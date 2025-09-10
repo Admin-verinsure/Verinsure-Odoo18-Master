@@ -4,24 +4,35 @@
       <field name="name">res.partner: toggle Membership/Org tabs by company_type</field>
       <field name="model">res.partner</field>
       <field name="inherit_id" ref="base.view_partner_form"/>
-      <!-- ensure we run after membership & rotary views -->
+      <!-- run after membership & rotary views -->
       <field name="priority">999</field>
       <field name="arch" type="xml">
 
-        <!-- Hide MEMBERSHIP for Companies -->
+        <!-- Hide MEMBERSHIP for companies -->
         <xpath expr="//page[@name='membership']" position="attributes">
-          <attribute name="invisible">[('company_type', '=', 'company')]</attribute>
+          <attribute name="invisible">['|', ('company_type', '=', 'company'), ('is_company', '=', True)]</attribute>
         </xpath>
 
-        <!-- Hide ROTARY ORG INFO for Individuals
-             We don't rely on @string or exact @name; we anchor by fields that tab contains. -->
+        <!-- Hide ORG INFO for individuals
+             Anchor by typical Rotary fields so we don't need the page's @name. -->
         <xpath expr="//page[
                         .//field[contains(@name,'rotary')]
                         or .//field[contains(@name,'club')]
                         or .//field[contains(@name,'district')]
+                        or .//field[contains(@name,'ri_')]
+                        or .//field[@name='club_type']
+                        or .//field[@name='club_type_id']
+                        or .//field[@name='club_id']
+                        or .//field[@name='district_id']
+                        or .//field[@name='rotary_id']
+                        or .//field[@name='rotary_member_id']
+                        or .//field[@name='rotary_club_id']
+                        or .//field[@name='club_number']
+                        or .//field[@name='club_name']
+                        or .//field[@name='club_code']
                      ]"
                position="attributes">
-          <attribute name="invisible">[('company_type', '=', 'person')]</attribute>
+          <attribute name="invisible">['|', ('company_type', '=', 'person'), ('is_company', '=', False)]</attribute>
         </xpath>
 
       </field>
