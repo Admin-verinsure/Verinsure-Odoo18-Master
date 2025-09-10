@@ -1,0 +1,36 @@
+<odoo>
+  <data>
+
+    <!-- Inherit the Contacts form (change inherit_id if your DB uses base.view_partner_form) -->
+    <record id="view_partner_form_hide_two_tabs" model="ir.ui.view">
+      <field name="name">res.partner: hide Membership/Org tabs by partner type</field>
+      <field name="model">res.partner</field>
+      <field name="inherit_id" ref="contacts.view_partner_form"/>
+      <field name="arch" type="xml">
+
+        <!-- MEMBERSHIP: visible only for Individuals -->
+        <xpath expr="//page[@name='membership' or @string='Membership']" position="attributes">
+          <attribute name="attrs">
+            {
+              "invisible": ["|", ("company_type", "=", "company"), ("is_company", "=", True)]
+            }
+          </attribute>
+        </xpath>
+
+        <!-- ORG INFO: visible only for Companies -->
+        <!-- Adjust @name once you confirm it in debug (e.g., 'rotary_org_info'). 
+             The @string fallback keeps it working even if name is unknown. -->
+        <xpath expr="//page[@name='rotary_org_info' or @name='org_info' or @string='Rotary Org Info']"
+               position="attributes">
+          <attribute name="attrs">
+            {
+              "invisible": ["|", ("company_type", "=", "person"), ("is_company", "=", False)]
+            }
+          </attribute>
+        </xpath>
+
+      </field>
+    </record>
+
+  </data>
+</odoo>
