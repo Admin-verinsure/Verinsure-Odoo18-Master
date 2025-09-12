@@ -10,7 +10,7 @@
         <page string="Location">
           <group>
             <!-- Hidden compute-only field: triggers auto-geocode on form open -->
-            <field name="x_geo_refresh" modifiers='{"invisible": true}'/>
+            
             <group>
               <field name="partner_latitude"  string="Latitude"/>
               <field name="partner_longitude" string="Longitude"/>
