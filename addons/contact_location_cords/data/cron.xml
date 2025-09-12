@@ -4,8 +4,14 @@
     <field name="name">Geocode Missing Contacts</field>
     <field name="model_id" ref="base.model_res_partner"/>
     <field name="state">code</field>
-    <field name="code">model._cron_geocode_missing_contacts()</field>
-    <!-- Run every hour; tune as you like -->
+    <field name="code">
+      model.search([
+        '|', ('club_latitude','=',False), ('club_longitude','=',False),
+        '|', ('street','!=',False), ('street2','!=',False),
+        '|', ('city','!=',False), ('zip','!=',False),
+        ('country_id','!=',False),
+      ], limit=25).with_context(disable_geocode=False)._geocode_if_ready()
+    </field>
     <field name="interval_type">hours</field>
     <field name="interval_number">1</field>
     <field name="numbercall">-1</field>
