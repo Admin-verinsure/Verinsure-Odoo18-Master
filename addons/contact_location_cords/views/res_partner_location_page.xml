@@ -12,8 +12,6 @@
             <group>
               <field name="partner_latitude"  string="Latitude"/>
               <field name="partner_longitude" string="Longitude"/>
-              <field name="club_latitude"     string="Club Latitude"/>
-              <field name="club_longitude"    string="Club Longitude"/>
             </group>
             <group>
               <button name="action_locate_from_address"
