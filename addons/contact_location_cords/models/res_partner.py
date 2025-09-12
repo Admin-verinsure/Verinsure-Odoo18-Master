@@ -8,10 +8,10 @@ _logger = logging.getLogger(__name__)
 ADDR_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 
 class ResPartner(models.Model):
-    _inherit = "res.partner"  # club_latitude/club_longitude exist elsewhere
+    _inherit = "res.partner"
 
     # ------------------------
-    # Address helpers (unchanged style)
+    # Address helpers
     # ------------------------
     def _geo_address_line(self):
         self.ensure_one()
@@ -25,14 +25,13 @@ class ResPartner(models.Model):
         ]
         return ", ".join(p for p in parts if p).strip(", ")
 
+    # ------------------------
+    # Nominatim client (simple & reliable)
+    # ------------------------
     def _nominatim_structured_params(self):
         self.ensure_one()
         street_line = ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
-        params = {
-            "format": "jsonv2",
-            "limit": 1,
-            "addressdetails": 1,
-        }
+        params = {"format": "jsonv2", "limit": 1, "addressdetails": 1}
         if street_line:
             params["street"] = street_line
         if self.city:
@@ -48,11 +47,10 @@ class ResPartner(models.Model):
 
     def _nominatim_base(self):
         ICP = self.env["ir.config_parameter"].sudo()
-        base_url = (ICP.get_param("base.geolocalize.nominatim.server")
-                    or "https://nominatim.openstreetmap.org").rstrip("/")
-        # keep a simple UA like your original working setup
-        user_agent = ICP.get_param("base.geolocalize.user_agent") or "your-app-name/1.0 (contact@example.com)"
-        # only use email if YOU set one (keeps behavior same as when it worked for you)
+        base_url = (ICP.get_param("base.geolocalize.nominatim.server") or
+                    "https://nominatim.openstreetmap.org").rstrip("/")
+        # keep it loose for testing; set your own UA via system params if you want
+        user_agent = ICP.get_param("base.geolocalize.user_agent") or "mytest-geocode/1.0 (test)"
         contact_email = (ICP.get_param("base.geolocalize.contact_email") or "").strip()
         if contact_email and "@" not in contact_email:
             contact_email = ""
@@ -69,9 +67,6 @@ class ResPartner(models.Model):
                 return None
         return None
 
-    # ------------------------
-    # Geocoder (matches your “working” version)
-    # ------------------------
     def _geocode_via_nominatim(self, addr):
         """Structured first; fallback to q=. Returns (lat, lon) or None."""
         if not addr:
@@ -89,9 +84,9 @@ class ResPartner(models.Model):
             coords = self._parse_nominatim_resp(resp.json())
             if coords:
                 return coords
-            _logger.info("Nominatim structured miss for %s (params=%s)", self.display_name, sparams)
+            _logger.info("Nominatim structured miss for %s", self.display_name)
         except Exception as e:
-            _logger.warning("Nominatim structured error for %s: %s", self.display_name, e)
+            _logger.info("Nominatim structured error for %s: %s", self.display_name, e)
 
         # 2) q= fallback
         cc = (self.country_id and (self.country_id.code or "")) or ""
@@ -103,30 +98,41 @@ class ResPartner(models.Model):
         try:
             resp = requests.get(f"{base_url}/search", params=qparams, headers=headers, timeout=12)
             resp.raise_for_status()
-            coords = self._parse_nominatim_resp(resp.json())
-            if not coords:
-                _logger.info("Nominatim q= miss for %s (q=%s)", self.display_name, addr)
-            return coords
+            return self._parse_nominatim_resp(resp.json())
         except Exception as e:
-            _logger.error("Nominatim q= error for %s: %s", self.display_name, e)
+            _logger.info("Nominatim q= error for %s: %s", self.display_name, e)
             return None
 
     # ------------------------
-    # Auto-update hooks (only change vs. original)
+    # Writing helpers (built-ins only)
+    # ------------------------
+    def _write_coords_builtin(self, coords):
+        """Write only on success to partner_latitude/partner_longitude."""
+        if not coords:
+            return
+        for rec in self:
+            rec.with_context(no_geocode=True).write({
+                "partner_latitude":  coords[0],
+                "partner_longitude": coords[1],
+            })
+
+    # ------------------------
+    # Auto hooks
     # ------------------------
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        # try to geocode once the record exists
+        # skip during installs/imports
+        if self.env.context.get("install_mode") or self.env.context.get("disable_geocode"):
+            return records
         for rec in records:
             try:
                 addr = rec._geo_address_line()
+                if not addr:
+                    continue
                 coords = rec._geocode_via_nominatim(addr)
                 if coords:
-                    rec.with_context(no_geocode=True).write({
-                        "club_latitude":  coords[0],
-                        "club_longitude": coords[1],
-                    })
+                    rec._write_coords_builtin(coords)
             except Exception as e:
                 _logger.info("Geocode on create failed for %s: %s", rec.display_name, e)
         return records
@@ -138,18 +144,17 @@ class ResPartner(models.Model):
             for rec in self:
                 try:
                     addr = rec._geo_address_line()
+                    if not addr:
+                        # do not force 0.0; just keep whatever was there
+                        continue
                     coords = rec._geocode_via_nominatim(addr)
                     if coords:
-                        rec.with_context(no_geocode=True).write({
-                            "club_latitude":  coords[0],
-                            "club_longitude": coords[1],
-                        })
-                    # on failure: do nothing (keep previous coords; no 0.000)
+                        rec._write_coords_builtin(coords)
                 except Exception as e:
-                    _logger.info("Geocode on write skipped/failed for %s: %s", rec.display_name, e)
+                    _logger.info("Geocode on write failed for %s: %s", rec.display_name, e)
         return res
 
-    # Manual button (if you keep it in the form)
+    # Optional manual button
     def action_locate_from_address(self):
         for rec in self:
             addr = rec._geo_address_line()
@@ -157,13 +162,10 @@ class ResPartner(models.Model):
                 continue
             coords = rec._geocode_via_nominatim(addr)
             if coords:
-                rec.with_context(no_geocode=True).write({
-                    "club_latitude":  coords[0],
-                    "club_longitude": coords[1],
-                })
+                rec._write_coords_builtin(coords)
         return True
 
-    # Live fill (as before)
+    # Onchange (form preview only; persists when you Save)
     @api.onchange(*ADDR_FIELDS)
     def _onchange_autofill_coords(self):
         for rec in self:
@@ -172,4 +174,4 @@ class ResPartner(models.Model):
                 continue
             coords = rec._geocode_via_nominatim(addr)
             if coords:
-                rec.club_latitude, rec.club_longitude = coords
+                rec.partner_latitude, rec.partner_longitude = coords
