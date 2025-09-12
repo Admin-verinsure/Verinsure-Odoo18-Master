@@ -147,6 +147,46 @@ class ResPartner(models.Model):
         return res
 
     # ------------------------
+    # Manual button (Option A)
+    # ------------------------
+    def action_locate_from_address(self):
+        """Button: geocode current postal address and write coords (built-in fields)."""
+        for rec in self:
+            try:
+                addr = rec._geo_address_line()
+            except Exception:
+                addr = ""
+            if not addr:
+                continue
+
+            coords = None
+            # Prefer your Nominatim helper
+            try:
+                coords = rec._geocode_via_nominatim(addr)
+            except Exception:
+                coords = None
+
+            # Fallback to Odoo's base_geolocalize if available
+            if not coords:
+                if hasattr(rec, "geo_find"):
+                    try:
+                        coords = rec.geo_find(addr)
+                    except Exception:
+                        coords = None
+                elif hasattr(rec, "_geo_find"):
+                    try:
+                        coords = rec._geo_find(addr)
+                    except Exception:
+                        coords = None
+
+            if coords and len(coords) >= 2:
+                rec.with_context(no_geocode=True).write({
+                    "partner_latitude":  float(coords[0]),
+                    "partner_longitude": float(coords[1]),
+                })
+        return True
+
+    # ------------------------
     # The on-open trigger (compute runs when field is in the view)
     # ------------------------
     @api.depends(*ADDR_FIELDS, "partner_latitude", "partner_longitude")
@@ -169,6 +209,11 @@ class ResPartner(models.Model):
                     addr = rec._geo_address_line()
                     if addr:
                         coords = rec._geocode_via_nominatim(addr)
+                        if not coords and hasattr(rec, "geo_find"):
+                            try:
+                                coords = rec.geo_find(addr)
+                            except Exception:
+                                coords = None
                         if coords:
                             rec.with_context(no_geocode=True).write({
                                 "partner_latitude":  coords[0],
@@ -178,5 +223,3 @@ class ResPartner(models.Model):
             except Exception as e:
                 _logger.info("Auto geocode on form open skipped for %s: %s", rec.display_name, e)
                 rec.x_auto_geocode = False
-
-
