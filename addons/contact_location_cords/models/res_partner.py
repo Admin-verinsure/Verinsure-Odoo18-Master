@@ -11,7 +11,7 @@ ADDR_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
-    # Invisible non-stored trigger; safe to keep (auto-fills on open if empty)
+    # Hidden, non-stored trigger so compute runs on form open
     x_auto_geocode = fields.Boolean(
         string="Auto Geocode Trigger",
         compute="_compute_auto_geocode",
@@ -34,25 +34,8 @@ class ResPartner(models.Model):
         return ", ".join(p for p in parts if p).strip(", ")
 
     # ---------------------------------------------------------------------
-    # Nominatim client
+    # Nominatim base (policy-friendly UA/email)
     # ---------------------------------------------------------------------
-    def _nominatim_structured_params(self):
-        self.ensure_one()
-        street_line = ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
-        params = {"format": "jsonv2", "limit": 1, "addressdetails": 1}
-        if street_line:
-            params["street"] = street_line
-        if self.city:
-            params["city"] = self.city
-        if self.state_id and self.state_id.name:
-            params["state"] = self.state_id.name
-        if self.zip:
-            params["postalcode"] = self.zip
-        if self.country_id and (self.country_id.name or self.country_id.code):
-            params["country"] = self.country_id.name or ""
-            params["countrycodes"] = (self.country_id.code or "").lower()
-        return params
-
     def _nominatim_base(self):
         ICP = self.env["ir.config_parameter"].sudo()
         base_url = (ICP.get_param("base.geolocalize.nominatim.server") or
@@ -63,75 +46,192 @@ class ResPartner(models.Model):
             contact_email = ""
         return base_url, user_agent, contact_email
 
-    def _parse_nominatim_resp(self, data):
-        if isinstance(data, list) and data:
-            d0 = data[0]
-            try:
-                return float(d0.get("lat")), float(d0.get("lon", d0.get("lng")))
-            except Exception:
-                return None
-        return None
-
+    # ---------------------------------------------------------------------
+    # Robust Nominatim geocoder (street-first, multi-pass with scoring)
+    # ---------------------------------------------------------------------
     def _geocode_via_nominatim(self, addr, cc_lower=None):
+        """
+        Robust Nominatim search:
+          1) structured with all fields, limit=5
+          2) structured without state (common mismatch)
+          3) structured without postalcode
+          4) full-text q= with everything
+          5) full-text q= lighter (no zip)
+          -> pick best candidate with scoring (street/house/city/zip/class).
+        Returns (lat, lon) or None.
+        """
         if not addr:
             return None
+
         base_url, user_agent, contact_email = self._nominatim_base()
         headers = {"User-Agent": user_agent}
 
-        # 1) structured
-        sparams = self._nominatim_structured_params()
-        if contact_email:
-            sparams["email"] = contact_email
-        try:
-            r = requests.get(f"{base_url}/search", params=sparams, headers=headers, timeout=12)
-            r.raise_for_status()
-            coords = self._parse_nominatim_resp(r.json())
-            if coords:
-                return coords
-        except Exception as e:
-            _logger.info("Nominatim structured error for %s: %s", self.display_name, e)
+        def _street_line():
+            return ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
 
-        # 2) q= fallback
-        qparams = {"q": addr, "format": "jsonv2", "limit": 1, "addressdetails": 1}
-        if cc_lower:
-            qparams["countrycodes"] = cc_lower
-        if contact_email:
-            qparams["email"] = contact_email
-        try:
-            r = requests.get(f"{base_url}/search", params=qparams, headers=headers, timeout=12)
-            r.raise_for_status()
-            return self._parse_nominatim_resp(r.json())
-        except Exception as e:
-            _logger.info("Nominatim q= error for %s: %s", self.display_name, e)
-            return None
+        def _params_structured(drop_state=False, drop_zip=False):
+            p = {
+                "format": "jsonv2",
+                "limit": 5,
+                "addressdetails": 1,
+            }
+            sl = _street_line()
+            if sl:
+                p["street"] = sl
+            if self.city:
+                p["city"] = self.city
+            if not drop_state and self.state_id and self.state_id.name:
+                p["state"] = self.state_id.name
+            if not drop_zip and self.zip:
+                p["postalcode"] = self.zip
+            if self.country_id and (self.country_id.name or self.country_id.code):
+                p["country"] = self.country_id.name or ""
+                p["countrycodes"] = (self.country_id.code or "").lower()
+            if contact_email:
+                p["email"] = contact_email
+            return p
+
+        def _params_q(full=True):
+            if full:
+                q_text = addr
+            else:
+                q_text = ", ".join([x for x in [
+                    _street_line(),
+                    self.city or "",
+                    (self.state_id and self.state_id.name) or "",
+                    (self.country_id and self.country_id.name) or "",
+                ] if x])
+            p = {
+                "format": "jsonv2",
+                "limit": 5,
+                "addressdetails": 1,
+                "q": q_text,
+            }
+            if cc_lower:
+                p["countrycodes"] = cc_lower
+            if contact_email:
+                p["email"] = contact_email
+            return p
+
+        def _score(c):
+            """Higher is better. Reward street/house/city/zip matches."""
+            score = 0.0
+            ad = c.get("address") or {}
+            # class/type preference: buildings/addresses > streets > cities
+            t = (c.get("type") or "").lower()
+            cls = (c.get("class") or "").lower()
+            if t in {"house", "building", "residential"}:
+                score += 20
+            if cls == "building":
+                score += 10
+            if cls == "highway":
+                score += 5
+
+            st_given = (self.street or "").lower()
+            st2_given = (self.street2 or "").lower()
+            road = (ad.get("road") or ad.get("pedestrian") or ad.get("residential") or ad.get("footway") or "").lower()
+            hnum = (ad.get("house_number") or "").lower()
+
+            # street token match
+            if st_given and road and st_given.split()[0] in road:
+                score += 25
+            if st2_given and road and st2_given.split()[0] in road:
+                score += 10
+            # leading house number match
+            first_tok = st_given.split(",")[0].split(" ")[0] if st_given else ""
+            if first_tok.isdigit() and hnum == first_tok:
+                score += 15
+
+            # city/town/village/suburb
+            city_given = (self.city or "").lower()
+            city_hit = (ad.get("city") or ad.get("town") or ad.get("village") or ad.get("suburb") or ad.get("county") or "").lower()
+            if city_given and city_hit and city_given in city_hit:
+                score += 15
+
+            # postcode
+            if self.zip and (ad.get("postcode") or "") == self.zip:
+                score += 10
+
+            # country bias
+            if self.country_id and self.country_id.code and ((ad.get("country_code") or "").lower() == self.country_id.code.lower()):
+                score += 5
+
+            # Nominatim's own importance
+            try:
+                score += float(c.get("importance") or 0.0)
+            except Exception:
+                pass
+            return score
+
+        def _pick_best(results):
+            if not results:
+                return None
+            best = max(results, key=_score)
+            try:
+                return float(best["lat"]), float(best.get("lon", best.get("lng")))
+            except Exception:
+                return None
+
+        def _hit(params):
+            try:
+                r = requests.get(f"{base_url}/search", params=params, headers=headers, timeout=12)
+                r.raise_for_status()
+                return r.json()
+            except Exception as e:
+                _logger.info("Nominatim error (%s): %s", params, e)
+                return []
+
+        # Pass 1: structured strict
+        data = _hit(_params_structured(drop_state=False, drop_zip=False))
+        coords = _pick_best(data)
+        if coords:
+            return coords
+
+        # Pass 2: drop state (frequent mismatch)
+        data = _hit(_params_structured(drop_state=True, drop_zip=False))
+        coords = _pick_best(data)
+        if coords:
+            return coords
+
+        # Pass 3: drop zip (often missing)
+        data = _hit(_params_structured(drop_state=False, drop_zip=True))
+        coords = _pick_best(data)
+        if coords:
+            return coords
+
+        # Pass 4: full-text all
+        data = _hit(_params_q(full=True))
+        coords = _pick_best(data)
+        if coords:
+            return coords
+
+        # Pass 5: full-text lighter (no zip)
+        data = _hit(_params_q(full=False))
+        coords = _pick_best(data)
+        if coords:
+            return coords
+
+        return None
 
     # ---------------------------------------------------------------------
-    # WRITE HELPERS: write to *both* built-ins and club_* when available
+    # WRITE helper: update both built-ins and club_* when available
     # ---------------------------------------------------------------------
     def _write_coords_all(self, coords):
-        """Write to partner_* and (if present) to club_* so both tabs show values."""
         if not coords:
             return
         F = self._fields
         vals = {}
-        # built-ins (base_geolocalize)
-        if "partner_latitude" in F:
-            vals["partner_latitude"] = coords[0]
-        if "partner_longitude" in F:
-            vals["partner_longitude"] = coords[1]
-        # rotary_project_map custom fields (Rotary Org Info tab)
-        if "club_latitude" in F:
-            vals["club_latitude"] = coords[0]
-        if "club_longitude" in F:
-            vals["club_longitude"] = coords[1]
+        if "partner_latitude" in F:  vals["partner_latitude"]  = coords[0]
+        if "partner_longitude" in F: vals["partner_longitude"] = coords[1]
+        if "club_latitude" in F:     vals["club_latitude"]     = coords[0]
+        if "club_longitude" in F:    vals["club_longitude"]    = coords[1]
         if vals:
             self.with_context(no_geocode=True).write(vals)
 
     # ---------------------------------------------------------------------
-    # Manual button (kept for user control)
+    # Manual button (kept)
     # ---------------------------------------------------------------------
     def action_locate_from_address(self):
-        """Button: geocode current postal address and write coords to all fields."""
         for rec in self:
             addr = rec._geo_address_line() if hasattr(rec, "_geo_address_line") else ""
             if not addr:
@@ -151,7 +251,7 @@ class ResPartner(models.Model):
         return True
 
     # ---------------------------------------------------------------------
-    # Auto on create/write (never blank on failure)
+    # Auto on create/write (restore previous on failure → no 0.0)
     # ---------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
@@ -173,7 +273,7 @@ class ResPartner(models.Model):
     def write(self, vals):
         address_changed = any(k in vals for k in ADDR_FIELDS)
 
-        # snapshot previous coords to avoid ending up with 0.0 on failure
+        # snapshot previous to avoid ending with 0.0 on failure
         prev = {}
         if address_changed:
             for rec in self:
@@ -196,7 +296,7 @@ class ResPartner(models.Model):
                     if coords:
                         rec._write_coords_all(coords)
                     else:
-                        # restore previous coords (avoid 0.0 if lookup failed)
+                        # restore previous values (so UI doesn't show 0.0)
                         old = prev.get(rec.id) or {}
                         restore = {}
                         if "partner_latitude" in rec._fields and old.get("plat") is not None:
@@ -228,8 +328,6 @@ class ResPartner(models.Model):
                     continue
 
                 has_addr = bool(rec.country_id or rec.state_id or rec.city or rec.street or rec.street2 or rec.zip)
-
-                # treat as missing if partner_* are empty/zero
                 lat_missing = (not getattr(rec, "partner_latitude", False)) or abs(getattr(rec, "partner_latitude", 0.0)) < 1e-12
                 lng_missing = (not getattr(rec, "partner_longitude", False)) or abs(getattr(rec, "partner_longitude", 0.0)) < 1e-12
 
@@ -250,22 +348,36 @@ class ResPartner(models.Model):
                 rec.x_auto_geocode = False
 
     # ---------------------------------------------------------------------
-    # Onchange (form preview) — set both pairs in the form cache if found
+    # Onchange (form preview) — preserve previous values on failure
     # ---------------------------------------------------------------------
     @api.onchange(*ADDR_FIELDS)
     def _onchange_autofill_coords(self):
         for rec in self:
+            # snapshot current on-screen values
+            old_plat = getattr(rec, "partner_latitude", False)
+            old_plng = getattr(rec, "partner_longitude", False)
+            old_clat = getattr(rec, "club_latitude", False) if "club_latitude" in rec._fields else False
+            old_clng = getattr(rec, "club_longitude", False) if "club_longitude" in rec._fields else False
+
             addr = rec._geo_address_line()
             if not addr:
+                # keep previous values; do not zero
+                if "partner_latitude" in rec._fields:  rec.partner_latitude  = old_plat
+                if "partner_longitude" in rec._fields: rec.partner_longitude = old_plng
+                if "club_latitude" in rec._fields:     rec.club_latitude     = old_clat
+                if "club_longitude" in rec._fields:    rec.club_longitude    = old_clng
                 continue
+
             coords = rec._geocode_via_nominatim(addr)
             if coords:
-                if "partner_latitude" in rec._fields:
-                    rec.partner_latitude = coords[0]
-                if "partner_longitude" in rec._fields:
-                    rec.partner_longitude = coords[1]
-                if "club_latitude" in rec._fields:
-                    rec.club_latitude = coords[0]
-                if "club_longitude" in rec._fields:
-                    rec.club_longitude = coords[1]
-            # else: leave current values visible; do not zero them
+                # update on-screen values (not persisted until Save)
+                if "partner_latitude" in rec._fields:  rec.partner_latitude  = coords[0]
+                if "partner_longitude" in rec._fields: rec.partner_longitude = coords[1]
+                if "club_latitude" in rec._fields:     rec.club_latitude     = coords[0]
+                if "club_longitude" in rec._fields:    rec.club_longitude    = coords[1]
+            else:
+                # explicitly restore previous so UI doesn't show 0.0
+                if "partner_latitude" in rec._fields:  rec.partner_latitude  = old_plat
+                if "partner_longitude" in rec._fields: rec.partner_longitude = old_plng
+                if "club_latitude" in rec._fields:     rec.club_latitude     = old_clat
+                if "club_longitude" in rec._fields:    rec.club_longitude    = old_clng
