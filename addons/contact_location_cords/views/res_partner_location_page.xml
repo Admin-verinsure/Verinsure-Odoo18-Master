@@ -6,25 +6,25 @@
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
 
-      <!-- GUARANTEED anchor: insert hidden trigger right after the name field -->
-      <xpath expr="//field[@name='name']" position="after">
-        <field name="x_auto_geocode" nolabel="1" invisible="1"/>
-      </xpath>
+      <!-- NOTE: we no longer insert any <field name="x_auto_geocode"/> here. -->
 
-      <!-- Your Location tab (built-in fields so you always see data) -->
+      <!-- Add a Location tab showing both built-in and club coords -->
       <xpath expr="//form/sheet/notebook" position="inside">
         <page string="Location">
           <group>
             <group>
               <field name="partner_latitude"  string="Latitude"/>
               <field name="partner_longitude" string="Longitude"/>
+              <!-- Show club_* too if your rotary module is present -->
+              <field name="club_latitude"     string="Club Latitude"     attrs="{'invisible': [('club_latitude','=', False)]}"/>
+              <field name="club_longitude"    string="Club Longitude"    attrs="{'invisible': [('club_longitude','=', False)]}"/>
             </group>
             <group>
               <button name="action_locate_from_address"
                       type="object"
                       class="btn btn-secondary"
                       string="Locate from Address"/>
-              <span class="o_form_label">Uses the postal address above.</span>
+              <label string="Uses the postal address above."/>
             </group>
           </group>
         </page>
