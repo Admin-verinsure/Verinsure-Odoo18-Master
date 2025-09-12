@@ -11,7 +11,8 @@ ADDR_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
-    # Hidden, non-stored trigger so compute runs on form open
+    # Optional hidden trigger (kept for compatibility with your view).
+    # It only runs if coords are missing; safe to leave as-is.
     x_auto_geocode = fields.Boolean(
         string="Auto Geocode Trigger",
         compute="_compute_auto_geocode",
@@ -70,11 +71,7 @@ class ResPartner(models.Model):
             return ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
 
         def _params_structured(drop_state=False, drop_zip=False):
-            p = {
-                "format": "jsonv2",
-                "limit": 5,
-                "addressdetails": 1,
-            }
+            p = {"format": "jsonv2", "limit": 5, "addressdetails": 1}
             sl = _street_line()
             if sl:
                 p["street"] = sl
@@ -92,21 +89,13 @@ class ResPartner(models.Model):
             return p
 
         def _params_q(full=True):
-            if full:
-                q_text = addr
-            else:
-                q_text = ", ".join([x for x in [
-                    _street_line(),
-                    self.city or "",
-                    (self.state_id and self.state_id.name) or "",
-                    (self.country_id and self.country_id.name) or "",
-                ] if x])
-            p = {
-                "format": "jsonv2",
-                "limit": 5,
-                "addressdetails": 1,
-                "q": q_text,
-            }
+            q_text = addr if full else ", ".join([x for x in [
+                _street_line(),
+                self.city or "",
+                (self.state_id and self.state_id.name) or "",
+                (self.country_id and self.country_id.name) or "",
+            ] if x])
+            p = {"format": "jsonv2", "limit": 5, "addressdetails": 1, "q": q_text}
             if cc_lower:
                 p["countrycodes"] = cc_lower
             if contact_email:
@@ -114,10 +103,8 @@ class ResPartner(models.Model):
             return p
 
         def _score(c):
-            """Higher is better. Reward street/house/city/zip matches."""
             score = 0.0
             ad = c.get("address") or {}
-            # class/type preference: buildings/addresses > streets > cities
             t = (c.get("type") or "").lower()
             cls = (c.get("class") or "").lower()
             if t in {"house", "building", "residential"}:
@@ -126,37 +113,25 @@ class ResPartner(models.Model):
                 score += 10
             if cls == "highway":
                 score += 5
-
             st_given = (self.street or "").lower()
             st2_given = (self.street2 or "").lower()
             road = (ad.get("road") or ad.get("pedestrian") or ad.get("residential") or ad.get("footway") or "").lower()
             hnum = (ad.get("house_number") or "").lower()
-
-            # street token match
             if st_given and road and st_given.split()[0] in road:
                 score += 25
             if st2_given and road and st2_given.split()[0] in road:
                 score += 10
-            # leading house number match
             first_tok = st_given.split(",")[0].split(" ")[0] if st_given else ""
             if first_tok.isdigit() and hnum == first_tok:
                 score += 15
-
-            # city/town/village/suburb
             city_given = (self.city or "").lower()
             city_hit = (ad.get("city") or ad.get("town") or ad.get("village") or ad.get("suburb") or ad.get("county") or "").lower()
             if city_given and city_hit and city_given in city_hit:
                 score += 15
-
-            # postcode
             if self.zip and (ad.get("postcode") or "") == self.zip:
                 score += 10
-
-            # country bias
             if self.country_id and self.country_id.code and ((ad.get("country_code") or "").lower() == self.country_id.code.lower()):
                 score += 5
-
-            # Nominatim's own importance
             try:
                 score += float(c.get("importance") or 0.0)
             except Exception:
@@ -181,36 +156,17 @@ class ResPartner(models.Model):
                 _logger.info("Nominatim error (%s): %s", params, e)
                 return []
 
-        # Pass 1: structured strict
-        data = _hit(_params_structured(drop_state=False, drop_zip=False))
-        coords = _pick_best(data)
-        if coords:
-            return coords
-
-        # Pass 2: drop state (frequent mismatch)
-        data = _hit(_params_structured(drop_state=True, drop_zip=False))
-        coords = _pick_best(data)
-        if coords:
-            return coords
-
-        # Pass 3: drop zip (often missing)
-        data = _hit(_params_structured(drop_state=False, drop_zip=True))
-        coords = _pick_best(data)
-        if coords:
-            return coords
-
-        # Pass 4: full-text all
-        data = _hit(_params_q(full=True))
-        coords = _pick_best(data)
-        if coords:
-            return coords
-
-        # Pass 5: full-text lighter (no zip)
-        data = _hit(_params_q(full=False))
-        coords = _pick_best(data)
-        if coords:
-            return coords
-
+        # Passes
+        for params in (
+            _params_structured(False, False),
+            _params_structured(True,  False),
+            _params_structured(False, True),
+            _params_q(True),
+            _params_q(False),
+        ):
+            coords = _pick_best(_hit(params))
+            if coords:
+                return coords
         return None
 
     # ---------------------------------------------------------------------
@@ -272,8 +228,6 @@ class ResPartner(models.Model):
 
     def write(self, vals):
         address_changed = any(k in vals for k in ADDR_FIELDS)
-
-        # snapshot previous to avoid ending with 0.0 on failure
         prev = {}
         if address_changed:
             for rec in self:
@@ -283,9 +237,7 @@ class ResPartner(models.Model):
                     "clat": getattr(rec, "club_latitude", False) if "club_latitude" in rec._fields else False,
                     "clng": getattr(rec, "club_longitude", False) if "club_longitude" in rec._fields else False,
                 }
-
         res = super().write(vals)
-
         if address_changed and not (self.env.context.get("no_geocode") or self.env.context.get("install_mode") or self.env.context.get("disable_geocode")):
             for rec in self:
                 try:
@@ -296,7 +248,6 @@ class ResPartner(models.Model):
                     if coords:
                         rec._write_coords_all(coords)
                     else:
-                        # restore previous values (so UI doesn't show 0.0)
                         old = prev.get(rec.id) or {}
                         restore = {}
                         if "partner_latitude" in rec._fields and old.get("plat") is not None:
@@ -314,38 +265,57 @@ class ResPartner(models.Model):
         return res
 
     # ---------------------------------------------------------------------
-    # Auto on form open (fills once if empty)
+    # *** NEW: Pre-render hook so first open shows coords immediately ***
     # ---------------------------------------------------------------------
-    @api.depends(*ADDR_FIELDS, "partner_latitude", "partner_longitude")
-    def _compute_auto_geocode(self):
-        blocked = (self.env.context.get("install_mode") or
-                   self.env.context.get("no_geocode") or
-                   self.env.context.get("disable_geocode"))
-        for rec in self:
+    def _auto_geocode_on_form_open(self):
+        """Run once when opening a form; write coords before the record is read."""
+        self.ensure_one()
+        if (self.env.context.get("install_mode")
+                or self.env.context.get("disable_geocode")
+                or self.env.context.get("no_geocode")):
+            return False
+        # Skip if already present
+        if getattr(self, "partner_latitude", False) and getattr(self, "partner_longitude", False):
+            return False
+        # Require some address
+        if not (self.country_id or self.state_id or self.city or self.street or self.street2 or self.zip):
+            return False
+        addr = self._geo_address_line()
+        if not addr:
+            return False
+        coords = None
+        try:
+            coords = self._geocode_via_nominatim(addr)
+        except Exception as e:
+            _logger.info("Geocode on pre-open failed for %s: %s", self.display_name, e)
+        if not coords and hasattr(self, "geo_find"):
             try:
-                if blocked:
-                    rec.x_auto_geocode = False
-                    continue
+                coords = self.geo_find(addr)
+            except Exception:
+                coords = None
+        if coords:
+            self.with_context(no_geocode=True).sudo()._write_coords_all(coords)
+            return True
+        return False
 
-                has_addr = bool(rec.country_id or rec.state_id or rec.city or rec.street or rec.street2 or rec.zip)
-                lat_missing = (not getattr(rec, "partner_latitude", False)) or abs(getattr(rec, "partner_latitude", 0.0)) < 1e-12
-                lng_missing = (not getattr(rec, "partner_longitude", False)) or abs(getattr(rec, "partner_longitude", 0.0)) < 1e-12
-
-                if has_addr and (lat_missing or lng_missing):
-                    addr = rec._geo_address_line()
-                    if addr:
-                        coords = rec._geocode_via_nominatim(addr)
-                        if not coords and hasattr(rec, "geo_find"):
-                            try:
-                                coords = rec.geo_find(addr)
-                            except Exception:
-                                coords = None
-                        if coords:
-                            rec._write_coords_all(coords)
-                rec.x_auto_geocode = True
-            except Exception as e:
-                _logger.info("Auto geocode on form open skipped for %s: %s", rec.display_name, e)
-                rec.x_auto_geocode = False
+    @api.model
+    def fields_view_get(self, view_id=None, view_type="form", toolbar=False, submenu=False):
+        """
+        Server-side hook: when a res.partner form view is fetched,
+        geocode & write coords for the active record BEFORE the form reads it.
+        This fixes the 'first open shows 0.00' issue.
+        """
+        res = super().fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
+        try:
+            if view_type == "form":
+                active_id = self.env.context.get("active_id")
+                if active_id:
+                    rec = self.browse(active_id)
+                    if rec.exists():
+                        rec._auto_geocode_on_form_open()
+        except Exception as e:
+            _logger.info("Auto geocode on form open skipped: %s", e)
+        return res
 
     # ---------------------------------------------------------------------
     # Onchange (form preview) — preserve previous values on failure
@@ -353,7 +323,6 @@ class ResPartner(models.Model):
     @api.onchange(*ADDR_FIELDS)
     def _onchange_autofill_coords(self):
         for rec in self:
-            # snapshot current on-screen values
             old_plat = getattr(rec, "partner_latitude", False)
             old_plng = getattr(rec, "partner_longitude", False)
             old_clat = getattr(rec, "club_latitude", False) if "club_latitude" in rec._fields else False
@@ -361,7 +330,6 @@ class ResPartner(models.Model):
 
             addr = rec._geo_address_line()
             if not addr:
-                # keep previous values; do not zero
                 if "partner_latitude" in rec._fields:  rec.partner_latitude  = old_plat
                 if "partner_longitude" in rec._fields: rec.partner_longitude = old_plng
                 if "club_latitude" in rec._fields:     rec.club_latitude     = old_clat
@@ -370,13 +338,11 @@ class ResPartner(models.Model):
 
             coords = rec._geocode_via_nominatim(addr)
             if coords:
-                # update on-screen values (not persisted until Save)
                 if "partner_latitude" in rec._fields:  rec.partner_latitude  = coords[0]
                 if "partner_longitude" in rec._fields: rec.partner_longitude = coords[1]
                 if "club_latitude" in rec._fields:     rec.club_latitude     = coords[0]
                 if "club_longitude" in rec._fields:    rec.club_longitude    = coords[1]
             else:
-                # explicitly restore previous so UI doesn't show 0.0
                 if "partner_latitude" in rec._fields:  rec.partner_latitude  = old_plat
                 if "partner_longitude" in rec._fields: rec.partner_longitude = old_plng
                 if "club_latitude" in rec._fields:     rec.club_latitude     = old_clat
