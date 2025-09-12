@@ -7,8 +7,7 @@
         "rotary_project_map",  # reuses club_latitude/club_longitude fields
     ],
     "data": [
-        "data/cron.xml",
-        "views/res_partner_location_page.xml"
+        "views/res_partner_location_page.xml",
         ],
     "installable": True,
 }
