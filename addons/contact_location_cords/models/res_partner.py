@@ -1,32 +1,29 @@
 # -*- coding: utf-8 -*-
 import logging
 import requests
-import hashlib
-from odoo import models, api, fields
+from odoo import models, api
 
 _logger = logging.getLogger(__name__)
 
+# Address fields that should trigger re-geocoding
 ADDRESS_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 
 class ResPartner(models.Model):
-    _inherit = "res.partner"  # fields already defined elsewhere
-
-    # Stores the last geocoded signature to avoid re-calling when address is unchanged
-    club_geo_sig = fields.Char(string="Geo Signature", copy=False, index=True)
+    _inherit = "res.partner"  # fields already defined elsewhere (incl. club_latitude/club_longitude)
 
     # ------------------------
     # Helpers / config
     # ------------------------
     def _lang_pref(self):
-        """Preferred language for Nominatim."""
+        """Preferred language for Nominatim (system param or user lang)."""
         ICP = self.env["ir.config_parameter"].sudo()
         lang = (ICP.get_param("base.geolocalize.language") or (self.env.user.lang or "en_US")).split("_")[0]
         return lang[:10]
 
     def _strict_precision(self):
         """
-        If True (1), only accept house/street-level results.
-        System Parameter: geocode.nominatim.strict_precision (default: 0 = allow coarse fallbacks)
+        If True (1), only accept street/house-level results.
+        System Param: geocode.nominatim.strict_precision (default '0' = allow city/ZIP fallback)
         """
         ICP = self.env["ir.config_parameter"].sudo()
         v = (ICP.get_param("geocode.nominatim.strict_precision") or "0").strip()
@@ -40,7 +37,7 @@ class ResPartner(models.Model):
         return base_url.rstrip("/"), user_agent, contact_email
 
     # ------------------------
-    # Address + signature
+    # Address builder
     # ------------------------
     def _geo_address_line(self):
         self.ensure_one()
@@ -54,26 +51,12 @@ class ResPartner(models.Model):
         ]
         return ", ".join(p for p in parts if p).strip(", ")
 
-    def _address_signature(self):
-        """Stable hash of the address fields used for geocoding."""
-        self.ensure_one()
-        raw = [
-            self.street or "",
-            self.street2 or "",
-            self.city or "",
-            (self.state_id and self.state_id.name) or "",
-            self.zip or "",
-            (self.country_id and self.country_id.code) or (self.country_id and self.country_id.name) or "",
-        ]
-        s = "|".join(raw)
-        return hashlib.sha1(s.encode("utf-8")).hexdigest()
-
     # ------------------------
     # Precision handling
     # ------------------------
     def _is_precise_enough(self, result):
         """
-        Accept house/building/road-level; reject city/ZIP unless strict off.
+        Accept house/building or street-level; reject city/ZIP unless strict is off.
         """
         if not result:
             return False
@@ -94,7 +77,7 @@ class ResPartner(models.Model):
             return not strict
 
     def _parse_nominatim_resp(self, data):
-        """Return (lat, lon) or None after precision gate."""
+        """Return (lat, lon) or None after precision check."""
         if isinstance(data, list) and data:
             d0 = data[0]
             if not self._is_precise_enough(d0):
@@ -107,11 +90,17 @@ class ResPartner(models.Model):
                 return None
         return None
 
-    # --- Structured params builder for Nominatim ---
+    # ------------------------
+    # Request params
+    # ------------------------
     def _nominatim_structured_params(self):
         self.ensure_one()
         street_line = ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
-        params = {"format": "jsonv2", "limit": 1, "addressdetails": 1}
+        params = {
+            "format": "jsonv2",
+            "limit": 1,
+            "addressdetails": 1,
+        }
         if street_line:
             params["street"] = street_line
         if self.city:
@@ -129,7 +118,10 @@ class ResPartner(models.Model):
     # Main geocoder
     # ------------------------
     def _geocode_via_nominatim(self, addr):
-        """Try structured search first; fall back to free-text q=."""
+        """
+        Try structured search first; fall back to free-text q=.
+        Returns (lat, lon) or None.
+        """
         if not addr:
             return None
         base_url, user_agent, contact_email = self._nominatim_base()
@@ -165,108 +157,62 @@ class ResPartner(models.Model):
             return None
 
     # ------------------------
-    # Orchestrators
+    # Auto triggers (no DB schema changes)
     # ------------------------
-    def _geocode_if_needed(self, force=False):
+    def _geocode_if_ready(self):
         """
-        Compute coords if address signature changed or if forced.
-        Skips during installs/imports if context disables it.
+        Compute coords when address looks complete. No-op in install/upgrade/import modes.
         """
-        if self.env.context.get("no_geocode") or self.env.context.get("install_mode") or self.env.context.get("disable_geocode"):
+        if self.env.context.get("install_mode") or self.env.context.get("no_geocode") or self.env.context.get("disable_geocode"):
             return False
 
         for rec in self:
-            # minimal completeness: some street OR street2, some locality, and country
             if not ((rec.street or rec.street2) and (rec.city or rec.zip or rec.state_id) and rec.country_id):
                 continue
-
-            sig = rec._address_signature()
-            if not force and rec.club_geo_sig and rec.club_geo_sig == sig and rec.club_latitude and rec.club_longitude:
-                continue  # nothing changed
-
             addr = rec._geo_address_line()
             coords = rec._geocode_via_nominatim(addr)
             if coords:
-                # avoid recursion by disabling geocode in context
+                # avoid recursive writes calling this again
                 rec.with_context(no_geocode=True).write({
                     "club_latitude": coords[0],
                     "club_longitude": coords[1],
-                    "club_geo_sig": sig,
                 })
-                _logger.debug("Geocoded %s -> %s", rec.display_name, coords)
         return True
 
-    # ------------------------
-    # Entry points (still usable manually)
-    # ------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        # Run after creation; guarded against install_mode above
+        try:
+            records._geocode_if_ready()
+        except Exception as e:
+            _logger.info("Geocode on create skipped/failed: %s", e)
+        return records
+
+    def write(self, vals):
+        # Only geocode when address fields actually change
+        address_changed = any(k in vals for k in ADDRESS_FIELDS)
+        res = super().write(vals)
+        if address_changed:
+            try:
+                self._geocode_if_ready()
+            except Exception as e:
+                _logger.info("Geocode on write skipped/failed: %s", e)
+        return res
+
+    # Optional manual button still works if you have it on the form
     def action_locate_from_address(self):
         for rec in self:
-            rec._geocode_if_needed(force=True)
+            # force a run even if nothing changed
+            rec.with_context(no_geocode=False)._geocode_if_ready()
         return True
 
+    # On-change fills in the form (persisted on Save)
     @api.onchange(*ADDRESS_FIELDS)
     def _onchange_autofill_coords(self):
-        """
-        Fill while editing, but only when address looks complete.
-        (This writes only to in-memory fields; values persist on Save.)
-        """
         for rec in self:
             if not ((rec.street or rec.street2) and (rec.city or rec.zip or rec.state_id) and rec.country_id):
                 continue
             coords = rec._geocode_via_nominatim(rec._geo_address_line())
             if coords:
                 rec.club_latitude, rec.club_longitude = coords
-
-    # ------------------------
-    # Auto-trigger on create/write
-    # ------------------------
-    @api.model_create_multi
-    def create(self, vals_list):
-        records = super().create(vals_list)
-        # Do network calls outside of super(); respect context flags.
-        for rec in records:
-            try:
-                rec._geocode_if_needed(force=True)
-            except Exception as e:
-                _logger.info("Geocode on create failed for %s: %s", rec.display_name, e)
-        return records
-
-    def write(self, vals):
-        address_changed = any(k in vals for k in ADDRESS_FIELDS)
-        res = super().write(vals)
-        if address_changed:
-            for rec in self:
-                try:
-                    rec._geocode_if_needed(force=True)
-                except Exception as e:
-                    _logger.info("Geocode on write failed for %s: %s", rec.display_name, e)
-        return res
-
-    # ------------------------
-    # Scheduled backfill (cron)
-    # ------------------------
-    def _cron_geocode_missing_contacts(self):
-        """
-        Backfill a small batch of partners missing coords, politely.
-        System Parameter: geocode.nominatim.cron_limit (default 25)
-        """
-        ICP = self.env["ir.config_parameter"].sudo()
-        try:
-            limit = int(ICP.get_param("geocode.nominatim.cron_limit") or 25)
-        except Exception:
-            limit = 25
-
-        domain = [
-            "|", ("club_latitude", "=", False), ("club_longitude", "=", False),
-            "|", ("street", "!=", False), ("street2", "!=", False),
-            "|", ("city", "!=", False), ("zip", "!=", False),
-            ("country_id", "!=", False),
-        ]
-        batch = self.search(domain, limit=limit, order="id asc")
-        for rec in batch:
-            try:
-                rec._geocode_if_needed(force=True)
-            except Exception as e:
-                _logger.info("Cron geocode failed for %s: %s", rec.display_name, e)
-        _logger.info("Cron geocode processed %s partners", len(batch))
-        return True
