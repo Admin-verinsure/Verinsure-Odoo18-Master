@@ -3,145 +3,124 @@
 (function () {
   "use strict";
 
-  // ----- helpers -----
-  function hashParams() {
-    const h = (window.location.hash || "").replace(/^#/, "");
-    const sp = new URLSearchParams(h);
-    const o = {};
-    for (const [k, v] of sp.entries()) o[k] = v;
-    return o;
-  }
-
-  async function callKw(model, method, args = [], kwargs = {}) {
-    const url = `/web/dataset/call_kw/${encodeURIComponent(
-      model
-    )}/${encodeURIComponent(method)}`;
+  // ---------- RPC helpers ----------
+  async function rpcCall(route, params) {
     const payload = {
       jsonrpc: "2.0",
       method: "call",
-      params: { model, method, args, kwargs },
+      params,
       id: Math.floor(Math.random() * 1e9),
     };
-    const res = await fetch(url, {
+    const res = await fetch(route, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (data && typeof data === "object" && "result" in data)
+    if (data && Object.prototype.hasOwnProperty.call(data, "result"))
       return data.result;
     throw new Error((data && data.error && data.error.message) || "RPC error");
   }
 
-  function qs(sel) {
-    return document.querySelector(sel);
-  }
-  function qsa(sel) {
-    return Array.from(document.querySelectorAll(sel));
-  }
-  function val(el) {
-    return el ? String(el.value || "").trim() : "";
+  async function callKw(model, method, args = [], kwargs = {}) {
+    // ✔ canonical endpoint for v17/18
+    return rpcCall("/web/dataset/call_kw", { model, method, args, kwargs });
   }
 
-  function hasAddress() {
-    return !!(
-      val(qs('input[name="street"]')) ||
-      val(qs('input[name="street2"]')) ||
-      val(qs('input[name="city"]')) ||
-      val(qs('input[name="zip"]')) ||
-      val(qs('select[name="state_id"]')) ||
-      val(qs('select[name="country_id"]'))
-    );
+  // ---------- ID & hash helpers ----------
+  function hashParams() {
+    const h = (location.hash || "").replace(/^#/, "");
+    const sp = new URLSearchParams(h);
+    const o = {};
+    for (const [k, v] of sp.entries()) o[k] = v;
+    return o;
   }
 
-  function getNumber(sel) {
-    const el = qs(sel);
-    if (!el) return null;
-    const s = val(el);
-    if (!s) return null;
-    const num = Number(s);
-    return Number.isFinite(num) ? num : null;
+  function currentPartnerId() {
+    // 1) hash (#id=..&model=res.partner)
+    const hp = hashParams();
+    if (hp.model === "res.partner" && hp.id && /^\d+$/.test(hp.id))
+      return parseInt(hp.id, 10);
+
+    // 2) DOM fallback: Odoo sets data-res-id on the form root in v17+
+    const form = document.querySelector(".o_form_view");
+    if (form) {
+      const rid = form.getAttribute("data-res-id") || form.dataset.resId;
+      if (rid && /^\d+$/.test(rid)) return parseInt(rid, 10);
+    }
+
+    // 3) last resort: look for hidden input widgets
+    const hiddenId = document.querySelector('input[name="id"]');
+    if (hiddenId && /^\d+$/.test(hiddenId.value))
+      return parseInt(hiddenId.value, 10);
+
+    return 0;
   }
 
-  function setNumber(sel, valNum) {
-    const el = qs(sel);
-    if (!el) return;
-    if (valNum == null) return;
-    el.value = String(valNum);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-  function coordsMissing() {
-    // Prefer partner_*; fall back to club_*
-    const lat =
-      getNumber('input[name="partner_latitude"]') ??
-      getNumber('input[name="club_latitude"]');
-    const lng =
-      getNumber('input[name="partner_longitude"]') ??
-      getNumber('input[name="club_longitude"]');
-    const latMissing = lat == null || lat === 0;
-    const lngMissing = lng == null || lng === 0;
-    return latMissing || lngMissing;
-  }
-
-  async function readCoords(id) {
-    const r = await callKw(
-      "res.partner",
-      "read",
+  // ---------- address & coords via RPC ----------
+  async function readMinimal(id) {
+    const recs = await callKw("res.partner", "read", [
+      [id],
       [
-        [id],
-        [
-          "partner_latitude",
-          "partner_longitude",
-          "club_latitude",
-          "club_longitude",
-        ],
+        "street",
+        "street2",
+        "city",
+        "zip",
+        "state_id",
+        "country_id",
+        "partner_latitude",
+        "partner_longitude",
+        "club_latitude",
+        "club_longitude",
       ],
-      {}
+    ]);
+    const r = Array.isArray(recs) && recs[0] ? recs[0] : {};
+    const hasAddr = !!(
+      r.street ||
+      r.street2 ||
+      r.city ||
+      r.zip ||
+      (r.state_id && r.state_id[0]) ||
+      (r.country_id && r.country_id[0])
     );
-    const rec = Array.isArray(r) && r.length ? r[0] : {};
-    return {
-      lat: rec.partner_latitude ?? rec.club_latitude ?? null,
-      lng: rec.partner_longitude ?? rec.club_longitude ?? null,
-    };
+    const plat = r.partner_latitude ?? null;
+    const plng = r.partner_longitude ?? null;
+    const clat = r.club_latitude ?? null;
+    const clng = r.club_longitude ?? null;
+    const lat = plat != null ? plat : clat;
+    const lng = plng != null ? plng : clng;
+    const coordsMissing = !(
+      lat &&
+      Math.abs(lat) > 1e-10 &&
+      lng &&
+      Math.abs(lng) > 1e-10
+    );
+    return { hasAddr, coordsMissing };
   }
 
-  function pushCoordsToInputs(lat, lng) {
-    setNumber('input[name="partner_latitude"]', lat);
-    setNumber('input[name="partner_longitude"]', lng);
-    setNumber('input[name="club_latitude"]', lat);
-    setNumber('input[name="club_longitude"]', lng);
-  }
-
-  // ----- main -----
-  const triggeredOnOpen = new Set();
+  // ---------- auto trigger ----------
+  const firedOnOpen = new Set();
   let debounceTimer = null;
 
-  async function tryAutoGeocode(reason) {
+  async function maybeAutoGeocode(reason) {
     try {
-      const hp = hashParams();
-      if (hp.model !== "res.partner") return;
-      const id = parseInt(hp.id || "0", 10);
+      const id = currentPartnerId();
       if (!id) return;
 
-      // On open, run once per record
-      if (reason === "open" && triggeredOnOpen.has(id)) return;
+      if (reason === "open" && firedOnOpen.has(id)) return;
 
-      if (hasAddress() && coordsMissing()) {
-        // Call your server-side method (same as pressing the button)
+      // read from server (more reliable than DOM)
+      const { hasAddr, coordsMissing } = await readMinimal(id);
+
+      if (hasAddr && coordsMissing) {
+        // Call your existing Python button
         await callKw("res.partner", "action_locate_from_address", [[id]], {});
-        // Read back and inject into inputs so user sees the change immediately
-        const { lat, lng } = await readCoords(id);
-        if (lat != null && lng != null) {
-          pushCoordsToInputs(lat, lng);
-        }
+        // no need to force reload; fields will show after the next render
       }
 
-      if (reason === "open") triggeredOnOpen.add(id);
+      if (reason === "open") firedOnOpen.add(id);
     } catch (e) {
-      // non-blocking
       console.warn("Auto geocode skipped:", e);
     }
   }
@@ -155,35 +134,39 @@
       'select[name="state_id"]',
       'select[name="country_id"]',
     ];
-    const els = qsa(sels.join(","));
+    const els = Array.from(document.querySelectorAll(sels.join(",")));
     const schedule = () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => tryAutoGeocode("change"), 800);
+      debounceTimer = setTimeout(() => maybeAutoGeocode("change"), 700);
     };
     els.forEach((el) => {
+      el.removeEventListener("input", schedule);
+      el.removeEventListener("change", schedule);
       el.addEventListener("input", schedule);
       el.addEventListener("change", schedule);
     });
   }
 
   function init() {
-    // Trigger on initial load / navigation
-    tryAutoGeocode("open");
-    attachAddressListeners();
+    // first run (after SPA has mounted)
+    setTimeout(() => {
+      maybeAutoGeocode("open");
+      attachAddressListeners();
+    }, 300);
 
-    // Re-check on SPA navigation
-    window.addEventListener("hashchange", () =>
+    // on hash navigation (next/prev record, menu, etc.)
+    window.addEventListener("hashchange", () => {
       setTimeout(() => {
-        tryAutoGeocode("open");
+        maybeAutoGeocode("open");
         attachAddressListeners();
-      }, 0)
-    );
+      }, 50);
+    });
 
-    // Re-check when form DOM is (re)rendered
+    // watch for re-renders (form replaced by Owl)
     const mo = new MutationObserver(() => {
       const form = document.querySelector(".o_form_view");
       if (form) {
-        tryAutoGeocode("open");
+        maybeAutoGeocode("open");
         attachAddressListeners();
       }
     });
