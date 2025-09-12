@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 import requests
-import unicodedata
-import re
 from odoo import models, api, fields
 
 _logger = logging.getLogger(__name__)
@@ -14,38 +12,22 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     # ---------------------------------------------------------------------
-    # Address helpers (light cleanup)
+    # Address helpers
     # ---------------------------------------------------------------------
-    @staticmethod
-    def _clean(s: str) -> str:
-        if not s:
-            return ""
-        s = unicodedata.normalize("NFKC", s).replace("\u00A0", " ")
-        s = " ".join(s.split())
-        return s.strip(" ,;")
-
-    def _street_clean(self):
-        s1 = self._clean(self.street or "")
-        s2 = self._clean(self.street2 or "")
-        line = ", ".join(p for p in (s1, s2) if p)
-        m = re.match(r"^\s*([0-9]+[A-Za-z\-]?)\b", s1 or "")
-        housenumber = m.group(1) if m else ""
-        return line, housenumber
-
     def _geo_address_line(self):
         self.ensure_one()
         parts = [
-            self._clean(self.street or ""),
-            self._clean(self.street2 or ""),
-            self._clean(self.city or ""),
-            self._clean((self.state_id and self.state_id.name) or ""),
-            self._clean(self.zip or ""),
-            self._clean((self.country_id and self.country_id.name) or ""),
+            self.street or "",
+            self.street2 or "",
+            self.city or "",
+            (self.state_id and self.state_id.name) or "",
+            self.zip or "",
+            (self.country_id and self.country_id.name) or "",
         ]
         return ", ".join(p for p in parts if p).strip(", ")
 
     # ---------------------------------------------------------------------
-    # Nominatim base
+    # Nominatim base (policy-friendly UA/email)
     # ---------------------------------------------------------------------
     def _nominatim_base(self):
         ICP = self.env["ir.config_parameter"].sudo()
@@ -58,7 +40,7 @@ class ResPartner(models.Model):
         return base_url, user_agent, contact_email
 
     # ---------------------------------------------------------------------
-    # Geocoder (now with "skip street" passes)
+    # Robust Nominatim geocoder (street-first, multi-pass with scoring)
     # ---------------------------------------------------------------------
     def _geocode_via_nominatim(self, addr, cc_lower=None):
         if not addr:
@@ -67,45 +49,37 @@ class ResPartner(models.Model):
         base_url, user_agent, contact_email = self._nominatim_base()
         headers = {"User-Agent": user_agent}
 
-        street_line, house_num = self._street_clean()
-        city   = self._clean(self.city or "")
-        state  = self._clean((self.state_id and self.state_id.name) or "")
-        zipc   = self._clean(self.zip or "")
-        country_name = self._clean((self.country_id and self.country_id.name) or "")
-        cc = (cc_lower or (self.country_id and (self.country_id.code or "")).lower() or "")
+        def _street_line():
+            return ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
 
-        def _params_structured(include_street=True, drop_state=False, drop_zip=False):
+        def _params_structured(drop_state=False, drop_zip=False):
             p = {"format": "jsonv2", "limit": 5, "addressdetails": 1}
-            if include_street and street_line:
-                p["street"] = street_line
-                if house_num:
-                    p["housenumber"] = house_num
-            if city:
-                p["city"] = city
-            if not drop_state and state:
-                p["state"] = state
-            if not drop_zip and zipc:
-                p["postalcode"] = zipc
-            if country_name:
-                p["country"] = country_name
-            if cc:
-                p["countrycodes"] = cc
+            sl = _street_line()
+            if sl:
+                p["street"] = sl
+            if self.city:
+                p["city"] = self.city
+            if not drop_state and self.state_id and self.state_id.name:
+                p["state"] = self.state_id.name
+            if not drop_zip and self.zip:
+                p["postalcode"] = self.zip
+            if self.country_id and (self.country_id.name or self.country_id.code):
+                p["country"] = self.country_id.name or ""
+                p["countrycodes"] = (self.country_id.code or "").lower()
             if contact_email:
                 p["email"] = contact_email
             return p
 
-        def _params_q(include_street=True, full=True):
-            parts = []
-            if include_street and street_line:
-                parts.append(street_line)
-            if full:
-                parts += [city, state, zipc, country_name]
-            else:
-                parts += [city, state, country_name]
-            q_text = ", ".join([p for p in parts if p]) or addr
+        def _params_q(full=True):
+            q_text = addr if full else ", ".join([x for x in [
+                _street_line(),
+                self.city or "",
+                (self.state_id and self.state_id.name) or "",
+                (self.country_id and self.country_id.name) or "",
+            ] if x])
             p = {"format": "jsonv2", "limit": 5, "addressdetails": 1, "q": q_text}
-            if cc:
-                p["countrycodes"] = cc
+            if cc_lower:
+                p["countrycodes"] = cc_lower
             if contact_email:
                 p["email"] = contact_email
             return p
@@ -120,25 +94,31 @@ class ResPartner(models.Model):
             if cls == "building":
                 score += 10
             if cls == "highway":
-                score += 4
+                score += 5
+
+            st_given = (self.street or "").lower()
+            st2_given = (self.street2 or "").lower()
             road = (ad.get("road") or ad.get("pedestrian") or ad.get("residential") or ad.get("footway") or "").lower()
             hnum = (ad.get("house_number") or "").lower()
-            s_given  = self._clean(self.street or "").lower()
-            s2_given = self._clean(self.street2 or "").lower()
-            if s_given and road and s_given.split()[0] in road:
+            if st_given and road and st_given.split()[0] in road:
                 score += 25
-            if s2_given and road and s2_given.split()[0] in road:
-                score += 8
-            first = s_given.split(",")[0].split(" ")[0] if s_given else ""
-            if first and first.isdigit() and hnum == first:
-                score += 12
+            if st2_given and road and st2_given.split()[0] in road:
+                score += 10
+            first_tok = st_given.split(",")[0].split(" ")[0] if st_given else ""
+            if first_tok.isdigit() and hnum == first_tok:
+                score += 15
+
+            city_given = (self.city or "").lower()
             city_hit = (ad.get("city") or ad.get("town") or ad.get("village") or ad.get("suburb") or ad.get("county") or "").lower()
-            if city and city_hit and city in city_hit:
-                score += 12
-            if zipc and (ad.get("postcode") or "") == zipc:
-                score += 8
-            if cc and (ad.get("country_code") or "").lower() == cc:
-                score += 4
+            if city_given and city_hit and city_given in city_hit:
+                score += 15
+
+            if self.zip and (ad.get("postcode") or "") == self.zip:
+                score += 10
+
+            if self.country_id and self.country_id.code and ((ad.get("country_code") or "").lower() == self.country_id.code.lower()):
+                score += 5
+
             try:
                 score += float(c.get("importance") or 0.0)
             except Exception:
@@ -163,20 +143,14 @@ class ResPartner(models.Model):
                 _logger.info("Nominatim error (%s): %s", params, e)
                 return []
 
-        # Order: try with street; if that fails, try **without** street
-        passes = (
-            _params_structured(include_street=True,  drop_state=False, drop_zip=False),  # strict
-            _params_structured(include_street=True,  drop_state=True,  drop_zip=False),  # drop state
-            _params_structured(include_street=True,  drop_state=False, drop_zip=True),   # drop zip
-            _params_structured(include_street=False, drop_state=False, drop_zip=False),  # **skip street**
-            _params_structured(include_street=False, drop_state=True,  drop_zip=False),  # skip street + drop state
-            _params_q(include_street=False, full=True),                                  # q= without street
-            _params_q(include_street=True,  full=True),                                  # q= with street
-        )
-
-        for params in passes:
-            results = _hit(params)
-            coords = _pick_best(results)
+        for params in (
+            _params_structured(False, False),
+            _params_structured(True,  False),
+            _params_structured(False, True),
+            _params_q(True),
+            _params_q(False),
+        ):
+            coords = _pick_best(_hit(params))
             if coords:
                 return coords
         return None
@@ -197,11 +171,11 @@ class ResPartner(models.Model):
             self.with_context(no_geocode=True).write(vals)
 
     # ---------------------------------------------------------------------
-    # Manual button
+    # Manual button (kept)
     # ---------------------------------------------------------------------
     def action_locate_from_address(self):
         for rec in self:
-            addr = rec._geo_address_line()
+            addr = rec._geo_address_line() if hasattr(rec, "_geo_address_line") else ""
             if not addr:
                 continue
             coords = None
@@ -216,7 +190,7 @@ class ResPartner(models.Model):
                     coords = None
             if coords and len(coords) >= 2:
                 rec._write_coords_all((float(coords[0]), float(coords[1])))
-        return {"type": "ir.actions.client", "tag": "reload"}  # show immediately
+        return True
 
     # ---------------------------------------------------------------------
     # Auto on create/write (restore previous on failure → no 0.0)
@@ -277,9 +251,10 @@ class ResPartner(models.Model):
         return res
 
     # ---------------------------------------------------------------------
-    # Pre-render hook so first open shows coords immediately
+    # *** Pre-render hook so first open shows coords immediately ***
     # ---------------------------------------------------------------------
     def _auto_geocode_on_form_open(self):
+        """Run once when opening a form; write coords before the record is read."""
         self.ensure_one()
         if (self.env.context.get("install_mode")
                 or self.env.context.get("disable_geocode")
@@ -309,6 +284,10 @@ class ResPartner(models.Model):
 
     @api.model
     def fields_view_get(self, view_id=None, view_type="form", toolbar=False, submenu=False):
+        """
+        Geocode & write coords for the active record BEFORE the form reads it.
+        Fixes the 'first open shows 0.00' issue.
+        """
         res = super().fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
         try:
             if view_type == "form":
@@ -322,7 +301,7 @@ class ResPartner(models.Model):
         return res
 
     # ---------------------------------------------------------------------
-    # Onchange (form preview) — keep previous values if lookup fails
+    # Onchange (form preview) — preserve previous values on failure
     # ---------------------------------------------------------------------
     @api.onchange(*ADDR_FIELDS)
     def _onchange_autofill_coords(self):
