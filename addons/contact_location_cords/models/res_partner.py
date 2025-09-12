@@ -11,14 +11,6 @@ ADDR_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
-    # Optional hidden trigger (kept for compatibility with your view).
-    # It only runs if coords are missing; safe to leave as-is.
-    x_auto_geocode = fields.Boolean(
-        string="Auto Geocode Trigger",
-        compute="_compute_auto_geocode",
-        store=False,
-    )
-
     # ---------------------------------------------------------------------
     # Address helpers
     # ---------------------------------------------------------------------
@@ -51,16 +43,6 @@ class ResPartner(models.Model):
     # Robust Nominatim geocoder (street-first, multi-pass with scoring)
     # ---------------------------------------------------------------------
     def _geocode_via_nominatim(self, addr, cc_lower=None):
-        """
-        Robust Nominatim search:
-          1) structured with all fields, limit=5
-          2) structured without state (common mismatch)
-          3) structured without postalcode
-          4) full-text q= with everything
-          5) full-text q= lighter (no zip)
-          -> pick best candidate with scoring (street/house/city/zip/class).
-        Returns (lat, lon) or None.
-        """
         if not addr:
             return None
 
@@ -113,6 +95,7 @@ class ResPartner(models.Model):
                 score += 10
             if cls == "highway":
                 score += 5
+
             st_given = (self.street or "").lower()
             st2_given = (self.street2 or "").lower()
             road = (ad.get("road") or ad.get("pedestrian") or ad.get("residential") or ad.get("footway") or "").lower()
@@ -124,14 +107,18 @@ class ResPartner(models.Model):
             first_tok = st_given.split(",")[0].split(" ")[0] if st_given else ""
             if first_tok.isdigit() and hnum == first_tok:
                 score += 15
+
             city_given = (self.city or "").lower()
             city_hit = (ad.get("city") or ad.get("town") or ad.get("village") or ad.get("suburb") or ad.get("county") or "").lower()
             if city_given and city_hit and city_given in city_hit:
                 score += 15
+
             if self.zip and (ad.get("postcode") or "") == self.zip:
                 score += 10
+
             if self.country_id and self.country_id.code and ((ad.get("country_code") or "").lower() == self.country_id.code.lower()):
                 score += 5
+
             try:
                 score += float(c.get("importance") or 0.0)
             except Exception:
@@ -156,7 +143,6 @@ class ResPartner(models.Model):
                 _logger.info("Nominatim error (%s): %s", params, e)
                 return []
 
-        # Passes
         for params in (
             _params_structured(False, False),
             _params_structured(True,  False),
@@ -265,7 +251,7 @@ class ResPartner(models.Model):
         return res
 
     # ---------------------------------------------------------------------
-    # *** NEW: Pre-render hook so first open shows coords immediately ***
+    # *** Pre-render hook so first open shows coords immediately ***
     # ---------------------------------------------------------------------
     def _auto_geocode_on_form_open(self):
         """Run once when opening a form; write coords before the record is read."""
@@ -274,10 +260,8 @@ class ResPartner(models.Model):
                 or self.env.context.get("disable_geocode")
                 or self.env.context.get("no_geocode")):
             return False
-        # Skip if already present
         if getattr(self, "partner_latitude", False) and getattr(self, "partner_longitude", False):
             return False
-        # Require some address
         if not (self.country_id or self.state_id or self.city or self.street or self.street2 or self.zip):
             return False
         addr = self._geo_address_line()
@@ -301,9 +285,8 @@ class ResPartner(models.Model):
     @api.model
     def fields_view_get(self, view_id=None, view_type="form", toolbar=False, submenu=False):
         """
-        Server-side hook: when a res.partner form view is fetched,
-        geocode & write coords for the active record BEFORE the form reads it.
-        This fixes the 'first open shows 0.00' issue.
+        Geocode & write coords for the active record BEFORE the form reads it.
+        Fixes the 'first open shows 0.00' issue.
         """
         res = super().fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
         try:
