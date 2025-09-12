@@ -10,7 +10,7 @@ ADDR_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
-    # Invisible, non-stored field that runs when the form is opened
+    # Invisible trigger that runs on form open (compute executes on read)
     x_auto_geocode = fields.Boolean(
         string="Auto Geocode Trigger",
         compute="_compute_auto_geocode",
@@ -32,31 +32,6 @@ class ResPartner(models.Model):
         ]
         return ", ".join(p for p in parts if p).strip(", ")
 
-    # Build address + cc from vals (not used by trigger; kept for completeness)
-    def _geo_address_line_vals(self, vals):
-        self.ensure_one()
-        state_name = ""
-        if vals.get("state_id"):
-            state_name = self.env["res.country.state"].browse(vals["state_id"]).name or ""
-        country_name = ""
-        country_code = ""
-        if vals.get("country_id"):
-            c = self.env["res.country"].browse(vals["country_id"])
-            country_name = c.name or ""
-            country_code = (c.code or "").lower()
-        parts = [
-            vals.get("street") or "",
-            vals.get("street2") or "",
-            vals.get("city") or "",
-            state_name,
-            vals.get("zip") or "",
-            country_name,
-        ]
-        return ", ".join(p for p in parts if p).strip(", "), country_code
-
-    # ------------------------
-    # Nominatim client (simple & reliable)
-    # ------------------------
     def _nominatim_structured_params(self):
         self.ensure_one()
         street_line = ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
@@ -127,7 +102,6 @@ class ResPartner(models.Model):
             return None
 
     def _write_coords_builtin(self, coords):
-        """Write only on success to partner_latitude/partner_longitude."""
         if not coords:
             return
         for rec in self:
@@ -137,14 +111,14 @@ class ResPartner(models.Model):
             })
 
     # ------------------------
-    # Auto hooks (create/write)
+    # Auto on create/write (keeps things in sync when you edit)
     # ------------------------
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
+        recs = super().create(vals_list)
         if self.env.context.get("install_mode") or self.env.context.get("disable_geocode"):
-            return records
-        for rec in records:
+            return recs
+        for rec in recs:
             try:
                 addr = rec._geo_address_line()
                 if not addr:
@@ -154,7 +128,7 @@ class ResPartner(models.Model):
                     rec._write_coords_builtin(coords)
             except Exception as e:
                 _logger.info("Geocode on create failed for %s: %s", rec.display_name, e)
-        return records
+        return recs
 
     def write(self, vals):
         address_changed = any(k in vals for k in ADDR_FIELDS)
@@ -173,56 +147,36 @@ class ResPartner(models.Model):
         return res
 
     # ------------------------
-    # NEW: compute that runs when the form is opened
+    # The on-open trigger (compute runs when field is in the view)
     # ------------------------
     @api.depends(*ADDR_FIELDS, "partner_latitude", "partner_longitude")
     def _compute_auto_geocode(self):
         """
-        This is triggered when the form asks for x_auto_geocode.
-        If coords are missing but address exists, geocode once and write.
+        Compute executes when the form loads this field.
+        If address exists and coords are empty/zero, geocode once and write.
         """
-        if self.env.context.get("install_mode") or self.env.context.get("no_geocode") or self.env.context.get("disable_geocode"):
-            for rec in self:
-                rec.x_auto_geocode = False
-            return
-
+        blocked = self.env.context.get("install_mode") or self.env.context.get("no_geocode") or self.env.context.get("disable_geocode")
         for rec in self:
             try:
-                # Only act when either lat/long is missing AND some address exists
+                if blocked:
+                    rec.x_auto_geocode = False
+                    continue
+
                 has_addr = bool(rec.country_id or rec.state_id or rec.city or rec.street or rec.street2 or rec.zip)
-                missing = not rec.partner_latitude or not rec.partner_longitude
-                if has_addr and missing:
+                lat_missing = (not rec.partner_latitude) or abs(rec.partner_latitude) < 1e-12
+                lng_missing = (not rec.partner_longitude) or abs(rec.partner_longitude) < 1e-12
+                if has_addr and (lat_missing or lng_missing):
                     addr = rec._geo_address_line()
-                    coords = rec._geocode_via_nominatim(addr)
-                    if coords:
-                        rec.with_context(no_geocode=True).write({
-                            "partner_latitude":  coords[0],
-                            "partner_longitude": coords[1],
-                        })
-                # Mark computed (value doesn't matter)
-                rec.x_auto_geocode = True
+                    if addr:
+                        coords = rec._geocode_via_nominatim(addr)
+                        if coords:
+                            rec.with_context(no_geocode=True).write({
+                                "partner_latitude":  coords[0],
+                                "partner_longitude": coords[1],
+                            })
+                rec.x_auto_geocode = True  # mark computed (value not used)
             except Exception as e:
                 _logger.info("Auto geocode on form open skipped for %s: %s", rec.display_name, e)
                 rec.x_auto_geocode = False
 
-    # Optional manual button (you can keep it)
-    def action_locate_from_address(self):
-        for rec in self:
-            addr = rec._geo_address_line()
-            if not addr:
-                continue
-            coords = rec._geocode_via_nominatim(addr)
-            if coords:
-                rec._write_coords_builtin(coords)
-        return True
 
-    # Onchange preview (not persisted until Save)
-    @api.onchange(*ADDR_FIELDS)
-    def _onchange_autofill_coords(self):
-        for rec in self:
-            addr = rec._geo_address_line()
-            if not addr:
-                continue
-            coords = rec._geocode_via_nominatim(addr)
-            if coords:
-                rec.partner_latitude, rec.partner_longitude = coords

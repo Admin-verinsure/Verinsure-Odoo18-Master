@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <record id="view_partner_form_geocode_auto" model="ir.ui.view">
-    <field name="name">res.partner geocode auto</field>
+    <field name="name">res.partner geocode auto (server)</field>
     <field name="model">res.partner</field>
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
-      <!-- Trigger compute immediately on form load -->
-      <xpath expr="//form/sheet" position="inside">
+
+      <!-- GUARANTEED anchor: insert hidden trigger right after the name field -->
+      <xpath expr="//field[@name='name']" position="after">
         <field name="x_auto_geocode" nolabel="1" invisible="1"/>
       </xpath>
 
-      <!-- Your Location tab (built-in fields) -->
+      <!-- Your Location tab (built-in fields so you always see data) -->
       <xpath expr="//form/sheet/notebook" position="inside">
         <page string="Location">
           <group>
@@ -28,6 +29,7 @@
           </group>
         </page>
       </xpath>
+
     </field>
   </record>
 </odoo>

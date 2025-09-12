@@ -3,16 +3,9 @@
     "version": "1.0",
     "depends": [
         "contacts",
-        "base_geolocalize",    # provides partner_latitude/partner_longitude & geo utils
-        "rotary_project_map",  # keep if you rely on club_latitude/club_longitude
+        "base_geolocalize",    # provides geo_find()
+        "rotary_project_map",  # reuses club_latitude/club_longitude fields
     ],
-    "data": [
-        "views/res_partner_location_page.xml",
-    ],
-    "assets": {
-        "web.assets_backend": [
-            "contact_location_cords/static/src/js/auto_geocode.js",
-        ],
-    },
+    "data": ["views/res_partner_location_page.xml"],
     "installable": True,
 }
