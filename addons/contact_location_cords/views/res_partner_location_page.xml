@@ -1,30 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <data>
-    <record id="view_partner_location_page" model="ir.ui.view">
-      <field name="name">res.partner: Location tab for all contacts</field>
-      <field name="model">res.partner</field>
-      <field name="inherit_id" ref="base.view_partner_form"/>
-      <field name="priority">500</field>
-      <field name="arch" type="xml">
-        <xpath expr="//notebook" position="inside">
-          <page name="location" string="Location">
+  <record id="view_partner_form_geocode_auto" model="ir.ui.view">
+    <field name="name">res.partner geocode auto</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.view_partner_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//form/sheet/notebook" position="inside">
+        <page string="Location">
+          <group>
             <group>
-              <group>
-                <field name="club_latitude"  string="Latitude"/>
-                <field name="club_longitude" string="Longitude"/>
-              </group>
-              <group>
-                <button name="action_locate_from_address"
-                        type="object"
-                        class="btn btn-secondary"
-                        string="Locate from Address"/>
-                <!-- Use a span/div with class instead of a <label> without 'for' -->
-                <span class="o_form_label">Uses the postal address above (configure in Settings → Contacts → Geolocation).</span>
-              </group>
+              <field name="partner_latitude"  string="Latitude"/>
+              <field name="partner_longitude" string="Longitude"/>
             </group>
-          </page>
-        </xpath>
-      </field>
-    </record>
-  </data>
+            <group>
+              <button name="action_locate_from_address"
+                      type="object"
+                      class="btn btn-secondary"
+                      string="Locate from Address"/>
+              <span class="o_form_label">Uses the postal address above.</span>
+            </group>
+          </group>
+        </page>
+      </xpath>
+    </field>
+  </record>
 </odoo>
