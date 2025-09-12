@@ -5,6 +5,12 @@
     <field name="model">res.partner</field>
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
+      <!-- Trigger compute immediately on form load -->
+      <xpath expr="//form/sheet" position="inside">
+        <field name="x_auto_geocode" nolabel="1" invisible="1"/>
+      </xpath>
+
+      <!-- Your Location tab (built-in fields) -->
       <xpath expr="//form/sheet/notebook" position="inside">
         <page string="Location">
           <group>
