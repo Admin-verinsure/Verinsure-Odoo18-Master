@@ -1,200 +1,272 @@
-# add near the top with your other imports
-import re
+# -*- coding: utf-8 -*-
+import logging
+import requests
+import hashlib
+from odoo import models, api, fields
 
-# helpers (put inside the class)
-def _ICP(self):
-    return self.env["ir.config_parameter"].sudo()
+_logger = logging.getLogger(__name__)
 
-def _cfg_bool(self, key, default=False):
-    v = (self._ICP().get_param(key) or "").strip()
-    if not v:
-        return bool(default)
-    return v not in ("0", "false", "False", "no", "No")
+ADDRESS_FIELDS = ("street", "street2", "city", "state_id", "zip", "country_id")
 
-def _cfg_str(self, key, default=""):
-    v = (self._ICP().get_param(key) or "").strip()
-    return v if v else default
+class ResPartner(models.Model):
+    _inherit = "res.partner"  # fields already defined elsewhere
 
-def _nom_mode(self):
-    return (self._cfg_str("geocode.nominatim.mode", "balanced")).lower()
+    # Stores the last geocoded signature to avoid re-calling when address is unchanged
+    club_geo_sig = fields.Char(string="Geo Signature", copy=False, index=True)
 
-def _country_code_lower(self):
-    return ((self.country_id and self.country_id.code) or "").lower()
+    # ------------------------
+    # Helpers / config
+    # ------------------------
+    def _lang_pref(self):
+        """Preferred language for Nominatim."""
+        ICP = self.env["ir.config_parameter"].sudo()
+        lang = (ICP.get_param("base.geolocalize.language") or (self.env.user.lang or "en_US")).split("_")[0]
+        return lang[:10]
 
-def _lang_pref(self):
-    lang_cfg = (self._ICP().get_param("base.geolocalize.language") or "").strip()
-    return (lang_cfg or (self.env.user.lang or "en_US").split("_")[0])[:10]
+    def _strict_precision(self):
+        """
+        If True (1), only accept house/street-level results.
+        System Parameter: geocode.nominatim.strict_precision (default: 0 = allow coarse fallbacks)
+        """
+        ICP = self.env["ir.config_parameter"].sudo()
+        v = (ICP.get_param("geocode.nominatim.strict_precision") or "0").strip()
+        return v not in ("0", "false", "False", "no", "No")
 
-def _nominatim_base(self):
-    ICP = self._ICP()
-    base_url = (ICP.get_param("base.geolocalize.nominatim.server") or
-                "https://nominatim.openstreetmap.org").rstrip("/")
-    user_agent = ICP.get_param("base.geolocalize.user_agent") or "odoo-geocode/1.0 (you@example.com)"
-    contact_email = ICP.get_param("base.geolocalize.contact_email") or "you@example.com"
-    return base_url, user_agent, contact_email
+    def _nominatim_base(self):
+        ICP = self.env["ir.config_parameter"].sudo()
+        base_url = ICP.get_param("base.geolocalize.nominatim.server") or "https://nominatim.openstreetmap.org"
+        user_agent = ICP.get_param("base.geolocalize.user_agent") or "your-app-name/1.0 (contact@example.com)"
+        contact_email = ICP.get_param("base.geolocalize.contact_email") or "contact@example.com"
+        return base_url.rstrip("/"), user_agent, contact_email
 
-def _nominatim_call(self, path, params):
-    base_url, user_agent, contact_email = self._nominatim_base()
-    p = dict(params or {})
-    p.setdefault("format", "jsonv2")
-    p.setdefault("limit", 1)
-    p.setdefault("addressdetails", 1)
-    p.setdefault("email", contact_email)
-    headers = {"User-Agent": user_agent, "Accept-Language": self._lang_pref()}
-    r = requests.get(f"{base_url}{path}", params=p, headers=headers, timeout=12)
-    r.raise_for_status()
-    return r.json()
+    # ------------------------
+    # Address + signature
+    # ------------------------
+    def _geo_address_line(self):
+        self.ensure_one()
+        parts = [
+            self.street or "",
+            self.street2 or "",
+            self.city or "",
+            (self.state_id and self.state_id.name) or "",
+            self.zip or "",
+            (self.country_id and self.country_id.name) or "",
+        ]
+        return ", ".join(p for p in parts if p).strip(", ")
 
-def _coords_from_result(self, r):
-    try:
-        return float(r["lat"]), float(r.get("lon", r.get("lng")))
-    except Exception:
-        return None
+    def _address_signature(self):
+        """Stable hash of the address fields used for geocoding."""
+        self.ensure_one()
+        raw = [
+            self.street or "",
+            self.street2 or "",
+            self.city or "",
+            (self.state_id and self.state_id.name) or "",
+            self.zip or "",
+            (self.country_id and self.country_id.code) or (self.country_id and self.country_id.name) or "",
+        ]
+        s = "|".join(raw)
+        return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
-def _is_precise_enough(self, r):
-    # allow city/ZIP fallback when strict_precision=0
-    strict = self._cfg_bool("geocode.nominatim.strict_precision", True)
-    addresstype = (r.get("addresstype") or "").lower()
-    rtype = (r.get("type") or "").lower()
-    address = r.get("address") or {}
-    if address.get("house_number") or addresstype in {"house","building","address"} or rtype in {"house","building"}:
-        return True
-    if addresstype in {"road","street"} or rtype in {"road","residential","tertiary","secondary","primary","trunk"}:
-        return True
-    try:
-        pr = int(r.get("place_rank") or 99)
-        if pr <= 18:
+    # ------------------------
+    # Precision handling
+    # ------------------------
+    def _is_precise_enough(self, result):
+        """
+        Accept house/building/road-level; reject city/ZIP unless strict off.
+        """
+        if not result:
+            return False
+        strict = self._strict_precision()
+        addresstype = (result.get("addresstype") or "").lower()
+        rtype = (result.get("type") or "").lower()
+        address = result.get("address") or {}
+
+        if address.get("house_number"):
             return True
-    except Exception:
-        pass
-    return not strict   # if not strict, allow locality/ZIP
-
-# optional, only if you used a "clean" function earlier
-def _clean_street_line(self):
-    # honor a switch to mimic older behavior
-    if not self._cfg_bool("geocode.nominatim.street_clean", False):
-        parts = [p.strip() for p in [self.street or "", self.street2 or ""] if p]
-        return ", ".join(parts)
-    # light cleaning
-    line = ", ".join([p.strip() for p in [self.street or "", self.street2 or ""] if p])
-    line = re.sub(r"\s+", " ", line).strip(" ,")
-    return line
-
-def _full_address_text(self):
-    parts = [
-        self._clean_street_line() or "",
-        self.city or "",
-        (self.state_id and self.state_id.name) or "",
-        self.zip or "",
-        (self.country_id and self.country_id.name) or "",
-    ]
-    return ", ".join([p for p in parts if p]).strip(", ")
-
-def _viewbox_for_bias(self):
-    if not self._cfg_bool("geocode.nominatim.bounded", True):
-        return None
-    cc = self._country_code_lower()
-    # try postal code
-    if self.zip:
+        if addresstype in {"house", "building", "address"} or rtype in {"house", "building"}:
+            return True
+        if addresstype in {"road", "street"} or rtype in {"road", "residential", "tertiary", "secondary", "primary", "trunk"}:
+            return True
         try:
-            data = self._nominatim_call("/search", {"postalcode": self.zip, "countrycodes": cc or None})
-            if isinstance(data, list) and data:
-                s, n, w, e = map(float, data[0]["boundingbox"])  # [south,north,west,east]
-                return [w, n, e, s]  # left, top, right, bottom
+            return int(result.get("place_rank") or 99) <= 18
         except Exception:
-            pass
-    # try city
-    if self.city:
-        try:
-            data = self._nominatim_call("/search", {
-                "city": self.city,
-                "state": (self.state_id and self.state_id.name) or None,
-                "countrycodes": cc or None,
-            })
-            if isinstance(data, list) and data:
-                s, n, w, e = map(float, data[0]["boundingbox"])
-                return [w, n, e, s]
-        except Exception:
-            pass
-    return None
+            return not strict
 
-# ------------------------
-# MAIN: choose strategy by mode
-# ------------------------
-def _geocode_via_nominatim(self, _addr_ignored=None):
-    """
-    legacy:   q= free-text -> structured -> bounded
-    balanced: structured -> bounded -> q=
-    strict:   structured -> bounded -> q= (but require precise)
-    """
-    full_text = self._full_address_text()
-    if not full_text:
+    def _parse_nominatim_resp(self, data):
+        """Return (lat, lon) or None after precision gate."""
+        if isinstance(data, list) and data:
+            d0 = data[0]
+            if not self._is_precise_enough(d0):
+                return None
+            try:
+                lat = float(d0.get("lat"))
+                lon = float(d0.get("lon", d0.get("lng")))
+                return (lat, lon)
+            except Exception:
+                return None
         return None
-    cc = self._country_code_lower()
-    mode = self._nom_mode()
-    prefer_q = self._cfg_bool("geocode.nominatim.prefer_q", mode == "legacy")
 
-    # helpers
-    def do_q(qtxt):
-        params = {"q": qtxt, "countrycodes": cc or None}
-        data = self._nominatim_call("/search", params)
-        if isinstance(data, list) and data:
-            r = data[0]
-            return r, self._coords_from_result(r)
-        return None, None
+    # --- Structured params builder for Nominatim ---
+    def _nominatim_structured_params(self):
+        self.ensure_one()
+        street_line = ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
+        params = {"format": "jsonv2", "limit": 1, "addressdetails": 1}
+        if street_line:
+            params["street"] = street_line
+        if self.city:
+            params["city"] = self.city
+        if self.state_id and self.state_id.name:
+            params["state"] = self.state_id.name
+        if self.zip:
+            params["postalcode"] = self.zip
+        if self.country_id and (self.country_id.name or self.country_id.code):
+            params["country"] = self.country_id.name or ""
+            params["countrycodes"] = (self.country_id.code or "").lower()
+        return params
 
-    def do_structured():
-        params = {
-            "street": self._clean_street_line() or None,
-            "city": self.city or None,
-            "state": (self.state_id and self.state_id.name) or None,
-            "postalcode": self.zip or None,
-            "country": (self.country_id and self.country_id.name) or None,
-            "countrycodes": cc or None,
-        }
-        data = self._nominatim_call("/search", params)
-        if isinstance(data, list) and data:
-            r = data[0]
-            return r, self._coords_from_result(r)
-        return None, None
+    # ------------------------
+    # Main geocoder
+    # ------------------------
+    def _geocode_via_nominatim(self, addr):
+        """Try structured search first; fall back to free-text q=."""
+        if not addr:
+            return None
+        base_url, user_agent, contact_email = self._nominatim_base()
+        headers = {"User-Agent": user_agent, "Accept-Language": self._lang_pref()}
 
-    def do_bounded(qtxt):
-        vb = self._viewbox_for_bias()
-        if not vb:
-            return None, None
-        left, top, right, bottom = vb
-        params = {
-            "q": qtxt,
-            "countrycodes": cc or None,
-            "viewbox": f"{left},{top},{right},{bottom}",
-            "bounded": 1,
-        }
-        data = self._nominatim_call("/search", params)
-        if isinstance(data, list) and data:
-            r = data[0]
-            return r, self._coords_from_result(r)
-        return None, None
+        # Attempt 1: structured
+        sparams = self._nominatim_structured_params()
+        sparams.setdefault("email", contact_email)
+        try:
+            resp = requests.get(f"{base_url}/search", params=sparams, headers=headers, timeout=12)
+            resp.raise_for_status()
+            coords = self._parse_nominatim_resp(resp.json())
+            if coords:
+                return coords
+            _logger.info("Nominatim structured miss for %s (params=%s)", self.display_name, sparams)
+        except Exception as e:
+            _logger.warning("Nominatim structured error for %s: %s", self.display_name, e)
 
-    # order of attempts
-    attempts = []
-    if prefer_q:
-        attempts = [("q", lambda: do_q(full_text)),
-                    ("structured", do_structured),
-                    ("bounded", lambda: do_bounded(self._clean_street_line() or full_text))]
-    else:
-        attempts = [("structured", do_structured),
-                    ("bounded", lambda: do_bounded(self._clean_street_line() or full_text)),
-                    ("q", lambda: do_q(full_text))]
-
-    for name, fn in attempts:
-        r, coords = fn()
-        if not coords:
-            continue
-        # precision check: strict only rejects coarse
-        if mode == "strict" and not self._is_precise_enough(r):
-            continue
-        # legacy always accepts; balanced applies precision but allows fallback
-        if mode == "legacy" or self._is_precise_enough(r):
+        # Attempt 2: free-text q=
+        cc = (self.country_id and (self.country_id.code or "")) or ""
+        qparams = {"q": addr, "format": "jsonv2", "limit": 1, "addressdetails": 1, "email": contact_email}
+        if cc:
+            qparams["countrycodes"] = cc.lower()
+        try:
+            resp = requests.get(f"{base_url}/search", params=qparams, headers=headers, timeout=12)
+            resp.raise_for_status()
+            coords = self._parse_nominatim_resp(resp.json())
+            if not coords:
+                _logger.info("Nominatim free-text miss for %s (q=%s)", self.display_name, addr)
             return coords
+        except Exception as e:
+            _logger.error("Nominatim free-text error for %s: %s", self.display_name, e)
+            return None
 
-    return None
+    # ------------------------
+    # Orchestrators
+    # ------------------------
+    def _geocode_if_needed(self, force=False):
+        """
+        Compute coords if address signature changed or if forced.
+        Skips during installs/imports if context disables it.
+        """
+        if self.env.context.get("no_geocode") or self.env.context.get("install_mode") or self.env.context.get("disable_geocode"):
+            return False
+
+        for rec in self:
+            # minimal completeness: some street OR street2, some locality, and country
+            if not ((rec.street or rec.street2) and (rec.city or rec.zip or rec.state_id) and rec.country_id):
+                continue
+
+            sig = rec._address_signature()
+            if not force and rec.club_geo_sig and rec.club_geo_sig == sig and rec.club_latitude and rec.club_longitude:
+                continue  # nothing changed
+
+            addr = rec._geo_address_line()
+            coords = rec._geocode_via_nominatim(addr)
+            if coords:
+                # avoid recursion by disabling geocode in context
+                rec.with_context(no_geocode=True).write({
+                    "club_latitude": coords[0],
+                    "club_longitude": coords[1],
+                    "club_geo_sig": sig,
+                })
+                _logger.debug("Geocoded %s -> %s", rec.display_name, coords)
+        return True
+
+    # ------------------------
+    # Entry points (still usable manually)
+    # ------------------------
+    def action_locate_from_address(self):
+        for rec in self:
+            rec._geocode_if_needed(force=True)
+        return True
+
+    @api.onchange(*ADDRESS_FIELDS)
+    def _onchange_autofill_coords(self):
+        """
+        Fill while editing, but only when address looks complete.
+        (This writes only to in-memory fields; values persist on Save.)
+        """
+        for rec in self:
+            if not ((rec.street or rec.street2) and (rec.city or rec.zip or rec.state_id) and rec.country_id):
+                continue
+            coords = rec._geocode_via_nominatim(rec._geo_address_line())
+            if coords:
+                rec.club_latitude, rec.club_longitude = coords
+
+    # ------------------------
+    # Auto-trigger on create/write
+    # ------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        # Do network calls outside of super(); respect context flags.
+        for rec in records:
+            try:
+                rec._geocode_if_needed(force=True)
+            except Exception as e:
+                _logger.info("Geocode on create failed for %s: %s", rec.display_name, e)
+        return records
+
+    def write(self, vals):
+        address_changed = any(k in vals for k in ADDRESS_FIELDS)
+        res = super().write(vals)
+        if address_changed:
+            for rec in self:
+                try:
+                    rec._geocode_if_needed(force=True)
+                except Exception as e:
+                    _logger.info("Geocode on write failed for %s: %s", rec.display_name, e)
+        return res
+
+    # ------------------------
+    # Scheduled backfill (cron)
+    # ------------------------
+    def _cron_geocode_missing_contacts(self):
+        """
+        Backfill a small batch of partners missing coords, politely.
+        System Parameter: geocode.nominatim.cron_limit (default 25)
+        """
+        ICP = self.env["ir.config_parameter"].sudo()
+        try:
+            limit = int(ICP.get_param("geocode.nominatim.cron_limit") or 25)
+        except Exception:
+            limit = 25
+
+        domain = [
+            "|", ("club_latitude", "=", False), ("club_longitude", "=", False),
+            "|", ("street", "!=", False), ("street2", "!=", False),
+            "|", ("city", "!=", False), ("zip", "!=", False),
+            ("country_id", "!=", False),
+        ]
+        batch = self.search(domain, limit=limit, order="id asc")
+        for rec in batch:
+            try:
+                rec._geocode_if_needed(force=True)
+            except Exception as e:
+                _logger.info("Cron geocode failed for %s: %s", rec.display_name, e)
+        _logger.info("Cron geocode processed %s partners", len(batch))
+        return True
