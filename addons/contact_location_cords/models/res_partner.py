@@ -40,7 +40,9 @@ class ResPartner(models.Model):
         return base_url, user_agent, contact_email
 
     # ---------------------------------------------------------------------
-    # Robust Nominatim geocoder (street-first, multi-pass with scoring)
+    # Robust Nominatim geocoder
+    # 1) get a BASE fix from country/city/state/zip (no street)
+    # 2) try to refine with street; if it fails, keep the BASE fix
     # ---------------------------------------------------------------------
     def _geocode_via_nominatim(self, addr, cc_lower=None):
         if not addr:
@@ -52,10 +54,11 @@ class ResPartner(models.Model):
         def _street_line():
             return ", ".join([p for p in [self.street or "", self.street2 or ""] if p]).strip(", ")
 
-        def _params_structured(drop_state=False, drop_zip=False):
+        # --- params builders ------------------------------------------------
+        def _params_structured(include_street=True, drop_state=False, drop_zip=False):
             p = {"format": "jsonv2", "limit": 5, "addressdetails": 1}
             sl = _street_line()
-            if sl:
+            if include_street and sl:
                 p["street"] = sl
             if self.city:
                 p["city"] = self.city
@@ -70,20 +73,36 @@ class ResPartner(models.Model):
                 p["email"] = contact_email
             return p
 
-        def _params_q(full=True):
-            q_text = addr if full else ", ".join([x for x in [
-                _street_line(),
-                self.city or "",
-                (self.state_id and self.state_id.name) or "",
-                (self.country_id and self.country_id.name) or "",
-            ] if x])
-            p = {"format": "jsonv2", "limit": 5, "addressdetails": 1, "q": q_text}
-            if cc_lower:
-                p["countrycodes"] = cc_lower
+        def _params_q(include_street=True, full=True):
+            parts = []
+            if include_street:
+                sl = _street_line()
+                if sl:
+                    parts.append(sl)
+            # prefer country/city/state/zip first in the query order
+            if full:
+                parts += [
+                    self.city or "",
+                    (self.state_id and self.state_id.name) or "",
+                    self.zip or "",
+                    (self.country_id and self.country_id.name) or "",
+                ]
+            else:
+                parts += [
+                    self.city or "",
+                    (self.state_id and self.state_id.name) or "",
+                    (self.country_id and self.country_id.name) or "",
+                ]
+            q_text = ", ".join([x for x in parts if x]) or addr
+            p = {"q": q_text, "format": "jsonv2", "limit": 5, "addressdetails": 1}
+            cc = (cc_lower or (self.country_id and (self.country_id.code or "")).lower() or "")
+            if cc:
+                p["countrycodes"] = cc
             if contact_email:
                 p["email"] = contact_email
             return p
 
+        # --- scoring & HTTP helpers ----------------------------------------
         def _score(c):
             score = 0.0
             ad = c.get("address") or {}
@@ -143,16 +162,49 @@ class ResPartner(models.Model):
                 _logger.info("Nominatim error (%s): %s", params, e)
                 return []
 
-        for params in (
-            _params_structured(False, False),
-            _params_structured(True,  False),
-            _params_structured(False, True),
-            _params_q(True),
-            _params_q(False),
-        ):
-            coords = _pick_best(_hit(params))
+        # --- Phase A: get a BASE fix WITHOUT street ------------------------
+        base_passes = (
+            _params_structured(include_street=False, drop_state=False, drop_zip=False),  # city+state+zip+country
+            _params_structured(include_street=False, drop_state=True,  drop_zip=False),  # drop state
+            _params_structured(include_street=False, drop_state=False, drop_zip=True),   # drop zip
+            _params_q(include_street=False, full=True),                                  # q= city/state/zip/country
+            _params_q(include_street=False, full=False),                                 # q= city/state/country
+        )
+        base_coords = None
+        for p in base_passes:
+            base_coords = _pick_best(_hit(p))
+            if base_coords:
+                break
+
+        # --- Phase B: try to REFINE with street; if fail, keep base --------
+        street_passes = (
+            _params_structured(include_street=True, drop_state=False, drop_zip=False),
+            _params_structured(include_street=True, drop_state=True,  drop_zip=False),
+            _params_structured(include_street=True, drop_state=False, drop_zip=True),
+            _params_q(include_street=True, full=True),
+        )
+        for p in street_passes:
+            refined = _pick_best(_hit(p))
+            if refined:
+                return refined
+
+        # No street refinement; return whatever we had from base
+        if base_coords:
+            return base_coords
+
+        # As a last resort, try your original (strictest) sequence again
+        fallback_passes = (
+            _params_structured(include_street=True, drop_state=False, drop_zip=False),
+            _params_structured(include_street=True, drop_state=True,  drop_zip=False),
+            _params_structured(include_street=True, drop_state=False, drop_zip=True),
+            _params_q(include_street=True, full=True),
+            _params_q(include_street=True, full=False),
+        )
+        for p in fallback_passes:
+            coords = _pick_best(_hit(p))
             if coords:
                 return coords
+
         return None
 
     # ---------------------------------------------------------------------
