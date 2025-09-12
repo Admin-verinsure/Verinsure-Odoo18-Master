@@ -6,30 +6,25 @@
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="priority">500</field>
     <field name="arch" type="xml">
-
-      <!-- Add a Location tab with both coord pairs -->
       <xpath expr="//form/sheet/notebook" position="inside">
         <page string="Location">
           <group>
             <group>
               <field name="partner_latitude"  string="Latitude"/>
               <field name="partner_longitude" string="Longitude"/>
-              <!-- Club coords (shown if those custom fields exist and have values) -->
-              <field name="club_latitude"  string="Club Latitude"  attrs="{'invisible': [('club_latitude','=', False)]}"/>
-              <field name="club_longitude" string="Club Longitude" attrs="{'invisible': [('club_longitude','=', False)]}"/>
+              <field name="club_latitude"     string="Club Latitude"/>
+              <field name="club_longitude"    string="Club Longitude"/>
             </group>
             <group>
               <button name="action_locate_from_address"
                       type="object"
                       class="btn btn-secondary"
                       string="Locate from Address"/>
-              <!-- Use span/div with label styling (no 'for' needed) -->
               <span class="o_form_label">Uses the postal address above.</span>
             </group>
           </group>
         </page>
       </xpath>
-
     </field>
   </record>
 </odoo>
