@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- ==============================================================
+       SERVER ACTION: orchestrates the whole sync (import + reconcile)
+       ============================================================== -->
+  <record id="action_akahu_bank_sync" model="ir.actions.server">
+    <!-- Name visible in UI (Settings ▸ Technical ▸ Automation ▸ Server Actions) -->
+    <field name="name">Akahu Bank Sync</field>
+
+    <!-- Bind this server action to our Python model 'akahu.bank.statement'
+         (Odoo automatically creates an external id 'model_akahu_bank_statement') -->
+    <field name="model_id" ref="model_akahu_bank_statement"/>
+
+    <!-- This server action runs raw Python code (vs. an ORM method call, email, etc.) -->
+    <field name="state">code</field>
+
+    <!-- The Python code to execute when the server action runs.
+         'model' here is an Odoo-provided variable pointing to env['akahu.bank.statement'].
+         1) import_akahu_transactions: pulls last 30 days, creates daily statements/lines, de-dups
+         2) auto_reconcile_bank_lines: tries safe auto-matching (amount ± tol, optional text), posts JE, reconciles -->
+    <field name="code"><![CDATA[
+res = model.import_akahu_transactions(days_back=30)
+model.auto_reconcile_bank_lines(max_days=14, amount_tolerance=0.50, require_text_hint=False)
+    ]]></field>
+  </record>
+
+  <!-- ==============================================================
+       CRON: schedules the server action to run automatically
+       ============================================================== -->
+  <record id="ir_cron_akahu_import" model="ir.cron">
+    <!-- Cron job name visible in UI (Settings ▸ Technical ▸ Automation ▸ Scheduled Actions) -->
+    <field name="name">Akahu Bank Sync</field>
+
+    <!-- Tell the cron which server action to execute -->
+    <field name="ir_actions_server_id" ref="action_akahu_bank_sync"/>
+
+    <!-- Run every 1 'interval_type' -->
+    <field name="interval_number">1</field>
+
+    <!-- Time unit for the interval: days (change to 'hours' if needed) -->
+    <field name="interval_type">days</field>
+
+    <!-- Enable the cron -->
+    <field name="active">True</field>
+
+    <!-- User context used to execute the action.
+         Must have permissions to read/write accounting and your custom model. -->
+    <field name="user_id" ref="base.user_admin"/>
+  </record>
+</odoo>

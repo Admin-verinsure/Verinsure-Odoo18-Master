@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_akahu_import_wizard" model="ir.ui.view">
+    <field name="name">akahu.import.wizard.form</field>
+    <field name="model">akahu.import.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Import Akahu Transactions">
+        <group>
+          <field name="journal_id"/>
+          <field name="days_back"/>
+        </group>
+        <group string="Reconciliation">
+          <field name="run_reconcile"/>
+          <field name="amount_tolerance" attrs="{'invisible':[('run_reconcile','=',False)]}"/>
+          <field name="require_text_hint" attrs="{'invisible':[('run_reconcile','=',False)]}"/>
+        </group>
+        <footer>
+          <button string="Import" type="object" name="action_import_transactions" class="btn-primary"/>
+          <button string="Cancel" class="btn-secondary" special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_akahu_import_wizard" model="ir.actions.act_window">
+    <field name="name">Import Akahu Transactions</field>
+    <field name="res_model">akahu.import.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+  </record>
+
+  <menuitem id="menu_akahu_import"
+            name="Import Akahu"
+            parent="account.menu_finance"
+            action="action_akahu_import_wizard"
+            sequence="10"/>
+</odoo>
