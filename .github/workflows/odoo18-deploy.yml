@@ -34,12 +34,13 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Ensure target folders
+      - name: Ensure target folders (owned by odoo18)
         run: |
           ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
             "sudo install -d -o odoo18 -g odoo18 -m 0755 '${{ env.STG_ADDONS }}' '${{ env.STG_O18_ADDONS }}'"
 
-      - name: Sync ./addons -> /opt/odoo/current/addons
+      # ---- addons/ -> /opt/odoo/current/addons
+      - name: Sync ./addons -> ${{ env.STG_ADDONS }}
         if: ${{ hashFiles('addons/**') != '' }}
         run: |
           rsync -az --delete \
@@ -48,7 +49,8 @@ jobs:
             -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
             ./addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_ADDONS }}/"
 
-      - name: Sync ./odoo18-addons -> /opt/odoo18/odoo18-addons
+      # ---- odoo18-addons/ -> /opt/odoo18/odoo18-addons
+      - name: Sync ./odoo18-addons -> ${{ env.STG_O18_ADDONS }}
         if: ${{ hashFiles('odoo18-addons/**') != '' }}
         run: |
           rsync -az --delete \
@@ -56,6 +58,11 @@ jobs:
             --chown=odoo18:odoo18 \
             -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
             ./odoo18-addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_O18_ADDONS }}/"
+
+      - name: List deployed folders (sanity)
+        run: |
+          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+            "sudo bash -lc 'set -euxo pipefail; ls -la ${STG_ADDONS} | head -n 40; echo ----; ls -la ${STG_O18_ADDONS} | head -n 40'"
 
       - name: Restart Odoo
         run: |
