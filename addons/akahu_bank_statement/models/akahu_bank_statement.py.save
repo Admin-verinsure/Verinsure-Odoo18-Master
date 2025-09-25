@@ -1,0 +1,37 @@
+import requests
+from odoo import models, fields, api
+from datetime import datetime, timedelta
+
+class AkahuBankStatement(models.Model):
+    _name = 'akahu.bank.statement'
+    _description = 'Akahu Bank Statement Import'
+
+    @api.model
+    def import_akahu_transactions(self):
+        akahu_token = self.env['ir.config_parameter'].sudo().get_param('akahu.access_token')
+        headers = {
+            "Authorization": f"Bearer {akahu_token}"
+        }
+
+        # Step 1: Get Accounts
+        accounts_url = "https://api.akahu.io/v1/accounts"
+        accounts = requests.get(accounts_url, headers=headers).json().get("items", [])
+
+        for acc in accounts:
+            acc_id = acc["_id"]
+            transactions_url = f"https://api.akahu.io/v1/accounts/{acc_id}/transactions"
+
+            # Optional: fetch last 1 day of transactions
+            since_date = (datetime.now() - timedelta(days=1)).isoformat()
+
+            res = requests.get(transactions_url, headers=headers, params={'start': since_date})
+            transactions = res.json().get("items", [])
+
+            for tx in transactions:
+                self.env['account.bank.statement.line'].create({
+                    'date': tx.get("date"),
+                    'payment_ref': tx.get("description") or 'Akahu',
+                    'amount': tx.get("amount"),
+                    'partner_name': tx.get("counterparty", {}).get("name", "Unknown"),
+                    'journal_id': YOUR_BANK_JOURNAL_ID,
+                })
