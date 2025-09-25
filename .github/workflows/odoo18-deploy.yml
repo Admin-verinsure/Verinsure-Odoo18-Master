@@ -42,18 +42,20 @@ jobs:
       - name: Sync ./addons -> /opt/odoo/current/addons
         if: ${{ hashFiles('addons/**') != '' }}
         run: |
-          rsync -az --delete -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
+          rsync -az --delete \
+            --rsync-path="sudo rsync" \
+            --chown=odoo18:odoo18 \
+            -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
             ./addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_ADDONS }}/"
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo chown -R odoo18:odoo18 '${{ env.STG_ADDONS }}'"
 
       - name: Sync ./odoo18-addons -> /opt/odoo18/odoo18-addons
         if: ${{ hashFiles('odoo18-addons/**') != '' }}
         run: |
-          rsync -az --delete -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
+          rsync -az --delete \
+            --rsync-path="sudo rsync" \
+            --chown=odoo18:odoo18 \
+            -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
             ./odoo18-addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_O18_ADDONS }}/"
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo chown -R odoo18:odoo18 '${{ env.STG_O18_ADDONS }}'"
 
       - name: Restart Odoo
         run: |
