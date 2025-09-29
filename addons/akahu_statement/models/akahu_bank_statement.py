@@ -12,7 +12,11 @@ _logger = logging.getLogger(__name__)
 AKAHU_API = "https://api.akahu.io/v1"
 
 
+# ---------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------
 def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
+    """Parse ISO string in UTC and return *naive* datetime in user's tz."""
     if not iso_str:
         aware = fields.Datetime.now()
         return aware.replace(tzinfo=None)
@@ -34,12 +38,59 @@ def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
     return local_aware.replace(tzinfo=None)
 
 
+# ---------------------------------------------------------
+# OPTION B toggle on the Bank Journal
+# ---------------------------------------------------------
+class AccountJournalAkahu(models.Model):
+    _inherit = 'account.journal'
+
+    x_defer_bank_posting = fields.Boolean(
+        string="Defer Bank Move Posting",
+        help="Keep liquidity moves created from bank statement lines in DRAFT "
+             "until an explicit reconciliation/post step runs.",
+        default=True,
+    )
+
+
+# ---------------------------------------------------------
+# Keep the auto-generated liquidity move in DRAFT
+# (and never auto-post) when the toggle is on
+# ---------------------------------------------------------
+class StatementLineDeferPosting(models.Model):
+    _inherit = 'account.bank.statement.line'
+
+    def _prepare_move_values(self):
+        vals = super()._prepare_move_values()
+        # if the toggle is on, ensure the move won't be auto-posted
+        try:
+            if self.journal_id.x_defer_bank_posting:
+                vals['auto_post'] = 'no'
+        except Exception:
+            # in batch contexts 'self' can be multiple; fall back safely
+            pass
+        return vals
+
+    def _synchronize_to_moves(self, changed_fields):
+        res = super()._synchronize_to_moves(changed_fields)
+        # safety belt: if something still posted, reopen to draft
+        for line in self:
+            if (
+                getattr(line.journal_id, 'x_defer_bank_posting', False)
+                and line.move_id
+                and line.move_id.state == 'posted'
+            ):
+                line.move_id.button_draft()
+        return res
+
+
+# ---------------------------------------------------------
+# Main Service: Import + Reconcile
+# ---------------------------------------------------------
 class AkahuBankStatement(models.Model):
     _name = 'akahu.bank.statement'
     _description = 'Akahu Bank Statement Import & Reconciliation'
 
     # ------------------ helpers ------------------
-
     @api.model
     def _get_headers(self):
         token = self.env['ir.config_parameter'].sudo().get_param('akahu.access_token')
@@ -65,11 +116,9 @@ class AkahuBankStatement(models.Model):
     @api.model
     def _get_clearing_account(self, journal):
         """Prefer journal field; else system param; always browse in the journal's company."""
-        # 1) journal field (if present on your build)
         if hasattr(journal, 'clearing_account_id') and journal.clearing_account_id:
             return journal.clearing_account_id
 
-        # 2) system parameter (company-aware + sudo so multi-company never hides it)
         cid = self.env['ir.config_parameter'].sudo().get_param('akahu.clearing_account_id')
         if cid:
             Account = self.env['account.account'].with_context(
@@ -98,8 +147,8 @@ class AkahuBankStatement(models.Model):
             ('journal_id', '=', journal_id), ('unique_import_id', '=', unique_id),
         ]))
 
-    # Receivable/Payable domain (version-proof)
     def _rp_domain(self, inbound: bool):
+        """Version-proof receivable/payable domain."""
         Account = self.env['account.account']
         target = ['receivable'] if inbound else ['payable']
 
@@ -121,9 +170,13 @@ class AkahuBankStatement(models.Model):
         return []
 
     # ------------------ import ------------------
-
     @api.model
     def import_akahu_transactions(self, journal_id=None, days_back=90, tz_name=None, page_limit=200):
+        """
+        Import Akahu transactions and create bank statement lines.
+        DO NOT create our own draft JE here (Option B) — we rely on the
+        statement line's own liquidity move kept in DRAFT by our override.
+        """
         headers = self._get_headers()
         journal = self._get_target_journal(journal_id)
         tz_name = tz_name or self.env.user.tz or "UTC"
@@ -189,44 +242,11 @@ class AkahuBankStatement(models.Model):
                         'journal_id': journal.id,
                         'unique_import_id': akahu_id,
                     }
-                    stl = self.env['account.bank.statement.line'].create(vals)
+                    self.env['account.bank.statement.line'].create(vals)
                     created += 1
 
-                    # DRAFT JE (Bank ↔ Clearing)
-                    clearing = self._get_clearing_account(journal)
-                    bank = journal.default_account_id
-                    if not bank:
-                        raise UserError(_("Bank journal %s needs a Default Account.") % journal.display_name)
-
-                    ref = f"AKAHU {akahu_id} - {description}"
-                    amt_abs = abs(amount)
-
-                    if amount > 0:
-                        move_lines = [
-                            {'name': description, 'account_id': bank.id,     'debit': amt_abs, 'credit': 0.0},
-                            {'name': description, 'account_id': clearing.id, 'debit': 0.0,     'credit': amt_abs},
-                        ]
-                    else:
-                        move_lines = [
-                            {'name': description, 'account_id': clearing.id, 'debit': amt_abs, 'credit': 0.0},
-                            {'name': description, 'account_id': bank.id,     'debit': 0.0,     'credit': amt_abs},
-                        ]
-
-                    draft_vals = {
-                        'move_type': 'entry',
-                        'date': day,
-                        'journal_id': journal.id,
-                        'ref': ref[:140],
-                        'line_ids': [(0, 0, v) for v in move_lines],
-                    }
-                    draft_move = self.env['account.move'].create(draft_vals)
-                    if hasattr(stl, 'journal_entry_ids'):
-                        stl.write({'journal_entry_ids': [(4, draft_move.id)]})
-
-                next_cursor = None
                 cursor_obj = data.get("cursor")
-                if isinstance(cursor_obj, dict):
-                    next_cursor = cursor_obj.get("next")
+                next_cursor = cursor_obj.get("next") if isinstance(cursor_obj, dict) else None
                 if next_cursor:
                     params = {'cursor': next_cursor}
                     continue
@@ -239,9 +259,12 @@ class AkahuBankStatement(models.Model):
         return {'created': created, 'skipped': skipped}
 
     # ------------------ auto-reconcile ------------------
-
     @api.model
     def auto_reconcile_bank_lines(self, journal_id=None, max_days=7, amount_tolerance=0.50, require_text_hint=False):
+        """
+        Transform the statement's **draft** liquidity move by replacing the non-bank leg
+        with the AR/AP counterpart; then POST and RECONCILE.
+        """
         journal = self._get_target_journal(journal_id)
         Move = self.env['account.move']
         AML  = self.env['account.move.line']
@@ -260,6 +283,7 @@ class AkahuBankStatement(models.Model):
         reconciled_count, ambiguous, missing = 0, 0, 0
 
         for stl in st_lines:
+            # already reconciled?
             if any(ml.reconciled for ml in getattr(stl, 'move_line_ids', [])):
                 continue
 
@@ -318,15 +342,18 @@ class AkahuBankStatement(models.Model):
                 ambiguous += 1
                 continue
 
-            counterpart = keep[0]
+            counterpart = keep[0]  # the AR/AP open item we will reconcile to
             bank_account = journal.default_account_id
-            clearing = self._get_clearing_account(journal)
-            label = stl.payment_ref or stl.name or '/'
-            amt = abs(amount)
 
-            draft_move = False
-            if hasattr(stl, 'journal_entry_ids'):
+            # --- find the statement's draft liquidity move ---
+            draft_move = None
+            # std field in recent Odoo
+            if hasattr(stl, 'move_id') and stl.move_id and stl.move_id.state == 'draft':
+                draft_move = stl.move_id
+            # some deployments add a m2m
+            if not draft_move and hasattr(stl, 'journal_entry_ids'):
                 draft_move = stl.journal_entry_ids.filtered(lambda m: m.state == 'draft' and m.journal_id == journal)[:1]
+            # last resort: search by ref pattern
             if not draft_move:
                 uid = getattr(stl, 'unique_import_id', '') or ''
                 if uid:
@@ -336,48 +363,68 @@ class AkahuBankStatement(models.Model):
                         ('ref', 'ilike', uid),
                     ], limit=1)
 
+            # if still none, create a new draft (very rare fallback)
             if not draft_move:
+                label = stl.payment_ref or stl.name or '/'
+                amt = abs(amount)
                 if inbound:
                     move_lines = [
                         {'name': label, 'account_id': bank_account.id,           'debit': amt, 'credit': 0.0},
-                        {'name': label, 'account_id': counterpart.account_id.id, 'debit': 0.0, 'credit': amt, 'partner_id': counterpart.partner_id.id},
+                        {'name': label, 'account_id': bank_account.id,           'debit': 0.0, 'credit': amt},  # temp, will overwrite
                     ]
                 else:
                     move_lines = [
                         {'name': label, 'account_id': bank_account.id,           'debit': 0.0, 'credit': amt},
-                        {'name': label, 'account_id': counterpart.account_id.id, 'debit': amt, 'credit': 0.0, 'partner_id': counterpart.partner_id.id},
+                        {'name': label, 'account_id': bank_account.id,           'debit': amt, 'credit': 0.0},  # temp, will overwrite
                     ]
                 move_vals = {
                     'move_type': 'entry',
                     'date': stl.date,
                     'journal_id': journal.id,
-                    'ref': label,
+                    'ref': (stl.payment_ref or stl.name or '/')[:140],
                     'line_ids': [(0, 0, v) for v in move_lines],
                 }
-                move = Move.create(move_vals)
-            else:
-                move = draft_move
-                clearing_lines = move.line_ids.filtered(lambda l: l.account_id == clearing)
-                if not clearing_lines:
-                    raise UserError(_("Expected a Clearing line in draft move %s but none found.") % move.display_name)
+                draft_move = Move.create(move_vals)
+                if hasattr(stl, 'journal_entry_ids'):
+                    stl.write({'journal_entry_ids': [(4, draft_move.id)]})
 
-                if inbound:
-                    target_line = clearing_lines.filtered(lambda l: l.credit > 0.0)[:1] or clearing_lines[:1]
-                    target_line.write({'account_id': counterpart.account_id.id, 'partner_id': counterpart.partner_id.id})
-                else:
-                    target_line = clearing_lines.filtered(lambda l: l.debit > 0.0)[:1] or clearing_lines[:1]
-                    target_line.write({'account_id': counterpart.account_id.id, 'partner_id': counterpart.partner_id.id})
+            # --- transform the draft liquidity move ---
+            label = stl.payment_ref or stl.name or '/'
+            draft_move.ref = draft_move.ref or label
 
-                if not move.ref or 'AKAHU' in (move.ref or ''):
-                    move.ref = label
+            bank_lines = draft_move.line_ids.filtered(lambda l: l.account_id == bank_account)
+            # pick "the other line" (non-bank) to rewrite into AR/AP
+            other_lines = draft_move.line_ids - bank_lines
+            if not other_lines:
+                # create one if the template had only a bank leg (unlikely)
+                other_lines = self.env['account.move.line']
+                other_lines += self.env['account.move.line'].create({
+                    'name': label,
+                    'move_id': draft_move.id,
+                    'account_id': bank_account.id,
+                    'debit': 0.0,
+                    'credit': 0.0,
+                })
 
-            move.action_post()
+            # inbound: AR credit, outbound: AP debit
+            for ol in other_lines:
+                ol.write({
+                    'account_id': counterpart.account_id.id,
+                    'partner_id': counterpart.partner_id.id,
+                })
 
-            new_leg = move.line_ids.filtered(lambda l: l.account_id == counterpart.account_id and not l.reconciled)
+            # --- post and reconcile ---
+            if draft_move.state == 'draft':
+                draft_move.action_post()
+
+            new_leg = draft_move.line_ids.filtered(
+                lambda l: l.account_id == counterpart.account_id and not l.reconciled
+            )
             (new_leg + counterpart).reconcile()
 
-            if hasattr(stl, 'journal_entry_ids') and move not in stl.journal_entry_ids:
-                stl.write({'journal_entry_ids': [(4, move.id)]})
+            # ensure link back for traceability
+            if hasattr(stl, 'journal_entry_ids') and draft_move not in stl.journal_entry_ids:
+                stl.write({'journal_entry_ids': [(4, draft_move.id)]})
 
             reconciled_count += 1
 
