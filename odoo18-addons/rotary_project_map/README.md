@@ -1,2 +1,0 @@
-# rotary_project_map
-rotary_project_map
