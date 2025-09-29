@@ -1,5 +1,5 @@
 {
-    'name': 'Akahu Bank Statement',
+    'name': 'Akahu Statement',
     'version': '18.0.1.0.0',
     'summary': 'Import NZ bank transactions from Akahu',
     'description': 'This module integrates with the Akahu API to import New Zealand bank transactions into Odoo 18.',
