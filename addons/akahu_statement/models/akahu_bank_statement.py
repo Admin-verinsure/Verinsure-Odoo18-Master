@@ -173,6 +173,41 @@ class AkahuBankStatement(models.Model):
             ('unique_import_id', '=', unique_id),
         ]))
 
+    # -------- NEW: version-proof receivable/payable domain helper --------
+    def _rp_domain(self, inbound: bool):
+        """
+        Return a domain that targets receivable/payable accounts, compatible with different Odoo schemas.
+        inbound=True  -> receivable
+        inbound=False -> payable
+        """
+        Account = self.env['account.account']
+        target = ['receivable'] if inbound else ['payable']
+
+        # Newer Odoo: 'account_type' selection on account.account
+        if 'account_type' in Account._fields:
+            sel = dict(Account._fields['account_type'].selection)
+            keys = []
+            for k in sel.keys():
+                # accept keys containing 'receivable' / 'payable' (e.g. 'asset_receivable', 'liability_payable')
+                if any(t in k for t in target):
+                    keys.append(k)
+            if keys:
+                return [('account_id.account_type', 'in', list(set(keys)))]
+
+        # Older Odoo: 'internal_type' selection ('receivable', 'payable', ...)
+        if 'internal_type' in Account._fields:
+            return [('account_id.internal_type', 'in', target)]
+
+        # Fallback: via account.account.type.type == receivable/payable
+        if 'user_type_id' in Account._fields:
+            Type = self.env['account.account.type']
+            ids_ = Type.search([('type', 'in', target)]).ids
+            if ids_:
+                return [('account_id.user_type_id', 'in', ids_)]
+
+        # Last resort: no additional filter
+        return []
+
     # ------------------------------------------------------------------
     # ENTRY POINT #1: IMPORT (CRON/SERVER ACTION & WIZARD USE THIS)
     # Draft → Posted cycle: this method creates **DRAFT** JEs only.
@@ -356,20 +391,22 @@ class AkahuBankStatement(models.Model):
                 continue
 
             inbound = amount > 0
-            target_types = ['receivable'] if inbound else ['payable']
 
             # Try to pin the partner (from field or fuzzy by name)
             partner = stl.partner_id if getattr(stl, 'partner_id', False) else None
             if not partner and getattr(stl, 'partner_name', None):
                 partner = Partner.search([('name', 'ilike', stl.partner_name)], limit=1)
 
-            # Pull open, posted AR/AP lines for this company (optionally narrowed by partner)
+            # Use parent_state if present, else move_id.state (version-proof)
+            posted_field = 'parent_state' if 'parent_state' in AML._fields else 'move_id.state'
+
+            # Build candidate domain with version-proof receivable/payable filter
             domain = [
                 ('company_id', '=', stl.company_id.id),
-                ('parent_state', '=', 'posted'),
+                (posted_field, '=', 'posted'),
                 ('reconciled', '=', False),
-                ('account_id.internal_type', 'in', target_types),
-            ]
+            ] + self._rp_domain(inbound)
+
             if partner:
                 domain.append(('partner_id', '=', partner.id))
 
@@ -432,7 +469,6 @@ class AkahuBankStatement(models.Model):
 
             # 2) If no draft found (edge case), create a new move (old behavior fallback)
             if not draft_move:
-                move_lines = []
                 if inbound:
                     move_lines = [
                         {'name': label, 'account_id': bank_account.id,           'debit': amt, 'credit': 0.0},
