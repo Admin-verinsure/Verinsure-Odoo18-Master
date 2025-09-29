@@ -5,14 +5,13 @@ on:
     branches: ["master"]
     paths:
       - "addons/**"
-      - "odoo18-addons/**"
       - ".github/workflows/deploy-staging.yml"
   workflow_dispatch: {}
 
 env:
-  STG_ADDONS: /opt/odoo/current/addons
-  STG_O18_ADDONS: /opt/odoo18/odoo18-addons
+  STG_CUSTOM: /opt/odoo18/custom-addons
   SERVICE_NAME: odoo18
+  ODOO_DB: staging_not4profit
 
 jobs:
   deploy-staging:
@@ -34,42 +33,67 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Ensure target folders (owned by odoo18)
+      - name: Ensure custom addons folder (owned by odoo18)
         run: |
           ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo install -d -o odoo18 -g odoo18 -m 0755 '${{ env.STG_ADDONS }}' '${{ env.STG_O18_ADDONS }}'"
+            "sudo install -d -o odoo18 -g odoo18 -m 0755 '${{ env.STG_CUSTOM }}'"
 
-      # ---- addons/ -> /opt/odoo/current/addons
-      - name: Sync ./addons -> ${{ env.STG_ADDONS }}
+      - name: Ensure addons_path contains custom-addons (idempotent)
+        run: |
+          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" '
+            set -euo pipefail
+            CONF=/etc/odoo18.conf
+            ADDP="${{ env.STG_CUSTOM }}"
+            # add if line missing entirely
+            if ! grep -qE "^[[:space:]]*addons_path[[:space:]]*=" "$CONF"; then
+              echo "addons_path = /opt/odoo18/addons,/opt/odoo18/odoo/addons,$ADDP" | sudo tee -a "$CONF" >/dev/null
+            fi
+            # append our dir if not present yet
+            if ! grep -E "^[[:space:]]*addons_path[[:space:]]*=" "$CONF" | grep -q "$ADDP"; then
+              sudo sed -i -E "s|^(addons_path[[:space:]]*=[[:space:]]*)(.*)|\1\2,$ADDP|" "$CONF"
+            fi
+          '
+
+      # ---- ./addons -> /opt/odoo18/custom-addons
+      - name: Sync ./addons -> ${{ env.STG_CUSTOM }}
         if: ${{ hashFiles('addons/**') != '' }}
         run: |
           rsync -az --delete \
             --rsync-path="sudo rsync" \
             --chown=odoo18:odoo18 \
             -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
-            ./addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_ADDONS }}/"
+            ./addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_CUSTOM }}/"
 
-      # ---- odoo18-addons/ -> /opt/odoo18/odoo18-addons
-      - name: Sync ./odoo18-addons -> ${{ env.STG_O18_ADDONS }}
-        if: ${{ hashFiles('odoo18-addons/**') != '' }}
-        run: |
-          rsync -az --delete \
-            --rsync-path="sudo rsync" \
-            --chown=odoo18:odoo18 \
-            -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
-            ./odoo18-addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_O18_ADDONS }}/"
-
-      - name: List deployed folders (sanity)
+      - name: List deployed custom addons (sanity)
         run: |
           ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo bash -lc 'set -euxo pipefail; ls -la ${STG_ADDONS} | head -n 40; echo ----; ls -la ${STG_O18_ADDONS} | head -n 40'"
+            "sudo bash -lc 'set -euxo pipefail; ls -la ${STG_CUSTOM} | head -n 200'"
 
       - name: Restart Odoo
         run: |
           ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
             "sudo systemctl restart '${{ env.SERVICE_NAME }}' && sleep 3 && sudo systemctl --no-pager -l status '${{ env.SERVICE_NAME }}' || true"
 
+      # OPTIONAL: auto-upgrade only modules changed in this push
+      - name: Compute changed modules
+        id: mods
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_ref="${{ github.event.before || 'HEAD~1' }}"
+          CHANGED=$(git diff --name-only "$base_ref" HEAD -- addons/ | awk -F/ 'NF>1{print $2}' | sort -u | tr '\n' ' ')
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Upgrade changed modules
+        if: steps.mods.outputs.changed != ''
+        run: |
+          MODS="${{ steps.mods.outputs.changed }}"
+          echo "Upgrading: $MODS"
+          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+            "sudo -u odoo18 /opt/odoo18/venv/bin/python3 /opt/odoo18/odoo-bin \
+               -c /etc/odoo18.conf -d '${{ env.ODOO_DB }}' -u $(echo $MODS | tr ' ' ',') --stop-after-init || true"
+
       - name: Health check
         run: |
           ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "curl -sS -I http://127.0.0.1:8069/odoo | head -n1 || true"
+            "curl -sS -I http://127.0.0.1:8069/web?db=${{ env.ODOO_DB }} | head -n1 || true"
