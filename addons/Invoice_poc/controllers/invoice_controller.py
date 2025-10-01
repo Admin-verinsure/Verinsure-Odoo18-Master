@@ -22,8 +22,11 @@ class InvoicePocController(http.Controller):
                 "odoo_move_id": move.id,
                 "number": move.name,
                 "state": move.state,
-            }
+            }#----
         except Exception as e:
             if "rec" in locals():
                 rec.sudo().write({"state": "error", "error_message": str(e)})
             return {"status": "error", "error": str(e)}
+          
+          
+          
