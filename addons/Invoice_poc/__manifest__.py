@@ -6,9 +6,8 @@
     "author": "Your Team",
     "license": "LGPL-3",
     "depends": ["base", "account"],
-    "data": [
-        "security/ir.model.access.csv",
-    ],
+    
+  
     "application": False,
     "installable": True,
 }
