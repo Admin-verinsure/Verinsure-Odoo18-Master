@@ -6,8 +6,11 @@ class InvoicePocPayload(models.Model):
     _name = "invoice.poc.payload"
     _description = "Stored payloads for invoice POC"
 
+    # INPUT container
     ext_id = fields.Char(index=True)
     payload_json = fields.Text(required=True)
+
+    # Trace
     move_id = fields.Many2one("account.move", string="Created Invoice")
     state = fields.Selection(
         [("new", "New"), ("posted", "Posted"), ("error", "Error")],
@@ -19,7 +22,6 @@ class InvoicePocPayload(models.Model):
     @api.model
     def _find_partner(self, email=None, name=None):
         Partner = self.env["res.partner"]
-        dom = []
         if email and name:
             dom = ["|", ("email", "=", email), ("name", "=", name)]
         elif email:
@@ -30,7 +32,6 @@ class InvoicePocPayload(models.Model):
             raise ValueError("Provide partner email or name")
         partner = Partner.search(dom, limit=1)
         if not partner:
-            # Create a minimal customer if not found (handy for POC)
             partner = Partner.create({
                 "name": name or email,
                 "email": email,
@@ -44,21 +45,21 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_journal(self, name=None):
+        """Use an existing SALE journal in the current user's company.
+        (No auto-create here, to match UI behavior/domains.)"""
         Journal = self.env["account.journal"]
+        company_id = self.env.user.company_id.id
         if name:
-            j = Journal.search([("name", "=", name)], limit=1)
+            j = Journal.search([
+                ("name", "=", name),
+                ("company_id", "=", company_id),
+            ], limit=1)
             if j:
                 return j
-        j = Journal.search([("type", "=", "sale")], limit=1)
-        if not j:
-            # Create a simple Sales journal if none exists (POC convenience)
-            j = Journal.create({
-                "name": "Sales",
-                "code": "SAJ",
-                "type": "sale",
-                "company_id": self.env.company.id,
-            })
-        return j
+        return Journal.search([
+            ("type", "=", "sale"),
+            ("company_id", "=", company_id),
+        ], limit=1)
 
     @api.model
     def _find_taxes(self, names=None):
@@ -70,15 +71,20 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _fallback_income_account(self):
-        return self.env["account.account"].search([("account_type", "=", "income")], limit=1)
+        return self.env["account.account"].search(
+            [("account_type", "=", "income")], limit=1
+        )
 
     # ---------- main action ----------
     def action_create_and_post_invoice(self):
-        """Create + post an out_invoice from stored JSON payload."""
+        """Create + post an out_invoice from stored JSON payload (UI-like)."""
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
 
-        # Header bits
+        # Match UI company & salesperson
+        company_id = self.env.user.company_id.id
+
+        # Header
         customer = data.get("customer", {}) or {}
         partner = self._find_partner(
             email=customer.get("email"),
@@ -95,22 +101,21 @@ class InvoicePocPayload(models.Model):
 
         line_cmds = []
         for l in lines_in:
-            taxes_cmd = self._find_taxes(l.get("tax_names"))
-            line_vals = {
+            line_cmds.append((0, 0, {
                 "name": l.get("description") or l.get("name") or "Item",
                 "quantity": float(l.get("qty") or 1.0),
                 "price_unit": float(l.get("unit_price") or 0.0),
-                "tax_ids": taxes_cmd,
-                # For POC we use account-based lines (no product required)
+                "tax_ids": self._find_taxes(l.get("tax_names")),
                 "account_id": income_acct.id,
-            }
-            line_cmds.append((0, 0, line_vals))
+            }))
 
         move_vals = {
             "move_type": "out_invoice",
+            "company_id": company_id,                       # ensure right company
             "partner_id": partner.id,
-            "journal_id": journal.id,
+            "journal_id": journal.id if journal else False, # existing sale journal
             "currency_id": currency.id if currency else False,
+            "invoice_user_id": self.env.user.id,            # shows under “My Invoices”
             "invoice_line_ids": line_cmds,
         }
         if data.get("ref"):
@@ -122,8 +127,12 @@ class InvoicePocPayload(models.Model):
         if data.get("note"):
             move_vals["narration"] = data["note"]
 
-        move = self.env["account.move"].create(move_vals)
-        move.action_post()
+        # Create with the same context the UI action uses
+        move = self.env["account.move"].with_context(
+            default_move_type="out_invoice",
+            allowed_company_ids=[company_id],
+        ).create(move_vals)
 
+        move.action_post()  # same as Confirm button
         self.write({"move_id": move.id, "state": "posted"})
         return move
