@@ -61,13 +61,16 @@ class InvoicePocPayload(models.Model):
         ], limit=1)
 
     @api.model
-    def _find_taxes(self, names=None):
-        names = names or []
-        if not names:
-            return [(6, 0, [])]
-        taxes = self.env["account.tax"].search([("name", "in", names)])
-        return [(6, 0, taxes.ids)]
-
+def _find_taxes(self, names=None):
+    names = names or []
+    if not names:
+        return [(6, 0, [])]
+    taxes = self.env['account.tax'].with_context(active_test=False).search([
+        ('name', 'in', names),
+        ('company_id', '=', self.env.user.company_id.id),
+        ('type_tax_use', 'in', ['sale','none']),
+    ])
+    return [(6, 0, taxes.ids)]
     @api.model
     def _fallback_income_account(self):
         return self.env["account.account"].search(
