@@ -45,8 +45,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_journal(self, name=None):
-        """Use an existing SALE journal in the current user's company.
-        (No auto-create here, to match UI behavior/domains.)"""
+        """Use an existing SALE journal in the current user's company (no auto-create)."""
         Journal = self.env["account.journal"]
         company_id = self.env.user.company_id.id
         if name:
@@ -75,6 +74,13 @@ class InvoicePocPayload(models.Model):
             [("account_type", "=", "income")], limit=1
         )
 
+    @api.model
+    def _find_payment_term(self, name=None):
+        """Resolve payment term by exact name (e.g., 'Immediate', '30 Days')."""
+        if not name:
+            return self.env['account.payment.term'].browse()
+        return self.env['account.payment.term'].search([('name', '=', name)], limit=1)
+
     # ---------- main action ----------
     def action_create_and_post_invoice(self):
         """Create + post an out_invoice from stored JSON payload (UI-like)."""
@@ -92,6 +98,7 @@ class InvoicePocPayload(models.Model):
         )
         currency = self._find_currency(data.get("currency") or "INR")
         journal = self._find_journal(data.get("journal"))
+        payment_term = self._find_payment_term(data.get("payment_term"))
 
         # Lines
         lines_in = data.get("lines") or []
@@ -118,14 +125,19 @@ class InvoicePocPayload(models.Model):
             "invoice_user_id": self.env.user.id,            # shows under “My Invoices”
             "invoice_line_ids": line_cmds,
         }
+        # Optional header/printing fields (to satisfy your template)
         if data.get("ref"):
-            move_vals["ref"] = data["ref"]
+            move_vals["ref"] = data["ref"]                            # Customer Reference
         if data.get("invoice_date"):
             move_vals["invoice_date"] = data["invoice_date"]
         if data.get("due_date"):
-            move_vals["invoice_date_due"] = data["due_date"]
+            move_vals["invoice_date_due"] = data["due_date"]          # Due Date block
         if data.get("note"):
-            move_vals["narration"] = data["note"]
+            move_vals["narration"] = data["note"]                     # Terms & Conditions block
+        if data.get("payment_reference"):
+            move_vals["payment_reference"] = data["payment_reference"]# Payment Communication
+        if payment_term:
+            move_vals["invoice_payment_term_id"] = payment_term.id    # Payment Term block
 
         # Create with the same context the UI action uses
         move = self.env["account.move"].with_context(
