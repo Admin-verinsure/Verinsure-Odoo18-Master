@@ -1,15 +1,16 @@
 # invoice_poc/models/invoice_poc.py
 from odoo import models, fields, api
 import json
-import re
 
 class InvoicePocPayload(models.Model):
     _name = "invoice.poc.payload"
     _description = "Stored payloads for invoice POC"
 
+    # INPUT container
     ext_id = fields.Char(index=True)
     payload_json = fields.Text(required=True)
 
+    # Trace
     move_id = fields.Many2one("account.move", string="Created Invoice")
     state = fields.Selection(
         [("new", "New"), ("posted", "Posted"), ("error", "Error")],
@@ -17,23 +18,7 @@ class InvoicePocPayload(models.Model):
     )
     error_message = fields.Text()
 
-    # ---------------------- NEW: small helper ----------------------
-    @api.model
-    def _coerce_html(self, txt):
-        """
-        Ensure narration is valid HTML:
-        - If txt already looks like HTML, return as-is.
-        - Else wrap in <p> and keep line breaks with <br/>.
-        """
-        if not txt:
-            return False
-        # crude HTML detector: any angle bracket tag-like pattern
-        if re.search(r"<[^>]+>", txt):
-            return txt
-        esc = (txt or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        esc = esc.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br/>")
-        return f"<p>{esc}</p>"
-
+    # ---------- helpers ----------
     @api.model
     def _find_partner(self, email=None, name=None):
         Partner = self.env["res.partner"]
@@ -60,6 +45,8 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_journal(self, name=None):
+        """Use an existing SALE journal in the current user's company.
+        (No auto-create here, to match UI behavior/domains.)"""
         Journal = self.env["account.journal"]
         company_id = self.env.user.company_id.id
         if name:
@@ -88,17 +75,16 @@ class InvoicePocPayload(models.Model):
             [("account_type", "=", "income")], limit=1
         )
 
-    @api.model
-    def _find_payment_term(self, name=None):
-        if not name:
-            return self.env['account.payment.term'].browse()
-        return self.env['account.payment.term'].search([('name', '=', name)], limit=1)
-
+    # ---------- main action ----------
     def action_create_and_post_invoice(self):
+        """Create + post an out_invoice from stored JSON payload (UI-like)."""
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
+
+        # Match UI company & salesperson
         company_id = self.env.user.company_id.id
 
+        # Header
         customer = data.get("customer", {}) or {}
         partner = self._find_partner(
             email=customer.get("email"),
@@ -106,12 +92,11 @@ class InvoicePocPayload(models.Model):
         )
         currency = self._find_currency(data.get("currency") or "INR")
         journal = self._find_journal(data.get("journal"))
-        payment_term = self._find_payment_term(data.get("payment_term"))
 
+        # Lines
         lines_in = data.get("lines") or []
         if not lines_in:
             raise ValueError("At least one line is required")
-
         income_acct = self._fallback_income_account()
 
         line_cmds = []
@@ -126,37 +111,28 @@ class InvoicePocPayload(models.Model):
 
         move_vals = {
             "move_type": "out_invoice",
-            "company_id": company_id,
+            "company_id": company_id,                       # ensure right company
             "partner_id": partner.id,
-            "journal_id": journal.id if journal else False,
+            "journal_id": journal.id if journal else False, # existing sale journal
             "currency_id": currency.id if currency else False,
-            "invoice_user_id": self.env.user.id,
+            "invoice_user_id": self.env.user.id,            # shows under “My Invoices”
             "invoice_line_ids": line_cmds,
         }
-
-        # ---------------------- UPDATED: narration sources ----------------------
-        # Prefer explicit HTML, then note/terms (plain text OK), all coerced to HTML
-        terms_html = data.get("terms_html") or data.get("note") or data.get("terms")
-        if terms_html:
-            move_vals["narration"] = self._coerce_html(terms_html)
-
-        # Optional header/printing fields
         if data.get("ref"):
             move_vals["ref"] = data["ref"]
         if data.get("invoice_date"):
             move_vals["invoice_date"] = data["invoice_date"]
         if data.get("due_date"):
             move_vals["invoice_date_due"] = data["due_date"]
-        if data.get("payment_reference"):
-            move_vals["payment_reference"] = data["payment_reference"]
-        if payment_term:
-            move_vals["invoice_payment_term_id"] = payment_term.id
+        if data.get("note"):
+            move_vals["narration"] = data["note"]
 
+        # Create with the same context the UI action uses
         move = self.env["account.move"].with_context(
             default_move_type="out_invoice",
             allowed_company_ids=[company_id],
         ).create(move_vals)
 
-        move.action_post()
+        move.action_post()  # same as Confirm button
         self.write({"move_id": move.id, "state": "posted"})
         return move
