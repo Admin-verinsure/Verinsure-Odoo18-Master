@@ -8,6 +8,16 @@ import pytz
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+# --- DB uniqueness handling (works across Odoo psycopg2/DB variants) ---
+try:
+    from psycopg2.errors import UniqueViolation  # type: ignore
+except Exception:  # pragma: no cover
+    UniqueViolation = Exception
+try:
+    from odoo.sql_db import IntegrityError  # Odoo-wrapped DB error
+except Exception:  # pragma: no cover
+    IntegrityError = Exception
+
 _logger = logging.getLogger(__name__)
 AKAHU_API = "https://api.akahu.io/v1"
 
@@ -61,7 +71,6 @@ class StatementLineDeferPosting(models.Model):
     def _prepare_move_values(self):
         """Force the liquidity move created from a statement line to stay DRAFT."""
         vals = super()._prepare_move_values()
-        # Guard for versions without auto_post
         if 'auto_post' in self.env['account.move']._fields:
             vals['auto_post'] = 'no'
         return vals
@@ -95,7 +104,7 @@ class AkahuBankStatement(models.Model):
             raise UserError(_("Akahu App ID not set (system parameter: akahu.app_id)."))
         return {
             "Authorization": f"Bearer {token}",
-            "X-Akahu-Id": app_id,
+            "X-Akahu-ID": app_id,  # <-- correct casing
         }
 
     def _json_or_raise(self, resp, endpoint: str):
@@ -154,13 +163,12 @@ class AkahuBankStatement(models.Model):
             return st
         return Statement.create({'name': f"{journal.name} {day.isoformat()}", 'date': day, 'journal_id': journal.id})
 
+    # --- GLOBAL duplicate check (NOT scoped by journal) ---
     @api.model
-    def _line_exists(self, journal_id: int, unique_id: str) -> bool:
-        if not unique_id:
-            return False
-        return bool(self.env['account.bank.statement.line'].search_count([
-            ('journal_id', '=', journal_id), ('unique_import_id', '=', unique_id),
-        ]))
+    def _line_exists(self, unique_id: str) -> bool:
+        return bool(unique_id) and bool(
+            self.env['account.bank.statement.line'].search_count([('unique_import_id', '=', unique_id)])
+        )
 
     def _rp_domain(self, inbound: bool):
         """Version-proof receivable/payable domain."""
@@ -190,6 +198,7 @@ class AkahuBankStatement(models.Model):
         """
         Import Akahu transactions and create bank statement lines ONLY.
         The liquidity moves created by Odoo for these lines are forced to DRAFT.
+        Idempotent: safe to re-run (duplicates are skipped).
         """
         headers = self._get_headers()
         journal = self._get_target_journal(journal_id)
@@ -233,7 +242,9 @@ class AkahuBankStatement(models.Model):
                     if not akahu_id:
                         skipped += 1
                         continue
-                    if self._line_exists(journal.id, akahu_id):
+
+                    # Global duplicate check (covers all journals/companies)
+                    if self._line_exists(akahu_id):
                         skipped += 1
                         continue
 
@@ -257,8 +268,15 @@ class AkahuBankStatement(models.Model):
                         'journal_id': journal.id,
                         'unique_import_id': akahu_id,
                     }
-                    self.env['account.bank.statement.line'].create(vals)
-                    created += 1
+
+                    # Savepoint: ignore concurrent/legacy duplicates safely
+                    with self.env.cr.savepoint():
+                        try:
+                            self.env['account.bank.statement.line'].create(vals)
+                            created += 1
+                        except (IntegrityError, UniqueViolation):
+                            skipped += 1
+                            _logger.info("Akahu: duplicate unique_import_id %s — skipped.", akahu_id)
 
                 cursor_obj = data.get("cursor")
                 next_cursor = cursor_obj.get("next") if isinstance(cursor_obj, dict) else None
@@ -350,7 +368,6 @@ class AkahuBankStatement(models.Model):
                         l.name or "",
                         getattr(l.move_id, 'invoice_payment_ref', '') or "",
                     ]).lower()
-                # only keep if the hint appears
                     if ref_l and ref_l in blob:
                         hinted.append(l)
                 if hinted:
