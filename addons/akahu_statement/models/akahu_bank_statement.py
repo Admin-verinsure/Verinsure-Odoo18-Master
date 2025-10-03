@@ -61,9 +61,9 @@ class StatementLineDeferPosting(models.Model):
     def _prepare_move_values(self):
         """Force the liquidity move created from a statement line to stay DRAFT."""
         vals = super()._prepare_move_values()
-        # Regardless of the journal toggle, we never want an auto-post here.
-        # This ensures schedulers won't post it.
-        vals['auto_post'] = 'no'
+        # Guard for versions without auto_post
+        if 'auto_post' in self.env['account.move']._fields:
+            vals['auto_post'] = 'no'
         return vals
 
     def _synchronize_to_moves(self, changed_fields):
@@ -86,10 +86,28 @@ class AkahuBankStatement(models.Model):
     # ------------------ helpers ------------------
     @api.model
     def _get_headers(self):
-        token = self.env['ir.config_parameter'].sudo().get_param('akahu.access_token')
+        ICP = self.env['ir.config_parameter'].sudo()
+        token = ICP.get_param('akahu.access_token')
+        app_id = ICP.get_param('akahu.app_id')  # REQUIRED by Akahu
         if not token:
             raise UserError(_("Akahu access token not set (system parameter: akahu.access_token)."))
-        return {"Authorization": f"Bearer {token}"}
+        if not app_id:
+            raise UserError(_("Akahu App ID not set (system parameter: akahu.app_id)."))
+        return {
+            "Authorization": f"Bearer {token}",
+            "X-Akahu-Id": app_id,
+        }
+
+    def _json_or_raise(self, resp, endpoint: str):
+        """Turn HTTP/network errors and non-JSON bodies into clear UserErrors."""
+        try:
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            raise UserError(_("Akahu request failed (%s): %s") % (endpoint, getattr(resp, "text", str(e))[:500]))
+        try:
+            return resp.json()
+        except Exception:
+            raise UserError(_("Akahu returned non-JSON for %s: %s") % (endpoint, getattr(resp, "text", "")[:500]))
 
     @api.model
     def _get_target_journal(self, journal_id=None):
@@ -108,7 +126,11 @@ class AkahuBankStatement(models.Model):
 
     @api.model
     def _get_clearing_account(self, journal):
-        """Prefer journal field; else system param; always browse in the journal's company."""
+        """
+        Prefer journal field; else system param; always browse in the journal's company.
+        Not strictly required to create the draft move anymore (we rewrite the non-bank leg),
+        but we keep this to help admins configure things properly.
+        """
         if hasattr(journal, 'clearing_account_id') and journal.clearing_account_id:
             return journal.clearing_account_id
 
@@ -122,8 +144,6 @@ class AkahuBankStatement(models.Model):
             if acc and acc.exists():
                 return acc
 
-        # Not strictly required anymore (we will rewrite the non-bank leg),
-        # but keep the check to help admins configure properly.
         raise UserError(_("Configure a Bank Clearing account (journal field or system parameter 'akahu.clearing_account_id')."))
 
     @api.model
@@ -178,12 +198,16 @@ class AkahuBankStatement(models.Model):
         since = (fields.Datetime.now() - timedelta(days=int(days_back))).strftime('%Y-%m-%dT%H:%M:%SZ')
 
         acc_resp = requests.get(f"{AKAHU_API}/accounts", headers=headers, timeout=60)
-        try:
-            acc_data = acc_resp.json()
-        except Exception:
-            raise UserError(_("Akahu /accounts response is not JSON: %s") % acc_resp.text)
-        accounts = acc_data.get("items", [])
+        acc_data = self._json_or_raise(acc_resp, "/accounts")
+        accounts = acc_data.get("items", []) or []
         _logger.info("Akahu: %d account(s) discovered", len(accounts))
+
+        # Optional: restrict to a specific Akahu account via system parameter
+        only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
+        if only_acc:
+            accounts = [a for a in accounts if (a.get('_id') or '') == only_acc]
+            if not accounts:
+                _logger.warning("Akahu: configured account %s not found in /accounts", only_acc)
 
         created = 0
         skipped = 0
@@ -198,12 +222,9 @@ class AkahuBankStatement(models.Model):
 
             while True:
                 resp = requests.get(url, headers=headers, params=params, timeout=90)
-                try:
-                    data = resp.json()
-                except Exception:
-                    raise UserError(_("Akahu /transactions not JSON for account %s: %s") % (acc_id, resp.text))
+                data = self._json_or_raise(resp, f"/accounts/{acc_id}/transactions")
 
-                items = data.get("items", [])
+                items = data.get("items", []) or []
                 if not isinstance(items, list):
                     raise UserError(_("Akahu: unexpected transactions payload for account %s.") % acc_id)
 
@@ -329,6 +350,7 @@ class AkahuBankStatement(models.Model):
                         l.name or "",
                         getattr(l.move_id, 'invoice_payment_ref', '') or "",
                     ]).lower()
+                # only keep if the hint appears
                     if ref_l and ref_l in blob:
                         hinted.append(l)
                 if hinted:
