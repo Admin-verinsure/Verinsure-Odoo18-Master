@@ -1,46 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- Server Action: import + reconcile -->
+  <record id="action_akahu_bank_sync" model="ir.actions.server">
+    <field name="name">Akahu: Import + Reconcile</field>
+    <field name="model_id" ref="model_akahu_bank_statement"/>
+    <field name="state">code</field>
+    <field name="code"><![CDATA[
+model.sudo().import_akahu_transactions(days_back=30)
+model.sudo().auto_reconcile_bank_lines(max_days=14, amount_tolerance=0.50)
+    ]]></field>
+  </record>
 
-  <!-- =========================================================
-       CRON #1: Import Akahu transactions (every 30 minutes)
-       - Creates bank statement lines only
-       - Liquidity moves remain DRAFT because of Option B override
-       ========================================================= -->
+  <!-- Cron: run the server action every 30 minutes -->
   <record id="ir_cron_akahu_import" model="ir.cron">
-    <field name="name">Akahu: Import transactions</field>
-    <field name="model_id" ref="model_akahu_bank_statement"/>
-    <field name="state">code</field>
-    <field name="code">model.sudo().import_akahu_transactions(days_back=30)</field>
-    <field name="interval_type">minutes</field>
-    <field name="interval_number">30</field>
-    <field name="numbercall">-1</field>
-    <field name="doall">False</field>
+    <field name="name">Akahu: Import + Reconcile (every 30 min)</field>
     <field name="active">True</field>
-    <!-- Superuser to avoid permission hiccups -->
+    <field name="interval_number">30</field>
+    <field name="interval_type">minutes</field>
+    <field name="ir_actions_server_id" ref="action_akahu_bank_sync"/>
+    <!-- run as superuser to avoid permission issues -->
     <field name="user_id" ref="base.user_root"/>
   </record>
-
-  <!-- =========================================================
-       CRON #2: Auto-reconcile (every 30 minutes, stagger if desired)
-       - Posts ONLY when a single AR/AP match is found
-       - Otherwise leaves the liquidity move in DRAFT
-       ========================================================= -->
-  <record id="ir_cron_akahu_reconcile" model="ir.cron">
-    <field name="name">Akahu: Auto-reconcile bank lines</field>
-    <field name="model_id" ref="model_akahu_bank_statement"/>
-    <field name="state">code</field>
-    <field name="code">
-      model.sudo().auto_reconcile_bank_lines(max_days=14, amount_tolerance=0.50, require_text_hint=False)
-    </field>
-    <field name="interval_type">minutes</field>
-    <field name="interval_number">30</field>
-    <field name="numbercall">-1</field>
-    <field name="doall">False</field>
-    <field name="active">True</field>
-    <field name="user_id" ref="base.user_root"/>
-  </record>
-
-  <!-- OPTIONAL: remove or disable your previous server action + cron.
-       If you keep them in the module, set active=False on that cron to avoid double-runs. -->
-
 </odoo>
