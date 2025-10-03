@@ -19,7 +19,6 @@ DEFAULT_TERMS = [
 ]
 
 DEFAULT_NOTES_HTML = (
-    "<p><strong>NOTES</strong></p>"
     "<p>Verinsure provides the support for RAWCS.org but will be a subcontractor to Not4Profit online.</p>"
     "<p>RAWCS will be contracting Four Way Test Limited - the details for that company are:</p>"
     "<ul>"
