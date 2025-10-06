@@ -2,8 +2,9 @@
 
 import logging
 from datetime import datetime, timedelta, date
-import requests
+
 import pytz
+import requests
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -104,7 +105,7 @@ class AkahuBankStatement(models.Model):
             raise UserError(_("Akahu App ID not set (system parameter: akahu.app_id)."))
         return {
             "Authorization": f"Bearer {token}",
-            "X-Akahu-ID": app_id,  # <-- correct casing
+            "X-Akahu-ID": app_id,  # correct casing
         }
 
     def _json_or_raise(self, resp, endpoint: str):
@@ -299,12 +300,12 @@ class AkahuBankStatement(models.Model):
           - Find a single matching posted AR/AP open item within tolerance.
           - If found, transform the line's DRAFT liquidity move:
             replace the non-bank leg with that AR/AP (and partner),
-            POST the move, then RECONCILE.
+            POST the move, then RECONCILE (exact pair).
           - If zero / multiple matches, leave the move in DRAFT.
         """
         journal = self._get_target_journal(journal_id)
         Move = self.env['account.move']
-        AML  = self.env['account.move.line']
+        AML = self.env['account.move.line']
         Partner = self.env['res.partner']
 
         if not journal.default_account_id:
@@ -381,10 +382,10 @@ class AkahuBankStatement(models.Model):
                 ambiguous += 1
                 continue
 
-            counterpart = keep[0]
+            counterpart = keep[0]  # the AR/AP open item we will reconcile to
             bank_account = journal.default_account_id
 
-            # find the draft liquidity move attached to the statement line
+            # --- find the draft liquidity move attached to the statement line
             draft_move = None
             if hasattr(stl, 'move_id') and stl.move_id and stl.move_id.state == 'draft':
                 draft_move = stl.move_id
@@ -395,7 +396,7 @@ class AkahuBankStatement(models.Model):
                 missing += 1
                 continue
 
-            # rewrite the non-bank leg to AR/AP + partner
+            # --- rewrite the non-bank leg to AR/AP + partner
             bank_lines = draft_move.line_ids.filtered(lambda l: l.account_id == bank_account)
             other_lines = draft_move.line_ids - bank_lines or draft_move.line_ids
             label = stl.payment_ref or stl.name or '/'
@@ -408,18 +409,68 @@ class AkahuBankStatement(models.Model):
                     'partner_id': counterpart.partner_id.id,
                 })
 
-            # post & reconcile
+            # --- post the move (after account/partner rewrite)
             if draft_move.state == 'draft':
                 draft_move.action_post()
 
-            new_leg = draft_move.line_ids.filtered(
-                lambda l: l.account_id == counterpart.account_id and not l.reconciled
-            )
-            (new_leg + counterpart).reconcile()
+            # Ensure partner also on the bank leg (helps some builds/views)
+            for bl in bank_lines:
+                if not bl.partner_id:
+                    bl.write({'partner_id': counterpart.partner_id.id})
 
-            # traceability (if m2m exists)
+            def _signed_amt_and_residual(l):
+                """Return (signed_amount, residual_abs) in correct currency context."""
+                if stl.currency_id and l.currency_id and l.currency_id == stl.currency_id:
+                    signed = l.amount_currency           # signed in line currency
+                    residual = abs(l.amount_residual_currency)
+                else:
+                    signed = l.balance                   # signed in company currency
+                    residual = abs(l.amount_residual)
+                return signed, residual
+
+            tol = float(amount_tolerance or 0.0)
+
+            # counterpart.balance > 0 means debit line (receivable), < 0 credit (payable)
+            def _is_matching_bank_arap_line(l):
+                if l.account_id != counterpart.account_id:
+                    return False
+                if l.partner_id != counterpart.partner_id:
+                    return False
+                signed, residual = _signed_amt_and_residual(l)
+                # Need opposite sign vs invoice line so they can offset
+                if (signed > 0 and counterpart.balance > 0) or (signed < 0 and counterpart.balance < 0):
+                    return False
+                return (not l.reconciled) and (abs(residual - wanted) <= tol)
+
+            bank_arap_leg = (draft_move.line_ids.filtered(_is_matching_bank_arap_line))[:1]
+            if not bank_arap_leg:
+                _logger.warning(
+                    "Akahu: could not identify AR/AP leg on bank move %s; counterpart line=%s amount=%s tol=%s",
+                    draft_move.display_name, counterpart.id, wanted, tol
+                )
+                missing += 1
+                continue
+
+            # --- reconcile the exact pair only ---
+            (bank_arap_leg + counterpart).reconcile()
+
+            # ensure link back for traceability
             if hasattr(stl, 'journal_entry_ids') and draft_move not in stl.journal_entry_ids:
                 stl.write({'journal_entry_ids': [(4, draft_move.id)]})
+
+            # Optional: log resulting invoice payment state
+            inv = counterpart.move_id
+            try:
+                inv.invalidate_recordset(['payment_state', 'amount_residual'])
+            except Exception:
+                pass
+            _logger.info(
+                "Akahu: reconciled bank %s line %s with invoice line %s → invoice %s payment_state=%s residual=%.2f",
+                draft_move.name or draft_move.id,
+                bank_arap_leg.id, counterpart.id,
+                inv.name or inv.id, getattr(inv, 'payment_state', 'n/a'),
+                float(getattr(inv, 'amount_residual', 0.0)),
+            )
 
             reconciled_count += 1
 
