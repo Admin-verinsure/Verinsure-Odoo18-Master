@@ -14,6 +14,7 @@
     "assets": {
         "web.assets_frontend": [
             "signup_club_type/static/src/js/club_dynamic_fill.js",
+            "signup_club_type/static/src/js/club_picker.js",
         ],
     },
     "installable": True,
