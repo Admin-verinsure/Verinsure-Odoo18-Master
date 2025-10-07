@@ -1,5 +1,6 @@
 from odoo import models, fields, api
 import json
+import base64  # <-- needed for PDF attachment encoding
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Hard-coded defaults (used when payload doesn't provide overrides)
@@ -62,6 +63,7 @@ class InvoicePocPayload(models.Model):
         else:
             raise ValueError("Provide partner email or name")
 
+        # Prefer same-company or shared partner
         dom = ["&", ("company_id", "in", [False, company_id])] + dom
         partner = Partner.search(dom, limit=1)
         if not partner:
@@ -109,6 +111,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _fallback_income_account(self, company_id=None):
+        # Prefer an account allowed in this company via company_ids, else any income
         acc = self.env["account.account"].search(
             [("account_type", "=", "income"), ("company_ids", "in", [company_id])],
             limit=1
@@ -147,21 +150,12 @@ class InvoicePocPayload(models.Model):
 
     def _send_invoice_email(self, move):
         """
-        Email the posted invoice to the customer using our template.
-        (Template external id must exist: 'invoice_poc.email_template_customer_invoice')
+        Email the posted invoice to the customer using our template and a
+        programmatically rendered PDF attachment (version-agnostic).
+        Template external id must exist: 'invoice_poc.email_template_customer_invoice'
         """
-        template = self.env.ref('invoice_poc.email_template_customer_invoice', raise_if_not_found=False)
-        if not template:
-            # Fallback: leave a chatter note so nothing breaks the flow
-            move.message_post(
-                body=f"Invoice {move.name} posted for {move.partner_id.display_name}. (No email template found)",
-                partner_ids=[move.partner_id.commercial_partner_id.id],
-                subtype_xmlid='mail.mt_note',
-            )
-            return
-
+        # If no email, add a to-do and stop — avoids errors
         if not move.partner_id.email:
-            # No email on partner → assign a to-do activity
             self.env['mail.activity'].create({
                 'res_model_id': self.env['ir.model']._get_id('account.move'),
                 'res_id': move.id,
@@ -173,10 +167,38 @@ class InvoicePocPayload(models.Model):
             })
             return
 
+        # Render invoice PDF using the standard report (no dependency on template fields)
+        # Main report external id commonly used in v16+:
+        report = self.env.ref('account.account_invoices_without_payment', raise_if_not_found=False)
+        if not report:
+            # Fallback to legacy id if needed
+            report = self.env.ref('account.report_invoice_document', raise_if_not_found=False)
+        if not report:
+            move.message_post(body="Auto-email: could not find an invoice PDF report to render.")
+            return
+
+        pdf_content, _ = report._render_qweb_pdf([move.id])
+
+        # Create an attachment linked to the invoice
+        att = self.env['ir.attachment'].create({
+            'name': f"Invoice_{(move.name or 'INV').replace('/', '_')}.pdf",
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_content),
+            'mimetype': 'application/pdf',
+            'res_model': 'account.move',
+            'res_id': move.id,
+        })
+
+        # Send via our minimal template (no report fields on template)
+        template = self.env.ref('invoice_poc.email_template_customer_invoice', raise_if_not_found=False)
+        if not template:
+            move.message_post(body="Invoice posted and PDF generated, but email template was not found.")
+            return
+
         template.sudo().send_mail(
             move.id,
             force_send=True,
-            email_values={'email_to': move.partner_id.email},
+            email_values={'email_to': move.partner_id.email, 'attachment_ids': [(6, 0, [att.id])]},
         )
 
     # ---------------- main ----------------

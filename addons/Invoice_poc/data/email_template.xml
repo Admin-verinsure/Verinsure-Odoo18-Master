@@ -4,7 +4,6 @@
     <field name="name">Customer Invoice - Auto Send</field>
     <field name="model_id" ref="account.model_account_move"/>
     <field name="subject">Invoice ${object.name}</field>
-
     <field name="body_html" type="html">
       <div>
         <p>Hello ${object.partner_id.name or ''},</p>
@@ -13,15 +12,9 @@
         <p>Regards,<br/>${object.company_id.name}</p>
       </div>
     </field>
-
-    <!-- addresses -->
     <field name="email_from">${(object.company_id.email or '')}</field>
     <field name="email_to">${object.partner_id.email}</field>
     <field name="lang">${object.partner_id.lang}</field>
     <field name="auto_delete" eval="True"/>
-
-    <!-- attach the PDF -->
-    <field name="report_template_id" ref="account.account_invoices_without_payment"/>
-    <field name="report_filename">Invoice_${(object.name or '').replace('/','_')}</field>
   </record>
 </odoo>
