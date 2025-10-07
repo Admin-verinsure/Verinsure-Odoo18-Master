@@ -1,4 +1,4 @@
-name: Odoo18 Deploy (staging)
+name: Odoo18 Deploy (staging + second server)
 
 on:
   push:
@@ -6,15 +6,25 @@ on:
     paths:
       - "addons/**"
       - ".github/workflows/deploy-staging.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Select which server to deploy"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - secondary
 
 env:
   STG_CUSTOM: /opt/odoo18/custom-addons
+  SEC_CUSTOM: /opt/odoo/current/addons
   SERVICE_NAME: odoo18
   ODOO_DB: staging_not4profit
 
 jobs:
-  deploy-staging:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,58 +33,71 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Select Deployment Target
+        id: select
+        run: |
+          if [[ "${{ github.event.inputs.server || 'staging' }}" == "secondary" ]]; then
+            echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
+            echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
+            echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
+            echo "SSH_KEY=${{ secrets.SSH_KEY }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=${{ env.SEC_CUSTOM }}" >> $GITHUB_ENV
+          else
+            echo "SSH_HOST=${{ secrets.STAGING_SSH_HOST }}" >> $GITHUB_ENV
+            echo "SSH_PORT=${{ secrets.STAGING_SSH_PORT }}" >> $GITHUB_ENV
+            echo "SSH_USER=${{ secrets.STAGING_SSH_USER }}" >> $GITHUB_ENV
+            echo "SSH_KEY=${{ secrets.STAGING_SSH_KEY }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
+          fi
+
       - name: Add SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+          ssh-private-key: ${{ env.SSH_KEY }}
 
       - name: Trust host key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ env.SSH_PORT }}" "${{ env.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Ensure custom addons folder (owned by odoo18)
+      - name: Ensure target folder (owned by odoo18)
         run: |
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo install -d -o odoo18 -g odoo18 -m 0755 '${{ env.STG_CUSTOM }}'"
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
+            "sudo install -d -o odoo18 -g odoo18 -m 0755 '${{ env.DEPLOY_PATH }}'"
 
-      - name: Ensure addons_path contains custom-addons (idempotent)
+      - name: Ensure addons_path contains deployment folder (idempotent)
         run: |
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" '
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" '
             set -euo pipefail
             CONF=/etc/odoo18.conf
-            ADDP="${{ env.STG_CUSTOM }}"
-            # add if line missing entirely
+            ADDP="${{ env.DEPLOY_PATH }}"
             if ! grep -qE "^[[:space:]]*addons_path[[:space:]]*=" "$CONF"; then
               echo "addons_path = /opt/odoo18/addons,/opt/odoo18/odoo/addons,$ADDP" | sudo tee -a "$CONF" >/dev/null
             fi
-            # append our dir if not present yet
             if ! grep -E "^[[:space:]]*addons_path[[:space:]]*=" "$CONF" | grep -q "$ADDP"; then
               sudo sed -i -E "s|^(addons_path[[:space:]]*=[[:space:]]*)(.*)|\1\2,$ADDP|" "$CONF"
             fi
           '
 
-      # ---- ./addons -> /opt/odoo18/custom-addons
-      - name: Sync ./addons -> ${{ env.STG_CUSTOM }}
+      - name: Sync ./addons -> target folder
         if: ${{ hashFiles('addons/**') != '' }}
         run: |
           rsync -az --delete \
             --rsync-path="sudo rsync" \
             --chown=odoo18:odoo18 \
-            -e "ssh -p ${{ secrets.STAGING_SSH_PORT }}" \
-            ./addons/ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ env.STG_CUSTOM }}/"
+            -e "ssh -p ${{ env.SSH_PORT }}" \
+            ./addons/ "${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.DEPLOY_PATH }}/"
 
-      - name: List deployed custom addons (sanity)
+      - name: List deployed addons (sanity)
         run: |
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "sudo bash -lc 'set -euxo pipefail; ls -la ${STG_CUSTOM} | head -n 200'"
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
+            "sudo bash -lc 'set -euxo pipefail; ls -la ${DEPLOY_PATH} | head -n 200'"
 
       - name: Restart Odoo
         run: |
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
             "sudo systemctl restart '${{ env.SERVICE_NAME }}' && sleep 3 && sudo systemctl --no-pager -l status '${{ env.SERVICE_NAME }}' || true"
 
-      # OPTIONAL: auto-upgrade only modules changed in this push
       - name: Compute changed modules
         id: mods
         shell: bash
@@ -89,11 +112,11 @@ jobs:
         run: |
           MODS="${{ steps.mods.outputs.changed }}"
           echo "Upgrading: $MODS"
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
             "sudo -u odoo18 /opt/odoo18/venv/bin/python3 /opt/odoo18/odoo-bin \
                -c /etc/odoo18.conf -d '${{ env.ODOO_DB }}' -u $(echo $MODS | tr ' ' ',') --stop-after-init || true"
 
       - name: Health check
         run: |
-          ssh -p "${{ secrets.STAGING_SSH_PORT }}" "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
             "curl -sS -I http://127.0.0.1:8069/web?db=${{ env.ODOO_DB }} | head -n1 || true"

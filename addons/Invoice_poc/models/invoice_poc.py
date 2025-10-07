@@ -49,6 +49,7 @@ class InvoicePocPayload(models.Model):
     error_message = fields.Text()
 
     # ---------------- helpers ----------------
+    
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
         Partner = self.env["res.partner"]
