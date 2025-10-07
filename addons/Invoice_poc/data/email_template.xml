@@ -1,36 +1,24 @@
-<!-- invoice_poc/data/email_template.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- Email template to send customer invoice -->
   <record id="email_template_customer_invoice" model="mail.template">
-    <field name="name">Customer Invoice (Auto Send)</field>
+    <field name="name">Customer Invoice - Auto Send</field>
     <field name="model_id" ref="account.model_account_move"/>
-    <field name="subject">Invoice ${object.name} - ${object.company_id.name}</field>
-    <field name="email_from">${(object.company_id.email or user.email) | safe}</field>
-    <field name="email_to">${object.partner_id.email}</field>
-    <field name="auto_delete" eval="True"/>
+    <field name="subject">Invoice ${object.name}</field>
     <field name="body_html" type="html">
-      <![CDATA[
-        <p>Dear ${object.partner_id.name or 'Customer'},</p>
-        <p>Please find your invoice <strong>${object.name}</strong> from
-           <strong>${object.company_id.name}</strong>.</p>
-        <p>Total due: <strong>${format_amount(object.amount_total, object.currency_id)}</strong><br/>
-           Due date: <strong>${object.invoice_date_due or ''}</strong></p>
-
-        <p>You can view it in Odoo:
-          <a href="/odoo/action-account.action_move_out_invoice_type?res_id=${object.id}&amp;cids=${object.company_id.id}">
-            Open Invoice
-          </a>
-        </p>
-
-        <hr/>
-        % if object.narration:
-          <p><strong>Terms &amp; Notes</strong></p>
-          ${object.narration | safe}
-        % endif
-
-        <p>Kind regards,<br/>${object.company_id.name}</p>
-      ]]>
+      <div>
+        <p>Hello ${object.partner_id.name or ''},</p>
+        <p>Please find your invoice <strong>${object.name}</strong> attached.</p>
+        <p>Amount due: ${format_amount(object.amount_total, object.currency_id)}</p>
+        <p>Regards,<br/>${object.company_id.name}</p>
+      </div>
     </field>
-
-    
+    <field name="auto_delete" eval="True"/>
+    <field name="email_from">${(object.company_id.email or '')}</field>
+    <field name="email_to">${object.partner_id.email}</field>
+    <field name="report_template" ref="account.account_invoices_without_payment"/>
+    <field name="report_name">Invoice_${(object.name or '').replace('/','_')}</field>
+    <field name="model">account.move</field>
+    <field name="lang">${object.partner_id.lang}</field>
   </record>
 </odoo>
