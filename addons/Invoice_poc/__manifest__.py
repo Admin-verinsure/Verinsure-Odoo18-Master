@@ -6,8 +6,9 @@
     "author": "Your Team",
     "license": "LGPL-3",
     "depends": ["base", "account"],
-    
-  
+    "data": [
+        "data/email_template.xml",
+    ],
     "application": False,
     "installable": True,
 }

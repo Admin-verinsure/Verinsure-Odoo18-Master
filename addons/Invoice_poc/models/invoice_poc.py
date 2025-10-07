@@ -49,7 +49,7 @@ class InvoicePocPayload(models.Model):
     error_message = fields.Text()
 
     # ---------------- helpers ----------------
-    
+
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
         Partner = self.env["res.partner"]
@@ -62,7 +62,6 @@ class InvoicePocPayload(models.Model):
         else:
             raise ValueError("Provide partner email or name")
 
-        # Prefer same-company or shared partner
         dom = ["&", ("company_id", "in", [False, company_id])] + dom
         partner = Partner.search(dom, limit=1)
         if not partner:
@@ -70,7 +69,7 @@ class InvoicePocPayload(models.Model):
                 "name": name or email,
                 "email": email,
                 "customer_rank": 1,
-                "company_id": company_id,  # ensure company consistency
+                "company_id": company_id,
             })
         return partner
 
@@ -110,7 +109,6 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _fallback_income_account(self, company_id=None):
-        # Prefer an account allowed in this company via company_ids, else any income
         acc = self.env["account.account"].search(
             [("account_type", "=", "income"), ("company_ids", "in", [company_id])],
             limit=1
@@ -146,6 +144,40 @@ class InvoicePocPayload(models.Model):
             parts.append(notes_html)
 
         return "".join(parts) if parts else False
+
+    def _send_invoice_email(self, move):
+        """
+        Email the posted invoice to the customer using our template.
+        (Template external id must exist: 'invoice_poc.email_template_customer_invoice')
+        """
+        template = self.env.ref('invoice_poc.email_template_customer_invoice', raise_if_not_found=False)
+        if not template:
+            # Fallback: leave a chatter note so nothing breaks the flow
+            move.message_post(
+                body=f"Invoice {move.name} posted for {move.partner_id.display_name}. (No email template found)",
+                partner_ids=[move.partner_id.commercial_partner_id.id],
+                subtype_xmlid='mail.mt_note',
+            )
+            return
+
+        if not move.partner_id.email:
+            # No email on partner → assign a to-do activity
+            self.env['mail.activity'].create({
+                'res_model_id': self.env['ir.model']._get_id('account.move'),
+                'res_id': move.id,
+                'res_name': move.name,
+                'user_id': self.env.user.id,
+                'summary': 'Missing customer email',
+                'note': 'Could not auto-email invoice: partner has no email.',
+                'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
+            })
+            return
+
+        template.sudo().send_mail(
+            move.id,
+            force_send=True,
+            email_values={'email_to': move.partner_id.email},
+        )
 
     # ---------------- main ----------------
     def action_create_and_post_invoice(self):
@@ -224,6 +256,12 @@ class InvoicePocPayload(models.Model):
             allowed_company_ids=[company.id],      # UI-like visibility
         ).create(move_vals)
 
+        # Post and auto-email
         move.action_post()
+        try:
+            self._send_invoice_email(move)
+        except Exception as e:
+            move.message_post(body=f"Auto-email failed: {e}")
+
         self.write({"move_id": move.id, "state": "posted"})
         return move
