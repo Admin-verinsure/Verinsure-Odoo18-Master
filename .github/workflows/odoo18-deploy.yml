@@ -36,7 +36,7 @@ jobs:
       - name: Select Deployment Target
         id: select
         run: |
-          if [[ "${{ github.event.inputs.server || 'staging' }}" == "secondary" ]]; then
+          if [[ "${{ github.event.inputs.server || 'staging' }}" == "Production" ]]; then
             echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
             echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
             echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
