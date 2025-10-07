@@ -40,14 +40,18 @@ jobs:
             echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
             echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
             echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
-            echo "SSH_KEY=${{ secrets.SSH_KEY }}" >> $GITHUB_ENV
-            echo "DEPLOY_PATH=${{ env.SEC_CUSTOM }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/opt/odoo/current/addons" >> $GITHUB_ENV
+            echo "SSH_KEY<<EOF" >> $GITHUB_ENV
+            echo "${{ secrets.SSH_KEY }}" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           else
             echo "SSH_HOST=${{ secrets.STAGING_SSH_HOST }}" >> $GITHUB_ENV
             echo "SSH_PORT=${{ secrets.STAGING_SSH_PORT }}" >> $GITHUB_ENV
             echo "SSH_USER=${{ secrets.STAGING_SSH_USER }}" >> $GITHUB_ENV
-            echo "SSH_KEY=${{ secrets.STAGING_SSH_KEY }}" >> $GITHUB_ENV
-            echo "DEPLOY_PATH=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/opt/odoo18/custom-addons" >> $GITHUB_ENV
+            echo "SSH_KEY<<EOF" >> $GITHUB_ENV
+            echo "${{ secrets.STAGING_SSH_KEY }}" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           fi
 
       - name: Add SSH key
