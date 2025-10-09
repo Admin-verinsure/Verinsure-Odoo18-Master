@@ -1,6 +1,5 @@
 from odoo import models, fields, api
 import json
-import base64  # <-- needed for PDF attachment encoding
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Hard-coded defaults (used when payload doesn't provide overrides)
@@ -32,7 +31,6 @@ DEFAULT_NOTES_HTML = (
     "</ul>"
 )
 
-
 class InvoicePocPayload(models.Model):
     _name = "invoice.poc.payload"
     _description = "Stored payloads for invoice POC"
@@ -63,7 +61,6 @@ class InvoicePocPayload(models.Model):
         else:
             raise ValueError("Provide partner email or name")
 
-        # Prefer same-company or shared partner
         dom = ["&", ("company_id", "in", [False, company_id])] + dom
         partner = Partner.search(dom, limit=1)
         if not partner:
@@ -77,44 +74,30 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_currency(self, code=None):
-        # If payload didn't say, use company currency
-        if not code:
-            return self.env.company.currency_id
-        return self.env["res.currency"].search([("name", "=", code)], limit=1) or self.env.company.currency_id
+        return (self.env["res.currency"].search([("name", "=", code)], limit=1)
+                if code else self.env.company.currency_id)
 
     @api.model
     def _find_journal(self, name=None, company_id=None):
         Journal = self.env["account.journal"]
         if name:
-            j = Journal.search([
-                ("name", "=", name),
-                ("company_id", "=", company_id),
-            ], limit=1)
+            j = Journal.search([("name", "=", name), ("company_id", "=", company_id)], limit=1)
             if j:
                 return j
-        j = Journal.search([
-            ("type", "=", "sale"),
-            ("company_id", "=", company_id),
-        ], limit=1)
-        return j
+        return Journal.search([("type", "=", "sale"), ("company_id", "=", company_id)], limit=1)
 
     @api.model
     def _find_taxes(self, names=None, company_id=None):
         names = names or []
         if not names:
             return [(6, 0, [])]
-        taxes = self.env["account.tax"].search([
-            ("name", "in", names),
-            ("company_id", "=", company_id),
-        ])
+        taxes = self.env["account.tax"].search([("name", "in", names), ("company_id", "=", company_id)])
         return [(6, 0, taxes.ids)]
 
     @api.model
     def _fallback_income_account(self, company_id=None):
-        # Prefer an account allowed in this company via company_ids, else any income
         acc = self.env["account.account"].search(
-            [("account_type", "=", "income"), ("company_ids", "in", [company_id])],
-            limit=1
+            [("account_type", "=", "income"), ("company_ids", "in", [company_id])], limit=1
         ) or self.env["account.account"].search([("account_type", "=", "income")], limit=1)
         if not acc:
             raise ValueError("No income account available to create invoice lines.")
@@ -122,16 +105,11 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_payment_term(self, name=None):
-        if not name:
-            return self.env['account.payment.term'].browse()
-        return self.env['account.payment.term'].search([('name', '=', name)], limit=1)
+        return (self.env['account.payment.term'].search([('name', '=', name)], limit=1)
+                if name else self.env['account.payment.term'].browse())
 
     @api.model
     def _build_narration_html(self, data):
-        """
-        Build HTML for Terms & Conditions + Notes (printed via o.narration in your QWeb).
-        Uses payload overrides if provided, otherwise the defaults above.
-        """
         terms_list = data.get("terms") or DEFAULT_TERMS
         notes_html = (data.get("notes") or data.get("note") or DEFAULT_NOTES_HTML)
         if isinstance(notes_html, str):
@@ -150,11 +128,10 @@ class InvoicePocPayload(models.Model):
 
     def _send_invoice_email(self, move):
         """
-        Email the posted invoice to the customer using our template and a
-        programmatically rendered PDF attachment (version-agnostic).
-        Template external id must exist: 'invoice_poc.email_template_customer_invoice'
+        Queue the posted invoice email using the built-in template.
+        This does NOT force-send (so SMTP issues won't break posting).
         """
-        # If no email, add a to-do and stop — avoids errors
+        # must have a recipient
         if not move.partner_id.email:
             self.env['mail.activity'].create({
                 'res_model_id': self.env['ir.model']._get_id('account.move'),
@@ -167,39 +144,22 @@ class InvoicePocPayload(models.Model):
             })
             return
 
-        # Render invoice PDF using the standard report (no dependency on template fields)
-        # Main report external id commonly used in v16+:
-        report = self.env.ref('account.account_invoices_without_payment', raise_if_not_found=False)
-        if not report:
-            # Fallback to legacy id if needed
-            report = self.env.ref('account.report_invoice_document', raise_if_not_found=False)
-        if not report:
-            move.message_post(body="Auto-email: could not find an invoice PDF report to render.")
-            return
-
-        pdf_content, _ = report._render_qweb_pdf([move.id])
-
-        # Create an attachment linked to the invoice
-        att = self.env['ir.attachment'].create({
-            'name': f"Invoice_{(move.name or 'INV').replace('/', '_')}.pdf",
-            'type': 'binary',
-            'datas': base64.b64encode(pdf_content),
-            'mimetype': 'application/pdf',
-            'res_model': 'account.move',
-            'res_id': move.id,
-        })
-
-        # Send via our minimal template (no report fields on template)
-        template = self.env.ref('invoice_poc.email_template_customer_invoice', raise_if_not_found=False)
+        # use Odoo standard invoice template (attaches PDF automatically)
+        template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
         if not template:
-            move.message_post(body="Invoice posted and PDF generated, but email template was not found.")
+            move.message_post(body="Invoice posted, but standard email template was not found.")
             return
 
+        # queue the email (do not force immediate send)
         template.sudo().send_mail(
             move.id,
-            force_send=True,
-            email_values={'email_to': move.partner_id.email, 'attachment_ids': [(6, 0, [att.id])]},
+            force_send=False,  # queued; process later via scheduler or manual queue run
+            email_values={
+                'email_to': move.partner_id.email,
+                # 'email_from': move.company_id.email,  # set once SMTP is aligned to this address
+            },
         )
+        # do NOT commit here; controller will commit on success, and shell users can env.cr.commit()
 
     # ---------------- main ----------------
     def action_create_and_post_invoice(self):
@@ -278,12 +238,12 @@ class InvoicePocPayload(models.Model):
             allowed_company_ids=[company.id],      # UI-like visibility
         ).create(move_vals)
 
-        # Post and auto-email
+        # Post and auto-queue email
         move.action_post()
         try:
             self._send_invoice_email(move)
         except Exception as e:
-            move.message_post(body=f"Auto-email failed: {e}")
+            move.message_post(body=f"Auto-email queueing failed: {e}")
 
         self.write({"move_id": move.id, "state": "posted"})
         return move
