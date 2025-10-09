@@ -16,12 +16,12 @@ on:
         options:
           - staging
           - secondary
-          - verinsure # <— NEW
+          - verinsure
 
 env:
   STG_CUSTOM: /opt/odoo18/custom-addons
   SEC_CUSTOM: /opt/odoo/current/addons
-  VER_CUSTOM: /opt/odoo18/odoo18-addons # <— NEW
+  VER_CUSTOM: /opt/odoo18/odoo18-addons
   SERVICE_NAME: odoo18
   ODOO_DB: staging_not4profit
 
@@ -49,28 +49,33 @@ jobs:
               echo "SSH_PORT=${{ secrets.STAGING_SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.STAGING_SSH_USER }}" >> $GITHUB_ENV
               echo "DEPLOY_PATH=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
-              echo "SSH_KEY<<'EOF'" >> $GITHUB_ENV
-              echo "${{ secrets.STAGING_SSH_KEY }}" >> $GITHUB_ENV
-              echo "EOF" >> $GITHUB_ENV
+              {
+                echo "SSH_KEY<<EOF"
+                echo "${{ secrets.STAGING_SSH_KEY }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
               ;;
             secondary)
               echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
               echo "DEPLOY_PATH=${{ env.SEC_CUSTOM }}" >> $GITHUB_ENV
-              echo "SSH_KEY<<'EOF'" >> $GITHUB_ENV
-              echo "${{ secrets.SSH_KEY }}" >> $GITHUB_ENV
-              echo "EOF" >> $GITHUB_ENV
+              {
+                echo "SSH_KEY<<EOF"
+                echo "${{ secrets.SSH_KEY }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
               ;;
             verinsure)
-              # Uses your requested secrets and target path
               echo "SSH_HOST=${{ secrets.VERINSURE_SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.VERINSURE_SSH_PORT }}" >> $GITHUB_ENV
-              echo "SSH_USER=${{ secrets.VERINSURE_SSH_USER }}" >> $GITHUB_ENV
+              echo "SSH_USER=${{ secrets.VERINSURE_SSH_USER || 'ubuntu' }}" >> $GITHUB_ENV
               echo "DEPLOY_PATH=${{ env.VER_CUSTOM }}" >> $GITHUB_ENV
-              echo "SSH_KEY<<'EOF'" >> $GITHUB_ENV
-              echo "${{ secrets.VERINSURE_SSH_KEY }}" >> $GITHUB_ENV
-              echo "EOF" >> $GITHUB_ENV
+              {
+                echo "SSH_KEY<<EOF"
+                echo "${{ secrets.VERINSURE_SSH_KEY }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
               ;;
             *)
               echo "Unknown server: $SERVER"; exit 1;;
