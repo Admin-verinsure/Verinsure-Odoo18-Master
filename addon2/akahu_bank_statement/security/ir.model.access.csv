@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_akahu_bank_statement,access.akahu.bank.statement,model_akahu_bank_statement,base.group_system,1,1,1,0
+access_akahu_import_wizard,access.akahu.import.wizard,model_akahu_import_wizard,base.group_system,1,1,1,0
