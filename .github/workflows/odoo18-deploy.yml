@@ -21,8 +21,8 @@ on:
 
 env:
   STG_CUSTOM: /opt/odoo18/custom-addons
+  STG_ADDON2: /opt/odoo18/odoo18-addons # NEW: staging target for addon2/
   SEC_ADDONS: /opt/odoo/current/addons # secondary target for addons/
-  SEC_ADDON2: /opt/odoo18/odoo18-addons # secondary target for addon2/
   VER_CUSTOM: /opt/odoo18/odoo18-addons
   SERVICE_NAME: odoo18
   ODOO_DB: staging_not4profit
@@ -45,21 +45,19 @@ jobs:
           SERVER="${{ github.event.inputs.server || 'staging' }}"
           echo "Server target: $SERVER"
 
-          # By default we deploy a single mapping: addons -> STG_CUSTOM
-          # For secondary we deploy TWO mappings: addons -> SEC_ADDONS AND addon2 -> SEC_ADDON2
+          # Define src|dest pairs (newline-separated) and DEPLOY_PATHS (space-separated)
           case "$SERVER" in
             staging)
               echo "SSH_HOST=${{ secrets.STAGING_SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.STAGING_SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.STAGING_SSH_USER }}" >> $GITHUB_ENV
-              # src|dest pairs (newline-separated)
               {
                 echo "SYNC_PAIRS<<EOF"
                 echo "addons|${{ env.STG_CUSTOM }}"
+                echo "addon2|${{ env.STG_ADDON2 }}"   # addon2 now deploys to staging
                 echo "EOF"
               } >> "$GITHUB_ENV"
-              # deploy paths list (space-separated) for addons_path ensure
-              echo "DEPLOY_PATHS=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
+              echo "DEPLOY_PATHS=${{ env.STG_CUSTOM }} ${{ env.STG_ADDON2 }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.STAGING_SSH_KEY }}"
@@ -70,14 +68,12 @@ jobs:
               echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
-              # TWO mappings: addons -> /opt/odoo/current/addons, addon2 -> /opt/odoo18/odoo18-addons
               {
                 echo "SYNC_PAIRS<<EOF"
-                echo "addons|${{ env.SEC_ADDONS }}"
-                echo "addon2|${{ env.SEC_ADDON2 }}"
+                echo "addons|${{ env.SEC_ADDONS }}"   # ONLY addons on secondary
                 echo "EOF"
               } >> "$GITHUB_ENV"
-              echo "DEPLOY_PATHS=${{ env.SEC_ADDONS }} ${{ env.SEC_ADDON2 }}" >> $GITHUB_ENV
+              echo "DEPLOY_PATHS=${{ env.SEC_ADDONS }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.SSH_KEY }}"
