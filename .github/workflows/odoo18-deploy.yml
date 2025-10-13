@@ -5,6 +5,7 @@ on:
     branches: ["master"]
     paths:
       - "addons/**"
+      - "addon2/**" # trigger on addon2 as well
       - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
     inputs:
@@ -20,7 +21,8 @@ on:
 
 env:
   STG_CUSTOM: /opt/odoo18/custom-addons
-  SEC_CUSTOM: /opt/odoo/current/addons
+  SEC_ADDONS: /opt/odoo/current/addons # secondary target for addons/
+  SEC_ADDON2: /opt/odoo18/odoo18-addons # secondary target for addon2/
   VER_CUSTOM: /opt/odoo18/odoo18-addons
   SERVICE_NAME: odoo18
   ODOO_DB: staging_not4profit
@@ -43,12 +45,21 @@ jobs:
           SERVER="${{ github.event.inputs.server || 'staging' }}"
           echo "Server target: $SERVER"
 
+          # By default we deploy a single mapping: addons -> STG_CUSTOM
+          # For secondary we deploy TWO mappings: addons -> SEC_ADDONS AND addon2 -> SEC_ADDON2
           case "$SERVER" in
             staging)
               echo "SSH_HOST=${{ secrets.STAGING_SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.STAGING_SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.STAGING_SSH_USER }}" >> $GITHUB_ENV
-              echo "DEPLOY_PATH=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
+              # src|dest pairs (newline-separated)
+              {
+                echo "SYNC_PAIRS<<EOF"
+                echo "addons|${{ env.STG_CUSTOM }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              # deploy paths list (space-separated) for addons_path ensure
+              echo "DEPLOY_PATHS=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.STAGING_SSH_KEY }}"
@@ -59,7 +70,14 @@ jobs:
               echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
-              echo "DEPLOY_PATH=${{ env.SEC_CUSTOM }}" >> $GITHUB_ENV
+              # TWO mappings: addons -> /opt/odoo/current/addons, addon2 -> /opt/odoo18/odoo18-addons
+              {
+                echo "SYNC_PAIRS<<EOF"
+                echo "addons|${{ env.SEC_ADDONS }}"
+                echo "addon2|${{ env.SEC_ADDON2 }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "DEPLOY_PATHS=${{ env.SEC_ADDONS }} ${{ env.SEC_ADDON2 }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.SSH_KEY }}"
@@ -70,7 +88,12 @@ jobs:
               echo "SSH_HOST=${{ secrets.VERINSURE_SSH_HOST }}" >> $GITHUB_ENV
               echo "SSH_PORT=${{ secrets.VERINSURE_SSH_PORT }}" >> $GITHUB_ENV
               echo "SSH_USER=${{ secrets.VERINSURE_SSH_USER || 'ubuntu' }}" >> $GITHUB_ENV
-              echo "DEPLOY_PATH=${{ env.VER_CUSTOM }}" >> $GITHUB_ENV
+              {
+                echo "SYNC_PAIRS<<EOF"
+                echo "addons|${{ env.VER_CUSTOM }}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "DEPLOY_PATHS=${{ env.VER_CUSTOM }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.VERINSURE_SSH_KEY }}"
@@ -91,7 +114,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p "${{ env.SSH_PORT }}" "${{ env.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      # NEW: detect which unix user/group is running Odoo (fallback to owner of /opt/odoo18/odoo-bin; else SSH_USER)
+      # Detect unix user/group for correct ownership
       - name: Detect Odoo unix user/group
         shell: bash
         run: |
@@ -99,55 +122,67 @@ jobs:
           ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" 'bash -lc "
             set -euo pipefail
             SVC=${{ env.SERVICE_NAME }}
-            # Try from systemd unit
             U=\$(systemctl show -p User \"\$SVC\" 2>/dev/null | sed -n \"s/^User=//p\")
             G=\$(getent group \"\$U\" >/dev/null 2>&1 && id -gn \"\$U\" || echo \"\")
-            # Fallback to owner of odoo-bin
             if [ -z \"\$U\" ] || [ -z \"\$G\" ]; then
               if [ -e /opt/odoo18/odoo-bin ]; then
                 U=\$(stat -c %U /opt/odoo18/odoo-bin)
                 G=\$(stat -c %G /opt/odoo18/odoo-bin)
               fi
             fi
-            # Last resort: current SSH user
             if [ -z \"\$U\" ] || [ \"\$U\" = \"root\" ]; then U=${{ env.SSH_USER }}; fi
             if [ -z \"\$G\" ] || [ \"\$G\" = \"root\" ]; then G=\$(id -gn \"\$U\"); fi
             echo ODOO_UNIX_USER=\$U
             echo ODOO_UNIX_GROUP=\$G
           "' | tee -a "$GITHUB_ENV"
 
-      - name: Ensure target folder (owned by detected user)
+      - name: Ensure target folders (owned by detected user)
         run: |
-          ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
-            "sudo install -d -o '${{ env.ODOO_UNIX_USER }}' -g '${{ env.ODOO_UNIX_GROUP }}' -m 0755 '${{ env.DEPLOY_PATH }}'"
+          set -euo pipefail
+          # Read newline-separated src|dest pairs and create each dest
+          while IFS='|' read -r SRC DEST; do
+            [ -z "$SRC" ] && continue
+            ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
+              "sudo install -d -o '${{ env.ODOO_UNIX_USER }}' -g '${{ env.ODOO_UNIX_GROUP }}' -m 0755 '$DEST'"
+          done <<< "${{ env.SYNC_PAIRS }}"
 
-      - name: Ensure addons_path contains deployment folder (idempotent)
+      - name: Ensure addons_path contains all deployment folders (idempotent)
         run: |
           ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" '
             set -euo pipefail
             CONF=/etc/odoo18.conf
-            ADDP="${{ env.DEPLOY_PATH }}"
+            # Ensure addons_path exists; if missing, initialize with core defaults
             if ! grep -qE "^[[:space:]]*addons_path[[:space:]]*=" "$CONF"; then
-              echo "addons_path = /opt/odoo18/addons,/opt/odoo18/odoo/addons,$ADDP" | sudo tee -a "$CONF" >/dev/null
+              echo "addons_path = /opt/odoo18/addons,/opt/odoo18/odoo/addons" | sudo tee -a "$CONF" >/dev/null
             fi
-            if ! grep -E "^[[:space:]]*addons_path[[:space:]]*=" "$CONF" | grep -q "$ADDP"; then
-              sudo sed -i -E "s|^(addons_path[[:space:]]*=[[:space:]]*)(.*)|\1\2,$ADDP|" "$CONF"
-            fi
+            # Append any missing paths from $DEPLOY_PATHS
+            for p in '"${{ env.DEPLOY_PATHS }}"'; do
+              grep -E "^[[:space:]]*addons_path[[:space:]]*=" "$CONF" | grep -q "$p" || \
+                sudo sed -i -E "s|^(addons_path[[:space:]]*=[[:space:]]*)(.*)|\1\2,$p|" "$CONF"
+            done
           '
 
-      - name: Sync ./addons -> target folder
-        if: ${{ hashFiles('addons/**') != '' }}
+      - name: Sync sources -> targets
         run: |
-          rsync -az --delete \
-            --rsync-path="sudo rsync" \
-            --chown=${{ env.ODOO_UNIX_USER }}:${{ env.ODOO_UNIX_GROUP }} \
-            -e "ssh -p ${{ env.SSH_PORT }}" \
-            ./addons/ "${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.DEPLOY_PATH }}/"
+          set -euo pipefail
+          while IFS='|' read -r SRC DEST; do
+            [ -z "$SRC" ] && continue
+            if [ -d "./$SRC" ]; then
+              echo "Syncing ./$SRC -> $DEST"
+              rsync -az --delete \
+                --rsync-path="sudo rsync" \
+                --chown=${{ env.ODOO_UNIX_USER }}:${{ env.ODOO_UNIX_GROUP }} \
+                -e "ssh -p ${{ env.SSH_PORT }}" \
+                "./$SRC/" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}:$DEST/"
+            else
+              echo "Skipping ./$SRC (not found)"
+            fi
+          done <<< "${{ env.SYNC_PAIRS }}"
 
       - name: List deployed addons (sanity)
         run: |
           ssh -p "${{ env.SSH_PORT }}" "${{ env.SSH_USER }}@${{ env.SSH_HOST }}" \
-            "sudo bash -lc 'set -euxo pipefail; ls -la ${DEPLOY_PATH} | head -n 200'"
+            "sudo bash -lc 'set -euxo pipefail; for d in ${DEPLOY_PATHS}; do echo \"--- \$d\"; ls -la \"\$d\" | head -n 200; done'"
 
       - name: Restart Odoo
         run: |
@@ -160,8 +195,18 @@ jobs:
         run: |
           set -euo pipefail
           base_ref="${{ github.event.before || 'HEAD~1' }}"
-          CHANGED=$(git diff --name-only "$base_ref" HEAD -- addons/ | awk -F/ 'NF>1{print $2}' | sort -u | tr '\n' ' ')
+          CHANGED=""
+          while IFS='|' read -r SRC DEST; do
+            [ -z "$SRC" ] && continue
+            if [ -d "./$SRC" ]; then
+              MODS=$(git diff --name-only "$base_ref" HEAD -- "./$SRC"/ | \
+                awk -F/ 'NF>1{print $2}' | sort -u)
+              CHANGED="$CHANGED $MODS"
+            fi
+          done <<< "${{ env.SYNC_PAIRS }}"
+          CHANGED=$(echo $CHANGED | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ')
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+          echo "Changed modules: $CHANGED"
 
       - name: Upgrade changed modules
         if: steps.mods.outputs.changed != ''
