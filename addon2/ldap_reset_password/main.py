@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
 
-# Replaced python-ldap with ldap3 throughout.
-# - add_s / passwd_s => ldap3 Connection.add / Connection.modify or Microsoft extension
-# - simple_bind_s    => Connection(..., auto_bind=True) or conn.rebind(...)
-# - ldap.filter      => ldap3.utils.conv.escape_filter_chars
-
-from ldap3 import Server, Connection, ALL, Tls, MODIFY_REPLACE
-from ldap3.core.exceptions import LDAPBindError, LDAPException
-from ldap3.utils.conv import escape_filter_chars
-import ssl
+import ldap
+import ldap.modlist as modlist
 
 import logging
 import werkzeug
@@ -17,6 +10,7 @@ import string
 import json
 
 from datetime import datetime, timedelta, date
+from ldap.filter import filter_format
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationError
 from odoo.tools.misc import str2bool
@@ -25,6 +19,7 @@ from odoo.http import content_disposition, Controller, request, route
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 from odoo.addons.mail.models.mail_mail import MailMail
 from odoo.addons.mail.models.mail_template import MailTemplate
+# from odoo.addons.web.controllers.main import Home
 
 _logger = logging.getLogger(__name__)
 
@@ -34,52 +29,9 @@ SIGN_UP_REQUEST_PARAMS = {'db', 'login', 'debug', 'token', 'message', 'error', '
                           'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id'
 }
 
-# -----------------------------
-# LDAP helper utilities (ldap3)
-# -----------------------------
-
-def _conf_get(conf, key, default=None):
-    """Conf may be a browse record or a dict (from .read())."""
-    if isinstance(conf, dict):
-        return conf.get(key, default)
-    return getattr(conf, key, default)
-
-def _ldap3_connect(conf, bind_dn, bind_pw):
-    host = _conf_get(conf, 'ldap_server', '127.0.0.1')
-    port = int(_conf_get(conf, 'ldap_server_port', 389))
-    use_tls_flag = bool(_conf_get(conf, 'ldap_tls', False))
-
-    # ldaps if 636; otherwise StartTLS if ldap_tls is enabled
-    use_ssl = (port == 636)
-    tls = Tls(validate=ssl.CERT_NONE)  # tighten to CERT_REQUIRED + CA if you have CA file
-    server = Server(host, port=port, use_ssl=use_ssl, get_info=ALL, tls=tls)
-
-    conn = Connection(server, user=bind_dn, password=bind_pw, auto_bind=True)
-    if use_tls_flag and not use_ssl:
-        conn.start_tls()
-    return conn
-
-def _to_ldap3_attrs(d):
-    """Convert python-ldap style {attr: [bytes,...]} to ldap3 {attr: [str,...]}."""
-    out = {}
-    for k, v in (d or {}).items():
-        vals = v if isinstance(v, (list, tuple)) else [v]
-        out[k] = [vv.decode() if isinstance(vv, (bytes, bytearray)) else str(vv) for vv in vals]
-    return out
-
-def _format_filter(ldap_filter_tmpl, login):
-    """Emulate ldap.filter.filter_format(…) using ldap3's escaping."""
-    try:
-        return ldap_filter_tmpl % (escape_filter_chars(tools.ustr(login)),)
-    except Exception:
-        _logger.warning("Could not format LDAP filter. Your filter should contain one '%%s'.")
-        return None
-
-# -----------------------------
-
-
 class ResPartner(models.Model):
     _inherit = 'res.partner'
+
     rotary_membership_id = fields.Char(string="Rotary ID")
 
 
@@ -99,6 +51,7 @@ class ChangePasswordWizard(models.TransientModel):
     user_ids = fields.One2many('change.password.user', 'wizard_id', string='Users', default=_default_user_ids)
 
     def change_password_button(self):
+        # Ensure one record in set
         self.ensure_one()
         self.user_ids.change_password_button()
         if self.env.user in self.user_ids.user_id:
@@ -121,17 +74,19 @@ class ChangePasswordUser(models.TransientModel):
         username = str(user_id.login)
         new_passwd = self.new_passwd
 
-        _logger.info("Calling LDAPAPI. Updating LDAP Password for %s", username)
+        _logger.info("Calling LDAPAPI. Updating LDAP Password for" + username)
 
         if len(new_passwd) == 0:
             raise UserError(_("Before clicking on 'Change Password', you have to write a new password."))
 
+        # Get LDAP Config and store in dictionary
         env = api.Environment(http.request.cr, SUPERUSER_ID, {})
         ldap_records = env['res.company.ldap'].search([])
         ldap_dict = {}
         for record in ldap_records:
             ldap_dict[record.id] = record.read()
 
+        # Use LDAP Config to change password
         if ldap_dict:
             first_ldap_id = next(iter(ldap_dict))
             ldap_config = env['res.company.ldap'].browse(first_ldap_id)
@@ -142,12 +97,14 @@ class ChangePasswordUser(models.TransientModel):
             changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_passwd)
 
             if changed:
-                _logger.info("Password reset has succeeded for: %s.", username)
+                _logger.info("Password reset has succeeded for: " + username + ".")
                 user_id.password = ''
                 user_id._set_password()
+
                 return {'type': 'ir.actions.act_window_close'}
+
             else:
-                _logger.error("Password reset has failed for: %s.", username)
+                _logger.error("Password reset has failed for: " + username + ".")
                 raise UserError(message)
         else:
             _logger.info("No LDAP Config.")
@@ -167,10 +124,12 @@ class LDAPResetController(http.Controller):
 
             error_response_values = {'login': username}
 
+            # Verify the passwords entered are the same
             if new_password != confirm_password:
                 error_response_values['password_error'] = "Passwords do not match!"
                 return http.request.render('ldap_reset_password.template_otp_entry', error_response_values)
 
+            # Check OTP
             env = api.Environment(http.request.cr, SUPERUSER_ID, {})
             try:
                 otp = env['otp'].search([('otp_code', '=', otp_code)], limit=1)
@@ -179,10 +138,12 @@ class LDAPResetController(http.Controller):
                     error_response_values['error_message'] = "One Time Password not found!"
                     return http.request.render('ldap_reset_password.template_otp_entry', error_response_values)
 
+                # Verify it isn't expired
                 if otp.expiration_time < datetime.now() - timedelta(minutes=15):
                     error_response_values['error_message'] = "One Time Password has expired!"
                     return http.request.render('ldap_reset_password.template_otp_entry', error_response_values)
 
+                # Verify it belongs to the same user
                 user = env['res.users'].search([('login', '=', username)], limit=1)
 
                 if not user or otp.user_id.id != user.id:
@@ -195,13 +156,15 @@ class LDAPResetController(http.Controller):
                     changed, message = ldap_config._change_password_admin_exceptions(ldap_config, username, new_password)
 
                     if changed:
-                        _logger.info("Password reset has succeeded for: %s.", username)
+                        _logger.info("Password reset has succeeded for: " + username + ".")
+
+                        # Set Flectra password to nothing so that LDAP is primary form of authentication
                         user.password = ''
                         user.sudo()._set_password()
                         return http.request.render('ldap_reset_password.portal_thanks',
                                                    {'message': 'Password reset has succeeded for {}'.format(username)})
                     else:
-                        _logger.info("LDAP Server produced the following error: %s", message)
+                        _logger.info("LDAP Server produced the following error: " + message)
                         error_response_values['error_message'] = "Password reset has failed for: " + username + "."
                         return http.request.render('ldap_reset_password.template_otp_entry', error_response_values)
                 else:
@@ -213,16 +176,22 @@ class LDAPResetController(http.Controller):
                 return http.request.render('ldap_reset_password.template_otp_entry', error_response_values)
 
         if kwargs.get('login'):
+
             username = kwargs.get('login')
 
+            # Get LDAP Config and store in dictionary
             env = api.Environment(http.request.cr, SUPERUSER_ID, {})
             user = env['res.users'].search([('login', '=', username)])
 
+            # Get the first user (administrator) to get their email
             administrator = env['res.users'].search([], limit=1, order='id')
             administrator_email = administrator.partner_id.email_normalized if administrator.partner_id else ""
 
             if user:
+                # Make sure the user has an email address (so email_normailzed or email)
                 if user.partner_id.email:
+
+                    # Generate and store OTP
                     otp_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
                     expiration_time = datetime.now() + timedelta(minutes=15)
 
@@ -232,17 +201,27 @@ class LDAPResetController(http.Controller):
                         'expiration_time': expiration_time,
                     })
 
+                    # website_name = http.request.website.name
                     website_domain = http.request.httprequest.headers.get('Host')
+
                     subject = "One Time Password for Password Change Verification"
 
+                    # Fix for localhost (remove Host port if exists before using in email_from)
                     website_domain = website_domain.split(':')[0]
+
                     if website_domain == "localhost":
                         website_domain = "rotaryoceania.zone"
                     email_from = f"no-reply@{website_domain}"
 
+                    # Load the email template
                     mail_template = env['mail.template'].sudo().search([('name', '=', 'Reset LDAP Password Email')], limit=1)
-                    email_values = {'email_from': email_from}
 
+                    # Required by function and doesn't actually do anything. Custom values entered through custom context.
+                    email_values = {
+                        'email_from': email_from,
+                    }
+
+                    # Create the dict to hold custom values to pass to the template via context
                     custom_context = {
                         'subject': subject,
                         'otp_code': otp_code,
@@ -250,15 +229,21 @@ class LDAPResetController(http.Controller):
                         'email_from': email_from
                     }
 
+                    # Call send_mail function
                     mail_template.with_context(custom_context).sudo().send_mail(user.id, email_values)
+
+                    # No email address on partner
                     return http.request.render('ldap_reset_password.template_otp_entry', {'login': username})
                 else:
+                    # Helpdesk
                     return http.request.render('ldap_reset_password.template_contact_admin')
             else:
+                # No user exists with that username
                 return http.request.render('ldap_reset_password.template_invalid_login')
 
         return http.request.render('ldap_reset_password.template_otp', {'message': 'Placeholder'})
 
+    # Redirect to change LDAP password page
     @http.route('/web/reset_password', type='http', auth="public", website=True)
     def reset_password(self):
         _logger.info("Redirecting to Reset LDAP Password.")
@@ -279,13 +264,18 @@ class LDAPSignupController(AuthSignupController):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
+
             try:
+                # Register LDAP
                 env = api.Environment(http.request.cr, SUPERUSER_ID, {})
+
+                # Get LDAP Config and store in dictionary
                 ldap_records = env['res.company.ldap'].search([])
                 ldap_dict = {}
                 for record in ldap_records:
                     ldap_dict[record.id] = record.read()
 
+                # Use LDAP Config to change password
                 if ldap_dict:
                     first_ldap_id = next(iter(ldap_dict))
                     ldap_config = env['res.company.ldap'].browse(first_ldap_id)
@@ -305,6 +295,7 @@ class LDAPSignupController(AuthSignupController):
                         "givenname": [fn.encode()],
                         "cn": [cn.encode()],
                         "sn": [sn.encode()],
+                        # "ou": [qcontext['rotary_club'].encode()],
                         "employeeNumber": [rotaryId.encode()],
                         "mail": [qcontext['email'].encode()],
                         "userPassword": [qcontext['password'].encode()],
@@ -314,28 +305,33 @@ class LDAPSignupController(AuthSignupController):
                     ldap_entry = (dn, attrs)
                     user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry, True)
 
-                    if existing_user:
+                    if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'})
 
                     if isinstance(user_id, int):
-                        _logger.info('res_user created. Creating LDAP User for: %s', login)
+                        _logger.info('res_user created. Creating LDAP User for: ' + login)
+
                         created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
 
-                        if created:
+                        if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
                             role = env['res.users.role'].search([('name', '=', 'Guests')])
 
                             if rotaryId.isdigit():
-                                user.partner_id.write({'rotary_membership_id': str(rotaryId)})
+                                user.partner_id.write({
+                                    'rotary_membership_id': str(rotaryId)
+                                })
                             else:
                                 _logger.info("User %s: provided rotaryId cannot be converted to an integer.", user.login)
 
+                            # Remove Current Role Lines
                             role_lines = env['res.users.role.line'].search([('user_id', '=', user_id)])
                             role_lines.unlink()
 
                             start_date = date.today()
                             end_date = date(2099, 12, 31)
 
+                            # If the role exists
                             if role:
                                 env['res.users.role.line'].create({
                                     'user_id': user.id,
@@ -345,10 +341,13 @@ class LDAPSignupController(AuthSignupController):
                                 })
                                 user.set_groups_from_roles()
 
-                            return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
+                            return http.request.render('ldap_reset_password.web_thanks',
+                                                       {'message': 'You have created user: {}'.format(login)})
                         else:
+                            # Delete user if LDAP fails
                             delete_user = self.env['res.users'].browse(user_id)
                             delete_user.unlink()
+
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'})
 
                     elif isinstance(user_id, str):
@@ -368,9 +367,12 @@ class LDAPSignupController(AuthSignupController):
 
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         clubs = []
+        # notclubs = []
+
         for partner in partners_club_name_not_empty:
             if partner.club_name is not None and partner.club_name != '':
                 clubs.append(partner)
+                # _logger.info("Added to clubs: Partner ID: %s, Club Name: %s", partner.id, partner.club_name)
 
         qcontext['clubs'] = clubs
 
@@ -379,12 +381,16 @@ class LDAPSignupController(AuthSignupController):
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
             try:
+                # Register LDAP
                 env = api.Environment(http.request.cr, SUPERUSER_ID, {})
+
+                # Get LDAP Config and store in dictionary
                 ldap_records = env['res.company.ldap'].search([])
                 ldap_dict = {}
                 for record in ldap_records:
                     ldap_dict[record.id] = record.read()
 
+                # Use LDAP Config to change password
                 if ldap_dict:
                     first_ldap_id = next(iter(ldap_dict))
                     ldap_config = env['res.company.ldap'].browse(first_ldap_id)
@@ -416,14 +422,16 @@ class LDAPSignupController(AuthSignupController):
                     ldap_entry = (dn, attrs)
                     user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry, True)
 
-                    if existing_user:
+                    if (existing_user):
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'})
 
+                    # If we have new_user.id
                     if isinstance(user_id, int):
-                        _logger.info('res_user created. Creating LDAP User for: %s', login)
+                        _logger.info('res_user created. Creating LDAP User for: ' + login)
+
                         created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
 
-                        if created:
+                        if (created):
                             user = request.env['res.users'].sudo().browse(user_id)
 
                             if rotaryId.isdigit():
@@ -435,14 +443,17 @@ class LDAPSignupController(AuthSignupController):
                                 user.partner_id.write({'rotary_club_id': rotary_club_id})
                                 _logger.info("User %s: provided rotaryId cannot be converted to an integer.", user.login)
 
+                            # Search for the role with the name "Members"
                             role = env['res.users.role'].search([('name', '=', 'Members')])
 
                             start_date = date.today()
                             end_date = date(2099, 12, 31)
 
+                            # Remove Current Role Lines
                             role_lines = env['res.users.role.line'].search([('user_id', '=', user_id)])
                             role_lines.unlink()
 
+                            # If the role exists
                             if role:
                                 env['res.users.role.line'].create({
                                     'user_id': user.id,
@@ -452,10 +463,13 @@ class LDAPSignupController(AuthSignupController):
                                 })
                                 user.set_groups_from_roles()
 
-                            return http.request.render('ldap_reset_password.web_thanks', {'message': 'You have created user: {}'.format(login)})
+                            return http.request.render('ldap_reset_password.web_thanks',
+                                                       {'message': 'You have created user: {}'.format(login)})
                         else:
+                            # Delete user if LDAP fails
                             delete_user = self.env['res.users'].browse(user_id)
                             delete_user.unlink()
+
                             return http.request.render('ldap_reset_password.web_error', {'message': message + '.'})
 
                     elif isinstance(user_id, str):
@@ -477,6 +491,7 @@ class LDAPSignupController(AuthSignupController):
             qcontext['token'] = request.session.get('auth_signup_token')
         if qcontext.get('token'):
             try:
+                # retrieve the user info (name, login or email) corresponding to a signup token
                 token_infos = request.env['res.partner'].sudo().signup_retrieve_info(qcontext.get('token'))
                 for k, v in token_infos.items():
                     qcontext.setdefault(k, v)
@@ -513,54 +528,92 @@ class CompanyLDAP(models.Model):
              "This option requires a server with STARTTLS enabled, "
              "otherwise all authentication attempts will fail.")
 
-    # -----------------------------
-    # LDAP queries / changes
-    # -----------------------------
+    # ---------- python-ldap connection helper ----------
+    def _pyldap_connect(self, conf):
+        """
+        Build a python-ldap connection (NOT Odoo's LDAPWrapper).
+        This gives us add_s / passwd_s etc.
+        """
+        host = getattr(conf, 'ldap_server', None) or (conf.get('ldap_server') if isinstance(conf, dict) else '127.0.0.1')
+        port = int(getattr(conf, 'ldap_server_port', None) or (conf.get('ldap_server_port') if isinstance(conf, dict) else 389))
+        use_tls = bool(getattr(conf, 'ldap_tls', None) if not isinstance(conf, dict) else conf.get('ldap_tls', False))
+
+        scheme = 'ldaps' if port == 636 else 'ldap'
+        uri = f'{scheme}://{host}:{port}'
+        conn = ldap.initialize(uri)
+        conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        # prevent referral chasing (esp. AD)
+        try:
+            conn.set_option(ldap.OPT_REFERRALS, 0)
+        except Exception:
+            pass
+        # StartTLS on 389 if requested
+        if use_tls and port != 636:
+            conn.start_tls_s()
+        return conn
 
     def _get_entry(self, conf, login):
-        dn, entry = False, False
-        flt = _format_filter(_conf_get(conf, 'ldap_filter', ''), login)
-        if flt:
-            results = self._query(conf, tools.ustr(flt))
-            results = [i for i in results if i[0]]  # drop search references
+        filter, dn, entry = False, False, False
+        try:
+            filter = filter_format(conf['ldap_filter'], (login,))
+        except TypeError:
+            _logger.warning("Could not format LDAP filter. Your filter should contain one '%%s'.")
+
+        if filter:
+            results = self._query(conf, tools.ustr(filter))
+            # Get rid of (None, attrs) for searchResultReference replies
+            results = [i for i in results if i[0]]
+
+            # Find the first entry with only one uid attribute
             for result in results:
                 if len(result[1].get('uid', [])) == 1:
                     entry = result
                     dn = result[0]
                     break
+
             if entry:
                 _logger.info("Found matching LDAP entry: %s", entry)
             else:
-                _logger.warning("No matching LDAP entries found for filter: %s", flt)
+                _logger.warning("No matching LDAP entries found for filter: %s", filter)
         else:
             _logger.warning("No LDAP filter available. Unable to perform query.")
+
         return dn, entry
 
     def _change_password_admin_exceptions(self, conf, login, new_passwd):
-        """Admin-driven password change. If user not found, create entry first."""
-        changed, message = False, ""
+        """
+        Reset a user's password as admin. If the DN doesn't exist yet, create it first.
+        Uses *python-ldap* so passwd_s is available.
+        """
+        changed = False
+        message = ""
 
         dn, entry = self._get_entry(conf, login)
-        _logger.info('DN: %s, Entry: %s', dn, entry)
+        _logger.info('DN: %s, Entry: %s', dn, entry)  # Log the results from _get_entry
 
-        admindn = _conf_get(conf, 'ldap_binddn')
-        adminpw = _conf_get(conf, 'ldap_password')
+        admindn = conf.ldap_binddn
+        adminpw = conf.ldap_password
 
         if not dn:
-            _logger.info('User not found in LDAP directory, creating...')
+            _logger.info('User not found in LDAP directory, creating...')  # Log that user is not found
+
+            # Get res.user associated
             env = api.Environment(http.request.cr, SUPERUSER_ID, {})
             user = env['res.users'].search([('login', '=', login)], limit=1)
 
             if user:
-                full_name = user.partner_id.name.strip()
+                full_name = (user.partner_id.name or '').strip()
                 parts = full_name.split()
 
                 if len(parts) == 1:
-                    first_name = parts[0]; last_name = ''
+                    first_name = parts[0]
+                    last_name = ''
                 elif len(parts) == 2:
                     first_name, last_name = parts
                 else:
-                    first_name = ' '.join(parts[:-1]); last_name = parts[-1]
+                    # Assume the last part is the last name, and everything else is the first name
+                    first_name = ' '.join(parts[:-1])
+                    last_name = parts[-1]
 
                 first_name = first_name or 'Default First Name'
                 last_name = last_name or 'Default Last Name'
@@ -578,86 +631,68 @@ class CompanyLDAP(models.Model):
                 if email:
                     attrs["mail"] = [email.encode()]
 
+                # Handle differently, so if they have a rotary_club_id you need to look up the partner and grab the club_id and use that one otherwise leave blank
                 ou = getattr(user.partner_id, 'rotary_club_id', None)
-                if ou and getattr(ou, 'club_id', False):
+                if ou and ou.club_id:
                     attrs["ou"] = [ou.club_id.encode()]
 
+                # Extract Rotary ID from login
                 rotary_id = extract_rotary_id(login, last_name)
                 if rotary_id:
                     attrs["employeeNumber"] = [rotary_id.encode()]
 
                 dn = 'UID=' + login + ', ' + self.ldap_base
+
                 created, message = self._create_ldap_user(conf, dn, attrs)
-                return (True, message) if created else (False, message)
 
-        # change password on existing DN
-        try:
-            conn = _ldap3_connect(conf, admindn, adminpw)
-
-            # Try Microsoft AD extended op first; if that fails, do OpenLDAP-style replace
-            ok = False
-            try:
-                # AD supports old_password=None for admin reset
-                ok = conn.extend.microsoft.modify_password(dn, new_passwd)
-            except Exception:
-                ok = False
-
-            if not ok:
-                ok = conn.modify(dn, {'userPassword': [(MODIFY_REPLACE, [new_passwd])]})
-
-            if ok:
-                changed, message = True, 'Success'
+                if created:
+                    return True, message
+                else:
+                    return False, message
             else:
-                _logger.error('LDAP password change failed: %s', conn.result)
-                message = f"LDAP password change failed: {conn.result}"
-            conn.unbind()
-        except LDAPBindError as e:
-            _logger.error('LDAP bind failed: %s', e)
-            message = f'LDAP bind failed: {e}'
-        except LDAPException as e:
-            _logger.error('LDAP exception: %s', e)
-            message = f'LDAP exception: {e}'
+
+                return False, "User not found in LDAP directory."
+
+        # Change password on existing DN using python-ldap
+        try:
+            conn = self._pyldap_connect(conf)
+            conn.simple_bind_s(admindn, adminpw)
+            # OpenLDAP-style admin reset (old password None)
+            conn.passwd_s(dn, None, new_passwd)
+            changed = True
+            message = 'Success'
+            conn.unbind_s()
+        except ldap.INVALID_CREDENTIALS as e:
+            _logger.error('An LDAP exception occurred: %s', e)
+            message = 'An LDAP exception occurred: ' + str(e)
+        except ldap.LDAPError as e:
+            _logger.error('An LDAP exception occurred: %s', e)
+            message = 'An LDAP exception occurred: ' + str(e)
         return changed, message
 
-    # Optional: user-driven change (old->new) used by portal security page
-    def _change_password_exceptions(self, conf, login, old_passwd, new_passwd):
-        """User-driven password change: bind as the user first; fall back to admin."""
-        changed, message = False, ""
-        dn, entry = self._get_entry(conf, login)
-        if not dn:
-            return False, "User not found in LDAP directory."
-
-        # Try self-bind then modify
-        try:
-            conn = _ldap3_connect(conf, dn, old_passwd)  # bind as the user
-            ok = False
-            try:
-                ok = conn.extend.microsoft.modify_password(dn, new_passwd, old_password=old_passwd)
-            except Exception:
-                ok = False
-            if not ok:
-                ok = conn.modify(dn, {'userPassword': [(MODIFY_REPLACE, [new_passwd])]})
-            if ok:
-                changed, message = True, "Success"
-            else:
-                message = f"LDAP password change failed: {conn.result}"
-            conn.unbind()
-            if changed:
-                return changed, message
-        except LDAPException as e:
-            # fall through to admin attempt
-            _logger.warning("Self-bind password change failed: %s; attempting admin-assisted change.", e)
-
-        # Admin-assisted change
-        return self._change_password_admin_exceptions(conf, login, new_passwd)
+    # Below functions unchanged from default res.company.ldap but inherited to allow for changes later if required.
 
     def _get_or_create_user(self, conf, login, ldap_entry, with_existing=False):
+
+        """
+        Retrieve an active resource of model res_users with the specified
+        login. Create the user if it is not initially found.
+
+        :param dict conf: LDAP configuration
+        :param login: the user's login
+        :param tuple ldap_entry: single LDAP result (dn, attrs)
+        :return: res_users id
+        :rtype: int
+        """
+
         existing_user = False
+
         login = tools.ustr(login.lower().strip())
         self.env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login,))
         res = self.env.cr.fetchone()
         _logger.debug("Fetched user: %s", res)
 
+        # If they exist
         if res and res[1]:
             existing_user = True
             return (res[0], existing_user) if with_existing else res[0]
@@ -665,29 +700,36 @@ class CompanyLDAP(models.Model):
         Users = self.env['res.users'].sudo()
         Partners = self.env['res.partner'].sudo()
 
+        # Map values from LDAP (keeps company_id normalization above)
         mapped = self._map_ldap_attributes(conf, login, ldap_entry) or {}
 
+        # Core fields
         login_str = (mapped.get('login') or login)
         email = (mapped.get('email') or mapped.get('mail'))
         name = (mapped.get('name') or (email or login_str) or 'LDAP User')
 
+        # Reuse user by EMAIL (no group change)
         if email:
             user_by_email = Users.search([('email', '=', email)], limit=1)
             if user_by_email:
                 existing_user = True
                 return (user_by_email.id, existing_user) if with_existing else user_by_email.id
 
+        # Not allowed to create → stop
         create_user_flag = conf.get('create_user') if isinstance(conf, dict) else getattr(conf, 'create_user', False)
         if not create_user_flag:
             raise AccessDenied(_("No local user found for LDAP login and not configured to create one"))
 
+        # Reuse or create partner by email (prevents duplicate-email errors)
         partner = False
-        P = Partners.with_context(active_test=False)
+        P = Partners.with_context(active_test=False)  # include inactive contacts
+
         if email:
             norm = (email or '').strip().lower()
             try:
                 partner = P.search(['|', ('email', '=', email), ('email_normalized', '=', norm)], limit=1)
             except Exception:
+                # if email_normalized field is unavailable, fall back to plain email
                 partner = P.search([('email', '=', email)], limit=1)
 
         if not partner and name:
@@ -710,6 +752,7 @@ class CompanyLDAP(models.Model):
         elif not partner.active:
             partner.write({'active': True})
 
+        # If a user already linked to this partner exists, reuse (no group change)
         u2 = Users.search([('partner_id', '=', partner.id)], limit=1)
         if u2:
             upd = {}
@@ -722,8 +765,12 @@ class CompanyLDAP(models.Model):
             existing_user = True
             return (u2.id, existing_user) if with_existing else u2.id
 
-        values = {'partner_id': partner.id, 'login': login_str}
-
+        # Prepare values for a new user linked to the partner
+        values = {
+            'partner_id': partner.id,
+            'login': login_str,
+        }
+        # Assign Portal (guest) ONLY to brand-new users
         portal_gid = False
         for xmlid in ('portal.group_portal', 'base.group_portal'):
             try:
@@ -734,8 +781,8 @@ class CompanyLDAP(models.Model):
         if portal_gid:
             values['groups_id'] = [(6, 0, [portal_gid])]
 
+        # Create user (use template if configured)
         SudoUser = Users.with_context(no_reset_password=True)
-
         if isinstance(conf, dict):
             val = conf.get('user')
             template_id = val[0] if isinstance(val, (list, tuple)) else val
@@ -756,36 +803,40 @@ class CompanyLDAP(models.Model):
         created = False
         message = ""
 
-        admindn = _conf_get(conf, 'ldap_binddn')
-        adminpw = _conf_get(conf, 'ldap_password')
+        admindn = conf.ldap_binddn
+        adminpw = conf.ldap_password
 
         try:
-            conn = _ldap3_connect(conf, admindn, adminpw)
-            attrs = _to_ldap3_attrs(attributes)
-            ok = conn.add(user_dn, attributes=attrs)
-            if ok:
-                created, message = True, 'Success'
+            conn = self._pyldap_connect(conf)
+            conn.simple_bind_s(admindn, adminpw)
+
+            # Add the user entry
+            modlist_data = modlist.addModlist(attributes)
+            conn.add_s(user_dn, modlist_data)
+
+            created = True
+            message = 'Success'
+            conn.unbind_s()
+        except ldap.INVALID_CREDENTIALS as e:
+            _logger.error('An LDAP exception occurred: %s', e)
+            message = 'An LDAP exception occurred: ' + str(e)
+        except ldap.LDAPError as e:
+            if e.args and isinstance(e.args[0], dict) and e.args[0].get('desc') == 'Already exists':
+                _logger.warning('The LDAP entry already exists: %s', e)
+                message = 'The LDAP entry already exists: ' + str(e)
             else:
-                desc = (conn.result or {}).get('description', 'unknown')
-                if desc in ('entryAlreadyExists', 'alreadyExists'):
-                    _logger.warning('The LDAP entry already exists: %s', conn.result)
-                    message = 'The LDAP entry already exists'
-                else:
-                    _logger.error('LDAP add failed: %s', conn.result)
-                    message = f"LDAP add failed: {conn.result}"
-            conn.unbind()
-        except LDAPBindError as e:
-            _logger.error('LDAP bind failed: %s', e)
-            message = f'LDAP bind failed: {e}'
-        except LDAPException as e:
-            _logger.error('LDAP exception: %s', e)
-            message = f'LDAP exception: {e}'
+                _logger.error('An LDAP exception occurred: %s', e)
+                message = 'An LDAP exception occurred: ' + str(e)
 
         return created, message
 
     def _map_ldap_attributes(self, conf, login, ldap_entry):
+        # Call the original method
         values = super()._map_ldap_attributes(conf, login, ldap_entry) or {}
 
+        # 'conf' might be a dict (from read()) or a browse record.
+        # In dict form, Many2one appears as (id, name).
+        company = None
         company_id = False
         if isinstance(conf, dict):
             company = conf.get('company')
@@ -797,7 +848,7 @@ class CompanyLDAP(models.Model):
             try:
                 company_id = conf.company.id if getattr(conf, 'company', False) else False
             except Exception:
-                company_id = False
+                company = None
 
         values.setdefault('company_id', company_id or self.env.company.id)
         return values
@@ -811,6 +862,11 @@ class CustomerPortal(Controller):
     _items_per_page = 20
 
     def _prepare_portal_layout_values(self):
+        """Values for /my/* templates rendering.
+
+        Does not include the record counts.
+        """
+        # get customer sales rep
         sales_user = False
         partner = request.env.user.partner_id
         if partner.user_id and not partner.user_id._is_public():
@@ -829,7 +885,11 @@ class CustomerPortal(Controller):
         result = ''
 
         if request.httprequest.method == 'POST':
-            username = env.user.login
+            username = ""
+            user_id = env.user.id
+            user = env['res.users'].browse(user_id)
+            username = user.login
+
             result = self._update_password(
                 post['old'].strip(),
                 post['new1'].strip(),
@@ -838,17 +898,22 @@ class CustomerPortal(Controller):
 
         if len(result) > 0:
             success = result.get('success')
+
             if success is not None and len(success) > 0:
+                # update session token so the user does not get logged out (cache cleared by passwd change)
                 new_token = request.env.user._compute_session_token(request.session.sid)
                 request.session.session_token = new_token
+
                 return http.request.render('ldap_reset_password.portal_thanks',
                                            {'message': 'Password reset has succeeded for {}'.format(username)})
 
             state = result.get('error', {}).get('state')
+
             if state == 'invalid':
                 return http.request.render('ldap_reset_password.portal_error', {'message': 'Invalid old password.'})
             elif state == 'refused':
-                return http.request.render('ldap_reset_password.portal_error', {'message': 'Password change refused by LDAP server.'})
+                return http.request.render('ldap_reset_password.portal_error',
+                                           {'message': 'Password change refused by LDAP server.'})
             elif state == 'misc':
                 message = result.get('error', {}).get('message')
                 return http.request.render('ldap_reset_password.portal_error', {'message': 'Uncommon Error: ' + message + '.'})
@@ -856,7 +921,9 @@ class CustomerPortal(Controller):
                 message = result.get('error', {}).get('message')
                 return http.request.render('ldap_reset_password.portal_error', {'message': 'Unknown Error: ' + message + '.'})
 
-        return request.render('portal.portal_my_security', values, headers={'X-Frame-Options': 'DENY'})
+        return request.render('portal.portal_my_security', values, headers={
+            'X-Frame-Options': 'DENY'
+        })
 
     def _update_password(self, old, new1, new2, username):
         for k, v in [('old', old), ('new1', new1), ('new2', new2)]:
@@ -871,64 +938,83 @@ class CustomerPortal(Controller):
 
         _logger.info("Calling LDAPAPI. Updating LDAP Password for %s!", username)
 
+        # Get LDAP Config and store in dictionary
         env = api.Environment(http.request.cr, SUPERUSER_ID, {})
         ldap_records = env['res.company.ldap'].search([])
         ldap_dict = {}
         for record in ldap_records:
             ldap_dict[record.id] = record.read()
 
+        # Use LDAP Config to change password
         if ldap_dict:
             first_ldap_id = next(iter(ldap_dict))
             ldap_config = env['res.company.ldap'].browse(first_ldap_id)
         else:
             ldap_config = None
-
         if ldap_config:
             changed, message = ldap_config._change_password_exceptions(ldap_config, username, old_passwd, new_passwd)
 
             if changed:
-                _logger.info("Password reset has succeeded for: %s.", username)
+                _logger.info("Password reset has succeeded for: " + username + ".")
+
+                # Get User by login
                 user = env['res.users'].search([('login', '=', username)])
                 if user:
                     user.password = ''
                     user._set_password()
+                    # user.sudo().write({'password': ''})
                     user.invalidate_cache(['password'], [user.id])
                 return {'success': {'state': 'changed'}}
 
-            elif not changed and "INVALID_CREDENTIALS" in tools.ustr(message):
-                _logger.error("Password reset has failed for: %s. Invalid old password.", username)
+            elif not changed and "INVALID_CREDENTIALS" in message:
+                _logger.error("Password reset has failed for: " + username + ". Invalid old password.")
                 return {'error': {'state': 'invalid'}}
 
-            elif not changed and "UNWILLING_TO_PERFORM" in tools.ustr(message):
-                _logger.error("Password reset has failed for: %s. Password change refused by LDAP server.", username)
+            elif not changed and "UNWILLING_TO_PERFORM" in message:
+                _logger.error("Password reset has failed for: " + username + ". Password change refused by LDAP server.")
                 return {'error': {'state': 'refused'}}
 
-            elif not changed and "Success" not in tools.ustr(message):
-                _logger.error("Password reset has failed for: %s. LDAP error: %s", username, message)
-                return {'error': {'state': 'misc', 'message': str(message)}}
+            elif not changed and "Success" not in message:
+                _logger.error("Password reset has failed for: " + username + ". LDAP error: " + message)
+                return {'error': {
+                    'state': 'misc',
+                    'message': str(message)}}
 
             else:
-                _logger.error("Password reset has failed for: %s. Unhandled Error: %s", username, message)
-                return {'error': {'state': 'unknown', 'message': str(message)}}
-
-        return {'error': {'state': 'unknown', 'message': 'No LDAP configuration'}}
+                _logger.error("Password reset has failed for: " + username + ". Unhandled Error: " + message)
+                return {'error': {
+                    'state': 'unknown',
+                    'message': str(message)}}
 
 
 def extract_rotary_id(login, last_name):
+    # Convert both login and last_name to lowercase
     login = login.lower()
     last_name = last_name.lower()
+
+    # Remove the last_name from the login
     potential_id = login.replace(last_name, '')
+
+    # Now, potential_id should be a sequence of digits.
+    # If it's length is between 5 and 8, return it, otherwise return None
     if 5 <= len(potential_id) <= 8:
         return potential_id
     else:
         return None
 
+
 def get_error(e, path=''):
+    """ Recursively dereferences `path` (a period-separated sequence of dict
+    keys) in `e` (an error dict or value), returns the final resolution IIF it's
+    an str, otherwise returns None
+    """
     for k in (path.split('.') if path else []):
         if not isinstance(e, dict):
             return None
         e = e.get(k)
+
     return e if isinstance(e, str) else None
+
 
 def generate_random_number(min_length, max_length):
     min_value = 10 ** (min_length - 1)
