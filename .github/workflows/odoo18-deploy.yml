@@ -5,7 +5,6 @@ on:
     branches: ["master"]
     paths:
       - "addons/**"
-      - "addon2/**" # trigger on addon2 as well
       - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
     inputs:
@@ -21,8 +20,7 @@ on:
 
 env:
   STG_CUSTOM: /opt/odoo18/custom-addons
-  STG_ADDON2: /opt/odoo18/odoo18-addons # NEW: staging target for addon2/
-  SEC_ADDONS: /opt/odoo/current/addons # secondary target for addons/
+  SEC_ADDONS: /opt/odoo/current/addons
   VER_CUSTOM: /opt/odoo18/odoo18-addons
   SERVICE_NAME: odoo18
   ODOO_DB: staging_not4profit
@@ -54,10 +52,9 @@ jobs:
               {
                 echo "SYNC_PAIRS<<EOF"
                 echo "addons|${{ env.STG_CUSTOM }}"
-                echo "addon2|${{ env.STG_ADDON2 }}"   # addon2 now deploys to staging
                 echo "EOF"
               } >> "$GITHUB_ENV"
-              echo "DEPLOY_PATHS=${{ env.STG_CUSTOM }} ${{ env.STG_ADDON2 }}" >> $GITHUB_ENV
+              echo "DEPLOY_PATHS=${{ env.STG_CUSTOM }}" >> $GITHUB_ENV
               {
                 echo "SSH_KEY<<EOF"
                 echo "${{ secrets.STAGING_SSH_KEY }}"
@@ -70,7 +67,7 @@ jobs:
               echo "SSH_USER=${{ secrets.SSH_USER }}" >> $GITHUB_ENV
               {
                 echo "SYNC_PAIRS<<EOF"
-                echo "addons|${{ env.SEC_ADDONS }}"   # ONLY addons on secondary
+                echo "addons|${{ env.SEC_ADDONS }}"
                 echo "EOF"
               } >> "$GITHUB_ENV"
               echo "DEPLOY_PATHS=${{ env.SEC_ADDONS }}" >> $GITHUB_ENV
