@@ -238,8 +238,9 @@ class LDAPSignupController(AuthSignupController):
                 if ldap_config:
                     sn = qcontext['last_name']
                     fn = qcontext['first_name']
+                    mail = qcontext['email']
                     rotaryId = str(generate_random_number(5, 8))
-                    login = sn + rotaryId
+                    login = mail
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_config.ldap_base}"
 
@@ -249,7 +250,7 @@ class LDAPSignupController(AuthSignupController):
                         "cn": [cn.encode()],
                         "sn": [sn.encode()],
                         "employeeNumber": [rotaryId.encode()],
-                        "mail": [qcontext['email'].encode()],
+                        "mail": [mail.encode()],
                         "userPassword": [qcontext['password'].encode()],
                         "objectclass": [b"top", b"inetOrgPerson"],
                     }
@@ -329,7 +330,8 @@ class LDAPSignupController(AuthSignupController):
                     sn = qcontext['last_name']
                     fn = qcontext['first_name']
                     rotaryId = qcontext['rotary_id']
-                    login = sn + rotaryId
+                    mail = qcontext['email']
+                    login = mail
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_config.ldap_base}"
 
@@ -342,7 +344,7 @@ class LDAPSignupController(AuthSignupController):
                         "sn": [sn.encode()],
                         "ou": [str(rotary_club_id).encode()],
                         "employeeNumber": [qcontext['rotary_id'].encode()],
-                        "mail": [qcontext['email'].encode()],
+                        "mail": [mail.encode()],
                         "userPassword": [qcontext['password'].encode()],
                         "objectclass": [b"top", b"inetOrgPerson"],
                     }
