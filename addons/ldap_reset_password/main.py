@@ -255,7 +255,8 @@ class LDAPSignupController(AuthSignupController):
                     }
 
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
+                    # IMPORTANT: ask for (user_id, existing_user)
+                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry, True)
                     if existing_user:
                         return http.request.render('ldap_reset_password.web_error',
                                                    {'message': 'Error: User already exists.'})
@@ -347,7 +348,8 @@ class LDAPSignupController(AuthSignupController):
                     }
 
                     ldap_entry = (dn, attrs)
-                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry)
+                    # IMPORTANT: ask for (user_id, existing_user)
+                    user_id, existing_user = ldap_config._get_or_create_user(ldap_config, login, ldap_entry, True)
 
                     if existing_user:
                         return http.request.render('ldap_reset_password.web_error',
@@ -453,7 +455,6 @@ class CompanyLDAP(models.Model):
     # ---------- python-ldap connection helper ----------
     def _pyldap_connect(self, conf):
         """Return a raw python-ldap connection (not Odoo's LDAPWrapper)."""
-        # conf may be a browse record or a dict
         host = getattr(conf, "ldap_server", None) or (conf.get("ldap_server") if isinstance(conf, dict) else "127.0.0.1")
         port = int(getattr(conf, "ldap_server_port", None) or (conf.get("ldap_server_port") if isinstance(conf, dict) else 389))
         use_tls = bool(getattr(conf, "ldap_tls", None) if not isinstance(conf, dict) else conf.get("ldap_tls", False))
@@ -593,8 +594,13 @@ class CompanyLDAP(models.Model):
             message = 'An LDAP exception occurred: ' + str(e)
         return changed, message
 
-    # Keep API: return (user_id, existing_user)
-    def _get_or_create_user(self, conf, login, ldap_entry):
+    def _get_or_create_user(self, conf, login, ldap_entry, with_existing=False):
+        """
+        Retrieve an active res.users by login; create if allowed.
+        Returns:
+          - int user_id by default (Odoo core expects this)
+          - (user_id, existing_user) if with_existing=True (for our controllers)
+        """
         existing_user = False
 
         login_norm = tools.ustr(login.lower().strip())
@@ -604,7 +610,7 @@ class CompanyLDAP(models.Model):
 
         if res and res[1]:
             existing_user = True
-            return res[0], existing_user
+            return (res[0], existing_user) if with_existing else res[0]
 
         confd = self._as_dict(conf)
 
@@ -625,11 +631,11 @@ class CompanyLDAP(models.Model):
                 values['active'] = True
                 user_id = SudoUser.browse(template_id).copy(default=values).id
                 _logger.debug("Created new user from existing user: %s", user_id)
-                return user_id, existing_user
+                return (user_id, existing_user) if with_existing else user_id
             else:
                 user_id = SudoUser.create(values).id
                 _logger.debug("Created new user: %s", user_id)
-                return user_id, existing_user
+                return (user_id, existing_user) if with_existing else user_id
 
         raise AccessDenied(_("No local user found for LDAP login and not configured to create one"))
 
@@ -680,7 +686,6 @@ class CompanyLDAP(models.Model):
                 company_id = False
 
         values['company_id'] = company_id or self.env.company.id
-        # Ensure login lowercased
         if values.get('login'):
             values['login'] = tools.ustr(values['login']).lower().strip()
         else:
