@@ -9,7 +9,6 @@ import logging
 import werkzeug
 import random
 import string
-import json
 
 from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
@@ -95,7 +94,7 @@ class LDAPResetController(http.Controller):
     @http.route('/web/reset_ldap_password', type='http', auth='public', website=True, csrf=False)
     def reset_ldap_password(self, **kwargs):
         # Phase 2: OTP + new password
-        if kwargs.get('otp') and kwargs.get('login') and kwargs.get('new_password') and kwargs.get('confirm_password')):
+        if kwargs.get('otp') and kwargs.get('login') and kwargs.get('new_password') and kwargs.get('confirm_password'):
             otp_code = kwargs.get('otp')
             username = kwargs.get('login')
             new_password = kwargs.get('new_password')
@@ -348,8 +347,7 @@ def extract_rotary_id(login, last_name):
 def generate_random_number(min_length, max_length):
     return random.randint(10 ** (min_length - 1), (10 ** max_length) - 1)
 
-# **Critical change**: do NOT block sign-up because a *contact* already has the email.
-# Only block when an existing *user* has the email.
+# Only block on an existing *user* e-mail, not a *contact*.
 def _email_is_valid(email):
     email = (email or "").strip()
     try:
@@ -365,7 +363,6 @@ def validate_signup_fields(env, email, first_name, last_name):
         return False, _("Email is required.")
     if not _email_is_valid(email):
         return False, _("Please enter a valid email address.")
-    # Only users matter here
     U = env['res.users'].with_context(active_test=False)
     if U.search([('email', 'ilike', email)], limit=1):
         return False, _("This email is already registered as a user.")
@@ -400,7 +397,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
 
     P = env['res.partner'].with_context(active_test=False).sudo()
 
-    # 1) by normalized email / raw email, with raw SQL fallback
     partner = False
     if email:
         partner = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
@@ -413,7 +409,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             except Exception:
                 pass
 
-    # 2) by name
     if not partner and cn:
         partner = P.search([('name', '=', cn)], limit=1)
     if not partner and (given or sn):
@@ -437,7 +432,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
     if company_id:
         vals['company_id'] = company_id
 
-    # Create safely; if unique-email validation triggers, reuse the existing one.
     try:
         return P.create(vals)
     except ValidationError as ve:
@@ -469,23 +463,11 @@ def ensure_partner_from_ldap(env, attrs, company_id):
 # ---------------------------------------------------------------------------
 
 class CompanyLDAP(models.Model):
-    _name = 'res.company.ldap'
-    _description = 'Company LDAP configuration'
+    """
+    IMPORTANT: We extend the existing model without redefining it.
+    No `_name`, no field re-declarations — avoids registry crashes.
+    """
     _inherit = 'res.company.ldap'
-    _order = 'sequence'
-    _rec_name = 'ldap_server'
-
-    sequence = fields.Integer(default=10)
-    company = fields.Many2one('res.company', string='Company', required=True, ondelete='cascade')
-    ldap_server = fields.Char(string='LDAP Server address', required=True, default='127.0.0.1')
-    ldap_server_port = fields.Integer(string='LDAP Server port', required=True, default=389)
-    ldap_binddn = fields.Char('LDAP binddn')
-    ldap_password = fields.Char(string='LDAP password')
-    ldap_filter = fields.Char(string='LDAP filter', required=True)
-    ldap_base = fields.Char(string='LDAP base', required=True)
-    user = fields.Many2one('res.users', string='Template User')
-    create_user = fields.Boolean(default=True)
-    ldap_tls = fields.Boolean(string='Use TLS')
 
     # ---------- raw python-ldap connection ----------
     def _pyldap_connect(self, conf):
@@ -563,12 +545,12 @@ class CompanyLDAP(models.Model):
                 if email:
                     attrs["mail"] = [email.encode()]
                 dn = f'uid={login}, {confd["ldap_base"]}'
-                created, message = self._create_ldap_user(conf, dn, attrs)
+                created, message = self._create_ldap_user(confd, dn, attrs)
                 return (True, message) if created else (False, message)
             return False, "User not found in LDAP directory."
 
         try:
-            conn = self._pyldap_connect(conf)
+            conn = self._pyldap_connect(confd)
             conn.simple_bind_s(admindn, adminpw)
             conn.passwd_s(dn, None, new_passwd)
             changed = True; message = 'Success'
@@ -604,7 +586,7 @@ class CompanyLDAP(models.Model):
         def _q(flt):
             try: return self._query(confd, flt)
             except Exception: return []
-        mail = self._ldap_attr_text(attrs, 'mail').strip()
+        mail = (self._ldap_attr_text(attrs, 'mail') or '').strip()
         if mail:
             res = [r for r in _q(filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (mail,))) if r and r[0]]
             if res: return res[0][0], res[0]
@@ -620,6 +602,11 @@ class CompanyLDAP(models.Model):
         return False, False
 
     def _get_or_create_user(self, conf, login, ldap_entry):
+        """
+        Robust path:
+        - If in LDAP but not an Odoo user → find/reuse contact → create user & attach.
+        - If not in LDAP → create LDAP → create/find contact → create user.
+        """
         env = self.env
         confd = self._as_dict(conf)
         existing_user = False
@@ -684,7 +671,7 @@ class CompanyLDAP(models.Model):
 
         attrs_given = (ldap_entry[1] if ldap_entry else {}) or {}
 
-        # 1) LDAP by email/name (reuse uid)
+        # 1) LDAP by email/name or uid (reuse uid)
         for dn_found, entry_found in (self._ldap_find_by_attrs(confd, attrs_given), self._get_entry(confd, login_norm)):
             if entry_found:
                 ldap_attrs = entry_found[1]
