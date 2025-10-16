@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.exceptions import UserError, ValidationError
-from odoo.http import Controller, request, route
+from odoo.http import Controller, request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 
 _logger = logging.getLogger(__name__)
@@ -463,10 +463,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
 # ---------------------------------------------------------------------------
 
 class CompanyLDAP(models.Model):
-    """
-    IMPORTANT: We extend the existing model without redefining it.
-    No `_name`, no field re-declarations — avoids registry crashes.
-    """
     _inherit = 'res.company.ldap'
 
     # ---------- raw python-ldap connection ----------
@@ -656,22 +652,18 @@ class CompanyLDAP(models.Model):
             return False
 
         def _create_user_for_partner(partner, final_login):
+            """Create a user attached to an existing partner, without touching partner email."""
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = dict(mapped_vals)
             vals.update({'login': final_login, 'partner_id': partner.id, 'active': True})
-            if partner.email and not vals.get('email'):
-                vals['email'] = partner.email
-            template_id = None
-            v = confd.get('user')
-            if isinstance(v, (list, tuple)) and v:
-                template_id = v[0]
-            elif isinstance(v, int):
-                template_id = v
-            return SudoUser.browse(template_id).copy(default=vals).id if template_id else SudoUser.create(vals).id
+            # Do NOT pass 'email' so create() won't attempt to write partner.email (avoids uniqueness clash).
+            if 'email' in vals:
+                vals.pop('email', None)
+            return SudoUser.create(vals).id
 
         attrs_given = (ldap_entry[1] if ldap_entry else {}) or {}
 
-        # 1) LDAP by email/name or uid (reuse uid)
+        # 1) LDAP by email/name then by uid (reuse uid)
         for dn_found, entry_found in (self._ldap_find_by_attrs(confd, attrs_given), self._get_entry(confd, login_norm)):
             if entry_found:
                 ldap_attrs = entry_found[1]
