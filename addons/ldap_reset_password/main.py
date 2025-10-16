@@ -949,7 +949,7 @@ class CompanyLDAP(models.Model):
                     return user_by_email.id, existing_user
 
             # No user -> ensure partner, then create user with LDAP uid
-            partner = ensure_partner_from_ldap(env.sudo(), ldap_attrs, company_id)
+            partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
             user_id = _create_user_for_partner(partner, ldap_uid)
             return user_id, existing_user
 
@@ -968,7 +968,7 @@ class CompanyLDAP(models.Model):
                         user_by_email.sudo().write({'login': ldap_uid})
                     return user_by_email.id, existing_user
 
-            partner = ensure_partner_from_ldap(env.sudo(), ldap_attrs, company_id)
+            partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
             user_id = _create_user_for_partner(partner, ldap_uid)
             return user_id, existing_user
 
