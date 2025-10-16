@@ -118,7 +118,7 @@ class ChangePasswordUser(models.TransientModel):
 
 class LDAPResetController(http.Controller):
 
-    @http.route('/web/reset_ldap_password', type='http', auth='public', website=True)
+    @http.route('/web/reset_ldap_password', type='http', auth='public', website=True, csrf=False)
     def reset_ldap_password(self, **kwargs):
         """
         Two-phase flow:
@@ -255,7 +255,7 @@ class LDAPSignupController(AuthSignupController):
         # Simple branching page
         return http.request.render('ldap_reset_password.signup_is_member')
 
-    @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False)
+    @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup_non_member(self, *args, **kw):
         # Same controller flow as member signup, but without club assignment
         qcontext = self.get_auth_signup_qcontext()
@@ -361,7 +361,7 @@ class LDAPSignupController(AuthSignupController):
         response.headers['X-Frame-Options'] = 'DENY'
         return response
 
-    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
+    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup(self, *args, **kw):
         # Member flow with club selection
         qcontext = self.get_auth_signup_qcontext()
@@ -521,7 +521,7 @@ def generate_random_number(min_length, max_length):
     max_value = (10 ** max_length) - 1
     return random.randint(min_value, max_value)
 
-# ---------- NEW: partner helper (module-level, NOT a model method) ----------
+# ---------- partner helper (module-level, NOT a model method) ----------
 def ensure_partner_from_ldap(env, attrs, company_id):
     """Find or create a partner using LDAP attributes. Priority: email → exact CN."""
     def _attr_text(a, key, default=""):
