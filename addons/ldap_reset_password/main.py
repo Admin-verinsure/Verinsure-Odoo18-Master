@@ -315,7 +315,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Ensuring LDAP entry for: %s', login)
 
-                        # NEW: check LDAP by email/name first; create only if missing
+                        # Check LDAP by email/name first; create only if missing
                         dn_exist, entry_exist = ldap_config._ldap_find_by_attrs(ldap_config, attrs)
                         if not entry_exist:
                             created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
@@ -427,7 +427,7 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int):
                         _logger.info('res_user created. Ensuring LDAP entry for: %s', login)
 
-                        # NEW: check LDAP by email/name first; create only if missing
+                        # Check LDAP by email/name first; create only if missing
                         dn_exist, entry_exist = ldap_config._ldap_find_by_attrs(ldap_config, attrs)
                         if not entry_exist:
                             created, message = ldap_config._create_ldap_user(ldap_config, dn, attrs)
@@ -492,6 +492,133 @@ class LDAPSignupController(AuthSignupController):
                 qcontext['error'] = _("Invalid signup token")
                 qcontext['invalid_token'] = True
         return qcontext
+
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
+def extract_rotary_id(login, last_name):
+    """From a login like 'smith12345' and last_name 'smith', extract '12345'."""
+    login = (login or '').lower()
+    last_name = (last_name or '').lower()
+    potential_id = login.replace(last_name, '')
+    return potential_id if potential_id.isdigit() and 5 <= len(potential_id) <= 8 else None
+
+
+def get_error(e, path=''):
+    """Dot-path helper to pull strings from nested dicts safely."""
+    for k in (path.split('.') if path else []):
+        if not isinstance(e, dict):
+            return None
+        e = e.get(k)
+    return e if isinstance(e, str) else None
+
+
+def generate_random_number(min_length, max_length):
+    """Random number with digit length in [min_length, max_length]."""
+    min_value = 10 ** (min_length - 1)
+    max_value = (10 ** max_length) - 1
+    return random.randint(min_value, max_value)
+
+# ---------- NEW: partner helper (module-level, NOT a model method) ----------
+def ensure_partner_from_ldap(env, attrs, company_id):
+    """Find or create a partner using LDAP attributes. Priority: email → exact CN."""
+    def _attr_text(a, key, default=""):
+        try:
+            vals = a.get(key) or []
+            if not vals:
+                return default
+            v = vals[0]
+            return v.decode() if isinstance(v, (bytes, bytearray)) else str(v)
+        except Exception:
+            return default
+
+    email = (_attr_text(attrs, 'mail') or "").strip().lower()
+    cn = _attr_text(attrs, 'cn') or ""
+    given = _attr_text(attrs, 'givenname')
+    sn = _attr_text(attrs, 'sn')
+    name = cn or (f"{given} {sn}".strip()) or "New Contact"
+
+    P = env['res.partner'].with_context(active_test=False).sudo()
+
+    partner = False
+    if email:
+        partner = P.search(['|', ('email_normalized', '=', email), ('email', '=', email)], limit=1)
+    if not partner and name:
+        partner = P.search([('name', '=', name)], limit=1)
+
+    if partner:
+        updates = {}
+        if email and (partner.email or "").strip().lower() != email:
+            updates['email'] = email
+        if company_id and partner.company_id.id != company_id:
+            updates['company_id'] = company_id
+        if updates:
+            partner.write(updates)
+        return partner
+
+    vals = {'name': name}
+    if email:
+        vals['email'] = email
+    if company_id:
+        vals['company_id'] = company_id
+    return P.create(vals)
+# ---------- END helper ----------
+
+# ---------- validation helpers ----------
+def _email_is_valid(email):
+    """Basic single-email validation (uses Odoo regex when available)."""
+    email = (email or "").strip()
+    try:
+        single_email_re = getattr(tools, "single_email_re", None)
+        if single_email_re:
+            return bool(single_email_re.match(email))
+    except Exception:
+        pass
+    return "@" in email and "." in email.split("@")[-1]
+
+def _normalize_email(email):
+    return (email or "").strip().lower()
+
+def validate_signup_fields(env, email, first_name, last_name):
+    """
+    Step 1: email format + uniqueness (hard stop on failure)
+    Step 2: first name present (hard stop on failure)
+    Step 3: last name present (hard stop on failure)
+    Returns (ok, message). ok=False means stop and show message.
+    """
+    # Step 1: email checks
+    if not email:
+        return False, _("Email is required.")
+    if not _email_is_valid(email):
+        return False, _("Please enter a valid email address.")
+
+    norm = _normalize_email(email)
+
+    # Uniqueness: check partners (active + archived) and users
+    P = env['res.partner'].with_context(active_test=False)
+    U = env['res.users'].with_context(active_test=False)
+
+    # Prefer normalized email on partner if available, fall back to raw email
+    partner_hit = P.search(['|', ('email_normalized', '=', norm), ('email', '=', email)], limit=1)
+    if partner_hit:
+        return False, _("This email address is already in use.")
+
+    user_hit = U.search([('email', 'ilike', email)], limit=1)
+    if user_hit:
+        return False, _("This email address is already in use.")
+
+    # Step 2: first name
+    if not (first_name or "").strip():
+        return False, _("First name is required.")
+
+    # Step 3: last name
+    if not (last_name or "").strip():
+        return False, _("Last name is required.")
+
+    return True, ""
+# ---------- END validation ----------
 
 
 # ---------------------------------------------------------------------------
@@ -822,7 +949,7 @@ class CompanyLDAP(models.Model):
                     return user_by_email.id, existing_user
 
             # No user -> ensure partner, then create user with LDAP uid
-            partner = self._ensure_partner_from_ldap(env, ldap_attrs, company_id)
+            partner = ensure_partner_from_ldap(env.sudo(), ldap_attrs, company_id)
             user_id = _create_user_for_partner(partner, ldap_uid)
             return user_id, existing_user
 
@@ -841,7 +968,7 @@ class CompanyLDAP(models.Model):
                         user_by_email.sudo().write({'login': ldap_uid})
                     return user_by_email.id, existing_user
 
-            partner = self._ensure_partner_from_ldap(env, ldap_attrs, company_id)
+            partner = ensure_partner_from_ldap(env.sudo(), ldap_attrs, company_id)
             user_id = _create_user_for_partner(partner, ldap_uid)
             return user_id, existing_user
 
@@ -855,7 +982,7 @@ class CompanyLDAP(models.Model):
             if not created:
                 return _("LDAP create failed: %s") % msg, existing_user
 
-            partner = self._ensure_partner_from_ldap(env, attrs_provided, company_id)
+            partner = ensure_partner_from_ldap(env.sudo(), attrs_provided, company_id)
             user_id = _create_user_for_partner(partner, login_norm)
             return user_id, existing_user
 
@@ -923,201 +1050,3 @@ class CompanyLDAP(models.Model):
             values['login'] = tools.ustr(login).lower().strip()
 
         return values
-
-
-# ---------------------------------------------------------------------------
-# Portal helper
-# ---------------------------------------------------------------------------
-
-class CustomerPortal(Controller):
-    """Hook into the standard /my/security page to use LDAP password change."""
-
-    MANDATORY_BILLING_FIELDS = ["name", "phone", "email", "street", "city", "country_id"]
-    OPTIONAL_BILLING_FIELDS = ["zipcode", "state_id", "vat", "company_name"]
-
-    _items_per_page = 20
-
-    def _prepare_portal_layout_values(self):
-        # Provide sales rep for the customer portal header
-        sales_user = False
-        partner = request.env.user.partner_id
-        if partner.user_id and not partner.user_id._is_public():
-            sales_user = partner.user_id
-        return {'sales_user': sales_user, 'page_name': 'home'}
-
-    @route('/my/security', type='http', auth='user', website=True, methods=['GET', 'POST'])
-    def security(self, **post):
-        # Handle the in-portal password change using LDAP old/new
-        env = request.env
-        values = self._prepare_portal_layout_values()
-        values['get_error'] = get_error
-        result = ''
-
-        if request.httprequest.method == 'POST':
-            user = env['res.users'].browse(env.user.id)
-            username = user.login
-            result = self._update_password(
-                post['old'].strip(),
-                post['new1'].strip(),
-                post['new2'].strip(),
-                username
-            )
-
-        if result:
-            success = result.get('success')
-            if success:
-                # Keep the user session valid after password change
-                new_token = request.env.user._compute_session_token(request.session.sid)
-                request.session.session_token = new_token
-                return http.request.render('ldap_reset_password.portal_thanks', {
-                    'message': f'Password reset has succeeded for {username}'
-                })
-
-            # Map internal states to friendly errors
-            state = result.get('error', {}).get('state')
-            if state == 'invalid':
-                return http.request.render('ldap_reset_password.portal_error', {'message': 'Invalid old password.'})
-            if state == 'refused':
-                return http.request.render('ldap_reset_password.portal_error',
-                                           {'message': 'Password change refused by LDAP server.'})
-            if state == 'misc':
-                message = result.get('error', {}).get('message')
-                return http.request.render('ldap_reset_password.portal_error',
-                                           {'message': 'Uncommon Error: ' + message + '.'})
-            if state == 'unknown':
-                message = result.get('error', {}).get('message')
-                return http.request.render('ldap_reset_password.portal_error',
-                                           {'message': 'Unknown Error: ' + message + '.'})
-
-        return request.render('portal.portal_my_security', values, headers={'X-Frame-Options': 'DENY'})
-
-    def _update_password(self, old, new1, new2, username):
-        # Basic validation
-        for k, v in [('old', old), ('new1', new1), ('new2', new2)]:
-            if not v:
-                return {'errors': {'password': {k: _("You cannot leave any password empty.")}}}
-        if new1 != new2:
-            return {'errors': {'password': {'new2': _("The new password and its confirmation must be identical.")}}}
-
-        old_passwd = old
-        new_passwd = new1
-
-        _logger.info("Calling LDAPAPI. Updating LDAP Password for %s!", username)
-
-        # Get LDAP config
-        env = api.Environment(http.request.cr, SUPERUSER_ID, {})
-        ldap_records = env['res.company.ldap'].search([])
-        ldap_dict = {rec.id: rec.read() for rec in ldap_records}
-        ldap_config = env['res.company.ldap'].browse(next(iter(ldap_dict))) if ldap_dict else None
-
-        if ldap_config:
-            # User-driven change (requires old password to be valid on LDAP)
-            changed, message = ldap_config._change_password_exceptions(ldap_config, username, old_passwd, new_passwd)
-            if changed:
-                _logger.info("Password reset has succeeded for: %s.", username)
-                user = env['res.users'].search([('login', '=', username)])
-                if user:
-                    # Keep local password blank so LDAP remains primary auth
-                    user.password = ''
-                    user._set_password()
-                    user.invalidate_cache(['password'], [user.id])
-                return {'success': {'state': 'changed'}}
-
-            # Map common LDAP error strings to UI
-            if "INVALID_CREDENTIALS" in message:
-                _logger.error("Password reset failed for %s: invalid old password.", username)
-                return {'error': {'state': 'invalid'}}
-            if "UNWILLING_TO_PERFORM" in message:
-                _logger.error("Password reset failed for %s: LDAP refused change.", username)
-                return {'error': {'state': 'refused'}}
-            if "Success" not in message:
-                _logger.error("Password reset failed for %s: %s", username, message)
-                return {'error': {'state': 'misc', 'message': str(message)}}
-
-            _logger.error("Password reset failed for %s: %s", username, message)
-            return {'error': {'state': 'unknown', 'message': str(message)}}
-
-        _logger.error("Password reset failed for %s: No LDAP configuration.", username)
-        return {'error': {'state': 'unknown', 'message': 'No LDAP configuration'}}
-
-
-# ---------------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------------
-
-def extract_rotary_id(login, last_name):
-    """From a login like 'smith12345' and last_name 'smith', extract '12345'."""
-    login = (login or '').lower()
-    last_name = (last_name or '').lower()
-    potential_id = login.replace(last_name, '')
-    return potential_id if potential_id.isdigit() and 5 <= len(potential_id) <= 8 else None
-
-
-def get_error(e, path=''):
-    """Dot-path helper to pull strings from nested dicts safely."""
-    for k in (path.split('.') if path else []):
-        if not isinstance(e, dict):
-            return None
-        e = e.get(k)
-    return e if isinstance(e, str) else None
-
-
-def generate_random_number(min_length, max_length):
-    """Random number with digit length in [min_length, max_length]."""
-    min_value = 10 ** (min_length - 1)
-    max_value = (10 ** max_length) - 1
-    return random.randint(min_value, max_value)
-
-# ---------- validation helpers ----------
-def _email_is_valid(email):
-    """Basic single-email validation (uses Odoo regex when available)."""
-    email = (email or "").strip()
-    try:
-        single_email_re = getattr(tools, "single_email_re", None)
-        if single_email_re:
-            return bool(single_email_re.match(email))
-    except Exception:
-        pass
-    return "@" in email and "." in email.split("@")[-1]
-
-def _normalize_email(email):
-    return (email or "").strip().lower()
-
-def validate_signup_fields(env, email, first_name, last_name):
-    """
-    Step 1: email format + uniqueness (hard stop on failure)
-    Step 2: first name present (hard stop on failure)
-    Step 3: last name present (hard stop on failure)
-    Returns (ok, message). ok=False means stop and show message.
-    """
-    # Step 1: email checks
-    if not email:
-        return False, _("Email is required.")
-    if not _email_is_valid(email):
-        return False, _("Please enter a valid email address.")
-
-    norm = _normalize_email(email)
-
-    # Uniqueness: check partners (active + archived) and users
-    P = env['res.partner'].with_context(active_test=False)
-    U = env['res.users'].with_context(active_test=False)
-
-    # Prefer normalized email on partner if available, fall back to raw email
-    partner_hit = P.search(['|', ('email_normalized', '=', norm), ('email', '=', email)], limit=1)
-    if partner_hit:
-        return False, _("This email address is already in use.")
-
-    user_hit = U.search([('email', 'ilike', email)], limit=1)
-    if user_hit:
-        return False, _("This email address is already in use.")
-
-    # Step 2: first name
-    if not (first_name or "").strip():
-        return False, _("First name is required.")
-
-    # Step 3: last name
-    if not (last_name or "").strip():
-        return False, _("Last name is required.")
-
-    return True, ""
-# ---------- END validation ----------
