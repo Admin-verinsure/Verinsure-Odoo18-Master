@@ -202,14 +202,14 @@ class LDAPSignupController(AuthSignupController):
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
                     rotaryId = str(generate_random_number(5, 8))
-                    mail = qcontext['email']
-                    login = mail
+                    mail = qcontext
+                    login = sn + rotaryId
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
 
                     attrs = {
                         "uid": [login.encode()], "givenname": [fn.encode()], "cn": [cn.encode()], "sn": [sn.encode()],
-                        "employeeNumber": [rotaryId.encode()], "mail": [mail.encode()],
+                        "employeeNumber": [rotaryId.encode()], "mail": [qcontext['email'].encode()],
                         "userPassword": [qcontext['password'].encode()], "objectclass": [b"top", b"inetOrgPerson"],
                     }
 
