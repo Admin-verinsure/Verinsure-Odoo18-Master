@@ -202,13 +202,14 @@ class LDAPSignupController(AuthSignupController):
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
                     rotaryId = str(generate_random_number(5, 8))
-                    login = (sn + rotaryId)
+                    mail = qcontext
+                    login = mail.split('@')[0] 
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
 
                     attrs = {
                         "uid": [login.encode()], "givenname": [fn.encode()], "cn": [cn.encode()], "sn": [sn.encode()],
-                        "employeeNumber": [rotaryId.encode()], "mail": [qcontext['email'].encode()],
+                        "employeeNumber": [rotaryId.encode()], "mail": [mail.encode()],
                         "userPassword": [qcontext['password'].encode()], "objectclass": [b"top", b"inetOrgPerson"],
                     }
 
@@ -270,7 +271,7 @@ class LDAPSignupController(AuthSignupController):
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
-                    rotaryId = qcontext['rotary_id']; login = (sn + rotaryId)
+                    rotaryId = qcontext['rotary_id']; login = sn + rotaryId
                     cn = f"{fn} {sn}"; dn = f"uid={login}, {ldap_rec.ldap_base}"
                     rotary_club_id = int(qcontext['rotary_club_id'])
 
@@ -389,7 +390,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             return default
 
     email = (_attr(attrs, 'mail') or "").strip()
-    email_norm = (email or "").lower()
+    email_norm = email.lower()
     cn = (_attr(attrs, 'cn') or "").strip()
     given = (_attr(attrs, 'givenname') or "").strip()
     sn = (_attr(attrs, 'sn') or "").strip()
@@ -402,8 +403,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
         partner = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
         if not partner:
             try:
-                env.cr.execute(
-                    "SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
+                env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
                 r = env.cr.fetchone()
                 if r:
                     partner = P.browse(r[0])
@@ -441,8 +441,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             p = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
             if not p and email:
                 try:
-                    env.cr.execute(
-                        "SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
+                    env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
                     r = env.cr.fetchone()
                     if r:
                         p = P.browse(r[0])
@@ -458,38 +457,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             if p:
                 return p
         raise
-
-
-# --------------------- DEDUPE HELPERS (new) ---------------------
-
-def _dedupe_users_by_login(env, login_lc):
-    """Ensure exactly one user (active preferred) has this lowercased login.
-    Returns the surviving res.users record; archives/renames the rest.
-    """
-    if not login_lc:
-        return False
-    login_lc = tools.ustr(login_lc).lower().strip()
-    U = env['res.users'].with_context(active_test=False).sudo()
-    dupes = U.search([('login', '=ilike', login_lc)])
-    if not dupes:
-        return False
-    if len(dupes) == 1:
-        if (dupes.login or '').lower() != login_lc:
-            dupes.write({'login': login_lc})
-        return dupes
-
-    # Choose survivor: any active one, else the first
-    survivor = dupes.filtered('active')[:1] or dupes[:1]
-    if (survivor.login or '').lower() != login_lc:
-        survivor.write({'login': login_lc})
-
-    # Archive and rename others
-    counter = 1
-    for u in (dupes - survivor):
-        new_login = f"{login_lc}+dupe{counter}"
-        counter += 1
-        u.write({'active': False, 'login': new_login})
-    return survivor
 
 
 # ---------------------------------------------------------------------------
@@ -636,19 +603,12 @@ class CompanyLDAP(models.Model):
         Robust path:
         - If in LDAP but not an Odoo user → find/reuse contact → create user & attach.
         - If not in LDAP → create LDAP → create/find contact → create user.
-        Plus: dedupe users sharing the same login to avoid singleton errors.
         """
         env = self.env
         confd = self._as_dict(conf)
         existing_user = False
         login_norm = tools.ustr(login or "").lower().strip()
 
-        # Collapse any duplicates first; if a single active user exists, return it
-        survivor = _dedupe_users_by_login(env, login_norm)
-        if survivor and survivor.active:
-            return survivor.id, True
-
-        # If DB still has a single row but archived, carry on
         env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login_norm,))
         row = env.cr.fetchone()
         if row and row[1]:
@@ -693,25 +653,14 @@ class CompanyLDAP(models.Model):
             return False
 
         def _create_user_for_partner(partner, final_login):
-            """Create a user attached to an existing partner, and guarantee login uniqueness."""
-            # Pre-dedupe for safety in concurrent requests
-            _dedupe_users_by_login(env, final_login)
-
+            """Create a user attached to an existing partner, without touching partner email."""
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = dict(mapped_vals)
             vals.update({'login': final_login, 'partner_id': partner.id, 'active': True})
-            # Do NOT pass 'email' so create() won't try to write partner.email
-            vals.pop('email', None)
-            # Make sure MFA is not enabled on new user (avoid TOTP reads)
-            vals['totp_enabled'] = False
-
-            new_id = SudoUser.create(vals).id
-
-            # Post-dedupe: make sure only one keeps the exact login
-            _dedupe_users_by_login(env, final_login)
-            # Belt-and-suspenders: keep MFA off
-            env['res.users'].sudo().browse(new_id).write({'totp_enabled': False})
-            return new_id
+            # Do NOT pass 'email' so create() won't attempt to write partner.email (avoids uniqueness clash).
+            if 'email' in vals:
+                vals.pop('email', None)
+            return SudoUser.create(vals).id
 
         attrs_given = (ldap_entry[1] if ldap_entry else {}) or {}
 
@@ -729,14 +678,10 @@ class CompanyLDAP(models.Model):
                         existing_user = True
                         if (user_by_email.login or '').lower() != ldap_uid:
                             user_by_email.sudo().write({'login': ldap_uid})
-                        # Final guard
-                        _dedupe_users_by_login(env, ldap_uid)
                         return user_by_email.id, existing_user
 
                 partner = _find_partner_for_attrs(ldap_attrs) or ensure_partner_from_ldap(env, ldap_attrs, company_id)
                 user_id = _create_user_for_partner(partner, ldap_uid)
-                # Final guard
-                _dedupe_users_by_login(env, ldap_uid)
                 return user_id, existing_user
 
         # 2) Not in LDAP → create LDAP → partner → user
@@ -750,7 +695,6 @@ class CompanyLDAP(models.Model):
 
         partner = _find_partner_for_attrs(attrs_provided) or ensure_partner_from_ldap(env, attrs_provided, company_id)
         user_id = _create_user_for_partner(partner, login_norm)
-        _dedupe_users_by_login(env, login_norm)
         return user_id, existing_user
 
     def _create_ldap_user(self, conf, user_dn, attributes):
@@ -789,6 +733,4 @@ class CompanyLDAP(models.Model):
                 company_id = False
         values['company_id'] = company_id or self.env.company.id
         values['login'] = tools.ustr(values.get('login') or login).lower().strip()
-        # never carry TOTP flag from template mapping
-        values.pop('totp_enabled', None)
         return values
