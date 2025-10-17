@@ -203,7 +203,7 @@ class LDAPSignupController(AuthSignupController):
                     sn = qcontext['last_name']; fn = qcontext['first_name']
                     rotaryId = str(generate_random_number(5, 8))
                     mail = qcontext
-                    login = mail.split('@')[0] 
+                    login = mail
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
 
