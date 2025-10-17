@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.exceptions import UserError, ValidationError
-from odoo.http import Controller, request
+from odoo.http import request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 
 _logger = logging.getLogger(__name__)
@@ -202,8 +202,7 @@ class LDAPSignupController(AuthSignupController):
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
                     rotaryId = str(generate_random_number(5, 8))
-                    mail = qcontext
-                    login = sn + rotaryId
+                    login = (sn or '').strip() + rotaryId
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
 
@@ -213,11 +212,12 @@ class LDAPSignupController(AuthSignupController):
                         "userPassword": [qcontext['password'].encode()], "objectclass": [b"top", b"inetOrgPerson"],
                     }
 
-                    user_id, existing_user = ldap_rec._get_or_create_user(ldap_rec, login, (dn, attrs))
+                    # IMPORTANT: call the tuple-returning variant
+                    user_id, existing_user = ldap_rec._get_or_create_user_tuple(ldap_rec, login, (dn, attrs))
                     if existing_user:
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'})
 
-                    if isinstance(user_id, int):
+                    if isinstance(user_id, int) and user_id:
                         dn_exist, entry_exist = ldap_rec._ldap_find_by_attrs(ldap_rec, attrs)
                         if not entry_exist:
                             created, message = ldap_rec._create_ldap_user(ldap_rec, dn, attrs)
@@ -271,7 +271,7 @@ class LDAPSignupController(AuthSignupController):
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
-                    rotaryId = qcontext['rotary_id']; login = sn + rotaryId
+                    rotaryId = qcontext['rotary_id']; login = (sn or '').strip() + (rotaryId or '').strip()
                     cn = f"{fn} {sn}"; dn = f"uid={login}, {ldap_rec.ldap_base}"
                     rotary_club_id = int(qcontext['rotary_club_id'])
 
@@ -282,11 +282,12 @@ class LDAPSignupController(AuthSignupController):
                         "objectclass": [b"top", b"inetOrgPerson"],
                     }
 
-                    user_id, existing_user = ldap_rec._get_or_create_user(ldap_rec, login, (dn, attrs))
+                    # IMPORTANT: call the tuple-returning variant
+                    user_id, existing_user = ldap_rec._get_or_create_user_tuple(ldap_rec, login, (dn, attrs))
                     if existing_user:
                         return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'})
 
-                    if isinstance(user_id, int):
+                    if isinstance(user_id, int) and user_id:
                         dn_exist, entry_exist = ldap_rec._ldap_find_by_attrs(ldap_rec, attrs)
                         if not entry_exist:
                             created, message = ldap_rec._create_ldap_user(ldap_rec, dn, attrs)
@@ -295,7 +296,7 @@ class LDAPSignupController(AuthSignupController):
                                 return http.request.render('ldap_reset_password.web_error', {'message': (message or '') + '.'})
 
                         user = request.env['res.users'].sudo().browse(user_id)
-                        if rotaryId.isdigit():
+                        if rotaryId and rotaryId.isdigit():
                             user.partner_id.write({'rotary_club_id': rotary_club_id, 'rotary_membership_id': str(rotaryId)})
                         else:
                             user.partner_id.write({'rotary_club_id': rotary_club_id})
@@ -372,6 +373,22 @@ def validate_signup_fields(env, email, first_name, last_name):
     if not (last_name or "").strip():
         return False, _("Last name is required.")
     return True, ""
+
+def _unique_login(env, desired: str) -> str:
+    """
+    Return a case-insensitive unique login based on `desired`.
+    Will suffix -2, -3, ... if needed.
+    """
+    base = tools.ustr(desired or '').strip().lower() or "user"
+    U = env['res.users'].with_context(active_test=False).sudo()
+    if not U.search([('login', '=ilike', base)], limit=1):
+        return base
+    i = 2
+    while True:
+        cand = f"{base}-{i}"
+        if not U.search([('login', '=ilike', cand)], limit=1):
+            return cand
+        i += 1
 
 # ---------- partner helper (module-level) ----------
 def ensure_partner_from_ldap(env, attrs, company_id):
@@ -598,23 +615,29 @@ class CompanyLDAP(models.Model):
             if res: return res[0][0], res[0]
         return False, False
 
+    # ------------ IMPORTANT: keep Odoo core signature (returns int) ------------
     def _get_or_create_user(self, conf, login, ldap_entry):
+        uid, _existing = self._get_or_create_user_tuple(conf, login, ldap_entry)
+        return uid
+
+    # ------------ Our tuple variant used by controllers ------------
+    def _get_or_create_user_tuple(self, conf, login, ldap_entry):
         """
-        Robust path:
-        - If in LDAP but not an Odoo user → find/reuse contact → create user & attach.
-        - If not in LDAP → create LDAP → create/find contact → create user.
+        Create or find user and return (user_id:int, existing_user:bool).
+        Ensures login uniqueness and adjusts LDAP uid/DN when needed.
         """
         env = self.env
         confd = self._as_dict(conf)
         existing_user = False
-        login_norm = tools.ustr(login or "").lower().strip()
+        requested_login = tools.ustr(login or "").lower().strip()
 
-        env.cr.execute("SELECT id, active FROM res_users WHERE lower(login)=%s", (login_norm,))
-        row = env.cr.fetchone()
-        if row and row[1]:
-            return row[0], True
+        # if a user already exists with this login (any state), reuse
+        env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (requested_login,))
+        r = env.cr.fetchone()
+        if r:
+            return r[0], True
 
-        mapped_vals = self._map_ldap_attributes(conf, login_norm, ldap_entry) or {}
+        mapped_vals = self._map_ldap_attributes(conf, requested_login, ldap_entry) or {}
         company_id = mapped_vals.get('company_id') or env.company.id
 
         def _find_partner_for_attrs(a):
@@ -625,50 +648,58 @@ class CompanyLDAP(models.Model):
                     return v.decode() if isinstance(v, (bytes, bytearray)) else str(v)
                 except Exception:
                     return default
-            email = (_t('mail') or '').strip()
-            email_norm = email.lower()
-            cn = (_t('cn') or '').strip()
+            email = (_t('mail') or '').strip().lower()
+            cn    = (_t('cn') or '').strip()
             given = (_t('givenname') or '').strip()
-            sn = (_t('sn') or '').strip()
+            sn    = (_t('sn') or '').strip()
 
             P = env['res.partner'].with_context(active_test=False).sudo()
             if email:
-                partner = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
+                partner = P.search(['|', ('email_normalized', '=', email), ('email', '=', email)], limit=1)
                 if not partner:
                     try:
-                        env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
-                        r = env.cr.fetchone()
-                        if r:
-                            partner = P.browse(r[0])
+                        env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email,))
+                        rr = env.cr.fetchone()
+                        if rr:
+                            partner = P.browse(rr[0])
                     except Exception:
                         pass
-                if partner: return partner
+                if partner:
+                    return partner
             if cn:
                 partner = P.search([('name', '=', cn)], limit=1)
-                if partner: return partner
+                if partner:
+                    return partner
             nm = (f"{given} {sn}".strip())
             if nm:
                 partner = P.search([('name', '=', nm)], limit=1)
-                if partner: return partner
+                if partner:
+                    return partner
             return False
 
-        def _create_user_for_partner(partner, final_login):
-            """Create a user attached to an existing partner, without touching partner email."""
+        def _create_user_for_partner(partner, desired_login):
+            final_login = _unique_login(env, desired_login)  # ensure uniqueness
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = dict(mapped_vals)
-            vals.update({'login': final_login, 'partner_id': partner.id, 'active': True})
-            # Do NOT pass 'email' so create() won't attempt to write partner.email (avoids uniqueness clash).
-            if 'email' in vals:
-                vals.pop('email', None)
-            return SudoUser.create(vals).id
+            vals.update({
+                'login': final_login,
+                'partner_id': partner.id,
+                'active': True,
+                'totp_enabled': False,  # avoid totp edge on first login
+            })
+            # Prevent user.create() from pushing email to partner and clashing
+            vals.pop('email', None)
+            user = SudoUser.create(vals)
+            return user.id, final_login
 
         attrs_given = (ldap_entry[1] if ldap_entry else {}) or {}
 
-        # 1) LDAP by email/name then by uid (reuse uid)
-        for dn_found, entry_found in (self._ldap_find_by_attrs(confd, attrs_given), self._get_entry(confd, login_norm)):
+        # 1) If already in LDAP (by email/name or by uid), reuse LDAP uid as preferred login
+        for dn_found, entry_found in (self._ldap_find_by_attrs(confd, attrs_given),
+                                      self._get_entry(confd, requested_login)):
             if entry_found:
                 ldap_attrs = entry_found[1]
-                ldap_uid = (self._get_uid_from_attrs(ldap_attrs) or login_norm).lower().strip()
+                ldap_uid = (self._get_uid_from_attrs(ldap_attrs) or requested_login).lower().strip()
                 email = (self._ldap_attr_text(ldap_attrs, 'mail') or '').strip().lower()
 
                 if email:
@@ -676,25 +707,41 @@ class CompanyLDAP(models.Model):
                     user_by_email = U.search(['|', ('email', '=', email), ('login', '=', email)], limit=1)
                     if user_by_email and user_by_email.active:
                         existing_user = True
-                        if (user_by_email.login or '').lower() != ldap_uid:
-                            user_by_email.sudo().write({'login': ldap_uid})
+                        target = ldap_uid
+                        if target and (user_by_email.login or '').lower() != target:
+                            taken = U.search([('login', '=ilike', target)], limit=1)
+                            if not taken:
+                                user_by_email.sudo().write({'login': target})
                         return user_by_email.id, existing_user
 
                 partner = _find_partner_for_attrs(ldap_attrs) or ensure_partner_from_ldap(env, ldap_attrs, company_id)
-                user_id = _create_user_for_partner(partner, ldap_uid)
+                user_id, _final_login = _create_user_for_partner(partner, ldap_uid)
                 return user_id, existing_user
 
-        # 2) Not in LDAP → create LDAP → partner → user
+        # 2) Not in LDAP → create LDAP → partner → user (may need to rewrite DN if login changes)
         dn_provided, attrs_provided = ldap_entry or (None, None)
         if not dn_provided or not isinstance(attrs_provided, dict):
-            return _("Missing LDAP attributes for new entry"), existing_user
-
-        created, msg = self._create_ldap_user(confd, dn_provided, attrs_provided)
-        if not created:
-            return _("LDAP create failed: %s") % msg, existing_user
+            return 0, existing_user
 
         partner = _find_partner_for_attrs(attrs_provided) or ensure_partner_from_ldap(env, attrs_provided, company_id)
-        user_id = _create_user_for_partner(partner, login_norm)
+
+        # pick a unique final login BEFORE creating LDAP, so DN matches
+        desired_login = (attrs_provided.get('uid') or [requested_login.encode()])[0]
+        desired_login = desired_login.decode() if isinstance(desired_login, (bytes, bytearray)) else str(desired_login)
+        final_login = _unique_login(env, desired_login)
+        if final_login != desired_login:
+            # adjust LDAP attrs & DN to the unique uid
+            attrs_provided = dict(attrs_provided)
+            attrs_provided['uid'] = [final_login.encode()]
+            if dn_provided.lower().startswith(f"uid={desired_login.lower()}"):
+                base = dn_provided.split(',', 1)[1] if ',' in dn_provided else confd['ldap_base']
+                dn_provided = f"uid={final_login}, {base}"
+
+        created, _msg = self._create_ldap_user(confd, dn_provided, attrs_provided)
+        if not created:
+            return 0, existing_user
+
+        user_id, _ = _create_user_for_partner(partner, final_login)
         return user_id, existing_user
 
     def _create_ldap_user(self, conf, user_dn, attributes):
