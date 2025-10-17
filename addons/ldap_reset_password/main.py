@@ -9,6 +9,7 @@ import logging
 import werkzeug
 import random
 import string
+import threading
 
 from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
@@ -16,6 +17,7 @@ from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import Controller, request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
+from odoo import registry as odoo_registry
 
 _logger = logging.getLogger(__name__)
 
@@ -25,6 +27,43 @@ SIGN_UP_REQUEST_PARAMS = {
     'password', 'confirm_password', 'city', 'country_id', 'lang',
     'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id'
 }
+
+# ---------------------------------------------------------------------------
+# Small helper: kick async email sending (non-blocking)
+# ---------------------------------------------------------------------------
+
+def _kick_async_mail_send(db_name: str):
+    """
+    Fire-and-forget background sender.
+    Opens its own cursor/environment and processes the mail queue.
+    Never raises; logs only.
+    """
+    def _runner():
+        try:
+            with api.Environment.manage():
+                with odoo_registry(db_name).cursor() as cr:
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    try:
+                        # Odoo 15+ public API
+                        if hasattr(env['mail.mail'], 'process_email_queue'):
+                            env['mail.mail'].sudo().process_email_queue()
+                        # Older private API fallback
+                        elif hasattr(env['mail.mail'], '_process_queue'):
+                            env['mail.mail'].sudo()._process_queue()
+                        else:
+                            _logger.warning("PWRESET: mail queue process method not found on this Odoo version")
+                    except Exception as e:
+                        _logger.warning("PWRESET: async mail queue processing failed: %s", e)
+                    cr.commit()
+        except Exception as e:
+            _logger.warning("PWRESET: async sender thread crashed: %s", e)
+
+    th = threading.Thread(target=_runner, name="otp-mail-sender", daemon=True)
+    try:
+        th.start()
+    except Exception as e:
+        _logger.warning("PWRESET: could not start async sender thread: %s", e)
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -144,7 +183,6 @@ class LDAPResetController(http.Controller):
         if kwargs.get('login'):
             username = kwargs.get('login')
             env = api.Environment(http.request.cr, SUPERUSER_ID, {})
-            # ensure singleton
             user = env['res.users'].search([('login', '=', username)], limit=1)
 
             administrator = env['res.users'].search([], limit=1, order='id')
@@ -156,7 +194,7 @@ class LDAPResetController(http.Controller):
                     expiration_time = datetime.now() + timedelta(minutes=15)
                     env['otp'].create({'user_id': user.id, 'otp_code': otp_code, 'expiration_time': expiration_time})
 
-                    # COMMIT ASAP so the OTP row exists even if mail sending later fails
+                    # Persist OTP before any email handling
                     request.env.cr.commit()
 
                     website_domain = http.request.httprequest.headers.get('Host').split(':')[0]
@@ -174,24 +212,29 @@ class LDAPResetController(http.Controller):
                         'email_from': email_from,
                     }
 
-                    # Queue email (automatic; non-blocking). Mail queue manager will send it.
+                    # Queue the email (fast), then kick async sender thread
                     try:
                         mail_tmpl.with_context(ctx).sudo().send_mail(
                             user.id,
-                            force_send=False,          # queued -> no HTTP wait on SMTP
-                            raise_exception=False,     # don't bubble up SMTP errors
-                            email_values={
-                                'email_from': email_from,
-                                'email_to': email_to,
-                            },
+                            force_send=False,          # queue only
+                            raise_exception=False,
+                            email_values={'email_from': email_from, 'email_to': email_to},
                         )
                     except Exception as e:
                         _logger.warning("PWRESET: failed to queue OTP email for %s: %s", username, e)
 
-                    # Ensure queued mail is persisted as well
+                    # Ensure queued mail is stored
                     request.env.cr.commit()
 
+                    # Trigger background sending immediately (non-blocking)
+                    try:
+                        _kick_async_mail_send(request.env.cr.dbname)
+                    except Exception as e:
+                        _logger.warning("PWRESET: could not trigger async mail sender: %s", e)
+
+                    # Always return the OTP entry page instantly — no waiting on SMTP
                     return http.request.render('ldap_reset_password.template_otp_entry', {'login': username})
+
                 return http.request.render('ldap_reset_password.template_contact_admin')
             return http.request.render('ldap_reset_password.template_invalid_login')
 
@@ -500,7 +543,7 @@ class CompanyLDAP(models.Model):
         uri = f"{scheme}://{host}:{port}"
         conn = ldap.initialize(uri)
         conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-        # Add short, hard timeouts so requests can't hang
+        # Short timeouts to avoid long 504s
         try:
             conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
         except Exception:
@@ -634,10 +677,8 @@ class CompanyLDAP(models.Model):
 
     def _get_or_create_user_tuple(self, conf, login, ldap_entry):
         """
-        Desired behavior:
-        - Search LDAP by *email*.
-        - If found -> take that entry's **uid** as Odoo login, reuse/create partner, create user (no LDAP write).
-        - If not found -> create LDAP using provided dn/attrs, then partner, then user.
+        - Lookup LDAP by email; if found use its uid as login (create Odoo user if needed).
+        - If not found, create LDAP entry, then Odoo partner/user.
         Returns (user_id:int, existing_user:bool).
         """
         env = self.env
