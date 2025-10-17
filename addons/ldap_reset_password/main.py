@@ -164,19 +164,29 @@ class LDAPResetController(http.Controller):
                     if website_domain == "localhost":
                         website_domain = "rotaryoceania.zone"
                     email_from = f"no-reply@{website_domain}"
+                    email_to = user.partner_id.email
 
                     mail_tmpl = env['mail.template'].sudo().search([('name', '=', 'Reset LDAP Password Email')], limit=1)
-                    ctx = {'subject': subject, 'otp_code': otp_code, 'administrator_email': administrator_email, 'email_from': email_from}
+                    ctx = {
+                        'subject': subject,
+                        'otp_code': otp_code,
+                        'administrator_email': administrator_email,
+                        'email_from': email_from,
+                    }
 
-                    # Queue email (do NOT block request on SMTP/DNS)
+                    # Queue email (automatic; non-blocking). Mail queue manager will send it.
                     try:
                         mail_tmpl.with_context(ctx).sudo().send_mail(
                             user.id,
-                            force_send=False,
-                            email_values={'email_from': email_from}
+                            force_send=False,          # queued -> no HTTP wait on SMTP
+                            raise_exception=False,     # don't bubble up SMTP errors
+                            email_values={
+                                'email_from': email_from,
+                                'email_to': email_to,
+                            },
                         )
                     except Exception as e:
-                        _logger.warning("PWRESET: failed to queue OTP email: %s", e)
+                        _logger.warning("PWRESET: failed to queue OTP email for %s: %s", username, e)
 
                     # Ensure queued mail is persisted as well
                     request.env.cr.commit()
