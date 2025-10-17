@@ -144,7 +144,8 @@ class LDAPResetController(http.Controller):
         if kwargs.get('login'):
             username = kwargs.get('login')
             env = api.Environment(http.request.cr, SUPERUSER_ID, {})
-            user = env['res.users'].search([('login', '=', username)])
+            # ensure singleton
+            user = env['res.users'].search([('login', '=', username)], limit=1)
 
             administrator = env['res.users'].search([], limit=1, order='id')
             administrator_email = administrator.partner_id.email_normalized if administrator.partner_id else ""
@@ -155,6 +156,9 @@ class LDAPResetController(http.Controller):
                     expiration_time = datetime.now() + timedelta(minutes=15)
                     env['otp'].create({'user_id': user.id, 'otp_code': otp_code, 'expiration_time': expiration_time})
 
+                    # COMMIT ASAP so the OTP row exists even if mail sending later fails
+                    request.env.cr.commit()
+
                     website_domain = http.request.httprequest.headers.get('Host').split(':')[0]
                     subject = "One Time Password for Password Change Verification"
                     if website_domain == "localhost":
@@ -162,9 +166,21 @@ class LDAPResetController(http.Controller):
                     email_from = f"no-reply@{website_domain}"
 
                     mail_tmpl = env['mail.template'].sudo().search([('name', '=', 'Reset LDAP Password Email')], limit=1)
-                    email_values = {'email_from': email_from}
                     ctx = {'subject': subject, 'otp_code': otp_code, 'administrator_email': administrator_email, 'email_from': email_from}
-                    mail_tmpl.with_context(ctx).sudo().send_mail(user.id, email_values)
+
+                    # Queue email (do NOT block request on SMTP/DNS)
+                    try:
+                        mail_tmpl.with_context(ctx).sudo().send_mail(
+                            user.id,
+                            force_send=False,
+                            email_values={'email_from': email_from}
+                        )
+                    except Exception as e:
+                        _logger.warning("PWRESET: failed to queue OTP email: %s", e)
+
+                    # Ensure queued mail is persisted as well
+                    request.env.cr.commit()
+
                     return http.request.render('ldap_reset_password.template_otp_entry', {'login': username})
                 return http.request.render('ldap_reset_password.template_contact_admin')
             return http.request.render('ldap_reset_password.template_invalid_login')
@@ -474,6 +490,15 @@ class CompanyLDAP(models.Model):
         uri = f"{scheme}://{host}:{port}"
         conn = ldap.initialize(uri)
         conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        # Add short, hard timeouts so requests can't hang
+        try:
+            conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
+        except Exception:
+            pass
+        try:
+            conn.set_option(ldap.OPT_TIMEOUT, 5)
+        except Exception:
+            pass
         try:
             conn.set_option(ldap.OPT_REFERRALS, 0)
         except Exception:
@@ -592,8 +617,7 @@ class CompanyLDAP(models.Model):
                 return res[0][0], res[0]
         return False, False
 
-    # ----------- BEHAVIOR FIX: use LDAP uid if entry exists, else create LDAP -----------
-    # Keep Odoo core signature (returns int) for compatibility
+    # ----------- keep core signature; delegate to tuple version -----------
     def _get_or_create_user(self, conf, login, ldap_entry):
         user_id, _existing = self._get_or_create_user_tuple(conf, login, ldap_entry)
         return user_id
@@ -612,7 +636,6 @@ class CompanyLDAP(models.Model):
 
         requested_email = tools.ustr(login or "").strip().lower()
 
-        # If an Odoo user already exists with that exact login, reuse it.
         env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (requested_email,))
         row = env.cr.fetchone()
         if row:
@@ -671,7 +694,6 @@ class CompanyLDAP(models.Model):
                 i += 1
 
         def _create_user_for_partner(partner, desired_login):
-            """Create a user attached to an existing partner, without touching partner email."""
             final_login = _unique_login(env, desired_login)
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = dict(mapped_vals)
@@ -679,19 +701,16 @@ class CompanyLDAP(models.Model):
                 'login': final_login,
                 'partner_id': partner.id,
                 'active': True,
-                # Create without TOTP enabled to avoid immediate MFA singleton issues
                 'totp_enabled': False,
             })
-            # Do NOT pass 'email' so user.create() won't write partner.email (avoids uniqueness clash).
             vals.pop('email', None)
             user = SudoUser.create(vals)
             return user.id, final_login
 
-        # ---------- 1) LDAP lookup by e-mail ----------
+        # 1) LDAP lookup by e-mail
         attrs_from_controller = (ldap_entry[1] if ldap_entry else {}) or {}
-        dn_found, entry_found = self._ldap_find_by_attrs(confd, attrs_from_controller)  # by mail
+        dn_found, entry_found = self._ldap_find_by_attrs(confd, attrs_from_controller)
 
-        # Fallback: direct query by requested_email if attrs didn't contain mail
         if not entry_found and requested_email:
             try:
                 results = self._query(confd, filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (requested_email,)))
@@ -705,21 +724,18 @@ class CompanyLDAP(models.Model):
             ldap_attrs = entry_found[1]
             ldap_uid = (self._get_uid_from_attrs(ldap_attrs) or requested_email).strip().lower()
 
-            # If an Odoo user already exists with that uid, reuse.
             U = env['res.users'].with_context(active_test=False).sudo()
             user_by_uid = U.search([('login', '=ilike', ldap_uid)], limit=1)
             if user_by_uid and user_by_uid.active:
                 return user_by_uid.id, True
 
-            # Create Odoo user attached to partner, with login = ldap uid
             partner = _find_partner_for_attrs(ldap_attrs) or ensure_partner_from_ldap(env, ldap_attrs, company_id)
             user_id, _final_login = _create_user_for_partner(partner, ldap_uid)
             return user_id, False
 
-        # ---------- 2) Not in LDAP -> create it using provided dn/attrs ----------
+        # 2) Not in LDAP -> create it
         dn_provided, attrs_provided = ldap_entry or (None, None)
         if not dn_provided or not isinstance(attrs_provided, dict):
-            # Nothing we can do without attributes
             return 0, False
 
         created, msg = self._create_ldap_user(confd, dn_provided, attrs_provided)
@@ -767,6 +783,5 @@ class CompanyLDAP(models.Model):
             except Exception:
                 company_id = False
         values['company_id'] = company_id or self.env.company.id
-        # Keep whatever we were passed, but it will get replaced by LDAP uid when found
         values['login'] = tools.ustr(values.get('login') or login).lower().strip()
         return values
