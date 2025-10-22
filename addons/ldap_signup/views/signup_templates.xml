@@ -1,0 +1,64 @@
+<odoo>
+  <template id="signup_is_member" name="Are you a member?" page="True">
+    <t t-call="website.layout">
+      <div class="container mt-5">
+        <h2>Join / Sign up</h2>
+        <p>Choose your flow.</p>
+        <a class="btn btn-primary me-2" href="/web/signup">Member Signup</a>
+        <a class="btn btn-secondary" href="/web/signup_non_member">Guest / Non-member Signup</a>
+      </div>
+    </t>
+  </template>
+
+  <template id="signup" name="Member Signup" page="True">
+    <t t-call="website.layout">
+      <div class="container mt-5">
+        <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
+        <form method="post" action="/web/signup">
+          <div class="row g-3">
+            <div class="col-md-6"><input class="form-control" name="first_name" placeholder="First name" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="last_name" placeholder="Last name" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required="required"/></div>
+            <div class="col-md-3"><input class="form-control" name="rotary_id" placeholder="Rotary ID" required="required"/></div>
+            <div class="col-md-3"><input class="form-control" name="rotary_club_id" placeholder="Club ID" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="password" type="password" placeholder="Password" required="required"/></div>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Create account</button>
+        </form>
+      </div>
+    </t>
+  </template>
+
+  <template id="signup_non_member" name="Guest Signup" page="True">
+    <t t-call="website.layout">
+      <div class="container mt-5">
+        <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
+        <form method="post" action="/web/signup_non_member">
+          <div class="row g-3">
+            <div class="col-md-6"><input class="form-control" name="first_name" placeholder="First name" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="last_name" placeholder="Last name" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required="required"/></div>
+            <div class="col-md-6"><input class="form-control" name="password" type="password" placeholder="Password" required="required"/></div>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Create account</button>
+        </form>
+      </div>
+    </t>
+  </template>
+
+  <template id="web_thanks" name="Signup OK" page="True">
+    <t t-call="website.layout">
+      <div class="container mt-5">
+        <div class="alert alert-success"><t t-esc="message or 'Account created.'"/></div>
+      </div>
+    </t>
+  </template>
+
+  <template id="web_error" name="Signup Error" page="True">
+    <t t-call="website.layout">
+      <div class="container mt-5">
+        <div class="alert alert-danger"><t t-esc="message or 'An error occurred.'"/></div>
+      </div>
+    </t>
+  </template>
+</odoo>
