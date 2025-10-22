@@ -6,6 +6,7 @@ from ldap.filter import filter_format
 from odoo import api, fields, models, tools, http, SUPERUSER_ID
 from odoo import _
 from .utils import ensure_partner_from_ldap
+
 import logging
 
 _logger = logging.getLogger(__name__)
