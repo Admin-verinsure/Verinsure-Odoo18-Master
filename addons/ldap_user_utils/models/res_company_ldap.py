@@ -1,15 +1,28 @@
 # -*- coding: utf-8 -*-
+import logging
+
 import ldap
 import ldap.modlist as modlist
 from ldap.filter import filter_format
 
 from odoo import api, fields, models, tools, http, SUPERUSER_ID
 from odoo import _
-from ..utils import ensure_partner_from_ldap
-
-import logging
 
 _logger = logging.getLogger(__name__)
+
+
+def _ensure_partner_from_ldap(env, attrs, company_id):
+    """
+    Lazy import wrapper to avoid circular/partial init errors.
+    utils.py must live at addon root: odoo.addons.ldap_user_utils.utils
+    """
+    try:
+        from odoo.addons.ldap_user_utils.utils import ensure_partner_from_ldap as _real
+    except Exception as e:
+        _logger.error("ldap_user_utils: failed to import ensure_partner_from_ldap: %s", e)
+        raise
+    return _real(env, attrs, company_id)
+
 
 class CompanyLDAP(models.Model):
     _inherit = 'res.company.ldap'
@@ -201,7 +214,7 @@ class CompanyLDAP(models.Model):
             if user_by_uid and user_by_uid.active:
                 return user_by_uid.id, True
 
-            partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
+            partner = _ensure_partner_from_ldap(env, ldap_attrs, company_id)
             user_id, _ = _create_user_for_partner(partner, ldap_uid)
             return user_id, False
 
@@ -216,7 +229,7 @@ class CompanyLDAP(models.Model):
             return 0, False
 
         new_uid = (self._get_uid_from_attrs(attrs_provided) or requested_email).strip().lower()
-        partner = ensure_partner_from_ldap(env, attrs_provided, company_id)
+        partner = _ensure_partner_from_ldap(env, attrs_provided, company_id)
         user_id, _ = _create_user_for_partner(partner, new_uid)
         return user_id, False
 
