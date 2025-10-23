@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <data>
 
-    <!-- Landing: choose member / non-member -->
+    <!-- Are you a member? landing -->
     <template id="ldap_signup_signup_is_member" name="Are you a member?" page="True">
       <t t-call="website.layout">
         <div class="container mt-5">
@@ -14,112 +14,59 @@
       </t>
     </template>
 
-    <!-- Member signup form -->
+    <!-- Member signup -->
     <template id="ldap_signup_signup" name="Member Signup" page="True">
       <t t-call="website.layout">
         <div class="container mt-5">
-          <t t-if="error">
-            <div class="alert alert-danger"><t t-esc="error"/></div>
-          </t>
-
+          <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
           <form method="post" action="/web/signup">
-            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-
             <div class="row g-3">
-              <div class="col-md-6">
-                <input class="form-control" name="first_name" placeholder="First name" t-att-value="first_name or ''" required="required"/>
-              </div>
-              <div class="col-md-6">
-                <input class="form-control" name="last_name" placeholder="Last name" t-att-value="last_name or ''" required="required"/>
-              </div>
-
-              <div class="col-md-6">
-                <input class="form-control" name="email" type="email" placeholder="Email" t-att-value="email or ''" required="required"/>
-              </div>
-
-              <div class="col-md-3">
-                <input class="form-control" name="rotary_id" placeholder="Rotary ID" t-att-value="rotary_id or ''" required="required"/>
-              </div>
-
-              <div class="col-md-3">
-                <select class="form-select" name="rotary_club_id" required="required">
-                  <option value="">Select Club…</option>
-                  <t t-foreach="clubs or []" t-as="club">
-                    <option t-att-value="club.id" t-esc="club.display_name"/>
-                  </t>
-                </select>
-              </div>
-
-              <div class="col-md-6">
-                <input class="form-control" name="password" type="password" placeholder="Password" required="required"/>
-              </div>
-              <div class="col-md-6">
-                <input class="form-control" name="confirm_password" type="password" placeholder="Confirm password" required="required"/>
-              </div>
+              <div class="col-md-6"><input class="form-control" name="first_name" placeholder="First name" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="last_name" placeholder="Last name" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required="required"/></div>
+              <div class="col-md-3"><input class="form-control" name="rotary_id" placeholder="Rotary ID" required="required"/></div>
+              <div class="col-md-3"><input class="form-control" name="rotary_club_id" placeholder="Club ID" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="password" type="password" placeholder="Password" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="confirm_password" type="password" placeholder="Confirm Password" required="required"/></div>
             </div>
-
             <button class="btn btn-primary mt-3" type="submit">Create account</button>
           </form>
         </div>
       </t>
     </template>
 
-    <!-- Guest / non-member signup form -->
+    <!-- Guest / non-member signup -->
     <template id="ldap_signup_signup_non_member" name="Guest Signup" page="True">
       <t t-call="website.layout">
         <div class="container mt-5">
-          <t t-if="error">
-            <div class="alert alert-danger"><t t-esc="error"/></div>
-          </t>
-
+          <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
           <form method="post" action="/web/signup_non_member">
-            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-
             <div class="row g-3">
-              <div class="col-md-6">
-                <input class="form-control" name="first_name" placeholder="First name" t-att-value="first_name or ''" required="required"/>
-              </div>
-              <div class="col-md-6">
-                <input class="form-control" name="last_name" placeholder="Last name" t-att-value="last_name or ''" required="required"/>
-              </div>
-
-              <div class="col-md-6">
-                <input class="form-control" name="email" type="email" placeholder="Email" t-att-value="email or ''" required="required"/>
-              </div>
-              <div class="col-md-6">
-                <input class="form-control" name="password" type="password" placeholder="Password" required="required"/>
-              </div>
-              <div class="col-md-6">
-                <input class="form-control" name="confirm_password" type="password" placeholder="Confirm password" required="required"/>
-              </div>
+              <div class="col-md-6"><input class="form-control" name="first_name" placeholder="First name" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="last_name" placeholder="Last name" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="password" type="password" placeholder="Password" required="required"/></div>
+              <div class="col-md-6"><input class="form-control" name="confirm_password" type="password" placeholder="Confirm Password" required="required"/></div>
             </div>
-
             <button class="btn btn-primary mt-3" type="submit">Create account</button>
           </form>
         </div>
       </t>
     </template>
 
-    <!-- Success -->
+    <!-- Result pages -->
     <template id="ldap_signup_web_thanks" name="Signup OK" page="True">
       <t t-call="website.layout">
         <div class="container mt-5">
-          <div class="alert alert-success">
-            <t t-esc="message or 'Account created.'"/>
-          </div>
-          <a class="btn btn-primary mt-3" href="/web/login">Go to Login</a>
+          <div class="alert alert-success"><t t-esc="message or 'Account created.'"/></div>
         </div>
       </t>
     </template>
 
-    <!-- Error -->
     <template id="ldap_signup_web_error" name="Signup Error" page="True">
       <t t-call="website.layout">
         <div class="container mt-5">
-          <div class="alert alert-danger">
-            <t t-esc="message or 'An error occurred.'"/>
-          </div>
-          <a class="btn btn-secondary mt-3" href="/web/signup">Try Again</a>
+          <div class="alert alert-danger"><t t-esc="message or 'An error occurred.'"/></div>
         </div>
       </t>
     </template>
