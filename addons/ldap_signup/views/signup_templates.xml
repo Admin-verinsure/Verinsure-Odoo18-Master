@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<odoo>
+<templates xml:space="preserve">
 
   <!-- Are you a member? landing -->
   <template id="ldap_signup_signup_is_member" name="Are you a member?" page="True">
@@ -70,4 +70,4 @@
     </t>
   </template>
 
-</odoo>
+</templates>
