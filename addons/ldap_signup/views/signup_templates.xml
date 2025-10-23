@@ -1,19 +1,21 @@
+<!-- ldap_signup/views/signup_templates.xml -->
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-  <!-- Are you a member? landing -->
+  <!-- Landing: Yes/No -->
   <template id="ldap_signup_signup_is_member" name="Are you a member?">
     <t t-call="website.layout">
-      <div class="container mt-5">
-        <h2>Join / Sign up</h2>
-        <p>Choose your flow.</p>
-        <a class="btn btn-primary me-2" href="/web/signup">Member Signup</a>
-        <a class="btn btn-secondary" href="/web/signup_non_member">Guest / Non-member Signup</a>
+      <div class="container mt-5 text-center">
+        <h2>Are you a Rotary International Member?</h2>
+        <div class="d-flex gap-4 justify-content-center mt-4">
+          <a class="btn btn-success btn-lg px-5" href="/web/signup">Yes</a>
+          <a class="btn btn-dark btn-lg px-5" href="/web/signup_non_member">No</a>
+        </div>
       </div>
     </t>
   </template>
 
-  <!-- Member signup -->
+  <!-- Member signup form -->
   <template id="ldap_signup_signup" name="Member Signup">
     <t t-call="website.layout">
       <div class="container mt-5">
@@ -34,7 +36,7 @@
     </t>
   </template>
 
-  <!-- Guest / non-member signup -->
+  <!-- Guest/Non-member signup form -->
   <template id="ldap_signup_signup_non_member" name="Guest Signup">
     <t t-call="website.layout">
       <div class="container mt-5">
