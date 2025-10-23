@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<templates xml:space="preserve">
-
+<templates id="template" xml:space="preserve">
   <!-- Are you a member? landing -->
   <template id="ldap_signup_signup_is_member" name="Are you a member?" page="True">
     <t t-call="website.layout">
@@ -69,5 +68,4 @@
       </div>
     </t>
   </template>
-
 </templates>
