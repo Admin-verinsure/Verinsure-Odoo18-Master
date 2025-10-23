@@ -1,9 +1,7 @@
-<!-- ldap_signup/views/signup_templates.xml -->
-<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
   <!-- Landing: Yes/No -->
-  <template id="ldap_signup_signup_is_member" name="Are you a member?">
+  <template id="signup_is_member" name="Are you a member?">
     <t t-call="website.layout">
       <div class="container mt-5 text-center">
         <h2>Are you a Rotary International Member?</h2>
@@ -16,7 +14,7 @@
   </template>
 
   <!-- Member signup form -->
-  <template id="ldap_signup_signup" name="Member Signup">
+  <template id="signup" name="Member Signup">
     <t t-call="website.layout">
       <div class="container mt-5">
         <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
@@ -37,7 +35,7 @@
   </template>
 
   <!-- Guest/Non-member signup form -->
-  <template id="ldap_signup_signup_non_member" name="Guest Signup">
+  <template id="signup_non_member" name="Guest Signup">
     <t t-call="website.layout">
       <div class="container mt-5">
         <t t-if="error"><div class="alert alert-danger"><t t-esc="error"/></div></t>
@@ -56,7 +54,7 @@
   </template>
 
   <!-- Result pages -->
-  <template id="ldap_signup_web_thanks" name="Signup OK">
+  <template id="web_thanks" name="Signup OK">
     <t t-call="website.layout">
       <div class="container mt-5">
         <div class="alert alert-success"><t t-esc="message or 'Account created.'"/></div>
@@ -64,7 +62,7 @@
     </t>
   </template>
 
-  <template id="ldap_signup_web_error" name="Signup Error">
+  <template id="web_error" name="Signup Error">
     <t t-call="website.layout">
       <div class="container mt-5">
         <div class="alert alert-danger"><t t-esc="message or 'An error occurred.'"/></div>
