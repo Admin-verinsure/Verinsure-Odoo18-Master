@@ -15,7 +15,6 @@
     ],
     "data": [
         "views/mail_template.xml",
-        "views/reset_ldap_password.xml",   # <-- ensure this filename exists in /views
         "security/ir.model.access.csv",    # keep only if this module defines models (e.g., otp); else remove
     ],
     "assets": {
