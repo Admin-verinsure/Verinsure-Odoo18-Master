@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
-import logging
-import random
+import logging, random
 from datetime import date
-
 from odoo import http, api, SUPERUSER_ID, _
 from odoo.http import request
-from odoo.addons.auth_signup.controllers.main import AuthSignupHome as BaseSignup
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 import werkzeug
 
 _logger = logging.getLogger(__name__)
 
 SIGN_UP_REQUEST_PARAMS = {
-    'db', 'login', 'debug', 'token', 'message', 'error', 'scope', 'mode',
-    'redirect', 'redirect_hostname', 'email', 'name', 'partner_id',
-    'password', 'confirm_password', 'city', 'country_id', 'lang',
-    'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id',
+    'db','login','debug','token','message','error','scope','mode',
+    'redirect','redirect_hostname','email','name','partner_id',
+    'password','confirm_password','city','country_id','lang',
+    'first_name','last_name','rotary_id','rotary_club','rotary_club_id'
 }
-
-# ----------------------------- helpers -----------------------------
 
 def _email_is_valid(email):
     from odoo import tools
@@ -47,43 +43,11 @@ def validate_signup_fields(env, email, first_name, last_name):
 def generate_random_number(min_length, max_length):
     return random.randint(10 ** (min_length - 1), (10 ** max_length) - 1)
 
-def _render(view_primary, qcontext=None, view_fallback=None):
-    """Render `view_primary`; if missing (old IDs), try `view_fallback`."""
-    qcontext = qcontext or {}
-    try:
-        resp = request.render(view_primary, qcontext)
-    except Exception:
-        if view_fallback:
-            resp = request.render(view_fallback, qcontext)
-        else:
-            raise
-    resp.headers['X-Frame-Options'] = 'DENY'
-    return resp
-
-# ----------------------------- controller -----------------------------
-
-class LDAPSignupController(BaseSignup):
-
-    # Use the base helper for consistency with Odoo's own signup flow
-    def get_auth_signup_qcontext(self):
-        # Only keep known params
-        qcontext = {k: v for (k, v) in request.params.items() if k in SIGN_UP_REQUEST_PARAMS}
-        qcontext.update(self.get_auth_signup_config())
-        if not qcontext.get('token') and request.session.get('auth_signup_token'):
-            qcontext['token'] = request.session.get('auth_signup_token')
-        if qcontext.get('token'):
-            try:
-                for k, v in request.env['res.partner'].sudo().signup_retrieve_info(qcontext['token']).items():
-                    qcontext.setdefault(k, v)
-            except Exception:
-                qcontext['error'] = _("Invalid signup token")
-                qcontext['invalid_token'] = True
-        return qcontext
+class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/is_member', type='http', auth='public', website=True)
     def is_member(self, **kwargs):
-        # primary id (new), fallback id (older file with double prefix)
-        return _render('ldap_signup.signup_is_member', view_fallback='ldap_signup.ldap_signup_signup_is_member')
+        return request.render('ldap_signup.signup_is_member')
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup_non_member(self, *args, **kw):
@@ -92,26 +56,20 @@ class LDAPSignupController(BaseSignup):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
-            # confirm password mismatch
-            if qcontext.get('password') and qcontext.get('confirm_password'):
-                if qcontext['password'] != qcontext['confirm_password']:
-                    qcontext['error'] = _("Passwords do not match.")
-                    return _render('ldap_signup.signup_non_member', qcontext,
-                                   view_fallback='ldap_signup.ldap_signup_signup_non_member')
             try:
                 env = api.Environment(request.cr, SUPERUSER_ID, {})
-                ok, msg = validate_signup_fields(env, qcontext.get('email'),
-                                                 qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    return _render('ldap_signup.signup_non_member', qcontext,
-                                   view_fallback='ldap_signup.ldap_signup_signup_non_member')
+                    resp = request.render('ldap_signup.signup_non_member', qcontext)
+                    resp.headers['X-Frame-Options'] = 'DENY'
+                    return resp
 
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
                     rotaryId = str(generate_random_number(5, 8))
-                    login = f"{sn}{rotaryId}"
+                    login = sn + rotaryId
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
 
@@ -123,8 +81,7 @@ class LDAPSignupController(BaseSignup):
 
                     user_id, existing_user = ldap_rec._get_or_create_user_tuple(ldap_rec, qcontext['email'], (dn, attrs))
                     if existing_user:
-                        return _render('ldap_signup.web_error', {'message': 'Error: User already exists.'},
-                                       view_fallback='ldap_signup.ldap_signup_web_error')
+                        return request.render('ldap_signup.web_error', {'message': 'Error: User already exists.'})
 
                     if isinstance(user_id, int) and user_id:
                         user = request.env['res.users'].sudo().browse(user_id)
@@ -136,74 +93,62 @@ class LDAPSignupController(BaseSignup):
                         if role:
                             env['res.users.role.line'].create({
                                 'user_id': user.id, 'role_id': role.id,
-                                'date_from': date.today(), 'date_to': date(2099, 12, 31),
+                                'date_from': date.today(), 'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
 
-                        return _render('ldap_signup.web_thanks',
-                                       {'message': f'You have created user: {user.login}'},
-                                       view_fallback='ldap_signup.ldap_signup_web_thanks')
+                        return request.render('ldap_signup.web_thanks', {'message': f'You have created user: {user.login}'})
                     else:
                         qcontext['error'] = _("Could not create a new account. " + str(user_id))
             except Exception as e:
-                _logger.error("Signup (non-member) failed: %s", e)
+                _logger.error("%s", e)
                 qcontext['error'] = _("Could not create account. " + str(e))
 
-        return _render('ldap_signup.signup_non_member', qcontext,
-                       view_fallback='ldap_signup.ldap_signup_signup_non_member')
+        resp = request.render('ldap_signup.signup_non_member', qcontext)
+        resp.headers['X-Frame-Options'] = 'DENY'
+        return resp
 
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
+        partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
+        qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
+
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
-            if qcontext.get('password') and qcontext.get('confirm_password'):
-                if qcontext['password'] != qcontext['confirm_password']:
-                    qcontext['error'] = _("Passwords do not match.")
-                    return _render('ldap_signup.signup', qcontext,
-                                   view_fallback='ldap_signup.ldap_signup_signup')
             try:
                 env = api.Environment(request.cr, SUPERUSER_ID, {})
-                ok, msg = validate_signup_fields(env, qcontext.get('email'),
-                                                 qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    return _render('ldap_signup.signup', qcontext,
-                                   view_fallback='ldap_signup.ldap_signup_signup')
+                    resp = request.render('ldap_signup.signup', qcontext)
+                    resp.headers['X-Frame-Options'] = 'DENY'
+                    return resp
 
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if ldap_rec:
                     sn = qcontext['last_name']; fn = qcontext['first_name']
-                    rotaryId = qcontext.get('rotary_id') or ''
-                    login = f"{sn}{rotaryId}"
-                    cn = f"{fn} {sn}"
-                    dn = f"uid={login}, {ldap_rec.ldap_base}"
-                    try:
-                        rotary_club_id = int(qcontext.get('rotary_club_id') or 0)
-                    except Exception:
-                        rotary_club_id = 0
+                    rotaryId = qcontext['rotary_id']; login = sn + rotaryId
+                    cn = f"{fn} {sn}"; dn = f"uid={login}, {ldap_rec.ldap_base}"
+                    rotary_club_id = int(qcontext['rotary_club_id'])
 
                     attrs = {
                         "uid": [login.encode()], "givenname": [fn.encode()], "cn": [cn.encode()], "sn": [sn.encode()],
-                        "ou": [str(rotary_club_id).encode()], "employeeNumber": [str(rotaryId).encode()],
+                        "ou": [str(rotary_club_id).encode()], "employeeNumber": [qcontext['rotary_id'].encode()],
                         "mail": [qcontext['email'].encode()], "userPassword": [qcontext['password'].encode()],
                         "objectclass": [b"top", b"inetOrgPerson"],
                     }
 
                     user_id, existing_user = ldap_rec._get_or_create_user_tuple(ldap_rec, qcontext['email'], (dn, attrs))
                     if existing_user:
-                        return _render('ldap_signup.web_error', {'message': 'Error: User already exists.'},
-                                       view_fallback='ldap_signup.ldap_signup_web_error')
+                        return request.render('ldap_signup.web_error', {'message': 'Error: User already exists.'})
 
                     if isinstance(user_id, int) and user_id:
                         user = request.env['res.users'].sudo().browse(user_id)
-                        if str(rotaryId).isdigit():
-                            user.partner_id.write({
-                                'rotary_club_id': rotary_club_id,
-                                'rotary_membership_id': str(rotaryId),
-                            })
+                        if rotaryId.isdigit():
+                            user.partner_id.write({'rotary_club_id': rotary_club_id, 'rotary_membership_id': str(rotaryId)})
                         else:
                             user.partner_id.write({'rotary_club_id': rotary_club_id})
 
@@ -212,18 +157,31 @@ class LDAPSignupController(BaseSignup):
                         if role:
                             env['res.users.role.line'].create({
                                 'user_id': user.id, 'role_id': role.id,
-                                'date_from': date.today(), 'date_to': date(2099, 12, 31),
+                                'date_from': date.today(), 'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
 
-                        return _render('ldap_signup.web_thanks',
-                                       {'message': f'You have created user: {user.login}'},
-                                       view_fallback='ldap_signup.ldap_signup_web_thanks')
+                        return request.render('ldap_signup.web_thanks', {'message': f'You have created user: {user.login}'})
                     else:
                         qcontext['error'] = _("Could not create a new account. " + str(user_id))
             except Exception as e:
-                _logger.error("Signup (member) failed: %s", e)
+                _logger.error("%s", e)
                 qcontext['error'] = _("Could not create account. " + str(e))
 
-        return _render('ldap_signup.signup', qcontext,
-                       view_fallback='ldap_signup.ldap_signup_signup')
+        resp = request.render('ldap_signup.signup', qcontext)
+        resp.headers['X-Frame-Options'] = 'DENY'
+        return resp
+
+    def get_auth_signup_qcontext(self):
+        qcontext = {k: v for (k, v) in request.params.items() if k in SIGN_UP_REQUEST_PARAMS}
+        qcontext.update(self.get_auth_signup_config())
+        if not qcontext.get('token') and request.session.get('auth_signup_token'):
+            qcontext['token'] = request.session.get('auth_signup_token')
+        if qcontext.get('token'):
+            try:
+                for k, v in request.env['res.partner'].sudo().signup_retrieve_info(qcontext.get('token')).items():
+                    qcontext.setdefault(k, v)
+            except Exception:
+                qcontext['error'] = _("Invalid signup token")
+                qcontext['invalid_token'] = True
+        return qcontext
