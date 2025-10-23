@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging, random
 from datetime import date
+
 from odoo import http, api, SUPERUSER_ID, _
 from odoo.http import request
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome as BaseSignup
 import werkzeug
 
 _logger = logging.getLogger(__name__)
@@ -42,13 +44,13 @@ def validate_signup_fields(env, email, first_name, last_name):
 def generate_random_number(min_length, max_length):
     return random.randint(10 ** (min_length - 1), (10 ** max_length) - 1)
 
-class LDAPSignupController(http.Controller):
+class LDAPSignupController(BaseSignup):
 
     def get_auth_signup_qcontext(self):
-        # pull only known params from request
+        # Only keep known params
         qcontext = {k: v for (k, v) in request.params.items() if k in SIGN_UP_REQUEST_PARAMS}
-        # FIX: use res.users (auth_signup extends it)
-        qcontext.update(request.env['res.users'].sudo().get_auth_signup_config())
+        # IMPORTANT: use BaseSignup helper (not res.users)
+        qcontext.update(self.get_auth_signup_config())
         if not qcontext.get('token') and request.session.get('auth_signup_token'):
             qcontext['token'] = request.session.get('auth_signup_token')
         if qcontext.get('token'):
@@ -62,7 +64,6 @@ class LDAPSignupController(http.Controller):
 
     @http.route('/web/is_member', type='http', auth='public', website=True)
     def is_member(self, **kwargs):
-        # FIX: template id must match file (module.template_id)
         return request.render('ldap_signup.ldap_signup_signup_is_member')
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
@@ -72,7 +73,7 @@ class LDAPSignupController(http.Controller):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
-            # optional: simple confirm password check
+            # optional confirmation check
             if qcontext.get('password') and qcontext.get('confirm_password'):
                 if qcontext['password'] != qcontext['confirm_password']:
                     qcontext['error'] = _("Passwords do not match.")
@@ -138,7 +139,6 @@ class LDAPSignupController(http.Controller):
             raise werkzeug.exceptions.NotFound()
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
-            # optional: simple confirm password check
             if qcontext.get('password') and qcontext.get('confirm_password'):
                 if qcontext['password'] != qcontext['confirm_password']:
                     qcontext['error'] = _("Passwords do not match.")
@@ -161,7 +161,6 @@ class LDAPSignupController(http.Controller):
                     login = f"{sn}{rotaryId}"
                     cn = f"{fn} {sn}"
                     dn = f"uid={login}, {ldap_rec.ldap_base}"
-                    # be tolerant of blank / non-int values
                     try:
                         rotary_club_id = int(qcontext.get('rotary_club_id') or 0)
                     except Exception:
