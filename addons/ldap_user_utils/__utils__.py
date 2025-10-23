@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
-from odoo import tools
+from odoo import api, tools
 from odoo.exceptions import ValidationError
 
 def ensure_partner_from_ldap(env, attrs, company_id):
-    """
-    Idempotent partner lookup/create by LDAP attrs.
-    If a unique-email constraint/validation fires, reuse the existing partner.
-    """
+    """Idempotent partner lookup/create by LDAP attrs."""
     def _attr(a, key, default=""):
         try:
             vals = a.get(key) or []
@@ -31,10 +27,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
         partner = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
         if not partner:
             try:
-                env.cr.execute(
-                    "SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1",
-                    (email_norm,)
-                )
+                env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
                 r = env.cr.fetchone()
                 if r:
                     partner = P.browse(r[0])
@@ -72,10 +65,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             p = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
             if not p and email:
                 try:
-                    env.cr.execute(
-                        "SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1",
-                        (email_norm,)
-                    )
+                    env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
                     r = env.cr.fetchone()
                     if r:
                         p = P.browse(r[0])
