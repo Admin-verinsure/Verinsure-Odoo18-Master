@@ -26,8 +26,10 @@ SIGN_UP_REQUEST_PARAMS = {
     'redirect', 'redirect_hostname', 'email', 'name', 'partner_id',
     'password', 'confirm_password', 'city', 'country_id', 'lang',
     'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id',
-    # allow Program Type params to survive across requests/rerenders
-    'program_type', 'program_type_id',
+    # keep both names so templates using either continue to work
+    'club_type',            # <-- added back (this is what your template reads)
+    'program_type',         # ok if some templates use this name
+    'program_type_id',
 }
 
 # ---------------------------------------------------------------------------
@@ -256,7 +258,6 @@ class LDAPSignupController(AuthSignupController):
         try:
             qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
         except Exception:
-            # Model not installed? Give an empty recordset so the template still renders cleanly.
             qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
         return http.request.render('ldap_reset_password.signup_is_member', qcontext)
 
@@ -266,7 +267,6 @@ class LDAPSignupController(AuthSignupController):
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
 
-        # Optional: also make program types available here if your template shows it for non-members
         try:
             qcontext.setdefault('program_types', request.env['program.type'].sudo().search([], order='name'))
         except Exception:
@@ -321,7 +321,6 @@ class LDAPSignupController(AuthSignupController):
                             })
                             user.set_groups_from_roles()
 
-                        # (Optional) persist program_type_id to partner if your model/field exists
                         program_type_id = qcontext.get('program_type_id')
                         if program_type_id:
                             try:
@@ -346,7 +345,7 @@ class LDAPSignupController(AuthSignupController):
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
 
-        # Ensure Program Types are available in context for the page and any re-render after POST
+        # Provide program types for the page (and any re-render)
         try:
             qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
         except Exception:
@@ -406,7 +405,6 @@ class LDAPSignupController(AuthSignupController):
                             })
                             user.set_groups_from_roles()
 
-                        # Persist chosen program type if provided and field exists
                         program_type_id = qcontext.get('program_type_id')
                         if program_type_id:
                             try:
@@ -760,14 +758,11 @@ class CompanyLDAP(models.Model):
                     return partner
             if cn:
                 partner = P.search([('name', '=', cn)], limit=1)
-                if partner:
-                    return partner
-            nm = (f"{given} {sn}".strip())
-            if nm:
-                partner = P.search([('name', '=', nm)], limit=1)
-                if partner:
-                    return partner
-            return False
+            if not partner and (given or sn):
+                nm = (f"{given} {sn}".strip())
+                if nm:
+                    partner = P.search([('name', '=', nm)], limit=1)
+            return partner or False
 
         def _unique_login(env_, desired: str) -> str:
             base = tools.ustr(desired or '').strip().lower() or "user"
