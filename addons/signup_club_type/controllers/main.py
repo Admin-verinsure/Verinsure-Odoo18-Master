@@ -1,25 +1,28 @@
 # your_module_name/controllers/main.py
 
-from odoo.addons.auth_signup.controllers.main import AuthSignupHome
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome as BaseSignup
 from odoo import http
-from odoo.http import request
 
+class AuthSignupHomeExtended(BaseSignup):
+    """
+    Keep the parent routes. Just ensure `rotary_id` from the form is:
+      - present in the qcontext as `rotary_org_id` so the field renders
+      - persisted on signup by mapping into the create vals
+    """
 
-
-    
-class AuthSignupHomeExtended(AuthSignupHome):
-
-    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
-    def web_auth_signup(self, *args, **kw):
-        qcontext = self.get_auth_signup_qcontext()
-        if 'error' not in qcontext and 'rotary_id' in qcontext:
-            qcontext['rotary_org_id'] = qcontext.pop('rotary_id')
-        
-        return super(AuthSignupHomeExtended, self).web_auth_signup(*args, **kw)
+    def get_auth_signup_qcontext(self):
+        """Ensure rotary_org_id is available to the signup template."""
+        q = super().get_auth_signup_qcontext()
+        # Mirror (not pop) so validation / re-render still has original key too
+        rid = q.get("rotary_id")
+        if rid and "rotary_org_id" not in q:
+            q["rotary_org_id"] = rid
+        return q
 
     def _prepare_signup_values(self, qcontext):
-        """ Add rotary_id to the context for partner creation """
-        res = super(AuthSignupHomeExtended, self)._prepare_signup_values(qcontext)
-        if 'rotary_id' in qcontext:
-            res['rotary_org_id'] = qcontext['rotary_id']
-        return res
+        """Map rotary_id -> rotary_org_id at save time."""
+        vals = super()._prepare_signup_values(qcontext)
+        rid = (qcontext or {}).get("rotary_id")
+        if rid:
+            vals["rotary_org_id"] = rid
+        return vals
