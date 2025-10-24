@@ -1,6 +1,10 @@
 from zxcvbn import zxcvbn
 from odoo import http
-import re, logging
+
+import json
+import re
+import logging
+
 
 _logger = logging.getLogger(__name__)
 
@@ -19,9 +23,11 @@ class PasswordValidation(http.Controller):
     def _validate_password(self, password):
         if not password:
             return False, "Password must not be empty."
+
         result = zxcvbn(password)
         if result['score'] < 3:
             return False, "Password is too weak."
+
         rules = [
             (len(password) >= 10, "Password must be at least 10 characters long."),
             (re.search("[a-z]", password), "Password must contain at least 1 lowercase letter."),
@@ -29,7 +35,10 @@ class PasswordValidation(http.Controller):
             (re.search("[0-9]", password), "Password must contain at least 1 number."),
             (re.search("[!@#$%^&*(),.?\":{}|<>]", password), "Password must contain at least 1 special character."),
         ]
-        failed = [msg for ok, msg in rules if not ok]
-        if failed:
-            return False, " ".join(failed)
+
+        failed_rules = [message for condition, message in rules if not condition]
+
+        if failed_rules:
+            return False, " ".join(failed_rules)
+
         return True, "Success"
