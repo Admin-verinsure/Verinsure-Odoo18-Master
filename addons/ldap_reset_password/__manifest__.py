@@ -1,24 +1,15 @@
 {
     'name': 'LDAP Reset Password',
-    'version': '18.0.1.0.1',
-    'summary': 'Add LDAP Reset Password functionality (OTP) and login overrides',
+    'version': '18.0.1.0.0',
+    'summary': 'Add LDAP Reset Password functionality',
+    'description': 'A module to allow a user to reset their password in LDAP from the reset password form.',
     'author': 'Verinsure',
-    'depends': [
-        'auth_ldap', 'auth_signup', 'base', 'web', 'website', 'mail',
-        'membership', 'rotary_project_map',
-        'ldap_user_utils',
-    ],
+    'depends': ['auth_ldap','base', 'membership', 'rotary_project_map'],
     'data': [
-        'security/ir.model.access.csv',
-        'views/reset_ldap_password.xml',
+        'reset_ldap_password.xml',
     ],
-    'assets': {
-        'web.assets_frontend': [
-            'ldap_reset_password/static/src/js/password_validation.js',
-        ],
-    },
     'installable': True,
     'auto_install': False,
     'application': False,
-    'license': 'LGPL-3',
 }
+
