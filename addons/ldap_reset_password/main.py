@@ -25,7 +25,9 @@ SIGN_UP_REQUEST_PARAMS = {
     'db', 'login', 'debug', 'token', 'message', 'error', 'scope', 'mode',
     'redirect', 'redirect_hostname', 'email', 'name', 'partner_id',
     'password', 'confirm_password', 'city', 'country_id', 'lang',
-    'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id'
+    'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id',
+    # allow Program Type params to survive across requests/rerenders
+    'program_type', 'program_type_id',
 }
 
 # ---------------------------------------------------------------------------
@@ -249,13 +251,26 @@ class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/is_member', type='http', auth='public', website=True)
     def is_member(self, **kwargs):
-        return http.request.render('ldap_reset_password.signup_is_member')
+        # Make sure template gets the dropdown list + any whitelisted params
+        qcontext = self.get_auth_signup_qcontext()
+        try:
+            qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
+        except Exception:
+            # Model not installed? Give an empty recordset so the template still renders cleanly.
+            qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
+        return http.request.render('ldap_reset_password.signup_is_member', qcontext)
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup_non_member(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
+
+        # Optional: also make program types available here if your template shows it for non-members
+        try:
+            qcontext.setdefault('program_types', request.env['program.type'].sudo().search([], order='name'))
+        except Exception:
+            qcontext.setdefault('program_types', request.env['ir.model'].sudo().browse([]))
 
         if 'error' not in qcontext and request.httprequest.method == 'POST':
             try:
@@ -306,6 +321,14 @@ class LDAPSignupController(AuthSignupController):
                             })
                             user.set_groups_from_roles()
 
+                        # (Optional) persist program_type_id to partner if your model/field exists
+                        program_type_id = qcontext.get('program_type_id')
+                        if program_type_id:
+                            try:
+                                user.partner_id.sudo().write({'program_type_id': int(program_type_id)})
+                            except Exception:
+                                _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
+
                         return http.request.render('ldap_reset_password.web_thanks', {'message': f'You have created user: {user.login}'})
                     else:
                         qcontext['error'] = _("Could not create a new account. " + str(user_id))
@@ -322,6 +345,12 @@ class LDAPSignupController(AuthSignupController):
         qcontext = self.get_auth_signup_qcontext()
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
+
+        # Ensure Program Types are available in context for the page and any re-render after POST
+        try:
+            qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
+        except Exception:
+            qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
@@ -376,6 +405,14 @@ class LDAPSignupController(AuthSignupController):
                                 'date_from': date.today(), 'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
+
+                        # Persist chosen program type if provided and field exists
+                        program_type_id = qcontext.get('program_type_id')
+                        if program_type_id:
+                            try:
+                                user.partner_id.sudo().write({'program_type_id': int(program_type_id)})
+                            except Exception:
+                                _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
 
                         return http.request.render('ldap_reset_password.web_thanks', {'message': f'You have created user: {user.login}'})
                     else:
