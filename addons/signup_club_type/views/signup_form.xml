@@ -1,38 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <template id="custom_signup_program_type_replace" inherit_id="ldap_reset_password.fields">
-
-    <!-- Replace Program Type block (use the real selection from res.partner.club_type) -->
-    <xpath expr="//div[@class='form-group'][select/@name='program_type']" position="replace">
+  <!-- Inject "Program Type" right after the Rotary ID row -->
+  <template id="signup_add_program_type" inherit_id="ldap_reset_password.signup">
+    <xpath expr="//input[@name='rotary_id']/ancestor::div[contains(@class,'form-group')][1]" position="after">
       <div class="form-group">
         <label for="club_type">Program Type</label>
         <select name="club_type" id="club_type" class="form-control form-control-sm" required="required">
           <option value="">-- Select Program Type --</option>
-          <t t-set="club_types" t-value="env['res.partner']._fields['club_type'].selection"/>
+          <!-- Use the selection from res.partner.club_type (falls back to empty list) -->
+          <t t-set="club_types" t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
           <t t-foreach="club_types" t-as="opt">
             <option t-att-value="opt[0]"
-                    t-att-selected="request.params.get('club_type') == opt[0]">
+                    t-att-selected="(request.params.get('club_type') or request.params.get('program_type')) == opt[0]">
               <t t-esc="opt[1]"/>
             </option>
           </t>
         </select>
       </div>
     </xpath>
+  </template>
 
-    <!-- Replace ONLY the existing Club Name select (rotary_club_id) -->
-    <!-- If your DOM differs, you can target the parent div via //select[@name='rotary_club_id']/.. -->
+  <!-- Replace the Club dropdown to depend on the chosen Program Type -->
+  <template id="signup_filter_clubs_by_program_type" inherit_id="ldap_reset_password.signup">
     <xpath expr="//select[@name='rotary_club_id']" position="replace">
-      <!-- Read chosen program type from the request -->
+      <!-- Read the chosen program type (support old 'program_type' too) -->
       <t t-set="sel_program" t-value="request.params.get('club_type') or request.params.get('program_type')"/>
 
-      <!-- Fetch clubs from Contacts (res.partner) filtered by club_type -->
-      <!-- You can add ('company_type','=','company') if you want only organizations -->
+      <!-- Fetch clubs filtered by program type -->
       <t t-set="clubs"
-         t-value="sel_program and
-                  env['res.partner'].sudo().search(
-                    [('club_type','=', sel_program), ('active','=', True)],
-                    order='name'
-                  )
+         t-value="sel_program
+                  and env['res.partner'].sudo().search([('club_type','=', sel_program), ('active','=', True)], order='name')
                   or env['res.partner'].browse([])"/>
 
       <select class="form-control form-control-sm" name="rotary_club_id" id="rotary_club_id" required="required">
@@ -44,12 +41,11 @@
         </t>
         <t t-foreach="clubs" t-as="c">
           <option t-att-value="c.id"
-                  t-att-selected="str(c.id) == (request.params.get('rotary_club_id') or '')">
+                  t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
             <t t-esc="c.name"/>
           </option>
         </t>
       </select>
     </xpath>
-
   </template>
 </odoo>
