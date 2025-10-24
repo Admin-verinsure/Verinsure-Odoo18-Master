@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, date
 from ldap.filter import filter_format
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.exceptions import UserError, ValidationError
-from odoo.http import request
+from odoo.http import Controller, request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 from odoo import registry as odoo_registry
 
@@ -26,8 +26,8 @@ SIGN_UP_REQUEST_PARAMS = {
     'redirect', 'redirect_hostname', 'email', 'name', 'partner_id',
     'password', 'confirm_password', 'city', 'country_id', 'lang',
     'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id',
-    # make sure we pass the program type from the form
-    'program_type_id',
+    # allow Program Type params to survive across requests/rerenders
+    'program_type', 'program_type_id',
 }
 
 # ---------------------------------------------------------------------------
@@ -35,27 +35,34 @@ SIGN_UP_REQUEST_PARAMS = {
 # ---------------------------------------------------------------------------
 
 def _kick_async_mail_send(db_name: str):
-    """Fire-and-forget queue processor; never raises in request thread."""
+    """
+    Fire-and-forget background sender.
+    Opens its own cursor/environment and processes the mail queue.
+    Never raises; logs only.
+    """
     def _runner():
         try:
             with api.Environment.manage():
                 with odoo_registry(db_name).cursor() as cr:
                     env = api.Environment(cr, SUPERUSER_ID, {})
                     try:
+                        # Odoo 15+ public API
                         if hasattr(env['mail.mail'], 'process_email_queue'):
                             env['mail.mail'].sudo().process_email_queue()
+                        # Older private API fallback
                         elif hasattr(env['mail.mail'], '_process_queue'):
                             env['mail.mail'].sudo()._process_queue()
                         else:
-                            _logger.warning("PWRESET: queue processor not found on this Odoo version")
+                            _logger.warning("PWRESET: mail queue process method not found on this Odoo version")
                     except Exception as e:
                         _logger.warning("PWRESET: async mail queue processing failed: %s", e)
                     cr.commit()
         except Exception as e:
             _logger.warning("PWRESET: async sender thread crashed: %s", e)
 
+    th = threading.Thread(target=_runner, name="otp-mail-sender", daemon=True)
     try:
-        threading.Thread(target=_runner, name="otp-mail-sender", daemon=True).start()
+        th.start()
     except Exception as e:
         _logger.warning("PWRESET: could not start async sender thread: %s", e)
 
@@ -67,9 +74,6 @@ def _kick_async_mail_send(db_name: str):
 class ResPartner(models.Model):
     _inherit = 'res.partner'
     rotary_membership_id = fields.Char(string="Rotary ID")
-    # assuming you have these fields in your model; if not, remove or adapt
-    program_type_id = fields.Many2one('program.type', string='Program Type')
-    rotary_org_id = fields.Char(string='Rotary Org ID')
 
 
 class ChangePasswordWizard(models.TransientModel):
@@ -214,7 +218,7 @@ class LDAPResetController(http.Controller):
                     try:
                         mail_tmpl.with_context(ctx).sudo().send_mail(
                             user.id,
-                            force_send=False,
+                            force_send=False,          # queue only
                             raise_exception=False,
                             email_values={'email_from': email_from, 'email_to': email_to},
                         )
@@ -238,57 +242,115 @@ class LDAPResetController(http.Controller):
 
         return http.request.render('ldap_reset_password.template_otp', {'message': 'Placeholder'})
 
+    @http.route('/web/reset_password', type='http', auth="public", website=True)
+    def reset_password(self):
+        return request.redirect('/web/reset_ldap_password')
+
 
 class LDAPSignupController(AuthSignupController):
 
     @http.route('/web/is_member', type='http', auth='public', website=True)
     def is_member(self, **kwargs):
-        # include base signup qcontext
+        # Make sure template gets the dropdown list + any whitelisted params
         qcontext = self.get_auth_signup_qcontext()
-
-        # 1) Provide Program Types for the template (recordset + list of tuples)
         try:
-            pts = request.env['program.type'].sudo().search([], order='name')
-            qcontext['program_types'] = pts
-            qcontext['program_type_list'] = pts
-            qcontext['program_type_options'] = [(p.id, p.name) for p in pts]
-            _logger.debug("WEBSITE SIGNUP is_member: loaded %s program types", len(pts))
-        except Exception as e:
-            _logger.warning("WEBSITE SIGNUP is_member: program.type not available: %s", e)
+            qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
+        except Exception:
+            # Model not installed? Give an empty recordset so the template still renders cleanly.
             qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
-            qcontext['program_type_list'] = qcontext['program_types']
-            qcontext['program_type_options'] = []
-
-        # 2) Map rotary_id -> rotary_org_id in qcontext for template compatibility
-        if 'rotary_id' in qcontext and 'rotary_org_id' not in qcontext:
-            qcontext['rotary_org_id'] = qcontext['rotary_id']
-
         return http.request.render('ldap_reset_password.signup_is_member', qcontext)
+
+    @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
+    def web_auth_signup_non_member(self, *args, **kw):
+        qcontext = self.get_auth_signup_qcontext()
+        if not qcontext.get('token') and not qcontext.get('signup_enabled'):
+            raise werkzeug.exceptions.NotFound()
+
+        # Optional: also make program types available here if your template shows it for non-members
+        try:
+            qcontext.setdefault('program_types', request.env['program.type'].sudo().search([], order='name'))
+        except Exception:
+            qcontext.setdefault('program_types', request.env['ir.model'].sudo().browse([]))
+
+        if 'error' not in qcontext and request.httprequest.method == 'POST':
+            try:
+                env = api.Environment(http.request.cr, SUPERUSER_ID, {})
+                ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
+                if not ok:
+                    qcontext['error'] = msg
+                    resp = request.render('ldap_reset_password.signup_non_member', qcontext)
+                    resp.headers['X-Frame-Options'] = 'DENY'
+                    return resp
+
+                ldap_rec = env['res.company.ldap'].search([], limit=1)
+                if ldap_rec:
+                    sn = qcontext['last_name']; fn = qcontext['first_name']
+                    rotaryId = str(generate_random_number(5, 8))
+                    login = sn + rotaryId
+                    cn = f"{fn} {sn}"
+                    dn = f"uid={login}, {ldap_rec.ldap_base}"
+
+                    attrs = {
+                        "uid": [login.encode()], "givenname": [fn.encode()], "cn": [cn.encode()], "sn": [sn.encode()],
+                        "employeeNumber": [rotaryId.encode()], "mail": [qcontext['email'].encode()],
+                        "userPassword": [qcontext['password'].encode()], "objectclass": [b"top", b"inetOrgPerson"],
+                    }
+
+                    user_id, existing_user = ldap_rec._get_or_create_user_tuple(ldap_rec, qcontext['email'], (dn, attrs))
+                    if existing_user:
+                        return http.request.render('ldap_reset_password.web_error', {'message': 'Error: User already exists.'})
+
+                    if isinstance(user_id, int) and user_id:
+                        dn_exist, entry_exist = ldap_rec._ldap_find_by_attrs(ldap_rec, attrs)
+                        if not entry_exist:
+                            created, message = ldap_rec._create_ldap_user(ldap_rec, dn, attrs)
+                            if not created and "Already exists" not in (message or ""):
+                                request.env['res.users'].sudo().browse(user_id).unlink()
+                                return http.request.render('ldap_reset_password.web_error', {'message': (message or '') + '.'})
+
+                        user = request.env['res.users'].sudo().browse(user_id)
+                        role = env['res.users.role'].search([('name', '=', 'Guests')])
+                        if rotaryId.isdigit():
+                            user.partner_id.write({'rotary_membership_id': str(rotaryId)})
+
+                        env['res.users.role.line'].search([('user_id', '=', user_id)]).unlink()
+                        if role:
+                            env['res.users.role.line'].create({
+                                'user_id': user.id, 'role_id': role.id,
+                                'date_from': date.today(), 'date_to': date(2099, 12, 31)
+                            })
+                            user.set_groups_from_roles()
+
+                        # (Optional) persist program_type_id to partner if your model/field exists
+                        program_type_id = qcontext.get('program_type_id')
+                        if program_type_id:
+                            try:
+                                user.partner_id.sudo().write({'program_type_id': int(program_type_id)})
+                            except Exception:
+                                _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
+
+                        return http.request.render('ldap_reset_password.web_thanks', {'message': f'You have created user: {user.login}'})
+                    else:
+                        qcontext['error'] = _("Could not create a new account. " + str(user_id))
+            except Exception as e:
+                _logger.error("%s", e)
+                qcontext['error'] = _("Could not create account. " + str(e))
+
+        resp = request.render('ldap_reset_password.signup_non_member', qcontext)
+        resp.headers['X-Frame-Options'] = 'DENY'
+        return resp
 
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
-
-        # prefill clubs
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
 
-        # Program Types for both GET and POST rerenders
+        # Ensure Program Types are available in context for the page and any re-render after POST
         try:
-            pts = request.env['program.type'].sudo().search([], order='name')
-            qcontext['program_types'] = pts
-            qcontext['program_type_list'] = pts
-            qcontext['program_type_options'] = [(p.id, p.name) for p in pts]
-            _logger.debug("WEBSITE SIGNUP: loaded %s program types for signup", len(pts))
-        except Exception as e:
-            _logger.warning("WEBSITE SIGNUP: program.type not available: %s", e)
+            qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
+        except Exception:
             qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
-            qcontext['program_type_list'] = qcontext['program_types']
-            qcontext['program_type_options'] = []
-
-        # Map rotary_id -> rotary_org_id for templates expecting that name
-        if 'rotary_id' in qcontext and 'rotary_org_id' not in qcontext:
-            qcontext['rotary_org_id'] = qcontext['rotary_id']
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
@@ -330,27 +392,11 @@ class LDAPSignupController(AuthSignupController):
                                 return http.request.render('ldap_reset_password.web_error', {'message': (message or '') + '.'})
 
                         user = request.env['res.users'].sudo().browse(user_id)
-                        # partner updates
-                        partner_vals = {'rotary_club_id': rotary_club_id}
-                        if rotaryId and str(rotaryId).isdigit():
-                            partner_vals['rotary_membership_id'] = str(rotaryId)
-                            # also store as rotary_org_id to match your snippet
-                            partner_vals['rotary_org_id'] = str(rotaryId)
+                        if rotaryId.isdigit():
+                            user.partner_id.write({'rotary_club_id': rotary_club_id, 'rotary_membership_id': str(rotaryId)})
+                        else:
+                            user.partner_id.write({'rotary_club_id': rotary_club_id})
 
-                        # persist chosen program type (if submitted)
-                        program_type_id = qcontext.get('program_type_id') or request.params.get('program_type_id')
-                        if program_type_id:
-                            try:
-                                partner_vals['program_type_id'] = int(program_type_id)
-                            except Exception:
-                                _logger.warning("SIGNUP: bad program_type_id %r", program_type_id)
-
-                        try:
-                            user.partner_id.sudo().write(partner_vals)
-                        except Exception as e:
-                            _logger.warning("SIGNUP: partner write failed (%s): %s", user.partner_id.id, e)
-
-                        # roles
                         role = env['res.users.role'].search([('name', '=', 'Members')])
                         env['res.users.role.line'].search([('user_id', '=', user_id)]).unlink()
                         if role:
@@ -359,6 +405,14 @@ class LDAPSignupController(AuthSignupController):
                                 'date_from': date.today(), 'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
+
+                        # Persist chosen program type if provided and field exists
+                        program_type_id = qcontext.get('program_type_id')
+                        if program_type_id:
+                            try:
+                                user.partner_id.sudo().write({'program_type_id': int(program_type_id)})
+                            except Exception:
+                                _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
 
                         return http.request.render('ldap_reset_password.web_thanks', {'message': f'You have created user: {user.login}'})
                     else:
@@ -372,7 +426,6 @@ class LDAPSignupController(AuthSignupController):
         return resp
 
     def get_auth_signup_qcontext(self):
-        # Standard qcontext + only the parameters we explicitly allow
         qcontext = {k: v for (k, v) in request.params.items() if k in SIGN_UP_REQUEST_PARAMS}
         qcontext.update(self.get_auth_signup_config())
         if not qcontext.get('token') and request.session.get('auth_signup_token'):
@@ -384,15 +437,6 @@ class LDAPSignupController(AuthSignupController):
             except Exception:
                 qcontext['error'] = _("Invalid signup token")
                 qcontext['invalid_token'] = True
-
-        # Make program_type_id available even if template posts it via raw params
-        if 'program_type_id' not in qcontext and request.params.get('program_type_id'):
-            qcontext['program_type_id'] = request.params.get('program_type_id')
-
-        # Mirror rotary_id to rotary_org_id for template/partner compatibility
-        if 'rotary_id' in qcontext and 'rotary_org_id' not in qcontext:
-            qcontext['rotary_org_id'] = qcontext['rotary_id']
-
         return qcontext
 
 
@@ -409,6 +453,7 @@ def extract_rotary_id(login, last_name):
 def generate_random_number(min_length, max_length):
     return random.randint(10 ** (min_length - 1), (10 ** max_length) - 1)
 
+# Only block on an existing *user* e-mail, not a *contact*.
 def _email_is_valid(email):
     email = (email or "").strip()
     try:
@@ -433,8 +478,12 @@ def validate_signup_fields(env, email, first_name, last_name):
         return False, _("Last name is required.")
     return True, ""
 
+# ---------- partner helper (module-level) ----------
 def ensure_partner_from_ldap(env, attrs, company_id):
-    """Idempotent partner lookup/create by LDAP attrs."""
+    """
+    Idempotent partner lookup/create by LDAP attrs.
+    If a unique-email constraint/validation fires, reuse the existing partner.
+    """
     def _attr(a, key, default=""):
         try:
             vals = a.get(key) or []
@@ -522,6 +571,7 @@ def ensure_partner_from_ldap(env, attrs, company_id):
 class CompanyLDAP(models.Model):
     _inherit = 'res.company.ldap'
 
+    # ---------- raw python-ldap connection ----------
     def _pyldap_connect(self, conf):
         host = getattr(conf, "ldap_server", None) or (conf.get("ldap_server") if isinstance(conf, dict) else "127.0.0.1")
         port = int(getattr(conf, "ldap_server_port", None) or (conf.get("ldap_server_port") if isinstance(conf, dict) else 389))
@@ -530,6 +580,7 @@ class CompanyLDAP(models.Model):
         uri = f"{scheme}://{host}:{port}"
         conn = ldap.initialize(uri)
         conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        # Short timeouts to avoid long 504s
         try:
             conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
         except Exception:
@@ -656,15 +707,20 @@ class CompanyLDAP(models.Model):
                 return res[0][0], res[0]
         return False, False
 
-    # Keep core signature; delegate to tuple version
+    # ----------- keep core signature; delegate to tuple version -----------
     def _get_or_create_user(self, conf, login, ldap_entry):
         user_id, _existing = self._get_or_create_user_tuple(conf, login, ldap_entry)
         return user_id
 
     def _get_or_create_user_tuple(self, conf, login, ldap_entry):
-        """LDAP lookup by email; else create; then create Odoo user/partner."""
+        """
+        - Lookup LDAP by email; if found use its uid as login (create Odoo user if needed).
+        - If not found, create LDAP entry, then Odoo partner/user.
+        Returns (user_id:int, existing_user:bool).
+        """
         env = self.env
         confd = self._as_dict(conf)
+        existing_user = False
 
         requested_email = tools.ustr(login or "").strip().lower()
 
