@@ -1,15 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- Override the Club dropdown to depend on the chosen Program Type -->
+  <!-- 1. Inject our own Program Type field after Rotary ID -->
+  <template id="signup_add_program_type" inherit_id="ldap_reset_password.fields">
+    <xpath expr="//input[@name='rotary_id']/ancestor::div[1]" position="after">
+
+      <div class="form-group">
+        <label for="club_type">Program Type</label>
+
+        <select name="club_type"
+                id="club_type"
+                class="form-control form-control-sm"
+                required="required"
+                t-att-readonly="'readonly' if only_passwords else None"
+                t-att-autofocus="'autofocus' if login and not only_passwords else None">
+
+          <option value="">-- Select Program Type --</option>
+
+          <!-- pull selection values from res.partner.club_type -->
+          <t t-set="club_types"
+             t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
+
+          <t t-foreach="club_types" t-as="opt">
+            <option t-att-value="opt[0]"
+                    t-att-selected="(request.params.get('club_type') or request.params.get('program_type')) == opt[0]">
+              <t t-esc="opt[1]"/>
+            </option>
+          </t>
+        </select>
+      </div>
+
+    </xpath>
+  </template>
+
+
+  <!-- 2. Replace the Club dropdown so it's filtered by the chosen Program Type -->
   <template id="signup_filter_clubs_by_program_type" inherit_id="ldap_reset_password.fields">
     <xpath expr="//select[@name='rotary_club_id']" position="replace">
 
-      <!-- Determine selected program type (supports both 'club_type' and 'program_type' params) -->
+      <!-- Determine which program type was picked (support both club_type and legacy program_type param names) -->
       <t t-set="sel_program"
          t-value="request.params.get('club_type') or request.params.get('program_type')"/>
 
-      <!-- Fetch clubs filtered by that program type -->
+      <!-- Fetch clubs that match that program type -->
       <t t-set="clubs"
          t-value="sel_program
                   and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
@@ -22,17 +55,17 @@
               t-att-readonly="'readonly' if only_passwords else None"
               t-att-autofocus="'autofocus' if login and not only_passwords else None">
 
-        <!-- No program chosen yet -->
+        <!-- If no Program Type chosen yet -->
         <t t-if="not sel_program">
           <option value="">-- Select Program Type first --</option>
         </t>
 
-        <!-- Program chosen but no clubs -->
+        <!-- If Program Type chosen but no clubs -->
         <t t-if="sel_program and not clubs">
           <option value="">-- No clubs found for this program --</option>
         </t>
 
-        <!-- Program chosen and clubs found -->
+        <!-- If Program Type chosen and clubs available -->
         <t t-foreach="clubs" t-as="c">
           <option t-att-value="c.id"
                   t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
@@ -41,6 +74,15 @@
         </t>
       </select>
 
+    </xpath>
+  </template>
+
+  <!-- 3. OPTIONAL cleanup: hide the original Program Type block from base template -->
+  <template id="signup_hide_original_program_type" inherit_id="ldap_reset_password.fields">
+    <!-- The base template wraps its Program Type in <t t-if="program_types"><div class="form-group">...</div></t>.
+         We neutralize it by removing that whole t-if block so ours is the only Program Type shown. -->
+    <xpath expr="//t[@t-if='program_types']" position="replace">
+      <!-- replaced with nothing -->
     </xpath>
   </template>
 
