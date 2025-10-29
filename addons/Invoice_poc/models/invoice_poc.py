@@ -31,6 +31,7 @@ DEFAULT_NOTES_HTML = (
     "</ul>"
 )
 
+
 class InvoicePocPayload(models.Model):
     _name = "invoice.poc.payload"
     _description = "Stored payloads for invoice POC"
@@ -47,8 +48,12 @@ class InvoicePocPayload(models.Model):
     )
     error_message = fields.Text()
 
-    # ---------------- helpers ----------------
+    # Make ext_id idempotent
+    _sql_constraints = [
+        ("ext_id_unique", "unique(ext_id)", "This external reference already exists.")
+    ]
 
+    # ---------------- helpers ----------------
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
         Partner = self.env["res.partner"]
@@ -61,6 +66,7 @@ class InvoicePocPayload(models.Model):
         else:
             raise ValueError("Provide partner email or name")
 
+        # Prefer same-company or shared partner
         dom = ["&", ("company_id", "in", [False, company_id])] + dom
         partner = Partner.search(dom, limit=1)
         if not partner:
@@ -68,12 +74,13 @@ class InvoicePocPayload(models.Model):
                 "name": name or email,
                 "email": email,
                 "customer_rank": 1,
-                "company_id": company_id,
+                "company_id": company_id,  # ensure company consistency
             })
         return partner
 
     @api.model
     def _find_currency(self, code=None):
+        # If not provided, use the company currency (safe default)
         return (self.env["res.currency"].search([("name", "=", code)], limit=1)
                 if code else self.env.company.currency_id)
 
@@ -89,6 +96,8 @@ class InvoicePocPayload(models.Model):
     @api.model
     def _find_taxes(self, names=None, company_id=None):
         names = names or []
+        if isinstance(names, str):
+            names = [names]
         if not names:
             return [(6, 0, [])]
         taxes = self.env["account.tax"].search([("name", "in", names), ("company_id", "=", company_id)])
@@ -96,6 +105,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _fallback_income_account(self, company_id=None):
+        # Prefer an account linked to this company (multi-company friendly)
         acc = self.env["account.account"].search(
             [("account_type", "=", "income"), ("company_ids", "in", [company_id])], limit=1
         ) or self.env["account.account"].search([("account_type", "=", "income")], limit=1)
@@ -110,6 +120,10 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _build_narration_html(self, data):
+        """
+        Build an HTML 'narration' that the QWeb report prints under Terms/Notes.
+        If payload provides overrides, use them; otherwise the defaults above.
+        """
         terms_list = data.get("terms") or DEFAULT_TERMS
         notes_html = (data.get("notes") or data.get("note") or DEFAULT_NOTES_HTML)
         if isinstance(notes_html, str):
@@ -131,7 +145,6 @@ class InvoicePocPayload(models.Model):
         Queue the posted invoice email using the built-in template.
         This does NOT force-send (so SMTP issues won't break posting).
         """
-        # must have a recipient
         if not move.partner_id.email:
             self.env['mail.activity'].create({
                 'res_model_id': self.env['ir.model']._get_id('account.move'),
@@ -144,29 +157,31 @@ class InvoicePocPayload(models.Model):
             })
             return
 
-        # use Odoo standard invoice template (attaches PDF automatically)
         template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
         if not template:
             move.message_post(body="Invoice posted, but standard email template was not found.")
             return
 
-        # queue the email (do not force immediate send)
         template.sudo().send_mail(
             move.id,
-            force_send=False,  # queued; process later via scheduler or manual queue run
+            force_send=False,  # queue it; mail queue / scheduler will send
             email_values={
                 'email_to': move.partner_id.email,
-                # 'email_from': move.company_id.email,  # set once SMTP is aligned to this address
+                # 'email_from': move.company_id.email,  # set once SMTP aligns
             },
         )
-        # do NOT commit here; controller will commit on success, and shell users can env.cr.commit()
 
     # ---------------- main ----------------
     def action_create_and_post_invoice(self):
+        """
+        Create & post a customer invoice from the stored JSON payload.
+        - Always sets salesperson (default from system param, overridable by payload).
+        - Always populates narration (Terms + Notes) with defaults (overridable).
+        """
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
 
-        # Target company & default salesperson (configurable via system parameter)
+        # Company & default salesperson (system parameter can override default)
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
@@ -219,9 +234,9 @@ class InvoicePocPayload(models.Model):
             "currency_id": currency.id if currency else False,
             "invoice_user_id": salesperson.id,      # permanent: set salesperson
             "invoice_line_ids": line_cmds,
-            "narration": narration_html or False,   # permanent: always set Terms + Notes
+            "narration": narration_html or False,   # permanent: Terms + Notes
         }
-        # Optional print fields
+        # Optional printable fields (also used by your QWeb)
         if data.get("ref"):
             move_vals["ref"] = data["ref"]
         if data.get("invoice_date"):
@@ -238,12 +253,13 @@ class InvoicePocPayload(models.Model):
             allowed_company_ids=[company.id],      # UI-like visibility
         ).create(move_vals)
 
-        # Post and auto-queue email
+        # Post and (optionally) queue the email
         move.action_post()
         try:
             self._send_invoice_email(move)
         except Exception as e:
             move.message_post(body=f"Auto-email queueing failed: {e}")
 
+        # Link trace & mark as posted
         self.write({"move_id": move.id, "state": "posted"})
         return move
