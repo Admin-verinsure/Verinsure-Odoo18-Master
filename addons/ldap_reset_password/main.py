@@ -27,8 +27,8 @@ SIGN_UP_REQUEST_PARAMS = {
     'password', 'confirm_password', 'city', 'country_id', 'lang',
     'first_name', 'last_name', 'rotary_id', 'rotary_club', 'rotary_club_id',
     # keep both names so templates using either continue to work
-    'club_type',            # <-- added back (this is what your template reads)
-    'program_type',         # ok if some templates use this name
+    'club_type',
+    'program_type',
     'program_type_id',
 }
 
@@ -194,54 +194,20 @@ class LDAPResetController(http.Controller):
 
             if user:
                 if user.partner_id.email:
-                    otp_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                    expiration_time = datetime.now() + timedelta(minutes=15)
-                    env['otp'].create({'user_id': user.id, 'otp_code': otp_code, 'expiration_time': expiration_time})
-
-                    # Persist OTP before any email handling
-                    request.env.cr.commit()
-
-                    website_domain = http.request.httprequest.headers.get('Host').split(':')[0]
-                    subject = "One Time Password for Password Change Verification"
-                    if website_domain == "localhost":
-                        website_domain = "rotaryoceania.zone"
-                    email_from = f"no-reply@{website_domain}"
-                    email_to = user.partner_id.email
-
-                    mail_tmpl = env['mail.template'].sudo().search([('name', '=', 'Reset LDAP Password Email')], limit=1)
-                    ctx = {
-                        'subject': subject,
-                        'otp_code': otp_code,
-                        'administrator_email': administrator_email,
-                        'email_from': email_from,
-                    }
-
-                    # Queue the email (fast), then kick async sender thread
+                    # Instead of using mail.template (which caused {{ }}),
+                    # call the model method that builds the HTML itself.
                     try:
-                        mail_tmpl.with_context(ctx).sudo().send_mail(
-                            user.id,
-                            force_send=True,          # queue only
-                            raise_exception=False,
-                            email_values={'email_from': email_from, 'email_to': email_to},
-                        )
+                        user.sudo().action_reset_password()
                     except Exception as e:
-                        _logger.warning("PWRESET: failed to queue OTP email for %s: %s", username, e)
+                        _logger.warning("PWRESET: failed to send OTP mail via res.users.action_reset_password: %s", e)
 
-                    # Ensure queued mail is stored
-                    request.env.cr.commit()
-
-                    # Trigger background sending immediately (non-blocking)
-                    try:
-                        _kick_async_mail_send(request.env.cr.dbname)
-                    except Exception as e:
-                        _logger.warning("PWRESET: could not trigger async mail sender: %s", e)
-
-                    # Always return the OTP entry page instantly — no waiting on SMTP
+                    # Show OTP entry page
                     return http.request.render('ldap_reset_password.template_otp_entry', {'login': username})
 
                 return http.request.render('ldap_reset_password.template_contact_admin')
             return http.request.render('ldap_reset_password.template_invalid_login')
 
+        # initial page
         return http.request.render('ldap_reset_password.template_otp', {'message': 'Placeholder'})
 
     @http.route('/web/reset_password', type='http', auth="public", website=True)
