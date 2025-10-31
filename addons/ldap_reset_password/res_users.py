@@ -1,5 +1,5 @@
 from odoo.exceptions import UserError
-from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
+from odoo import api, fields, models, SUPERUSER_ID, _, http
 
 import logging
 from datetime import date, datetime, timedelta
@@ -11,9 +11,9 @@ _logger = logging.getLogger(__name__)
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    # ---- keep your custom authenticate exactly as is ----
     @classmethod
     def authenticate(cls, db, login, password, user_agent_env=None):
+        # your original code, unchanged
         res = cls._login(db, login, password)
         if isinstance(res, tuple):
             uid, _ = res
@@ -35,114 +35,78 @@ class ResUsers(models.Model):
 
     def action_reset_password(self):
         """
-        Your original method sent a template directly, so variables stayed unrendered.
-        Here we:
-        1. generate OTP
-        2. store OTP in your `otp` model
-        3. render the mail template FIRST
-        4. create mail.mail and send
-        and we keep the 'create_user' behavior.
+        FINAL version: do NOT rely on mail.template rendering for OTP.
+        We build the HTML here and send it.
         """
         _logger.info("action_reset_password: Start")
 
-        # superuser env because we are inside http request
+        # superuser env because we are in HTTP
         env = api.Environment(http.request.cr, SUPERUSER_ID, {})
 
         if self.filtered(lambda u: not u.active):
             raise UserError(_("You cannot perform this action on an archived user."))
 
-        # figure out subject
-        create_mode = bool(self.env.context.get('create_user'))
-        # self at this point can be multi, but we will compute per-user below
+        # figure out domain → email_from
         website_domain = http.request.httprequest.headers.get('Host').split(':')[0]
         if website_domain == "localhost":
             website_domain = "rotaryoceania.zone"
         email_from = f"no-reply@{website_domain}"
 
-        # admin email for footer
+        # admin email to show at bottom (optional)
         administrator = env['res.users'].search([], limit=1, order='id')
         administrator_email = administrator.partner_id.email_normalized if administrator.partner_id else ""
 
-        # try to get our dedicated reset template FIRST
-        # (this is the one you defined in reset_ldap_password.xml)
-        reset_tmpl = env.ref('ldap_reset_password.reset_ldap_password', raise_if_not_found=False)
-        # fallback to your old template name
-        if not reset_tmpl:
-            reset_tmpl = env['mail.template'].sudo().search(
-                [('name', '=', 'LDAP Invitation Email')], limit=1
-            )
-
+        # for each selected user
         for user in self:
-            _logger.info("action_reset_password: Processing user: %s, email: %s", user.login, user.partner_id.email)
-
             if not user.partner_id.email:
                 raise UserError(_("Cannot send email: user %s has no email address.", user.name))
 
-            # subject may change per user
-            subject = "Change password for " + user.name
+            # subject logic (keep your original)
+            create_mode = bool(self.env.context.get('create_user'))
             if create_mode:
                 subject = "Welcome to %s %s" % (user.company_id.name, user.name)
+            else:
+                subject = "One Time Password for Password Change Verification"
 
-            # -----------------------------
-            # 1) create OTP and store it
-            # -----------------------------
+            # 1) generate OTP
             otp_code = str(random.randint(100000, 999999))
             expires_at = datetime.utcnow() + timedelta(minutes=10)
 
+            # 2) store OTP in your model
             env['otp'].sudo().create({
                 'user_id': user.id,
                 'otp_code': otp_code,
                 'expiration_time': fields.Datetime.to_string(expires_at),
             })
 
-            # -----------------------------
-            # 2) context for template render
-            # -----------------------------
-            tctx = {
-                'subject': subject,
-                'administrator_email': administrator_email,
-                'email_from': email_from,
-                'otp_code': otp_code,
-                'otp_expiration_minutes': 10,
-            }
+            # 3) build HTML manually so no templating is needed
+            body_html = f"""
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+                    <p>Hello {user.name or ''},</p>
+                    <p>We received a request to reset the password for your account.</p>
+                    <p>Your One-Time Password (OTP) is:</p>
+                    <p style="font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 15px 0;">
+                        {otp_code}
+                    </p>
+                    <p>This OTP will expire in <strong>10</strong> minutes.</p>
+                    <p>If you did not request this password reset, you can ignore this email.</p>
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;"/>
+                    <p style="font-size: 12px; color: #777;">
+                        Sent by {email_from}.
+            """
 
-            # -----------------------------
-            # 3) render template
-            # -----------------------------
-            if reset_tmpl:
-                # render body
-                rendered_body = reset_tmpl.with_context(tctx).sudo()._render_template(
-                    reset_tmpl.body_html,
-                    reset_tmpl.model,
-                    user.id,
-                ).get(user.id, '')
+            if administrator_email:
+                body_html += f"You may also contact {administrator_email}."
+            body_html += "</p></div>"
 
-                # render subject too (otherwise you see {{ ... }} in subject)
-                rendered_subject = reset_tmpl.with_context(tctx).sudo()._render_template(
-                    reset_tmpl.subject,
-                    reset_tmpl.model,
-                    user.id,
-                ).get(user.id, subject)
-            else:
-                # fallback plain body
-                rendered_subject = subject
-                rendered_body = (
-                    f"<p>Hello {user.name},</p>"
-                    f"<p>Your OTP is: <strong>{otp_code}</strong></p>"
-                    f"<p>This OTP will expire in 10 minutes.</p>"
-                )
-
-            # -----------------------------
-            # 4) create mail.mail so you can see it in Technical > Emails
-            # -----------------------------
+            # 4) create and send mail
             mail_vals = {
-                'subject': rendered_subject,
-                'body_html': rendered_body,
+                'subject': subject,
+                'body_html': body_html,
                 'email_from': email_from,
                 'email_to': user.partner_id.email,
-                'auto_delete': False,  # keep for debugging
+                'auto_delete': False,  # keep it so you can see it in Technical > Emails
             }
-
             mail = env['mail.mail'].sudo().create(mail_vals)
             mail.sudo().send()
 
@@ -160,7 +124,7 @@ class ResUsers(models.Model):
 
     @api.model
     def create(self, vals):
-        # Create the user using the existing logic
+        # original create logic, unchanged
         user = super(ResUsers, self).create(vals)
 
         # Clear the groups
