@@ -11,9 +11,9 @@ _logger = logging.getLogger(__name__)
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
+    # keep your authenticate as-is
     @classmethod
     def authenticate(cls, db, login, password, user_agent_env=None):
-        # your original code, unchanged
         res = cls._login(db, login, password)
         if isinstance(res, tuple):
             uid, _ = res
@@ -35,79 +35,84 @@ class ResUsers(models.Model):
 
     def action_reset_password(self):
         """
-        FINAL version: do NOT rely on mail.template rendering for OTP.
-        We build the HTML here and send it.
+        Send OTP mail without using mail.template, and without linking to any model,
+        so Odoo cannot try to re-render {{...}} from a template.
         """
         _logger.info("action_reset_password: Start")
 
-        # superuser env because we are in HTTP
+        # superuser env (we're in http)
         env = api.Environment(http.request.cr, SUPERUSER_ID, {})
 
+        # block archived users (your original logic)
         if self.filtered(lambda u: not u.active):
             raise UserError(_("You cannot perform this action on an archived user."))
 
-        # figure out domain → email_from
+        # figure out from-domain
         website_domain = http.request.httprequest.headers.get('Host').split(':')[0]
         if website_domain == "localhost":
             website_domain = "rotaryoceania.zone"
         email_from = f"no-reply@{website_domain}"
 
-        # admin email to show at bottom (optional)
+        # admin email - optional footer
         administrator = env['res.users'].search([], limit=1, order='id')
         administrator_email = administrator.partner_id.email_normalized if administrator.partner_id else ""
 
-        # for each selected user
         for user in self:
             if not user.partner_id.email:
                 raise UserError(_("Cannot send email: user %s has no email address.", user.name))
 
-            # subject logic (keep your original)
+            # subject like before
             create_mode = bool(self.env.context.get('create_user'))
             if create_mode:
                 subject = "Welcome to %s %s" % (user.company_id.name, user.name)
             else:
                 subject = "One Time Password for Password Change Verification"
 
-            # 1) generate OTP
+            # 1) generate and store OTP
             otp_code = str(random.randint(100000, 999999))
             expires_at = datetime.utcnow() + timedelta(minutes=10)
 
-            # 2) store OTP in your model
             env['otp'].sudo().create({
                 'user_id': user.id,
                 'otp_code': otp_code,
                 'expiration_time': fields.Datetime.to_string(expires_at),
             })
 
-            # 3) build HTML manually so no templating is needed
+            # 2) build pure HTML
             body_html = f"""
-                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-                    <p>Hello {user.name or ''},</p>
-                    <p>We received a request to reset the password for your account.</p>
-                    <p>Your One-Time Password (OTP) is:</p>
-                    <p style="font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 15px 0;">
-                        {otp_code}
-                    </p>
-                    <p>This OTP will expire in <strong>10</strong> minutes.</p>
-                    <p>If you did not request this password reset, you can ignore this email.</p>
-                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;"/>
-                    <p style="font-size: 12px; color: #777;">
-                        Sent by {email_from}.
+            <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+                <p>Hello {user.name or ''},</p>
+                <p>We received a request to reset the password for your account.</p>
+                <p>Your One-Time Password (OTP) is:</p>
+                <p style="font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 15px 0;">
+                    {otp_code}
+                </p>
+                <p>This OTP will expire in <strong>10</strong> minutes.</p>
+                <p>If you did not request this password reset, you can ignore this email.</p>
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;"/>
+                <p style="font-size: 12px; color: #777;">
+                    Sent by {email_from}.
             """
 
             if administrator_email:
                 body_html += f"You may also contact {administrator_email}."
             body_html += "</p></div>"
 
-            # 4) create and send mail
+            # 3) create a PLAIN mail.mail (no model/res_id) so Odoo won’t try to re-render
             mail_vals = {
                 'subject': subject,
                 'body_html': body_html,
                 'email_from': email_from,
                 'email_to': user.partner_id.email,
-                'auto_delete': False,  # keep it so you can see it in Technical > Emails
+                'auto_delete': False,
+                # critical: do NOT link to any record/template
+                'model': False,
+                'res_id': False,
+                'message_id': False,
             }
             mail = env['mail.mail'].sudo().create(mail_vals)
+
+            # send now
             mail.sudo().send()
 
             _logger.info(
@@ -124,7 +129,7 @@ class ResUsers(models.Model):
 
     @api.model
     def create(self, vals):
-        # original create logic, unchanged
+        # unchanged user create
         user = super(ResUsers, self).create(vals)
 
         # Clear the groups
@@ -145,7 +150,6 @@ class ResUsers(models.Model):
             ('role_id', '=', role.id),
         ])
 
-        # If User has been allocated a role already
         if currentRole:
             user.set_groups_from_roles()
             return user
