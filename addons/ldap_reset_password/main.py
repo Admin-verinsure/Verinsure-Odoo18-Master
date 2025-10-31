@@ -220,7 +220,7 @@ class LDAPResetController(http.Controller):
                     try:
                         mail_tmpl.with_context(ctx).sudo().send_mail(
                             user.id,
-                            force_send=False,          # queue only
+                            force_send=True,          # queue only
                             raise_exception=False,
                             email_values={'email_from': email_from, 'email_to': email_to},
                         )
