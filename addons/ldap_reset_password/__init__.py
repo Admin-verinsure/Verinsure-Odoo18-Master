@@ -3,4 +3,3 @@ from . import main
 from . import otp
 from . import res_users
 from . import password_validation
-from . import reset_password

@@ -1,16 +1,13 @@
 {
-    "name": "LDAP Signup",
-    "version": "18.0.1.0.0",
-    "summary": "Website signup backed by LDAP (reuses/creates LDAP entries)",
-    "depends": [
-        "website", "web",
-        "auth_signup", "auth_ldap",
-        "mail", "membership", "rotary_project_map",
-        "ldap_user_utils",
+    'name': 'LDAP Signup',
+    'version': '1.0',
+    'summary': 'User signup through LDAP',
+    'description': 'Allows user registration using LDAP integration.',
+    'category': 'Authentication',
+    'depends': ['auth_signup', 'auth_ldap', 'website', 'ldap_reset_password'],
+    'data': [
+        'views/signup_templates.xml',
     ],
-    "data": [
-        "views/signup_templates.xml",
-    ],
-    "license": "LGPL-3",
-    "installable": True,
+    'installable': True,
+    'application': False,
 }
