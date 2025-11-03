@@ -172,7 +172,7 @@ class LDAPSignupController(AuthSignupController):
             qcontext['program_types'] = request.env['program.type'].sudo().search([], order='name')
         except Exception:
             qcontext['program_types'] = request.env['ir.model'].sudo().browse([])
-        return request.render('ldap_signup.signup_is_member', qcontext)
+        return request.render('rotary_signup.signup_is_member', qcontext)
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup_non_member(self, *args, **kw):
@@ -191,7 +191,7 @@ class LDAPSignupController(AuthSignupController):
                 ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    resp = request.render('ldap_signup.signup_non_member', qcontext)
+                    resp = request.render('rotary_signup.signup_non_member', qcontext)
                     resp.headers['X-Frame-Options'] = 'DENY'
                     return resp
 
@@ -199,7 +199,7 @@ class LDAPSignupController(AuthSignupController):
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if not ldap_rec:
                     qcontext['error'] = _("No LDAP configuration found.")
-                    resp = request.render('ldap_signup.signup_non_member', qcontext)
+                    resp = request.render('rotary_signup.signup_non_member', qcontext)
                     resp.headers['X-Frame-Options'] = 'DENY'
                     return resp
 
@@ -238,7 +238,7 @@ class LDAPSignupController(AuthSignupController):
                     user_id, existing = user.id, False
 
                 if existing:
-                    return request.render('ldap_signup.web_error', {'message': _('Error: User already exists.')})
+                    return request.render('rotary_signup.web_error', {'message': _('Error: User already exists.')})
 
                 if isinstance(user_id, int) and user_id:
                     # If LDAP helper didn't add LDAP entry, attempt to create it if method exists
@@ -252,7 +252,7 @@ class LDAPSignupController(AuthSignupController):
                                     env['res.users'].sudo().browse(user_id).unlink()
                                 except Exception:
                                     _logger.exception("Could not unlink created user after LDAP create failure")
-                                return request.render('ldap_signup.web_error', {'message': (message or '') + '.'})
+                                return request.render('rotary_signup.web_error', {'message': (message or '') + '.'})
 
                     # Post-create updates: assign 'Guests' role, program_type etc.
                     user = env['res.users'].sudo().browse(user_id)
@@ -285,14 +285,14 @@ class LDAPSignupController(AuthSignupController):
                         except Exception:
                             _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
 
-                    return request.render('ldap_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
+                    return request.render('rotary_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
                 else:
                     qcontext['error'] = _("Could not create a new account. %s" % str(user_id))
             except Exception as e:
                 _logger.exception("Signup non-member exception: %s", e)
                 qcontext['error'] = _("Could not create account. %s") % str(e)
 
-        resp = request.render('ldap_signup.signup_non_member', qcontext)
+        resp = request.render('rotary_signup.signup_non_member', qcontext)
         resp.headers['X-Frame-Options'] = 'DENY'
         return resp
 
@@ -319,14 +319,14 @@ class LDAPSignupController(AuthSignupController):
                 ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    resp = request.render('ldap_signup.signup', qcontext)
+                    resp = request.render('rotary_signup.signup', qcontext)
                     resp.headers['X-Frame-Options'] = 'DENY'
                     return resp
 
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if not ldap_rec:
                     qcontext['error'] = _("No LDAP configuration found.")
-                    resp = request.render('ldap_signup.signup', qcontext)
+                    resp = request.render('rotary_signup.signup', qcontext)
                     resp.headers['X-Frame-Options'] = 'DENY'
                     return resp
 
@@ -364,7 +364,7 @@ class LDAPSignupController(AuthSignupController):
                     user_id, existing = user.id, False
 
                 if existing:
-                    return request.render('ldap_signup.web_error', {'message': _('Error: User already exists.')})
+                    return request.render('rotary_signup.web_error', {'message': _('Error: User already exists.')})
 
                 if isinstance(user_id, int) and user_id:
                     user = env['res.users'].sudo().browse(user_id)
@@ -398,14 +398,14 @@ class LDAPSignupController(AuthSignupController):
                         except Exception:
                             _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
 
-                    return request.render('ldap_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
+                    return request.render('rotary_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
                 else:
                     qcontext['error'] = _("Could not create a new account. %s") % str(user_id)
             except Exception as e:
                 _logger.exception("Signup member exception: %s", e)
                 qcontext['error'] = _("Could not create account. %s") % str(e)
 
-        resp = request.render('ldap_signup.signup', qcontext)
+        resp = request.render('rotary_signup.signup', qcontext)
         resp.headers['X-Frame-Options'] = 'DENY'
         return resp
 
