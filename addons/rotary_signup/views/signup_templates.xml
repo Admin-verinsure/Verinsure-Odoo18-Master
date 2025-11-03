@@ -20,36 +20,48 @@
             <t t-call="web.login_layout">
                 <div class="container w-md-75 w-lg-50 mt-5">
                     <h3 class="mb-4 text-center">Rotary Member Signup</h3>
-                    <form method="post" action="/web/signup" class="oe_signup_form">
+
+                    <t t-if="error">
+                        <div class="alert alert-danger"><t t-esc="error"/></div>
+                    </t>
+
+                    <form method="post" class="oe_signup_form">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <div class="form-group mb-3">
                             <label>First Name</label>
-                            <input type="text" name="first_name" class="form-control" required="required"/>
+                            <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Last Name</label>
-                            <input type="text" name="last_name" class="form-control" required="required"/>
+                            <input type="text" name="last_name" class="form-control" required="required" t-att-value="last_name"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Email</label>
-                            <input type="email" name="email" class="form-control" required="required"/>
+                            <input type="email" name="email" class="form-control" required="required" t-att-value="email"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Rotary Membership ID</label>
-                            <input type="text" name="rotary_id" class="form-control" required="required"/>
+                            <input type="text" name="rotary_id" class="form-control" required="required" t-att-value="rotary_id"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Select Rotary Club</label>
                             <select name="rotary_club_id" class="form-control" required="required">
+                                <option value="">Select your Club</option>
                                 <t t-foreach="clubs" t-as="club">
                                     <option t-att-value="club.id"><t t-esc="club.club_name"/></option>
                                 </t>
                             </select>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Program Type</label>
                             <select name="program_type_id" class="form-control">
+                                <option value="">Select Program Type</option>
                                 <t t-foreach="program_types" t-as="ptype">
                                     <option t-att-value="ptype.id"><t t-esc="ptype.name"/></option>
                                 </t>
@@ -60,12 +72,14 @@
                             <label>Password</label>
                             <input type="password" name="password" class="form-control" required="required"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Confirm Password</label>
                             <input type="password" name="confirm_password" class="form-control" required="required"/>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100">Create Account</button>
+
                         <div class="text-center mt-3">
                             <a href="/web/login">Back to Login</a>
                         </div>
@@ -79,24 +93,33 @@
             <t t-call="web.login_layout">
                 <div class="container w-md-75 w-lg-50 mt-5">
                     <h3 class="mb-4 text-center">Non-Member Signup</h3>
-                    <form method="post" action="/web/signup_non_member" class="oe_signup_form">
+
+                    <t t-if="error">
+                        <div class="alert alert-danger"><t t-esc="error"/></div>
+                    </t>
+
+                    <form method="post" class="oe_signup_form">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <div class="form-group mb-3">
                             <label>First Name</label>
-                            <input type="text" name="first_name" class="form-control" required="required"/>
+                            <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Last Name</label>
-                            <input type="text" name="last_name" class="form-control" required="required"/>
+                            <input type="text" name="last_name" class="form-control" required="required" t-att-value="last_name"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Email</label>
-                            <input type="email" name="email" class="form-control" required="required"/>
+                            <input type="email" name="email" class="form-control" required="required" t-att-value="email"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Program Type</label>
                             <select name="program_type_id" class="form-control">
+                                <option value="">Select Program Type</option>
                                 <t t-foreach="program_types" t-as="ptype">
                                     <option t-att-value="ptype.id"><t t-esc="ptype.name"/></option>
                                 </t>
@@ -107,12 +130,14 @@
                             <label>Password</label>
                             <input type="password" name="password" class="form-control" required="required"/>
                         </div>
+
                         <div class="form-group mb-3">
                             <label>Confirm Password</label>
                             <input type="password" name="confirm_password" class="form-control" required="required"/>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100">Create Account</button>
+
                         <div class="text-center mt-3">
                             <a href="/web/login">Back to Login</a>
                         </div>
@@ -140,7 +165,7 @@
                     <div class="alert alert-danger">
                         <h4><t t-esc="message"/></h4>
                     </div>
-                    <a href="/web/signup" class="btn btn-secondary">Try Again</a>
+                    <a href="/web/is_member" class="btn btn-secondary">Try Again</a>
                     <div class="mt-3">
                         <a href="/web/login">Back to Login</a>
                     </div>
