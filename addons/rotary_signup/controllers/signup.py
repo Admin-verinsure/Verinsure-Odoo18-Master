@@ -728,7 +728,7 @@ class CompanyLDAP(models.Model):
         # Step 3: create LDAP entry using provided dn/attrs (after uid sanitation + collision checks)
         dn_provided, attrs_provided = ldap_entry or (None, None)
         if dn_provided and isinstance(attrs_provided, dict):
-            # Re-check by email to avoid races (someone may have created it meanwhile)
+            # Re-check by email to avoid races
             re_dn, re_entry = self._ldap_find_by_email(confd, requested_email)
             if re_dn and re_entry:
                 ldap_attrs = re_entry[1] if isinstance(re_entry, tuple) else re_entry
