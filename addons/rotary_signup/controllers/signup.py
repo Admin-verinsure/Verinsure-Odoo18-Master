@@ -514,98 +514,114 @@ class CompanyLDAP(models.Model):
         return False, False
 
     def _get_or_create_user_tuple(self, conf, login, ldap_entry):
-        """
-        Return (user_id:int, existing:bool).
-        Checks LDAP first by email (login param is treated as email).
-        If LDAP entry exists -> create/reuse partner and create user using mapped attrs.
-        If LDAP entry missing and ldap_entry provided -> create LDAP entry then create Odoo user.
-        """
+        
         env = self.env
         confd = self._as_dict(conf)
         requested_email = tools.ustr(login or "").strip().lower()
 
-        # If python-ldap is not present, do not crash: return 0 -> fallback to Odoo creation
+        if not requested_email:
+            return 0, False
+
         if ldap is None:
             _logger.debug("python-ldap not available: skipping LDAP-backed create")
             return 0, False
 
-        # --- LDAP-first: try to find an LDAP entry by email (attrs from controller may be provided) ---
+        # --- Step 1: Search LDAP first by email ---
         attrs_from_controller = (ldap_entry[1] if ldap_entry else {}) or {}
         dn_found, entry_found = self._ldap_find_by_attrs(confd, attrs_from_controller)
 
-        if entry_found:
-            ldap_attrs = entry_found[1]
+        if dn_found and entry_found:
+            # ✅ Existing LDAP entry found
+            ldap_attrs = entry_found[1] if isinstance(entry_found, tuple) else entry_found
             ldap_uid = (self._get_uid_from_attrs(ldap_attrs) or requested_email).strip().lower()
-            U = env['res.users'].with_context(active_test=False).sudo()
-            # If an Odoo user already exists with that LDAP uid, return it
-            user_by_uid = U.search([('login', '=ilike', ldap_uid)], limit=1)
-            if user_by_uid and user_by_uid.active:
-                return user_by_uid.id, True
+            final_login = ldap_uid or requested_email
 
-            # Ensure or create partner from LDAP attrs (company from confd if set)
+            _logger.info("Existing LDAP entry found for %s → uid=%s", requested_email, ldap_uid)
+
+            # Step 1a: Check if Odoo user already exists for this login
+            U = env['res.users'].with_context(active_test=False).sudo()
+            user = U.search([('login', '=ilike', final_login)], limit=1)
+            if user:
+                return user.id, True
+
+            # Step 1b: Ensure partner
             try:
                 company_id = confd.get('company') and confd['company'][0] or env.company.id
             except Exception:
                 company_id = env.company.id
+
             partner = None
             try:
                 partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
-            except Exception:
-                partner = None
+            except Exception as e:
+                _logger.warning("Partner creation from LDAP failed: %s", e)
 
-            # Create Odoo user using mapped LDAP attributes
-            final_login = ldap_uid
+            # Step 1c: Create Odoo user linked to existing LDAP
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
-            vals = self._map_ldap_attributes(conf, ldap_uid, entry_found) or {}
-            vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
+            vals = self._map_ldap_attributes(conf, final_login, (dn_found, ldap_attrs)) or {}
+            vals.update({
+                'login': final_login,
+                'partner_id': partner.id if partner else False,
+                'active': True,
+                'totp_enabled': False,
+            })
             vals.pop('email', None)
             try:
-                user = SudoUser.create(vals)
-                return user.id, False
+                new_user = SudoUser.create(vals)
+                _logger.info("Created Odoo user linked to existing LDAP uid=%s", final_login)
+                return new_user.id, True
             except Exception as e:
-                _logger.exception("Failed to create Odoo user from LDAP attrs: %s", e)
-                # Fall through to allow other creation paths
+                _logger.exception("Failed to create Odoo user from existing LDAP entry: %s", e)
                 return 0, False
 
-        # --- If LDAP entry not found, check if an Odoo user already exists with requested_email and return it ---
+        # --- Step 2: No LDAP entry found, but Odoo user might exist ---
         try:
             env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (requested_email,))
             row = env.cr.fetchone()
             if row:
                 return row[0], True
         except Exception:
-            # ignore DB errors here; proceed to creation paths
             pass
 
-        # --- If controller gave a (dn, attrs), create LDAP entry then create Odoo user from those attrs ---
+        # --- Step 3: No LDAP entry found → create LDAP entry then Odoo user ---
         dn_provided, attrs_provided = ldap_entry or (None, None)
         if dn_provided and isinstance(attrs_provided, dict):
             created, msg = self._create_ldap_user(confd, dn_provided, attrs_provided)
-            if not created:
+            if not created and 'Already exists' not in msg:
                 _logger.warning("LDAP create failed: %s", msg)
                 return 0, False
 
             new_uid = (self._get_uid_from_attrs(attrs_provided) or requested_email).strip().lower()
+            final_login = new_uid or requested_email
+
             try:
                 company_id = confd.get('company') and confd['company'][0] or env.company.id
             except Exception:
                 company_id = env.company.id
+
             partner = None
             try:
                 partner = ensure_partner_from_ldap(env, attrs_provided, company_id)
-            except Exception:
-                partner = None
-            final_login = new_uid
+            except Exception as e:
+                _logger.warning("Partner create after new LDAP failed: %s", e)
+
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = self._map_ldap_attributes(conf, final_login, (dn_provided, attrs_provided)) or {}
-            vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
+            vals.update({
+                'login': final_login,
+                'partner_id': partner.id if partner else False,
+                'active': True,
+                'totp_enabled': False,
+            })
             vals.pop('email', None)
             try:
-                user = SudoUser.create(vals)
-                return user.id, False
+                new_user = SudoUser.create(vals)
+                _logger.info("Created new LDAP + Odoo user for %s", requested_email)
+                return new_user.id, False
             except Exception as e:
-                _logger.exception("Failed to create Odoo user after LDAP creation: %s", e)
+                _logger.exception("Failed to create Odoo user after new LDAP: %s", e)
                 return 0, False
 
-        # Nothing found and nothing created
+        # --- Step 4: Nothing found/created ---
+        _logger.warning("No LDAP or Odoo user could be created for %s", requested_email)
         return 0, False
