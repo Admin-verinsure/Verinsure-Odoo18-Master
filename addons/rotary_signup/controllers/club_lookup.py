@@ -1,30 +1,33 @@
 # -*- coding: utf-8 -*-
 from odoo import http
 from odoo.http import request
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class ClubLookup(http.Controller):
 
-    @http.route('/clubs/by_program', type='json', auth='public', csrf=False, website=True)
-    def clubs_by_program(self, club_type=None, program_type=None, **kw):
+    @http.route('/club_lookup', type='json', auth='public', csrf=False, website=True)
+    def club_lookup(self, program_type_id=None, **kw):
         """
-        Return active clubs filtered by selected program type or club type.
-        Works with both old (club_type) and new (program_type) parameter names.
+        Return active clubs filtered by selected program type.
+        JS calls this with { program_type_id: int }.
         """
-        # Accept either parameter for backward compatibility
-        club_type = club_type or program_type
-        if not club_type:
+        if not program_type_id:
+            _logger.warning("No program_type_id received in /club_lookup")
             return []
 
         domain = [
-            ('club_type', '=', club_type),
+            ('program_type_id', '=', int(program_type_id)),
             ('active', '=', True),
         ]
 
         try:
-            # Fetch clubs; include club_name if available
             partners = request.env['res.partner'].sudo().search_read(domain, ['id', 'club_name', 'name'], order='club_name')
-            # Fallback to 'name' if 'club_name' missing
-            return [{'id': p['id'], 'name': p.get('club_name') or p['name']} for p in partners]
+            clubs = [{'id': p['id'], 'name': p.get('club_name') or p['name']} for p in partners]
+            _logger.info("club_lookup returned %s clubs for program_type_id=%s", len(clubs), program_type_id)
+            return clubs
         except Exception as e:
             request.env.cr.rollback()
+            _logger.exception("club_lookup failed: %s", e)
             return []
