@@ -5,11 +5,20 @@
         <!-- 1️⃣ Landing Page – Choose Member or Non-Member -->
         <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
             <t t-call="web.login_layout">
-                <div class="container text-center mt-5">
-                    <h2 class="fw-bold mb-4">Are you a Rotary International Member?</h2>
-                    <div class="d-flex justify-content-center gap-4">
-                        <a href="/web/signup" class="btn btn-success px-5 py-2">Yes</a>
-                        <a href="/web/signup_non_member" class="btn btn-dark px-5 py-2">No</a>
+                <div class="container py-5 text-center">
+                    <div class="card shadow-lg border-0 mx-auto" style="max-width: 600px; border-radius: 1rem;">
+                        <div class="card-body py-5">
+                            <h2 class="fw-bold mb-4 text-primary">Are you a Rotary International Member?</h2>
+                            <p class="text-muted mb-4">Choose your signup type to continue.</p>
+                            <div class="d-flex justify-content-center gap-4">
+                                <a href="/web/signup" class="btn btn-success px-5 py-2 fw-semibold shadow-sm">
+                                    <i class="fa fa-user-check me-2"></i>Yes, I’m a Member
+                                </a>
+                                <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2 fw-semibold shadow-sm">
+                                    <i class="fa fa-user me-2"></i>No, I’m a Non-Member
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </t>
@@ -18,78 +27,103 @@
         <!-- 2️⃣ Member Signup Form -->
         <template id="ldap_reset_password.signup" name="Rotary Member Signup">
             <t t-call="web.login_layout">
-                <div class="container mt-5" style="max-width:600px;">
-                    <h3 class="text-center mb-4">Rotary Member Signup</h3>
+                <div class="container py-5">
+                    <div class="card shadow-lg border-0 mx-auto" style="max-width: 650px; border-radius: 1rem;">
+                        <div class="card-body p-5">
+                            <div class="text-center mb-4">
+                                <h3 class="fw-bold text-primary">Rotary Member Signup</h3>
+                                <p class="text-muted">Join the Rotary community by creating your account.</p>
+                            </div>
 
-                    <t t-if="error">
-                        <div class="alert alert-danger text-center">
-                            <t t-esc="error"/>
+                            <t t-if="error">
+                                <div class="alert alert-danger text-center">
+                                    <t t-esc="error"/>
+                                </div>
+                            </t>
+
+                            <form method="post" action="/web/signup" class="oe_signup_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">First Name</label>
+                                        <input type="text" name="first_name" class="form-control form-control-lg" required="required" t-att-value="first_name"/>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Last Name</label>
+                                        <input type="text" name="last_name" class="form-control form-control-lg" required="required" t-att-value="last_name"/>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    <input type="email" name="email" class="form-control form-control-lg" placeholder="example@email.com" required="required" t-att-value="email"/>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Rotary International Number</label>
+                                    <input type="text" name="rotary_id" class="form-control form-control-lg" placeholder="5–8 digit Rotary ID" required="required" t-att-value="rotary_id"/>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Program Type</label>
+                                    <select name="club_type" id="club_type" class="form-select form-select-lg" required="required">
+                                        <option value="">-- Select Program Type --</option>
+                                        <t t-set="club_types"
+                                           t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
+                                        <t t-foreach="club_types" t-as="opt">
+                                            <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]">
+                                                <t t-esc="opt[1]"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Club Name</label>
+                                    <select name="rotary_club_id" id="rotary_club_id" class="form-select form-select-lg" required="required">
+                                        <t t-set="sel_program" t-value="request.params.get('club_type')"/>
+                                        <t t-set="clubs"
+                                           t-value="sel_program
+                                                    and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
+                                                    or env['res.partner'].browse([])"/>
+                                        <t t-if="not sel_program">
+                                            <option value="">-- Select Program Type first --</option>
+                                        </t>
+                                        <t t-if="sel_program and not clubs">
+                                            <option value="">-- No clubs found for this program --</option>
+                                        </t>
+                                        <t t-foreach="clubs" t-as="c">
+                                            <option t-att-value="c.id"
+                                                    t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
+                                                <t t-esc="c.club_name or c.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Password</label>
+                                        <input type="password" name="password" class="form-control form-control-lg" required="required"/>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Confirm Password</label>
+                                        <input type="password" name="confirm_password" class="form-control form-control-lg" required="required"/>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3 shadow-sm">
+                                    <i class="fa fa-user-plus me-2"></i>Create My Account
+                                </button>
+
+                                <div class="text-center mt-3">
+                                    <small>Already have an account?</small>
+                                    <a href="/web/login" class="fw-semibold text-decoration-none ms-1">Sign in</a>
+                                </div>
+                            </form>
                         </div>
-                    </t>
-
-                    <form method="post" action="/web/signup" class="oe_signup_form">
-                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-
-                        <!-- Basic Info -->
-                        <div class="mb-3">
-                            <label>First Name</label>
-                            <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Last Name</label>
-                            <input type="text" name="last_name" class="form-control" required="required" t-att-value="last_name"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Email</label>
-                            <input type="email" name="email" class="form-control" required="required" t-att-value="email"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Rotary International Number (5–8 digits)</label>
-                            <input type="text" name="rotary_id" class="form-control" required="required" t-att-value="rotary_id"/>
-                        </div>
-
-                        <!-- Program Type (JS triggers here) -->
-                        <div class="mb-3">
-                            <label>Program Type</label>
-                            <select name="program_type_id" id="club_type" class="form-control" required="required">
-                                <option value="">-- Select Program Type --</option>
-                                <t t-foreach="program_types" t-as="ptype">
-                                    <option t-att-value="ptype.id"><t t-esc="ptype.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-
-                        <!-- Club Name (filled dynamically via JS) -->
-                        <div class="mb-3">
-                            <label>Club Name</label>
-                            <select name="rotary_club_id" id="rotary_club_id" class="form-control" required="required">
-                                <option value="">-- Select Program Type first --</option>
-                                <t t-foreach="clubs" t-as="club">
-                                    <option t-att-value="club.id"><t t-esc="club.club_name or club.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-
-                        <!-- Passwords -->
-                        <div class="mb-3">
-                            <label>Password</label>
-                            <input type="password" name="password" class="form-control" required="required"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Confirm Password</label>
-                            <input type="password" name="confirm_password" class="form-control" required="required"/>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary w-100 mt-3">Sign up</button>
-
-                        <div class="text-center mt-3">
-                            <a href="/web/login">Already have an account?</a>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </t>
         </template>
@@ -97,51 +131,61 @@
         <!-- 3️⃣ Non-Member Signup Form -->
         <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
             <t t-call="web.login_layout">
-                <div class="container mt-5" style="max-width:600px;">
-                    <h3 class="text-center mb-4">Non-Member Signup</h3>
+                <div class="container py-5">
+                    <div class="card shadow-lg border-0 mx-auto" style="max-width: 650px; border-radius: 1rem;">
+                        <div class="card-body p-5">
+                            <div class="text-center mb-4">
+                                <h3 class="fw-bold text-primary">Non-Member Signup</h3>
+                                <p class="text-muted">Sign up to access the platform as a guest or participant.</p>
+                            </div>
 
-                    <t t-if="error">
-                        <div class="alert alert-danger text-center">
-                            <t t-esc="error"/>
+                            <t t-if="error">
+                                <div class="alert alert-danger text-center">
+                                    <t t-esc="error"/>
+                                </div>
+                            </t>
+
+                            <form method="post" action="/web/signup_non_member" class="oe_signup_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">First Name</label>
+                                        <input type="text" name="first_name" class="form-control form-control-lg" required="required" t-att-value="first_name"/>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Last Name</label>
+                                        <input type="text" name="last_name" class="form-control form-control-lg" required="required" t-att-value="last_name"/>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    <input type="email" name="email" class="form-control form-control-lg" required="required" t-att-value="email"/>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Password</label>
+                                        <input type="password" name="password" class="form-control form-control-lg" required="required"/>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Confirm Password</label>
+                                        <input type="password" name="confirm_password" class="form-control form-control-lg" required="required"/>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3 shadow-sm">
+                                    <i class="fa fa-user-plus me-2"></i>Create My Account
+                                </button>
+
+                                <div class="text-center mt-3">
+                                    <small>Already have an account?</small>
+                                    <a href="/web/login" class="fw-semibold text-decoration-none ms-1">Sign in</a>
+                                </div>
+                            </form>
                         </div>
-                    </t>
-
-                    <form method="post" action="/web/signup_non_member" class="oe_signup_form">
-                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-
-                        <!-- Basic Info -->
-                        <div class="mb-3">
-                            <label>First Name</label>
-                            <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Last Name</label>
-                            <input type="text" name="last_name" class="form-control" required="required" t-att-value="last_name"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Email</label>
-                            <input type="email" name="email" class="form-control" required="required" t-att-value="email"/>
-                        </div>
-
-                        <!-- Removed program type (per your code logic) -->
-                        <div class="mb-3">
-                            <label>Password</label>
-                            <input type="password" name="password" class="form-control" required="required"/>
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Confirm Password</label>
-                            <input type="password" name="confirm_password" class="form-control" required="required"/>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary w-100 mt-3">Sign up</button>
-
-                        <div class="text-center mt-3">
-                            <a href="/web/login">Already have an account?</a>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </t>
         </template>
@@ -149,11 +193,15 @@
         <!-- 4️⃣ Thank You Page -->
         <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
             <t t-call="web.login_layout">
-                <div class="container text-center mt-5">
-                    <div class="alert alert-success">
-                        <h4><t t-esc="message"/></h4>
+                <div class="container text-center py-5">
+                    <div class="card shadow-lg border-0 mx-auto" style="max-width:600px; border-radius:1rem;">
+                        <div class="card-body py-5">
+                            <div class="alert alert-success fs-5 fw-semibold">
+                                <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
+                            </div>
+                            <a href="/web/login" class="btn btn-primary mt-3 px-4 py-2 shadow-sm">Go to Login</a>
+                        </div>
                     </div>
-                    <a href="/web/login" class="btn btn-primary mt-3">Go to Login</a>
                 </div>
             </t>
         </template>
@@ -161,13 +209,15 @@
         <!-- 5️⃣ Error Page -->
         <template id="ldap_reset_password.web_error" name="Signup Error Page">
             <t t-call="web.login_layout">
-                <div class="container text-center mt-5">
-                    <div class="alert alert-danger">
-                        <h4><t t-esc="message"/></h4>
-                    </div>
-                    <a href="/web/is_member" class="btn btn-secondary mt-3">Try Again</a>
-                    <div class="mt-2">
-                        <a href="/web/login">Back to Login</a>
+                <div class="container text-center py-5">
+                    <div class="card shadow-lg border-0 mx-auto" style="max-width:600px; border-radius:1rem;">
+                        <div class="card-body py-5">
+                            <div class="alert alert-danger fs-5 fw-semibold">
+                                <i class="fa fa-times-circle me-2"></i><t t-esc="message"/>
+                            </div>
+                            <a href="/web/is_member" class="btn btn-secondary mt-3 me-2">Try Again</a>
+                            <a href="/web/login" class="btn btn-outline-primary mt-3">Back to Login</a>
+                        </div>
                     </div>
                 </div>
             </t>
