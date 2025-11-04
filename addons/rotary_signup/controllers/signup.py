@@ -278,7 +278,6 @@ class LDAPSignupController(AuthSignupController):
                     if isinstance(user_id, int) and user_id:
                         user = env['res.users'].sudo().browse(user_id)
                         # set LDAP password if we just created LDAP entry
-                        # (model will set if password provided via attrs.userPassword; ensure set now)
                         if not existing and ldap and dn:
                             try:
                                 ldap_model._set_ldap_password(ldap_conf, dn, pw)
@@ -291,7 +290,7 @@ class LDAPSignupController(AuthSignupController):
                 # Ensure partner and create Odoo user if still missing
                 partner = ensure_partner_from_ldap(env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
                 if not user:
-                    # fallback local user (note: this enables local auth unless password is left unset)
+                    # fallback local user
                     user = env['res.users'].sudo().create({
                         'login': proposed_uid,
                         'partner_id': partner.id,
@@ -545,7 +544,31 @@ class CompanyLDAP(models.Model):
         except Exception:
             return ''
 
-    # ---------- search by email ----------
+    # ---------- search by email (NEW) ----------
+    def _ldap_find_by_email(self, conf, email: str):
+        """Find LDAP entry by raw email string (returns dn, entry)."""
+        if ldap is None:
+            return False, False
+        email = (email or "").strip()
+        if not email:
+            return False, False
+        confd = self._as_dict(conf)
+        try:
+            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (email,)) if filter_format else f'(&(objectClass=inetOrgPerson)(mail={email}))'
+            conn = self._pyldap_connect(confd)
+            if confd.get('ldap_binddn') and confd.get('ldap_password'):
+                conn.simple_bind_s(confd.get('ldap_binddn'), confd.get('ldap_password'))
+            results = conn.search_s(confd.get('ldap_base') or '', ldap.SCOPE_SUBTREE, flt)
+            conn.unbind_s()
+            if results:
+                for r in results:
+                    if r and r[0]:
+                        return r[0], r
+        except Exception:
+            _logger.exception("_ldap_find_by_email failed for email=%s", email)
+        return False, False
+
+    # ---------- search by attrs (kept for compatibility) ----------
     def _ldap_find_by_attrs(self, conf, attrs):
         """Find LDAP entry by email only (returns dn, entry)."""
         if ldap is None:
@@ -649,9 +672,8 @@ class CompanyLDAP(models.Model):
             _logger.debug("python-ldap not available: skipping LDAP-backed create")
             return 0, False
 
-        # Step 1: search LDAP by email
-        attrs_from_controller = (ldap_entry[1] if ldap_entry else {}) or {}
-        dn_found, entry_found = self._ldap_find_by_attrs(confd, attrs_from_controller)
+        # Step 1: search LDAP strictly by the submitted email (not controller attrs)
+        dn_found, entry_found = self._ldap_find_by_email(confd, requested_email)
 
         if dn_found and entry_found:
             ldap_attrs = entry_found[1] if isinstance(entry_found, tuple) else entry_found
@@ -706,6 +728,29 @@ class CompanyLDAP(models.Model):
         # Step 3: create LDAP entry using provided dn/attrs (after uid sanitation + collision checks)
         dn_provided, attrs_provided = ldap_entry or (None, None)
         if dn_provided and isinstance(attrs_provided, dict):
+            # Re-check by email to avoid races (someone may have created it meanwhile)
+            re_dn, re_entry = self._ldap_find_by_email(confd, requested_email)
+            if re_dn and re_entry:
+                ldap_attrs = re_entry[1] if isinstance(re_entry, tuple) else re_entry
+                ldap_uid = (self._get_uid_from_attrs(ldap_attrs) or requested_email).strip().lower()
+                ldap_uid = sanitize_uid(ldap_uid) or requested_email
+                final_login = ldap_uid
+                try:
+                    company_id = confd.get('company') and confd['company'][0] or env.company.id
+                except Exception:
+                    company_id = env.company.id
+                partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
+                SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
+                vals = self._map_ldap_attributes(conf, final_login, (re_dn, ldap_attrs)) or {}
+                vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
+                vals.pop('email', None)
+                try:
+                    new_user = SudoUser.create(vals)
+                    return new_user.id, True
+                except Exception as e:
+                    _logger.exception("Failed to create Odoo user after race re-check: %s", e)
+                    return 0, False
+
             # sanitize uid and DN
             raw_uid = self._get_uid_from_attrs(attrs_provided) or requested_email
             safe_uid = sanitize_uid(raw_uid) or requested_email
