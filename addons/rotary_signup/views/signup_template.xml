@@ -22,12 +22,15 @@
                     <h3 class="text-center mb-4">Rotary Member Signup</h3>
 
                     <t t-if="error">
-                        <div class="alert alert-danger text-center"><t t-esc="error"/></div>
+                        <div class="alert alert-danger text-center">
+                            <t t-esc="error"/>
+                        </div>
                     </t>
 
                     <form method="post" action="/web/signup" class="oe_signup_form">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
+                        <!-- Basic Info -->
                         <div class="mb-3">
                             <label>First Name</label>
                             <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
@@ -48,9 +51,10 @@
                             <input type="text" name="rotary_id" class="form-control" required="required" t-att-value="rotary_id"/>
                         </div>
 
+                        <!-- Program Type (JS triggers here) -->
                         <div class="mb-3">
                             <label>Program Type</label>
-                            <select name="program_type_id" class="form-control" required="required">
+                            <select name="program_type_id" id="club_type" class="form-control" required="required">
                                 <option value="">-- Select Program Type --</option>
                                 <t t-foreach="program_types" t-as="ptype">
                                     <option t-att-value="ptype.id"><t t-esc="ptype.name"/></option>
@@ -58,16 +62,18 @@
                             </select>
                         </div>
 
+                        <!-- Club Name (filled dynamically via JS) -->
                         <div class="mb-3">
                             <label>Club Name</label>
-                            <select name="rotary_club_id" class="form-control" required="required">
-                                <option value="">-- Select Club --</option>
+                            <select name="rotary_club_id" id="rotary_club_id" class="form-control" required="required">
+                                <option value="">-- Select Program Type first --</option>
                                 <t t-foreach="clubs" t-as="club">
                                     <option t-att-value="club.id"><t t-esc="club.club_name or club.name"/></option>
                                 </t>
                             </select>
                         </div>
 
+                        <!-- Passwords -->
                         <div class="mb-3">
                             <label>Password</label>
                             <input type="password" name="password" class="form-control" required="required"/>
@@ -95,12 +101,15 @@
                     <h3 class="text-center mb-4">Non-Member Signup</h3>
 
                     <t t-if="error">
-                        <div class="alert alert-danger text-center"><t t-esc="error"/></div>
+                        <div class="alert alert-danger text-center">
+                            <t t-esc="error"/>
+                        </div>
                     </t>
 
                     <form method="post" action="/web/signup_non_member" class="oe_signup_form">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
+                        <!-- Basic Info -->
                         <div class="mb-3">
                             <label>First Name</label>
                             <input type="text" name="first_name" class="form-control" required="required" t-att-value="first_name"/>
@@ -116,16 +125,7 @@
                             <input type="email" name="email" class="form-control" required="required" t-att-value="email"/>
                         </div>
 
-                        <div class="mb-3">
-                            <label>Program Type</label>
-                            <select name="program_type_id" class="form-control" required="required">
-                                <option value="">-- Select Program Type --</option>
-                                <t t-foreach="program_types" t-as="ptype">
-                                    <option t-att-value="ptype.id"><t t-esc="ptype.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-
+                        <!-- Removed program type (per your code logic) -->
                         <div class="mb-3">
                             <label>Password</label>
                             <input type="password" name="password" class="form-control" required="required"/>

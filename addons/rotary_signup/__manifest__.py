@@ -17,7 +17,8 @@ Custom signup flow for Rotary users:
     'depends': [
         'auth_signup',
         'website',
-        'ldap_reset_password',  # ensures compatibility with existing LDAP reset module
+        'ldap_reset_password',
+        'rotary_project_map',# ensures compatibility with existing LDAP reset module
     ],
     'data': [
         'views/signup_template.xml',  # ✅ corrected filename (consistent with your XML)
