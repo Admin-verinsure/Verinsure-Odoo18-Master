@@ -159,7 +159,7 @@ from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignu
 class LDAPSignupController(AuthSignupController):
     """
     Signup controller subclass for member/non-member signup.
-    Uses rotary_signup templates and restores old program/club behavior.
+    Uses ldap_reset_password templates and restores old program/club behavior.
     """
 
     @http.route('/web/is_member', type='http', auth='public', website=True)
@@ -167,7 +167,7 @@ class LDAPSignupController(AuthSignupController):
         """First step: Ask user if they're a Rotary member."""
         qcontext = self.get_auth_signup_qcontext()
         # no heavy model lookups here; template is static choice page
-        return request.render('rotary_signup.signup_is_member', qcontext)
+        return request.render('ldap_reset_password.signup_is_member', qcontext)
 
     @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup_non_member(self, *args, **kw):
@@ -187,12 +187,12 @@ class LDAPSignupController(AuthSignupController):
                 ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    return request.render('rotary_signup.signup_non_member', qcontext)
+                    return request.render('ldap_reset_password.signup_non_member', qcontext)
 
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if not ldap_rec:
                     qcontext['error'] = _("No LDAP configuration found.")
-                    return request.render('rotary_signup.signup_non_member', qcontext)
+                    return request.render('ldap_reset_password.signup_non_member', qcontext)
 
                 sn = qcontext.get('last_name', '')
                 fn = qcontext.get('first_name', '')
@@ -241,12 +241,12 @@ class LDAPSignupController(AuthSignupController):
                     except Exception:
                         _logger.warning("Could not call set_groups_from_roles on user %s", user.id)
 
-                return request.render('rotary_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
+                return request.render('ldap_reset_password.web_thanks', {'message': _('You have created user: %s') % user.login})
             except Exception as e:
                 _logger.exception("Signup non-member exception: %s", e)
                 qcontext['error'] = _("Could not create account. %s") % str(e)
 
-        return request.render('rotary_signup.signup_non_member', qcontext)
+        return request.render('ldap_reset_password.signup_non_member', qcontext)
 
     @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False, csrf=False)
     def web_auth_signup(self, *args, **kw):
@@ -272,12 +272,12 @@ class LDAPSignupController(AuthSignupController):
                 ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
-                    return request.render('rotary_signup.signup', qcontext)
+                    return request.render('ldap_reset_password.signup', qcontext)
 
                 ldap_rec = env['res.company.ldap'].search([], limit=1)
                 if not ldap_rec:
                     qcontext['error'] = _("No LDAP configuration found.")
-                    return request.render('rotary_signup.signup', qcontext)
+                    return request.render('ldap_reset_password.signup', qcontext)
 
                 sn = qcontext.get('last_name', '')
                 fn = qcontext.get('first_name', '')
@@ -343,12 +343,12 @@ class LDAPSignupController(AuthSignupController):
                     except Exception:
                         _logger.warning("SIGNUP: could not set program_type_id on partner %s", user.partner_id.id)
 
-                return request.render('rotary_signup.web_thanks', {'message': _('You have created user: %s') % user.login})
+                return request.render('ldap_reset_password.web_thanks', {'message': _('You have created user: %s') % user.login})
             except Exception as e:
                 _logger.exception("Signup member exception: %s", e)
                 qcontext['error'] = _("Could not create account. %s") % str(e)
 
-        return request.render('rotary_signup.signup', qcontext)
+        return request.render('ldap_reset_password.signup', qcontext)
 
     def get_auth_signup_qcontext(self):
         """Collect whitelisted request params and populate from signup token if present"""
