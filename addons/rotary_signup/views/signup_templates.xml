@@ -3,7 +3,7 @@
     <data noupdate="0">
 
         <!-- 1️⃣ Landing Page – Choose Member or Non-Member -->
-        <template id="rotary_signup.signup_is_member" name="Choose Signup Type">
+        <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
             <t t-call="web.login_layout">
                 <div class="container text-center mt-5">
                     <h2 class="fw-bold mb-4">Are you a Rotary International Member?</h2>
@@ -16,7 +16,7 @@
         </template>
 
         <!-- 2️⃣ Member Signup Form -->
-        <template id="rotary_signup.signup" name="Rotary Member Signup">
+        <template id="ldap_reset_password.signup" name="Rotary Member Signup">
             <t t-call="web.login_layout">
                 <div class="container mt-5" style="max-width:600px;">
                     <h3 class="text-center mb-4">Rotary Member Signup</h3>
@@ -63,7 +63,7 @@
                             <select name="rotary_club_id" class="form-control" required="required">
                                 <option value="">-- Select Club --</option>
                                 <t t-foreach="clubs" t-as="club">
-                                    <option t-att-value="club.id"><t t-esc="club.club_name"/></option>
+                                    <option t-att-value="club.id"><t t-esc="club.club_name or club.name"/></option>
                                 </t>
                             </select>
                         </div>
@@ -89,7 +89,7 @@
         </template>
 
         <!-- 3️⃣ Non-Member Signup Form -->
-        <template id="rotary_signup.signup_non_member" name="Non-Member Signup">
+        <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
             <t t-call="web.login_layout">
                 <div class="container mt-5" style="max-width:600px;">
                     <h3 class="text-center mb-4">Non-Member Signup</h3>
@@ -147,7 +147,7 @@
         </template>
 
         <!-- 4️⃣ Thank You Page -->
-        <template id="rotary_signup.web_thanks" name="Signup Thank You">
+        <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
             <t t-call="web.login_layout">
                 <div class="container text-center mt-5">
                     <div class="alert alert-success">
@@ -159,7 +159,7 @@
         </template>
 
         <!-- 5️⃣ Error Page -->
-        <template id="rotary_signup.web_error" name="Signup Error Page">
+        <template id="ldap_reset_password.web_error" name="Signup Error Page">
             <t t-call="web.login_layout">
                 <div class="container text-center mt-5">
                     <div class="alert alert-danger">
