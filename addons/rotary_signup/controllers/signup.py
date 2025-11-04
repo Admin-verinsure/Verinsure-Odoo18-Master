@@ -209,7 +209,10 @@ class LDAPSignupController(AuthSignupController):
     def web_auth_signup(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
         qcontext['program_types'] = _program_type_objects()
-        qcontext['clubs'] = request.env['res.partner'].sudo().search([('is_rotary_club', '=', True)])
+
+        # ✅ Fixed: use existing club_name filter (no is_rotary_club field needed)
+        partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
+        qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
 
         if not qcontext.get('token') and not qcontext.get('signup_enabled'):
             raise werkzeug.exceptions.NotFound()
