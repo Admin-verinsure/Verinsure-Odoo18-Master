@@ -544,50 +544,57 @@ class CompanyLDAP(models.Model):
         except Exception:
             return ''
 
-    # ---------- search by email (NEW) ----------
+    # ---------- search by email (FIXED: uses self._query like old working code) ----------
     def _ldap_find_by_email(self, conf, email: str):
-        """Find LDAP entry by raw email string (returns dn, entry)."""
-        if ldap is None:
-            return False, False
+        """Find LDAP entry by raw email string using Odoo's internal query path (returns dn, entry)."""
         email = (email or "").strip()
         if not email:
             return False, False
         confd = self._as_dict(conf)
+
+        def _q(flt):
+            try:
+                return self._query(confd, flt)
+            except Exception:
+                return []
+
+        # Old-behavior filter
         try:
-            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (email,)) if filter_format else f'(&(objectClass=inetOrgPerson)(mail={email}))'
-            conn = self._pyldap_connect(confd)
-            if confd.get('ldap_binddn') and confd.get('ldap_password'):
-                conn.simple_bind_s(confd.get('ldap_binddn'), confd.get('ldap_password'))
-            results = conn.search_s(confd.get('ldap_base') or '', ldap.SCOPE_SUBTREE, flt)
-            conn.unbind_s()
-            if results:
-                for r in results:
-                    if r and r[0]:
-                        return r[0], r
+            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (email,))
         except Exception:
-            _logger.exception("_ldap_find_by_email failed for email=%s", email)
+            flt = f'(&(objectClass=inetOrgPerson)(mail={email}))'
+
+        res = [r for r in _q(flt) if r and r[0]]
+        if res:
+            return res[0][0], res[0]
+
+        # Optional broaden (comment in if your directory uses AD/user or other mail attrs)
+        # flt2 = f'(&(|(objectClass=inetOrgPerson)(objectClass=user)(objectClass=person))(|(mail={email})(userPrincipalName={email})(mailPrimaryAddress={email})))'
+        # res2 = [r for r in _q(flt2) if r and r[0]]
+        # if res2:
+        #     return res2[0][0], res2[0]
+
         return False, False
 
-    # ---------- search by attrs (kept for compatibility) ----------
+    # ---------- search by attrs (kept, also routed via self._query) ----------
     def _ldap_find_by_attrs(self, conf, attrs):
         """Find LDAP entry by email only (returns dn, entry)."""
-        if ldap is None:
-            return False, False
-        confd = self._as_dict(conf)
         mail = (self._ldap_attr_text(attrs, 'mail') or '').strip()
         if not mail:
             return False, False
+        confd = self._as_dict(conf)
+
+        def _q(flt):
+            try:
+                return self._query(confd, flt)
+            except Exception:
+                return []
+
         try:
             flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (mail,)) if filter_format else f'(&(objectClass=inetOrgPerson)(mail={mail}))'
-            conn = self._pyldap_connect(confd)
-            if confd.get('ldap_binddn') and confd.get('ldap_password'):
-                conn.simple_bind_s(confd.get('ldap_binddn'), confd.get('ldap_password'))
-            results = conn.search_s(confd.get('ldap_base') or '', ldap.SCOPE_SUBTREE, flt)
-            conn.unbind_s()
-            if results:
-                for r in results:
-                    if r and r[0]:
-                        return r[0], r
+            res = [r for r in _q(flt) if r and r[0]]
+            if res:
+                return res[0][0], res[0]
         except Exception:
             _logger.exception("_ldap_find_by_attrs failed for mail=%s", mail)
             return False, False
@@ -598,17 +605,18 @@ class CompanyLDAP(models.Model):
         if ldap is None or not uid_value:
             return False, False
         confd = self._as_dict(conf)
+
+        def _q(flt):
+            try:
+                return self._query(confd, flt)
+            except Exception:
+                return []
+
         try:
             flt = filter_format('(&(objectClass=inetOrgPerson)(uid=%s))', (uid_value,)) if filter_format else f'(&(objectClass=inetOrgPerson)(uid={uid_value}))'
-            conn = self._pyldap_connect(confd)
-            if confd.get('ldap_binddn') and confd.get('ldap_password'):
-                conn.simple_bind_s(confd.get('ldap_binddn'), confd.get('ldap_password'))
-            results = conn.search_s(confd.get('ldap_base') or '', ldap.SCOPE_SUBTREE, flt)
-            conn.unbind_s()
-            if results:
-                for r in results:
-                    if r and r[0]:
-                        return r[0], r
+            res = [r for r in _q(flt) if r and r[0]]
+            if res:
+                return res[0][0], res[0]
         except Exception:
             _logger.exception("_ldap_find_by_uid failed for uid=%s", uid_value)
         return False, False
