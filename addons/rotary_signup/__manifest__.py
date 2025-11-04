@@ -17,11 +17,16 @@ Custom signup flow for Rotary users:
     'depends': [
         'auth_signup',
         'website',
-        'ldap_reset_password',  # ✅ depends on existing reset-password module
+        'ldap_reset_password',  # ensures compatibility with existing LDAP reset module
     ],
     'data': [
-        'views/signup_templates.xml',  # XML templates for signup pages
+        'views/signup_template.xml',  # ✅ corrected filename (consistent with your XML)
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'ldap_reset_password/static/src/js/club_dynamic_fill.js',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,
