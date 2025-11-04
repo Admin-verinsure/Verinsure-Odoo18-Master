@@ -3,7 +3,8 @@ import logging
 import random
 from datetime import date
 import werkzeug
-
+import ldap
+import ldap.modlist as modlist
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
 from odoo.http import request
 from odoo.exceptions import ValidationError
@@ -20,11 +21,9 @@ SIGN_UP_REQUEST_PARAMS = {
 
 _PROGRAM_TYPE_NAMES = ["None", "Rotary", "Rotaract", "Interact", "Rota-Kids"]
 
-
 def _program_type_objects():
     """Return lightweight mock objects for static program type dropdown."""
     return [type("PT", (), {"id": i, "name": n})() for i, n in enumerate(_PROGRAM_TYPE_NAMES, start=1)]
-
 
 # -----------------------------
 # Helpers
@@ -32,14 +31,12 @@ def _program_type_objects():
 def generate_random_number(min_length, max_length):
     return random.randint(10 ** (min_length - 1), (10 ** max_length) - 1)
 
-
 def _email_is_valid(email):
     email = (email or "").strip()
     try:
         return bool(tools.single_email_re.match(email))
     except Exception:
         return "@" in email and "." in email.split("@")[-1]
-
 
 def validate_signup_fields(env, email, first_name, last_name):
     if not email:
@@ -53,7 +50,6 @@ def validate_signup_fields(env, email, first_name, last_name):
     if not (last_name or "").strip():
         return False, _("Last name is required.")
     return True, ""
-
 
 def ensure_partner_from_ldap(env, attrs, company_id):
     """Ensure partner record exists for given LDAP attributes."""
@@ -108,7 +104,6 @@ def ensure_partner_from_ldap(env, attrs, company_id):
 # -----------------------------
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignupController
 
-
 class LDAPSignupController(AuthSignupController):
     """Signup flow using ldap_reset_password templates."""
 
@@ -121,9 +116,8 @@ class LDAPSignupController(AuthSignupController):
         try:
             env = request.env['res.partner'].sudo()
             domain = [('active', '=', True)]
-
             # Handle both text and numeric program_type values
-            if program_type.isdigit():
+            if str(program_type).isdigit():
                 domain.append(('program_type_id', '=', int(program_type)))
             else:
                 domain.append(('club_type', '=', program_type))
@@ -210,7 +204,7 @@ class LDAPSignupController(AuthSignupController):
         qcontext = self.get_auth_signup_qcontext()
         qcontext['program_types'] = _program_type_objects()
 
-        # ✅ Fixed: use existing club_name filter (no is_rotary_club field needed)
+        # ✅ Fixed: use existing club_name filter
         partners_club_name_not_empty = request.env['res.partner'].sudo().search([('club_name', '!=', '')])
         qcontext['clubs'] = [p for p in partners_club_name_not_empty if p.club_name]
 
@@ -290,3 +284,52 @@ class LDAPSignupController(AuthSignupController):
                 qcontext['error'] = _("Invalid signup token")
                 qcontext['invalid_token'] = True
         return qcontext
+
+
+# -----------------------------
+# LDAP Company Extension
+# -----------------------------
+class CompanyLDAP(models.Model):
+    _inherit = "res.company.ldap"
+
+    def _create_ldap_user(self, conn, dn, attrs):
+        """Helper: Create a new LDAP user entry."""
+        try:
+            ldif = modlist.addModlist(attrs)
+            conn.add_s(dn, ldif)
+        except ldap.ALREADY_EXISTS:
+            _logger.info("LDAP entry already exists for %s", dn)
+        except Exception as e:
+            _logger.error("Failed to create LDAP user %s: %s", dn, e)
+            raise
+
+    def _get_or_create_user_tuple(self, conf, login, attrs=None):
+        """Creates or retrieves LDAP user DN and attributes."""
+        base_dn = conf['user']
+        if not attrs:
+            attrs = {
+                "objectClass": [b"top", b"person", b"organizationalPerson", b"inetOrgPerson"],
+                "cn": [login.encode()],
+                "sn": [login.encode()],
+                "uid": [login.encode()],
+            }
+        dn = f"uid={login},{base_dn}"
+        conn = self.connect(conf)
+        try:
+            conn.search_s(dn, ldap.SCOPE_BASE)
+            _logger.info("LDAP user exists: %s", dn)
+        except ldap.NO_SUCH_OBJECT:
+            _logger.info("Creating new LDAP user: %s", dn)
+            self._create_ldap_user(conn, dn, attrs)
+        finally:
+            conn.unbind_s()
+        return dn, attrs
+
+    def connect(self, conf):
+        """Establish LDAP connection using stored configuration."""
+        server = conf['ldap_server']
+        conn = ldap.initialize(server)
+        conn.protocol_version = ldap.VERSION3
+        if conf.get('ldap_binddn') and conf.get('ldap_password'):
+            conn.simple_bind_s(conf['ldap_binddn'], conf['ldap_password'])
+        return conn
