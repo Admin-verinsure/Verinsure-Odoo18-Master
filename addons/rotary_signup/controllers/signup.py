@@ -228,12 +228,16 @@ class LDAPSignupController(AuthSignupController):
                     "objectclass": [b"top", b"inetOrgPerson"],
                 }
 
+                # Construct DN to enable LDAP create when necessary
+                ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
+                dn = f"uid={login},{ldap_base}" if ldap_base else None
+
                 # 1) Try to find/create user via LDAP model (this will check LDAP by email)
                 user = None
                 try:
                     ldap_model = env['res.company.ldap'].sudo()
-                    # Pass login as email (matching by email inside model)
-                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, qcontext.get('email'), (None, attrs))
+                    # Pass login as email (matching by email inside model), and provide DN+attrs so creation can happen
+                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, qcontext.get('email'), (dn, attrs))
                     if isinstance(user_id, int) and user_id:
                         user = env['res.users'].sudo().browse(user_id)
                 except Exception as e:
@@ -243,6 +247,7 @@ class LDAPSignupController(AuthSignupController):
                 # If LDAP-backed creation didn't provide a user, fallback: ensure partner + create Odoo user
                 partner = ensure_partner_from_ldap(env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
                 if not user:
+                    # use generated login as fallback local login
                     user = env['res.users'].sudo().create({'login': login, 'partner_id': partner.id, 'active': True, 'name': cn})
 
                 # Write membership id if any
@@ -302,23 +307,29 @@ class LDAPSignupController(AuthSignupController):
                 cn = f"{fn} {sn}".strip()
                 rotary_club_id = int(qcontext.get('rotary_club_id') or 0)
 
+                # Build attrs (only include employeeNumber if provided)
                 attrs = {
                     "uid": [login.encode()],
                     "givenname": [fn.encode()],
                     "cn": [cn.encode()],
                     "sn": [sn.encode()],
                     "ou": [str(rotary_club_id).encode()],
-                    "employeeNumber": [rotary_id.encode()] if rotary_id else [b""],
                     "mail": [qcontext.get('email', '').encode()],
                     "userPassword": [qcontext.get('password', '').encode()],
                     "objectclass": [b"top", b"inetOrgPerson"],
                 }
+                if rotary_id:
+                    attrs['employeeNumber'] = [rotary_id.encode()]
 
-                # 1) Try LDAP-backed create/find by email
+                # Construct DN (so LDAP create can occur if needed)
+                ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
+                dn = f"uid={login},{ldap_base}" if ldap_base else None
+
+                # 1) Try LDAP-backed create/find by email (give DN+attrs so creation is possible)
                 user = None
                 try:
                     ldap_model = env['res.company.ldap'].sudo()
-                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, qcontext.get('email'), (None, attrs))
+                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, qcontext.get('email'), (dn, attrs))
                     if isinstance(user_id, int) and user_id:
                         user = env['res.users'].sudo().browse(user_id)
                 except Exception as e:
