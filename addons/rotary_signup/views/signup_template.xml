@@ -2,497 +2,288 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- 1) Landing Page – Choose Member or Non-Member -->
+    <!-- 1) Landing – unchanged content, just simple centering -->
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
-
-        <!-- Inline styles for this page only -->
         <style type="text/css"><![CDATA[
-          .auth-bg {
-            min-height: 100vh;
-            background:
-              radial-gradient(1200px 500px at 10% -10%, rgba(99,102,241,.08), transparent 60%),
-              radial-gradient(800px 400px at 120% 20%, rgba(16,185,129,.08), transparent 60%),
-              linear-gradient(180deg, #f8fafc, #ffffff);
-          }
-          .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
-          .auth-title { letter-spacing: .2px; }
+          .simple-auth{max-width:640px;margin:48px auto}
+          .simple-auth .title{margin-bottom:16px}
+          .simple-auth .sub{color:#6b7280;margin-bottom:24px}
+          .simple-auth .btn{border-radius:10px}
         ]]></style>
 
-        <div class="auth-bg d-flex align-items-center py-5">
-          <div class="container text-center">
-            <div class="card auth-card shadow-lg border-0 mx-auto" style="max-width: 600px;">
-              <div class="card-body py-5">
-                <h2 class="fw-bold mb-3 text-primary auth-title">Are you a Rotary International Member?</h2>
-                <p class="text-muted mb-4">Choose your signup type to continue.</p>
-                <div class="d-flex justify-content-center gap-3 flex-wrap">
-                  <a href="/web/signup" class="btn btn-success px-5 py-2 fw-semibold shadow-sm">
-                    <i class="fa fa-user-check me-2"></i>Yes, I’m a Member
-                  </a>
-                  <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2 fw-semibold shadow-sm">
-                    <i class="fa fa-user me-2"></i>No, I’m a Non-Member
-                  </a>
-                </div>
-              </div>
+        <div class="container">
+          <div class="simple-auth text-center">
+            <h2 class="title fw-bold text-primary">Are you a Rotary International Member?</h2>
+            <p class="sub">Choose your signup type to continue.</p>
+            <div class="d-flex justify-content-center gap-3 flex-wrap">
+              <a href="/web/signup" class="btn btn-dark px-5 py-2 fw-semibold">Yes, I’m a Member</a>
+              <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2 fw-semibold">No, I’m a Non-Member</a>
             </div>
           </div>
         </div>
-
       </t>
     </template>
 
-    <!-- 2) Member Signup Form -->
+    <!-- 2) Member Signup – same fields, simple look -->
     <template id="ldap_reset_password.signup" name="Rotary Member Signup">
       <t t-call="web.login_layout">
-
-        <!-- Inline styles + small helpers -->
         <style type="text/css"><![CDATA[
-          .auth-bg {
-            min-height: 100vh;
-            background:
-              radial-gradient(1200px 500px at 10% -10%, rgba(99,102,241,.08), transparent 60%),
-              radial-gradient(800px 400px at 120% 20%, rgba(16,185,129,.08), transparent 60%),
-              linear-gradient(180deg, #f8fafc, #ffffff);
-          }
-          .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
-          .auth-title { letter-spacing: .2px; }
-          .input-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); opacity: .55; pointer-events: none; }
-          .has-icon input, .has-icon select { padding-left: 2.25rem; }
-          .pw-meter { height: 6px; border-radius: 8px; background: #e5e7eb; overflow: hidden; }
-          /* escape the child selector ">" for XML safety */
-          .pw-meter span.meter { display:block; height:100%; width:0; }
-          .pw-weak {background:#ef4444;} .pw-fair {background:#f59e0b;}
-          .pw-good {background:#10b981;} .pw-strong {background:#22c55e;}
-          .small-muted {font-size:.875rem; color:#6b7280;}
+          .simple-auth{max-width:640px;margin:48px auto}
+          .simple-auth label{font-weight:600}
+          .simple-auth .field{margin-bottom:16px}
+          .simple-auth .btn-primary{background:#111;border-color:#111;border-radius:10px;padding:.7rem 1.5rem}
+          .simple-auth .login-hint{margin-left:12px;color:#6b7280}
+          .simple-auth .invalid-feedback{display:block}
         ]]></style>
 
-        <div class="auth-bg d-flex align-items-center py-5">
-          <div class="container">
-            <div class="card auth-card shadow-lg border-0 mx-auto" style="max-width: 650px;">
-              <div class="card-body p-5">
-                <div class="text-center mb-4">
-                  <h3 class="fw-bold text-primary auth-title">Rotary Member Signup</h3>
-                  <p class="text-muted">Join the Rotary community by creating your account.</p>
-                </div>
+        <div class="container">
+          <div class="simple-auth">
+            <h3 class="mb-3">Rotary Member Signup</h3>
 
-                <t t-if="error">
-                  <div class="alert alert-danger text-center">
-                    <i class="fa fa-exclamation-circle me-2"></i><t t-esc="error"/>
-                  </div>
-                </t>
+            <t t-if="error">
+              <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
+            </t>
 
-                <form method="post" action="/web/signup" class="oe_signup_form needs-validation" novalidate="novalidate">
-                  <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+            <form method="post" action="/web/signup" class="oe_signup_form needs-validation" novalidate="novalidate">
+              <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
-                  <div class="row">
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">First Name</label>
-                      <div class="has-icon">
-                        <i class="fa fa-user input-icon"></i>
-                        <input type="text" name="first_name" class="form-control form-control-lg"
-                               placeholder="e.g. John" required="required" autocomplete="given-name"
-                               t-att-value="first_name"/>
-                      </div>
-                      <div class="invalid-feedback">First name is required.</div>
-                    </div>
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Last Name</label>
-                      <div class="has-icon">
-                        <i class="fa fa-user input-icon"></i>
-                        <input type="text" name="last_name" class="form-control form-control-lg"
-                               placeholder="e.g. Smith" required="required" autocomplete="family-name"
-                               t-att-value="last_name"/>
-                      </div>
-                      <div class="invalid-feedback">Last name is required.</div>
-                    </div>
-                  </div>
-
-                  <div class="mb-3 position-relative">
-                    <label class="form-label fw-semibold">Email Address</label>
-                    <div class="has-icon">
-                      <i class="fa fa-envelope input-icon"></i>
-                      <input type="email" name="email" class="form-control form-control-lg"
-                             placeholder="example@email.com" required="required" autocomplete="email"
-                             t-att-value="email"/>
-                    </div>
-                    <div class="invalid-feedback">Please enter a valid email.</div>
-                  </div>
-
-                  <div class="mb-3 position-relative">
-                    <label class="form-label fw-semibold">Rotary International Number</label>
-                    <div class="has-icon">
-                      <i class="fa fa-id-badge input-icon"></i>
-                      <input type="text" name="rotary_id" class="form-control form-control-lg"
-                             placeholder="5–8 digit Rotary ID" pattern="^\d{5,8}$"
-                             required="required" t-att-value="rotary_id"/>
-                    </div>
-                    <div class="small-muted mt-1">Digits only, 5–8 in length.</div>
-                    <div class="invalid-feedback">Enter a valid Rotary ID (5–8 digits).</div>
-                  </div>
-
-                  <div class="mb-3 position-relative">
-                    <label class="form-label fw-semibold">Program Type</label>
-                    <div class="has-icon">
-                      <i class="fa fa-layer-group input-icon"></i>
-                      <select name="club_type" id="club_type" class="form-select form-select-lg" required="required">
-                        <option value="">-- Select Program Type --</option>
-                        <t t-set="club_types"
-                           t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
-                        <t t-foreach="club_types" t-as="opt">
-                          <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]">
-                            <t t-esc="opt[1]"/>
-                          </option>
-                        </t>
-                      </select>
-                    </div>
-                    <div class="invalid-feedback">Please select a program type.</div>
-                  </div>
-
-                  <div class="mb-3 position-relative">
-                    <label class="form-label fw-semibold">Club Name</label>
-                    <div class="has-icon">
-                      <i class="fa fa-building input-icon"></i>
-                      <select name="rotary_club_id" id="rotary_club_id" class="form-select form-select-lg" required="required">
-                        <t t-set="sel_program" t-value="request.params.get('club_type')"/>
-                        <t t-set="clubs"
-                           t-value="sel_program
-                                    and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
-                                    or env['res.partner'].browse([])"/>
-                        <t t-if="not sel_program">
-                          <option value="">-- Select Program Type first --</option>
-                        </t>
-                        <t t-if="sel_program and not clubs">
-                          <option value="">-- No clubs found for this program --</option>
-                        </t>
-                        <t t-foreach="clubs" t-as="c">
-                          <option t-att-value="c.id"
-                                  t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
-                            <t t-esc="c.club_name or c.name"/>
-                          </option>
-                        </t>
-                      </select>
-                    </div>
-                    <div class="invalid-feedback">Please select your club.</div>
-                  </div>
-
-                  <div class="row">
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Password</label>
-                      <div class="has-icon position-relative">
-                        <i class="fa fa-lock input-icon"></i>
-                        <input type="password" name="password" id="m_password" class="form-control form-control-lg"
-                               required="required" autocomplete="new-password" placeholder="Minimum 8 characters"/>
-                        <button type="button" class="btn btn-sm btn-outline-secondary position-absolute"
-                                style="right:.5rem; top:50%; transform:translateY(-50%);" onclick="window.__togglePw('m_password', this)">
-                          Show
-                        </button>
-                      </div>
-                      <div class="pw-meter mt-2"><span class="meter" id="m_pw_bar"></span></div>
-                      <div class="small-muted mt-1">Use at least 8 characters and mix letters, numbers, or symbols.</div>
-                      <div class="invalid-feedback">Please enter a password.</div>
-                    </div>
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Confirm Password</label>
-                      <div class="has-icon position-relative">
-                        <i class="fa fa-lock input-icon"></i>
-                        <input type="password" name="confirm_password" id="m_confirm" class="form-control form-control-lg"
-                               required="required" autocomplete="new-password" placeholder="Re-enter password"/>
-                        <button type="button" class="btn btn-sm btn-outline-secondary position-absolute"
-                                style="right:.5rem; top:50%; transform:translateY(-50%);" onclick="window.__togglePw('m_confirm', this)">
-                          Show
-                        </button>
-                      </div>
-                      <div class="invalid-feedback">Please confirm your password.</div>
-                    </div>
-                  </div>
-
-                  <button type="submit" class="btn btn-primary btn-lg w-100 mt-3 shadow-sm">
-                    <i class="fa fa-user-plus me-2"></i>Create My Account
-                  </button>
-
-                  <div class="text-center mt-3">
-                    <small>Already have an account?</small>
-                    <a href="/web/login" class="fw-semibold text-decoration-none ms-1">Sign in</a>
-                  </div>
-                </form>
+              <div class="field">
+                <label>First Name</label>
+                <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
+                       required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
-            </div>
+
+              <div class="field">
+                <label>Last Name</label>
+                <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
+                       required="required" autocomplete="family-name" t-att-value="last_name"/>
+              </div>
+
+              <div class="field">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
+                       required="required" autocomplete="email" t-att-value="email"/>
+              </div>
+
+              <!-- Keep your extra member fields, just same minimal style -->
+              <div class="field">
+                <label>Rotary International Number</label>
+                <input type="text" name="rotary_id" class="form-control" placeholder="5–8 digit Rotary ID"
+                       required="required" t-att-value="rotary_id"/>
+              </div>
+
+              <div class="field">
+                <label>Program Type</label>
+                <select name="club_type" id="club_type" class="form-select" required="required">
+                  <option value="">-- Select Program Type --</option>
+                  <t t-set="club_types"
+                     t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
+                  <t t-foreach="club_types" t-as="opt">
+                    <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]">
+                      <t t-esc="opt[1]"/>
+                    </option>
+                  </t>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Club Name</label>
+                <select name="rotary_club_id" id="rotary_club_id" class="form-select" required="required">
+                  <t t-set="sel_program" t-value="request.params.get('club_type')"/>
+                  <t t-set="clubs"
+                     t-value="sel_program
+                              and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
+                              or env['res.partner'].browse([])"/>
+                  <t t-if="not sel_program">
+                    <option value="">-- Select Program Type first --</option>
+                  </t>
+                  <t t-if="sel_program and not clubs">
+                    <option value="">-- No clubs found for this program --</option>
+                  </t>
+                  <t t-foreach="clubs" t-as="c">
+                    <option t-att-value="c.id"
+                            t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
+                      <t t-esc="c.club_name or c.name"/>
+                    </option>
+                  </t>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Password</label>
+                <input type="password" name="password" id="m_password" class="form-control"
+                       required="required" autocomplete="new-password"/>
+              </div>
+
+              <div class="field">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" id="m_confirm" class="form-control"
+                       required="required" autocomplete="new-password"/>
+                <div class="invalid-feedback" id="m_msg" style="display:none">Passwords do not match</div>
+              </div>
+
+              <div class="d-flex align-items-center">
+                <button type="submit" class="btn btn-primary">Sign up</button>
+                <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
+              </div>
+            </form>
           </div>
         </div>
 
-        <!-- Safe inline script -->
         <script type="text/javascript"><![CDATA[
           (function () {
-            // Client-side validation + password match
-            var forms = document.querySelectorAll('.needs-validation');
-            Array.prototype.slice.call(forms).forEach(function (form) {
-              form.addEventListener('submit', function (event) {
-                var p = form.querySelector('#m_password');
-                var c = form.querySelector('#m_confirm');
-                if (p && c && p.value !== c.value) {
-                  c.setCustomValidity('Passwords do not match');
-                } else if (c) {
-                  c.setCustomValidity('');
-                }
-                if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
-                form.classList.add('was-validated');
-              }, false);
-            });
+            var form = document.querySelector('.needs-validation');
+            if (!form) return;
+            var p = document.getElementById('m_password');
+            var c = document.getElementById('m_confirm');
+            var msg = document.getElementById('m_msg');
 
-            // Password strength meter
-            function score(pw) {
-              if (!pw) return 0;
-              var s = 0;
-              if (pw.length >= 8) s++;
-              if (/[A-Z]/.test(pw)) s++;
-              if (/[a-z]/.test(pw)) s++;
-              if (/\d/.test(pw)) s++;
-              if (/[^A-Za-z0-9]/.test(pw)) s++;
-              return Math.min(s, 4);
+            function checkMatch() {
+              if (p && c && p.value && c.value && p.value !== c.value) {
+                c.setCustomValidity('no-match');
+                if (msg) msg.style.display = '';
+              } else {
+                if (c) c.setCustomValidity('');
+                if (msg) msg.style.display = 'none';
+              }
             }
-            var pw = document.getElementById('m_password');
-            var bar = document.getElementById('m_pw_bar');
-            if (pw && bar) {
-              pw.addEventListener('input', function () {
-                var sc = score(pw.value);
-                var widths = ['0%','25%','50%','75%','100%'];
-                var classes = ['','pw-weak','pw-fair','pw-good','pw-strong'];
-                bar.className = 'meter ' + classes[sc];
-                bar.style.width = widths[sc];
-              });
-            }
+            if (p) p.addEventListener('input', checkMatch);
+            if (c) c.addEventListener('input', checkMatch);
 
-            // Show/hide password widgets
-            window.__togglePw = function (id, btn) {
-              var el = document.getElementById(id);
-              if (!el) return;
-              if (el.type === 'password') { el.type = 'text'; btn.innerText = 'Hide'; }
-              else { el.type = 'password'; btn.innerText = 'Show'; }
-            };
+            form.addEventListener('submit', function (e) {
+              checkMatch();
+              if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
+              form.classList.add('was-validated');
+            }, false);
           })();
         ]]></script>
-
       </t>
     </template>
 
-    <!-- 3) Non-Member Signup Form -->
+    <!-- 3) Non-Member Signup – same minimal look -->
     <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
       <t t-call="web.login_layout">
-
-        <!-- Inline styles reused -->
         <style type="text/css"><![CDATA[
-          .auth-bg {
-            min-height: 100vh;
-            background:
-              radial-gradient(1200px 500px at 10% -10%, rgba(99,102,241,.08), transparent 60%),
-              radial-gradient(800px 400px at 120% 20%, rgba(16,185,129,.08), transparent 60%),
-              linear-gradient(180deg, #f8fafc, #ffffff);
-          }
-          .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
-          .auth-title { letter-spacing: .2px; }
-          .input-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); opacity: .55; pointer-events: none; }
-          .has-icon input { padding-left: 2.25rem; }
-          .pw-meter { height: 6px; border-radius: 8px; background: #e5e7eb; overflow: hidden; }
-          .pw-meter span.meter { display:block; height:100%; width:0; }
-          .pw-weak {background:#ef4444;} .pw-fair {background:#f59e0b;}
-          .pw-good {background:#10b981;} .pw-strong {background:#22c55e;}
-          .small-muted {font-size:.875rem; color:#6b7280;}
+          .simple-auth{max-width:640px;margin:48px auto}
+          .simple-auth label{font-weight:600}
+          .simple-auth .field{margin-bottom:16px}
+          .simple-auth .btn-primary{background:#111;border-color:#111;border-radius:10px;padding:.7rem 1.5rem}
+          .simple-auth .login-hint{margin-left:12px;color:#6b7280}
+          .simple-auth .invalid-feedback{display:block}
         ]]></style>
 
-        <div class="auth-bg d-flex align-items-center py-5">
-          <div class="container">
-            <div class="card auth-card shadow-lg border-0 mx-auto" style="max-width: 650px; border-radius: 1rem;">
-              <div class="card-body p-5">
-                <div class="text-center mb-4">
-                  <h3 class="fw-bold text-primary auth-title">Non-Member Signup</h3>
-                  <p class="text-muted">Sign up to access the platform as a guest or participant.</p>
-                </div>
+        <div class="container">
+          <div class="simple-auth">
+            <h3 class="mb-3">Non-Member Signup</h3>
 
-                <t t-if="error">
-                  <div class="alert alert-danger text-center">
-                    <i class="fa fa-exclamation-circle me-2"></i><t t-esc="error"/>
-                  </div>
-                </t>
+            <t t-if="error">
+              <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
+            </t>
 
-                <form method="post" action="/web/signup_non_member" class="oe_signup_form needs-validation" novalidate="novalidate">
-                  <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+            <form method="post" action="/web/signup_non_member" class="oe_signup_form needs-validation" novalidate="novalidate">
+              <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
-                  <div class="row">
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">First Name</label>
-                      <div class="has-icon">
-                        <i class="fa fa-user input-icon"></i>
-                        <input type="text" name="first_name" class="form-control form-control-lg"
-                               placeholder="e.g. John" required="required" autocomplete="given-name"
-                               t-att-value="first_name"/>
-                      </div>
-                      <div class="invalid-feedback">First name is required.</div>
-                    </div>
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Last Name</label>
-                      <div class="has-icon">
-                        <i class="fa fa-user input-icon"></i>
-                        <input type="text" name="last_name" class="form-control form-control-lg"
-                               placeholder="e.g. Smith" required="required" autocomplete="family-name"
-                               t-att-value="last_name"/>
-                      </div>
-                      <div class="invalid-feedback">Last name is required.</div>
-                    </div>
-                  </div>
-
-                  <div class="mb-3 position-relative">
-                    <label class="form-label fw-semibold">Email Address</label>
-                    <div class="has-icon">
-                      <i class="fa fa-envelope input-icon"></i>
-                      <input type="email" name="email" class="form-control form-control-lg"
-                             required="required" autocomplete="email" t-att-value="email"/>
-                    </div>
-                    <div class="invalid-feedback">Please enter a valid email.</div>
-                  </div>
-
-                  <div class="row">
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Password</label>
-                      <div class="has-icon position-relative">
-                        <i class="fa fa-lock input-icon"></i>
-                        <input type="password" name="password" id="n_password" class="form-control form-control-lg"
-                               required="required" autocomplete="new-password" placeholder="Minimum 8 characters"/>
-                        <button type="button" class="btn btn-sm btn-outline-secondary position-absolute"
-                                style="right:.5rem; top:50%; transform:translateY(-50%);" onclick="window.__togglePw('n_password', this)">
-                          Show
-                        </button>
-                      </div>
-                      <div class="pw-meter mt-2"><span class="meter" id="n_pw_bar"></span></div>
-                      <div class="small-muted mt-1">Use at least 8 characters and mix letters, numbers, or symbols.</div>
-                      <div class="invalid-feedback">Please enter a password.</div>
-                    </div>
-                    <div class="col-md-6 mb-3 position-relative">
-                      <label class="form-label fw-semibold">Confirm Password</label>
-                      <div class="has-icon position-relative">
-                        <i class="fa fa-lock input-icon"></i>
-                        <input type="password" name="confirm_password" id="n_confirm" class="form-control form-control-lg"
-                               required="required" autocomplete="new-password" placeholder="Re-enter password"/>
-                        <button type="button" class="btn btn-sm btn-outline-secondary position-absolute"
-                                style="right:.5rem; top:50%; transform:translateY(-50%);" onclick="window.__togglePw('n_confirm', this)">
-                          Show
-                        </button>
-                      </div>
-                      <div class="invalid-feedback">Please confirm your password.</div>
-                    </div>
-                  </div>
-
-                  <button type="submit" class="btn btn-primary btn-lg w-100 mt-3 shadow-sm">
-                    <i class="fa fa-user-plus me-2"></i>Create My Account
-                  </button>
-
-                  <div class="text-center mt-3">
-                    <small>Already have an account?</small>
-                    <a href="/web/login" class="fw-semibold text-decoration-none ms-1">Sign in</a>
-                  </div>
-                </form>
+              <div class="field">
+                <label>First Name</label>
+                <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
+                       required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
-            </div>
+
+              <div class="field">
+                <label>Last Name</label>
+                <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
+                       required="required" autocomplete="family-name" t-att-value="last_name"/>
+              </div>
+
+              <div class="field">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
+                       required="required" autocomplete="email" t-att-value="email"/>
+              </div>
+
+              <div class="field">
+                <label>Password</label>
+                <input type="password" name="password" id="n_password" class="form-control" required="required"
+                       autocomplete="new-password"/>
+              </div>
+
+              <div class="field">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" id="n_confirm" class="form-control" required="required"
+                       autocomplete="new-password"/>
+                <div class="invalid-feedback" id="n_msg" style="display:none">Passwords do not match</div>
+              </div>
+
+              <div class="d-flex align-items-center">
+                <button type="submit" class="btn btn-primary">Sign up</button>
+                <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
+              </div>
+            </form>
           </div>
         </div>
 
         <script type="text/javascript"><![CDATA[
           (function () {
-            // Client-side validation + match
-            var forms = document.querySelectorAll('.needs-validation');
-            Array.prototype.slice.call(forms).forEach(function (form) {
-              form.addEventListener('submit', function (event) {
-                var p = form.querySelector('#n_password');
-                var c = form.querySelector('#n_confirm');
-                if (p && c && p.value !== c.value) {
-                  c.setCustomValidity('Passwords do not match');
-                } else if (c) {
-                  c.setCustomValidity('');
-                }
-                if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
-                form.classList.add('was-validated');
-              }, false);
-            });
+            var form = document.querySelector('.needs-validation');
+            if (!form) return;
+            var p = document.getElementById('n_password');
+            var c = document.getElementById('n_confirm');
+            var msg = document.getElementById('n_msg');
 
-            // Strength meter
-            function score(pw) {
-              if (!pw) return 0;
-              var s = 0;
-              if (pw.length >= 8) s++;
-              if (/[A-Z]/.test(pw)) s++;
-              if (/[a-z]/.test(pw)) s++;
-              if (/\d/.test(pw)) s++;
-              if (/[^A-Za-z0-9]/.test(pw)) s++;
-              return Math.min(s, 4);
+            function checkMatch() {
+              if (p && c && p.value && c.value && p.value !== c.value) {
+                c.setCustomValidity('no-match');
+                if (msg) msg.style.display = '';
+              } else {
+                if (c) c.setCustomValidity('');
+                if (msg) msg.style.display = 'none';
+              }
             }
-            var pw = document.getElementById('n_password');
-            var bar = document.getElementById('n_pw_bar');
-            if (pw && bar) {
-              pw.addEventListener('input', function () {
-                var sc = score(pw.value);
-                var widths = ['0%','25%','50%','75%','100%'];
-                var classes = ['','pw-weak','pw-fair','pw-good','pw-strong'];
-                bar.className = 'meter ' + classes[sc];
-                bar.style.width = widths[sc];
-              });
-            }
+            if (p) p.addEventListener('input', checkMatch);
+            if (c) c.addEventListener('input', checkMatch);
 
-            // Toggle password
-            window.__togglePw = function (id, btn) {
-              var el = document.getElementById(id);
-              if (!el) return;
-              if (el.type === 'password') { el.type = 'text'; btn.innerText = 'Hide'; }
-              else { el.type = 'password'; btn.innerText = 'Show'; }
-            };
+            form.addEventListener('submit', function (e) {
+              checkMatch();
+              if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
+              form.classList.add('was-validated');
+            }, false);
           })();
         ]]></script>
-
       </t>
     </template>
 
-    <!-- 4) Thank You Page -->
+    <!-- 4) Thank You -->
     <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
       <t t-call="web.login_layout">
-
         <style type="text/css"><![CDATA[
-          .auth-bg { min-height: 100vh; background: linear-gradient(180deg, #f8fafc, #ffffff); }
-          .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+          .simple-auth{max-width:620px;margin:64px auto}
         ]]></style>
-
-        <div class="auth-bg d-flex align-items-center py-5">
-          <div class="container text-center">
-            <div class="card auth-card shadow-lg border-0 mx-auto" style="max-width:600px;">
-              <div class="card-body py-5">
-                <div class="alert alert-success fs-5 fw-semibold">
-                  <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
-                </div>
-                <a href="/web/login" class="btn btn-primary mt-3 px-4 py-2 shadow-sm">Go to Login</a>
-              </div>
+        <div class="container">
+          <div class="simple-auth text-center">
+            <div class="alert alert-success fs-5 fw-semibold">
+              <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
             </div>
+            <a href="/web/login" class="btn btn-dark mt-3 px-4 py-2">Go to Login</a>
           </div>
         </div>
       </t>
     </template>
 
-    <!-- 5) Error Page -->
+    <!-- 5) Error -->
     <template id="ldap_reset_password.web_error" name="Signup Error Page">
       <t t-call="web.login_layout">
-
         <style type="text/css"><![CDATA[
-          .auth-bg { min-height: 100vh; background: linear-gradient(180deg, #f8fafc, #ffffff); }
-          .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+          .simple-auth{max-width:620px;margin:64px auto}
+          .simple-auth .btn{border-radius:10px}
         ]]></style>
-
-        <div class="auth-bg d-flex align-items-center py-5">
-          <div class="container text-center">
-            <div class="card auth-card shadow-lg border-0 mx-auto" style="max-width:600px;">
-              <div class="card-body py-5">
-                <div class="alert alert-danger fs-5 fw-semibold">
-                  <i class="fa fa-times-circle me-2"></i><t t-esc="message"/>
-                </div>
-                <a href="/web/is_member" class="btn btn-secondary mt-3 me-2">Try Again</a>
-                <a href="/web/login" class="btn btn-outline-primary mt-3">Back to Login</a>
-              </div>
+        <div class="container">
+          <div class="simple-auth text-center">
+            <div class="alert alert-danger fs-5 fw-semibold">
+              <i class="fa fa-times-circle me-2"></i><t t-esc="message"/>
             </div>
+            <a href="/web/is_member" class="btn btn-secondary mt-3 me-2">Try Again</a>
+            <a href="/web/login" class="btn btn-outline-primary mt-3">Back to Login</a>
           </div>
         </div>
       </t>
