@@ -2,44 +2,49 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- 1) Landing – unchanged content, just simple centering -->
+    <!-- 1) Landing – simple, centered -->
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
-          .simple-auth{max-width:640px;margin:48px auto}
-          .simple-auth .title{margin-bottom:16px}
-          .simple-auth .sub{color:#6b7280;margin-bottom:24px}
-          .simple-auth .btn{border-radius:10px}
+          .simple-auth { max-width: 640px; margin: 56px auto; text-align: center; }
+          .simple-auth .title { margin-bottom: 12px; font-weight: 500; }
+          .simple-auth .sub { color: #6b7280; margin-bottom: 20px; }
+          .simple-auth .btn { border-radius: 10px; }
         ]]></style>
 
         <div class="container">
-          <div class="simple-auth text-center">
-            <h2 class="title fw-bold text-primary">Are you a Rotary International Member?</h2>
+          <div class="simple-auth">
+            <h2 class="title text-primary">Are you a Rotary International Member?</h2>
             <p class="sub">Choose your signup type to continue.</p>
             <div class="d-flex justify-content-center gap-3 flex-wrap">
-              <a href="/web/signup" class="btn btn-dark px-5 py-2 fw-semibold">Yes, I’m a Member</a>
-              <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2 fw-semibold">No, I’m a Non-Member</a>
+              <a href="/web/signup" class="btn btn-dark px-5 py-2">Yes, I’m a Member</a>
+              <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2">No, I’m a Non-Member</a>
             </div>
           </div>
         </div>
       </t>
     </template>
 
-    <!-- 2) Member Signup – same fields, simple look -->
+    <!-- 2) Member Signup – centered layout, minimal CSS/JS -->
     <template id="ldap_reset_password.signup" name="Rotary Member Signup">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
-          .simple-auth{max-width:640px;margin:48px auto}
-          .simple-auth label{font-weight:600}
-          .simple-auth .field{margin-bottom:16px}
-          .simple-auth .btn-primary{background:#111;border-color:#111;border-radius:10px;padding:.7rem 1.5rem}
-          .simple-auth .login-hint{margin-left:12px;color:#6b7280}
-          .simple-auth .invalid-feedback{display:block}
+          .signup-wrap { max-width: 420px; margin: 60px auto; text-align: center; }
+          .signup-wrap h3 { font-weight: 500; margin-bottom: 18px; font-size: 1.6rem; }
+          .signup-wrap .field { margin-bottom: 14px; }
+          .signup-wrap label { display:block; text-align:left; font-weight:400; font-size:.95rem; margin-bottom:.35rem; }
+          .signup-wrap input, .signup-wrap select { height: 42px; border-radius: 8px; }
+          .signup-actions { display:flex; align-items:center; gap:.5rem; justify-content:center; flex-wrap:wrap; margin-top:6px; }
+          .signup-btn { background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:10px; padding:.65rem 1.4rem; transition:background .15s ease; }
+          .signup-btn:hover { background:#1d4ed8; }
+          .login-hint { font-size:.92rem; color:#6b7280; }
+          .login-hint a { color:#2563eb; text-decoration:none; }
+          .login-hint a:hover { text-decoration:underline; }
         ]]></style>
 
         <div class="container">
-          <div class="simple-auth">
-            <h3 class="mb-3">Rotary Member Signup</h3>
+          <div class="signup-wrap">
+            <h3>Rotary Member Signup</h3>
 
             <t t-if="error">
               <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
@@ -66,7 +71,6 @@
                        required="required" autocomplete="email" t-att-value="email"/>
               </div>
 
-              <!-- Keep your extra member fields, just same minimal style -->
               <div class="field">
                 <label>Rotary International Number</label>
                 <input type="text" name="rotary_id" class="form-control" placeholder="5–8 digit Rotary ID"
@@ -80,9 +84,7 @@
                   <t t-set="club_types"
                      t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
                   <t t-foreach="club_types" t-as="opt">
-                    <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]">
-                      <t t-esc="opt[1]"/>
-                    </option>
+                    <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]"><t t-esc="opt[1]"/></option>
                   </t>
                 </select>
               </div>
@@ -123,8 +125,8 @@
                 <div class="invalid-feedback" id="m_msg" style="display:none">Passwords do not match</div>
               </div>
 
-              <div class="d-flex align-items-center">
-                <button type="submit" class="btn btn-primary">Sign up</button>
+              <div class="signup-actions">
+                <button type="submit" class="signup-btn">Sign up</button>
                 <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
               </div>
             </form>
@@ -161,21 +163,26 @@
       </t>
     </template>
 
-    <!-- 3) Non-Member Signup – same minimal look -->
+    <!-- 3) Non-Member Signup – centered layout, same styles -->
     <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
-          .simple-auth{max-width:640px;margin:48px auto}
-          .simple-auth label{font-weight:600}
-          .simple-auth .field{margin-bottom:16px}
-          .simple-auth .btn-primary{background:#111;border-color:#111;border-radius:10px;padding:.7rem 1.5rem}
-          .simple-auth .login-hint{margin-left:12px;color:#6b7280}
-          .simple-auth .invalid-feedback{display:block}
+          .signup-wrap { max-width: 420px; margin: 60px auto; text-align: center; }
+          .signup-wrap h3 { font-weight: 500; margin-bottom: 18px; font-size: 1.6rem; }
+          .signup-wrap .field { margin-bottom: 14px; }
+          .signup-wrap label { display:block; text-align:left; font-weight:400; font-size:.95rem; margin-bottom:.35rem; }
+          .signup-wrap input { height: 42px; border-radius: 8px; }
+          .signup-actions { display:flex; align-items:center; gap:.5rem; justify-content:center; flex-wrap:wrap; margin-top:6px; }
+          .signup-btn { background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:10px; padding:.65rem 1.4rem; transition:background .15s ease; }
+          .signup-btn:hover { background:#1d4ed8; }
+          .login-hint { font-size:.92rem; color:#6b7280; }
+          .login-hint a { color:#2563eb; text-decoration:none; }
+          .login-hint a:hover { text-decoration:underline; }
         ]]></style>
 
         <div class="container">
-          <div class="simple-auth">
-            <h3 class="mb-3">Non-Member Signup</h3>
+          <div class="signup-wrap">
+            <h3>Non-Member Signup</h3>
 
             <t t-if="error">
               <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
@@ -204,19 +211,19 @@
 
               <div class="field">
                 <label>Password</label>
-                <input type="password" name="password" id="n_password" class="form-control" required="required"
-                       autocomplete="new-password"/>
+                <input type="password" name="password" id="n_password" class="form-control"
+                       required="required" autocomplete="new-password"/>
               </div>
 
               <div class="field">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" id="n_confirm" class="form-control" required="required"
-                       autocomplete="new-password"/>
+                <input type="password" name="confirm_password" id="n_confirm" class="form-control"
+                       required="required" autocomplete="new-password"/>
                 <div class="invalid-feedback" id="n_msg" style="display:none">Passwords do not match</div>
               </div>
 
-              <div class="d-flex align-items-center">
-                <button type="submit" class="btn btn-primary">Sign up</button>
+              <div class="signup-actions">
+                <button type="submit" class="signup-btn">Sign up</button>
                 <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
               </div>
             </form>
@@ -257,10 +264,10 @@
     <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
-          .simple-auth{max-width:620px;margin:64px auto}
+          .simple-auth { max-width: 620px; margin: 64px auto; text-align:center; }
         ]]></style>
         <div class="container">
-          <div class="simple-auth text-center">
+          <div class="simple-auth">
             <div class="alert alert-success fs-5 fw-semibold">
               <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
             </div>
@@ -274,11 +281,11 @@
     <template id="ldap_reset_password.web_error" name="Signup Error Page">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
-          .simple-auth{max-width:620px;margin:64px auto}
-          .simple-auth .btn{border-radius:10px}
+          .simple-auth { max-width: 620px; margin: 64px auto; text-align:center; }
+          .simple-auth .btn { border-radius: 10px; }
         ]]></style>
         <div class="container">
-          <div class="simple-auth text-center">
+          <div class="simple-auth">
             <div class="alert alert-danger fs-5 fw-semibold">
               <i class="fa fa-times-circle me-2"></i><t t-esc="message"/>
             </div>
