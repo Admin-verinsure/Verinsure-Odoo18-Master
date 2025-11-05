@@ -6,6 +6,7 @@
     <template id="ldap_reset_password._inline_assets" name="Signup Inline Assets" inherit_id="web.login_layout">
       <xpath expr="//body" position="before">
         <t t-set="__signup_inline_css">
+          <![CDATA[
           <style>
             .auth-bg {
               min-height: 100vh;
@@ -22,6 +23,7 @@
             .pw-weak {background:#ef4444;} .pw-fair {background:#f59e0b;} .pw-good {background:#10b981;} .pw-strong {background:#22c55e;}
             .small-muted {font-size:.875rem; color:#6b7280;}
           </style>
+          ]]>
         </t>
       </xpath>
     </template>
@@ -290,7 +292,7 @@
                 </t>
 
                 <form method="post" action="/web/signup_non_member" class="oe_signup_form needs-validation" novalidate="novalidate">
-                  <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                  <input type="hidden" name="csrf_token" t-att-value="request.csrf_token"/>
 
                   <div class="row g-3">
                     <div class="col-md-6 position-relative">
