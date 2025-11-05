@@ -2,10 +2,7 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- =========================
-         Shared minimal styles + helpers
-         (kept inline to avoid extra asset files)
-    ========================== -->
+    <!-- Inline styles (safe) -->
     <template id="ldap_reset_password._inline_assets" name="Signup Inline Assets" inherit_id="web.login_layout">
       <xpath expr="//body" position="before">
         <t t-set="__signup_inline_css">
@@ -16,38 +13,20 @@
                           radial-gradient(800px 400px at 120% 20%, rgba(16,185,129,.08), transparent 60%),
                           linear-gradient(180deg, #f8fafc, #ffffff);
             }
-            .auth-card {
-              border-radius: 1rem;
-              border: 0;
-              box-shadow: 0 10px 30px rgba(15,23,42,.08);
-            }
-            .auth-title {
-              letter-spacing: .2px;
-            }
-            .input-icon {
-              position: absolute; left: .9rem; top: 50%; transform: translateY(-50%);
-              opacity: .55; pointer-events: none;
-            }
-            .has-icon input, .has-icon select {
-              padding-left: 2.25rem;
-            }
-            .pw-meter {
-              height: 6px; border-radius: 8px; background: #e5e7eb; overflow: hidden;
-            }
-            .pw-meter > span {display:block; height:100%; width:0;}
-            .pw-weak {background:#ef4444;}
-            .pw-fair {background:#f59e0b;}
-            .pw-good {background:#10b981;}
-            .pw-strong {background:#22c55e;}
+            .auth-card { border-radius: 1rem; border: 0; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+            .auth-title { letter-spacing: .2px; }
+            .input-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); opacity: .55; pointer-events: none; }
+            .has-icon input, .has-icon select { padding-left: 2.25rem; }
+            .pw-meter { height: 6px; border-radius: 8px; background: #e5e7eb; overflow: hidden; }
+            .pw-meter > span { display:block; height:100%; width:0; }
+            .pw-weak {background:#ef4444;} .pw-fair {background:#f59e0b;} .pw-good {background:#10b981;} .pw-strong {background:#22c55e;}
             .small-muted {font-size:.875rem; color:#6b7280;}
           </style>
         </t>
       </xpath>
     </template>
 
-    <!-- =========================
-         1) Landing: choose signup type
-    ========================== -->
+    <!-- Choose type -->
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
         <div class="auth-bg d-flex align-items-center py-5">
@@ -71,9 +50,7 @@
       </t>
     </template>
 
-    <!-- =========================
-         2) Member Signup
-    ========================== -->
+    <!-- Member -->
     <template id="ldap_reset_password.signup" name="Rotary Member Signup">
       <t t-call="web.login_layout">
         <div class="auth-bg d-flex align-items-center py-5">
@@ -209,14 +186,13 @@
           </div>
         </div>
 
-        <!-- Page script (small, safe) -->
-        <script type="text/javascript">
+        <!-- Script wrapped in CDATA to avoid XML entity errors -->
+        <script type="text/javascript"><![CDATA[
           (function () {
             // Bootstrap validation
             var forms = document.querySelectorAll('.needs-validation');
             Array.prototype.slice.call(forms).forEach(function (form) {
               form.addEventListener('submit', function (event) {
-                // match passwords on client for instant feedback
                 var p = form.querySelector('#m_password');
                 var c = form.querySelector('#m_confirm');
                 if (p && c && p.value !== c.value) {
@@ -224,9 +200,7 @@
                 } else if (c) {
                   c.setCustomValidity('');
                 }
-                if (!form.checkValidity()) {
-                  event.preventDefault(); event.stopPropagation();
-                }
+                if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
                 form.classList.add('was-validated');
               }, false);
             });
@@ -254,7 +228,7 @@
               });
             }
 
-            // Show/hide password utility
+            // Show/hide password
             window.__togglePw = function (id, btn) {
               var el = document.getElementById(id);
               if (!el) return;
@@ -290,17 +264,14 @@
             }
             if (selProgram) {
               selProgram.addEventListener('change', function () { loadClubs(this.value); });
-              // initial fill if param present
               if (selProgram.value) loadClubs(selProgram.value);
             }
           })();
-        </script>
+        ]]></script>
       </t>
     </template>
 
-    <!-- =========================
-         3) Non-Member Signup
-    ========================== -->
+    <!-- Non-Member -->
     <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
       <t t-call="web.login_layout">
         <div class="auth-bg d-flex align-items-center py-5">
@@ -396,7 +367,8 @@
           </div>
         </div>
 
-        <script type="text/javascript">
+        <!-- Script wrapped in CDATA -->
+        <script type="text/javascript"><![CDATA[
           (function () {
             // Bootstrap validation
             var forms = document.querySelectorAll('.needs-validation');
@@ -409,14 +381,12 @@
                 } else if (c) {
                   c.setCustomValidity('');
                 }
-                if (!form.checkValidity()) {
-                  event.preventDefault(); event.stopPropagation();
-                }
+                if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
                 form.classList.add('was-validated');
               }, false);
             });
 
-            // Password strength (non-member)
+            // Password strength
             function score(pw) {
               if (!pw) return 0;
               var s = 0;
@@ -439,13 +409,11 @@
               });
             }
           })();
-        </script>
+        ]]></script>
       </t>
     </template>
 
-    <!-- =========================
-         4) Thank You
-    ========================== -->
+    <!-- Thank you -->
     <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
       <t t-call="web.login_layout">
         <div class="auth-bg d-flex align-items-center py-5">
@@ -455,9 +423,7 @@
                 <div class="alert alert-success fs-5 fw-semibold mb-4">
                   <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
                 </div>
-                <a href="/web/login" class="btn btn-primary px-4 py-2 shadow-sm">
-                  Go to Login
-                </a>
+                <a href="/web/login" class="btn btn-primary px-4 py-2 shadow-sm">Go to Login</a>
               </div>
             </div>
           </div>
@@ -465,9 +431,7 @@
       </t>
     </template>
 
-    <!-- =========================
-         5) Error Page
-    ========================== -->
+    <!-- Error -->
     <template id="ldap_reset_password.web_error" name="Signup Error">
       <t t-call="web.login_layout">
         <div class="auth-bg d-flex align-items-center py-5">
