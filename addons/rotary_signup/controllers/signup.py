@@ -8,7 +8,7 @@ Hardened flow:
  - If an LDAP entry exists for the submitted email -> ensure partner -> create Odoo user linked to LDAP uid.
  - If no LDAP entry -> create LDAP entry (NO userPassword attribute) -> set password via passwd_s -> ensure partner -> create Odoo user.
  - DN building uses escape_dn_chars; uid is sanitized and collision-checked.
- - Public POST routes use CSRF.
+ - Public POST routes use CSRF (default; do not set csrf=False).
  - Password strength + confirmation checks.
  - Gracefully falls back if python-ldap is not installed (creates Odoo-only user with uid login).
 """
@@ -43,6 +43,12 @@ except Exception:
         return s
     _logger.debug("python-ldap not available at import time; LDAP operations will be disabled")
 
+try:
+    # For race-safe create retry
+    from psycopg2 import IntegrityError
+except Exception:  # pragma: no cover
+    IntegrityError = Exception
+
 SIGN_UP_REQUEST_PARAMS = {
     'db', 'login', 'debug', 'token', 'message', 'error', 'scope', 'mode',
     'redirect', 'redirect_hostname', 'email', 'name', 'partner_id',
@@ -71,15 +77,15 @@ def generate_random_number(min_length, max_length):
 def sanitize_uid(uid_raw: str) -> str:
     uid = (uid_raw or "").strip().lower()
     uid = re.sub(r'[^a-z0-9._-]+', '', uid)
-    return uid[:64]
+    return uid[:64] or "user"
 
 
 def check_password_strength(pw: str) -> bool:
     pw = pw or ""
-    if len(pw) < 8:
+    if len(pw) < 10:
         return False
     classes = sum(bool(re.search(r, pw)) for r in [r'[A-Z]', r'[a-z]', r'\d', r'[^\w\s]'])
-    return classes >= 2
+    return classes >= 3
 
 
 def _email_is_valid(email):
@@ -93,19 +99,42 @@ def _email_is_valid(email):
     return "@" in email and "." in email.split("@")[-1]
 
 
+def _email_norm(email: str) -> str:
+    return (email or "").strip().lower()
+
+
 def validate_signup_fields(env, email, first_name, last_name):
     if not email:
         return False, _("Email is required.")
     if not _email_is_valid(email):
         return False, _("Please enter a valid email address.")
-    # Keep the user-level duplicate block (as before). If you want to allow reuse, comment this out.
-    if env['res.users'].with_context(active_test=False).search([('email', 'ilike', email)], limit=1):
+    U = env['res.users'].with_context(active_test=False)
+    email_norm = _email_norm(email)
+    # strict normalized equality (no substring ILIKE)
+    if U.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1):
         return False, _("This email is already registered.")
     if not (first_name or "").strip():
         return False, _("First name is required.")
     if not (last_name or "").strip():
         return False, _("Last name is required.")
     return True, ""
+
+
+def _create_user_with_retry(env, base_vals, base_login):
+    """
+    Create res.users with race-safe unique login retry.
+    """
+    SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
+    i = 1
+    while True:
+        final_login = base_login if i == 1 else f"{base_login}-{i}"
+        vals = dict(base_vals, login=final_login)
+        try:
+            with env.cr.savepoint():
+                user = SudoUser.create(vals)
+            return user
+        except IntegrityError:
+            i += 1
 
 
 def ensure_partner_from_ldap(env, attrs, company_id):
@@ -135,7 +164,10 @@ def ensure_partner_from_ldap(env, attrs, company_id):
             partner = P.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1)
             if not partner:
                 try:
-                    env.cr.execute("SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1", (email_norm,))
+                    env.cr.execute(
+                        "SELECT id FROM res_partner WHERE lower(email)=%s ORDER BY active DESC LIMIT 1",
+                        (email_norm,)
+                    )
                     r = env.cr.fetchone()
                     if r:
                         partner = P.browse(r[0])
@@ -188,7 +220,7 @@ from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignu
 class LDAPSignupController(AuthSignupController):
     """Signup flow using ldap_reset_password templates (CSRF-enabled)."""
 
-    @http.route('/clubs/by_program', type='json', auth='public', website=True)  # CSRF enabled by default for JSON-RPC
+    @http.route('/clubs/by_program', type='json', auth='public', website=True)  # CSRF enabled for JSON-RPC
     def clubs_by_program(self, program_type=None, **kw):
         """Return Rotary clubs filtered by program type (AJAX endpoint)."""
         if not program_type:
@@ -229,9 +261,10 @@ class LDAPSignupController(AuthSignupController):
             raise werkzeug.exceptions.NotFound()
 
         if request.httprequest.method == 'POST':
-            env = api.Environment(request.cr, SUPERUSER_ID, {})
+            env = request.env  # keep request env; sudo explicitly where needed
+            sudo_env = env.sudo()
             try:
-                ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(sudo_env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
@@ -242,94 +275,81 @@ class LDAPSignupController(AuthSignupController):
                     qcontext['error'] = _("Passwords do not match.")
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
                 if not check_password_strength(pw):
-                    qcontext['error'] = _("Password too weak. Use at least 8 chars and mix letters/numbers/symbols.")
+                    qcontext['error'] = _("Password too weak. Use at least 10 chars with upper/lower/digit/symbol (3 classes).")
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
 
-                ldap_conf = env['res.company.ldap'].search([], limit=1)
+                # Prefer company-specific LDAP config
+                company = env.company
+                ldap_conf = sudo_env['res.company.ldap'].search([('company', '=', company.id)], limit=1) \
+                            or sudo_env['res.company.ldap'].search([], limit=1)
                 if not ldap_conf:
                     qcontext['error'] = _("No LDAP configuration found.")
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
 
                 sn = (qcontext.get('last_name') or '').strip()
                 fn = (qcontext.get('first_name') or '').strip()
-                email = (qcontext.get('email') or '').strip().lower()
+                email = _email_norm(qcontext.get('email'))
                 rotary_id = str(generate_random_number(5, 8))
+
+                proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
+                ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
+                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
                 cn = f"{fn} {sn}".strip()
 
-                ldap_model = env['res.company.ldap'].sudo()
+                # LDAP attributes WITHOUT password
+                attrs = {
+                    "uid": [proposed_uid.encode()],
+                    "givenname": [fn.encode()],
+                    "cn": [cn.encode()],
+                    "sn": [sn.encode()],
+                    "employeeNumber": [rotary_id.encode()],
+                    "mail": [email.encode()],
+                    "objectclass": [b"top", b"inetOrgPerson"],
+                }
 
-                # >>> CHANGES: FIRST try LDAP by email. If found, re-use LDAP uid; DO NOT create new uid.
+                # LDAP-backed: get/create user via model
                 user = None
-                dn_found = entry_found = False
-                if ldap:
-                    dn_found, entry_found = ldap_model._ldap_find_by_email(ldap_conf, email)
+                try:
+                    ldap_model = sudo_env['res.company.ldap']
+                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
+                    if isinstance(user_id, int) and user_id:
+                        user = sudo_env['res.users'].browse(user_id)
+                        # set LDAP password if we just created LDAP entry
+                        if not existing and ldap and dn:
+                            try:
+                                ok_pw, msg_pw = ldap_model._set_ldap_password(ldap_conf, dn, pw)
+                                if not ok_pw:
+                                    _logger.warning("LDAP passwd_s failed for %s: %s", dn, msg_pw)
+                            except Exception:
+                                _logger.warning("Could not set LDAP password for newly created entry (non-member).")
+                except Exception as e:
+                    _logger.debug("LDAP-backed user create failed (fallback to Odoo-only): %s", e)
+                    user = None
 
-                if dn_found and entry_found:
-                    ldap_attrs = entry_found[1] if isinstance(entry_found, tuple) else entry_found
-                    ldap_uid = (ldap_model._get_uid_from_attrs(ldap_attrs) or email).strip().lower()
-                    final_login = sanitize_uid(ldap_uid) or (email.split('@')[0] if '@' in email else 'user')
-
-                    # Reuse existing Odoo user by that login or create new one mapped to LDAP uid
-                    U = env['res.users'].with_context(active_test=False).sudo()
-                    user = U.search([('login', '=ilike', final_login)], limit=1)
-                    if not user:
-                        partner = ensure_partner_from_ldap(env, ldap_attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
-                        vals = ldap_model._map_ldap_attributes(ldap_conf, final_login, (dn_found, ldap_attrs)) or {}
-                        vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
-                        vals.pop('email', None)
-                        user = env['res.users'].with_context(no_reset_password=True).sudo().create(vals)
-
-                else:
-                    # >>> CHANGES: Only when NOT in LDAP we craft a new uid/DN and call tuple helper.
-                    proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
-                    ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
-                    dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
-
-                    attrs = {
-                        "uid": [proposed_uid.encode()],
-                        "givenname": [fn.encode()],
-                        "cn": [cn.encode()],
-                        "sn": [sn.encode()],
-                        "employeeNumber": [rotary_id.encode()],
-                        "mail": [email.encode()],
-                        "objectclass": [b"top", b"inetOrgPerson"],
+                # Ensure partner and create Odoo user if still missing
+                partner = ensure_partner_from_ldap(sudo_env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
+                if not user:
+                    base_vals = {
+                        'partner_id': partner.id,
+                        'active': True,
+                        'name': cn,
+                        'totp_enabled': False,
                     }
+                    user = _create_user_with_retry(sudo_env, base_vals, proposed_uid)
 
-                    try:
-                        user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
-                        if isinstance(user_id, int) and user_id:
-                            user = env['res.users'].sudo().browse(user_id)
-                            # Set password only when we just created LDAP
-                            if not existing and ldap and dn:
-                                try:
-                                    ldap_model._set_ldap_password(ldap_conf, dn, pw)
-                                except Exception:
-                                    _logger.warning("Could not set LDAP password for newly created entry (non-member).")
-                    except Exception as e:
-                        _logger.debug("LDAP-backed user create failed (fallback to Odoo-only): %s", e)
-                        user = None
-
-                    # Ensure partner and create local user if still missing
-                    if not user:
-                        partner = ensure_partner_from_ldap(env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
-                        user = env['res.users'].sudo().create({
-                            'login': proposed_uid,
-                            'partner_id': partner.id,
-                            'active': True,
-                            'name': cn,
-                        })
-                        try:
-                            if rotary_id.isdigit():
-                                partner.write({'rotary_membership_id': rotary_id})
-                        except Exception:
-                            pass
+                # Partner extras (guarded)
+                try:
+                    if rotary_id.isdigit():
+                        partner.write({'rotary_membership_id': rotary_id})
+                except Exception:
+                    pass
 
                 # Assign Guests role
                 try:
-                    role = env['res.users.role'].search([('name', '=', 'Guests')], limit=1)
-                    env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
+                    role = sudo_env['res.users.role'].search([('name', '=', 'Guests')], limit=1)
+                    sudo_env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
                     if role:
-                        env['res.users.role.line'].create({
+                        sudo_env['res.users.role.line'].create({
                             'user_id': user.id,
                             'role_id': role.id,
                             'date_from': date.today(),
@@ -360,9 +380,10 @@ class LDAPSignupController(AuthSignupController):
             raise werkzeug.exceptions.NotFound()
 
         if request.httprequest.method == 'POST':
-            env = api.Environment(request.cr, SUPERUSER_ID, {})
+            env = request.env
+            sudo_env = env.sudo()
             try:
-                ok, msg = validate_signup_fields(env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(sudo_env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
                     return request.render('ldap_reset_password.signup', qcontext)
@@ -373,123 +394,90 @@ class LDAPSignupController(AuthSignupController):
                     qcontext['error'] = _("Passwords do not match.")
                     return request.render('ldap_reset_password.signup', qcontext)
                 if not check_password_strength(pw):
-                    qcontext['error'] = _("Password too weak. Use at least 8 chars and mix letters/numbers/symbols.")
+                    qcontext['error'] = _("Password too weak. Use at least 10 chars with upper/lower/digit/symbol (3 classes).")
                     return request.render('ldap_reset_password.signup', qcontext)
 
-                ldap_conf = env['res.company.ldap'].search([], limit=1)
+                # Prefer company-specific LDAP config
+                company = env.company
+                ldap_conf = sudo_env['res.company.ldap'].search([('company', '=', company.id)], limit=1) \
+                            or sudo_env['res.company.ldap'].search([], limit=1)
                 if not ldap_conf:
                     qcontext['error'] = _("No LDAP configuration found.")
                     return request.render('ldap_reset_password.signup', qcontext)
 
                 sn = (qcontext.get('last_name') or '').strip()
                 fn = (qcontext.get('first_name') or '').strip()
-                email = (qcontext.get('email') or '').strip().lower()
+                email = _email_norm(qcontext.get('email'))
                 rotary_id = (qcontext.get('rotary_id') or '').strip()
                 rotary_club_id = int(qcontext.get('rotary_club_id') or 0)
+
+                proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
+                ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
+                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
                 cn = f"{fn} {sn}".strip()
 
-                ldap_model = env['res.company.ldap'].sudo()
+                attrs = {
+                    "uid": [proposed_uid.encode()],
+                    "givenname": [fn.encode()],
+                    "cn": [cn.encode()],
+                    "sn": [sn.encode()],
+                    "ou": [str(rotary_club_id).encode()],
+                    "mail": [email.encode()],
+                    "objectclass": [b"top", b"inetOrgPerson"],
+                }
+                if rotary_id:
+                    attrs['employeeNumber'] = [rotary_id.encode()]
 
-                # >>> CHANGES: Prefer existing LDAP uid if email is in LDAP.
                 user = None
-                dn_found = entry_found = False
-                if ldap:
-                    dn_found, entry_found = ldap_model._ldap_find_by_email(ldap_conf, email)
-
-                if dn_found and entry_found:
-                    ldap_attrs = entry_found[1] if isinstance(entry_found, tuple) else entry_found
-                    ldap_uid = (ldap_model._get_uid_from_attrs(ldap_attrs) or email).strip().lower()
-                    final_login = sanitize_uid(ldap_uid) or (email.split('@')[0] if '@' in email else 'user')
-
-                    U = env['res.users'].with_context(active_test=False).sudo()
-                    user = U.search([('login', '=ilike', final_login)], limit=1)
-                    if not user:
-                        partner = ensure_partner_from_ldap(env, ldap_attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
-                        vals = ldap_model._map_ldap_attributes(ldap_conf, final_login, (dn_found, ldap_attrs)) or {}
-                        vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
-                        vals.pop('email', None)
-                        user = env['res.users'].with_context(no_reset_password=True).sudo().create(vals)
-
-                    # Enrich partner with submitted data
-                    try:
-                        pvals = {}
-                        if rotary_club_id:
-                            pvals['rotary_club_id'] = rotary_club_id
-                        if rotary_id and rotary_id.isdigit():
-                            pvals['rotary_membership_id'] = rotary_id
-                        if qcontext.get('program_type_id'):
+                try:
+                    ldap_model = sudo_env['res.company.ldap']
+                    user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
+                    if isinstance(user_id, int) and user_id:
+                        user = sudo_env['res.users'].browse(user_id)
+                        if not existing and ldap and dn:
                             try:
-                                pvals['program_type_id'] = int(qcontext['program_type_id'])
+                                ok_pw, msg_pw = ldap_model._set_ldap_password(ldap_conf, dn, pw)
+                                if not ok_pw:
+                                    _logger.warning("LDAP passwd_s failed for %s: %s", dn, msg_pw)
                             except Exception:
-                                pvals['program_type_id'] = qcontext.get('program_type_id')
-                        if pvals:
-                            user.partner_id.sudo().write(pvals)
-                    except Exception:
-                        pass
+                                _logger.warning("Could not set LDAP password for newly created entry (member).")
+                except Exception as e:
+                    _logger.debug("LDAP-backed create failed, fallback to Odoo-only: %s", e)
+                    user = None
 
-                else:
-                    # Not in LDAP -> create new entry (NO password in attributes)
-                    proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
-                    ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
-                    dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
-
-                    attrs = {
-                        "uid": [proposed_uid.encode()],
-                        "givenname": [fn.encode()],
-                        "cn": [cn.encode()],
-                        "sn": [sn.encode()],
-                        "ou": [str(rotary_club_id).encode()],
-                        "mail": [email.encode()],
-                        "objectclass": [b"top", b"inetOrgPerson"],
+                partner = ensure_partner_from_ldap(sudo_env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
+                if not user:
+                    base_vals = {
+                        'partner_id': partner.id,
+                        'active': True,
+                        'name': cn,
+                        'totp_enabled': False,
                     }
-                    if rotary_id:
-                        attrs['employeeNumber'] = [rotary_id.encode()]
+                    user = _create_user_with_retry(sudo_env, base_vals, proposed_uid)
 
+                # Partner enrich
+                vals = {}
+                if rotary_club_id:
+                    vals['rotary_club_id'] = rotary_club_id
+                if rotary_id and rotary_id.isdigit():
+                    vals['rotary_membership_id'] = rotary_id
+                if qcontext.get('program_type_id'):
                     try:
-                        user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
-                        if isinstance(user_id, int) and user_id:
-                            user = env['res.users'].sudo().browse(user_id)
-                            if not existing and ldap and dn:
-                                try:
-                                    ldap_model._set_ldap_password(ldap_conf, dn, pw)
-                                except Exception:
-                                    _logger.warning("Could not set LDAP password for newly created entry (member).")
-                    except Exception as e:
-                        _logger.debug("LDAP-backed create failed, fallback to Odoo-only: %s", e)
-                        user = None
-
-                    if not user:
-                        partner = ensure_partner_from_ldap(env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
-                        user = env['res.users'].sudo().create({
-                            'login': proposed_uid,
-                            'partner_id': partner.id,
-                            'active': True,
-                            'name': cn,
-                        })
-
-                    # Enrich partner (club/rotary/program)
+                        vals['program_type_id'] = int(qcontext['program_type_id'])
+                    except Exception:
+                        vals['program_type_id'] = qcontext.get('program_type_id')
+                if vals:
                     try:
-                        pvals = {}
-                        if rotary_club_id:
-                            pvals['rotary_club_id'] = rotary_club_id
-                        if rotary_id and rotary_id.isdigit():
-                            pvals['rotary_membership_id'] = rotary_id
-                        if qcontext.get('program_type_id'):
-                            try:
-                                pvals['program_type_id'] = int(qcontext['program_type_id'])
-                            except Exception:
-                                pvals['program_type_id'] = qcontext.get('program_type_id')
-                        if pvals:
-                            user.partner_id.sudo().write(pvals)
+                        partner.write(vals)
                     except Exception:
                         pass
 
                 # Assign Members role
                 try:
-                    role = env['res.users.role'].search([('name', '=', 'Members')], limit=1)
-                    env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
+                    role = sudo_env['res.users.role'].search([('name', '=', 'Members')], limit=1)
+                    sudo_env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
                     if role:
-                        env['res.users.role.line'].create({
+                        sudo_env['res.users.role.line'].create({
                             'user_id': user.id,
                             'role_id': role.id,
                             'date_from': date.today(),
@@ -602,7 +590,7 @@ class CompanyLDAP(models.Model):
         except Exception:
             return ''
 
-    # ---------- search by email (uses Odoo's internal query path) ----------
+    # ---------- search by email ----------
     def _ldap_find_by_email(self, conf, email: str):
         """Find LDAP entry by raw email string using Odoo's internal query path (returns dn, entry)."""
         email = (email or "").strip()
@@ -617,7 +605,7 @@ class CompanyLDAP(models.Model):
                 return []
 
         try:
-            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (email,))
+            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (email,)) if filter_format else f'(&(objectClass=inetOrgPerson)(mail={email}))'
         except Exception:
             flt = f'(&(objectClass=inetOrgPerson)(mail={email}))'
 
@@ -626,29 +614,12 @@ class CompanyLDAP(models.Model):
             return res[0][0], res[0]
         return False, False
 
-    # ---------- search by attrs ----------
+    # ---------- search by attrs (email-only) ----------
     def _ldap_find_by_attrs(self, conf, attrs):
-        """Find LDAP entry by email only (returns dn, entry)."""
         mail = (self._ldap_attr_text(attrs, 'mail') or '').strip()
         if not mail:
             return False, False
-        confd = self._as_dict(conf)
-
-        def _q(flt):
-            try:
-                return self._query(confd, flt)
-            except Exception:
-                return []
-
-        try:
-            flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (mail,)) if filter_format else f'(&(objectClass=inetOrgPerson)(mail={mail}))'
-            res = [r for r in _q(flt) if r and r[0]]
-            if res:
-                return res[0][0], res[0]
-        except Exception:
-            _logger.exception("_ldap_find_by_attrs failed for mail=%s", mail)
-            return False, False
-        return False, False
+        return self._ldap_find_by_email(conf, mail)
 
     # ---------- search by uid ----------
     def _ldap_find_by_uid(self, conf, uid_value: str):
@@ -681,7 +652,7 @@ class CompanyLDAP(models.Model):
         adminpw = confd.get('ldap_password') or ''
         try:
             attrs = dict(attributes or {})
-            attrs.pop('userPassword', None)  # never add cleartext here
+            attrs.pop('userPassword', None)  # ensure no cleartext password is added
             conn = self._pyldap_connect(confd)
             if admindn and adminpw:
                 conn.simple_bind_s(admindn, adminpw)
@@ -689,7 +660,7 @@ class CompanyLDAP(models.Model):
             conn.add_s(user_dn, ldif)
             conn.unbind_s()
             return True, 'Success'
-        except ldap.ALREADY_EXISTS:
+        except getattr(ldap, 'ALREADY_EXISTS', Exception):
             return False, 'Already exists'
         except Exception as e:
             _logger.exception("_create_ldap_user failed: %s", e)
@@ -730,7 +701,7 @@ class CompanyLDAP(models.Model):
             _logger.debug("python-ldap not available: skipping LDAP-backed create")
             return 0, False
 
-        # Step 1: search LDAP strictly by the submitted email
+        # Step 1: search LDAP strictly by the submitted email (not controller attrs)
         dn_found, entry_found = self._ldap_find_by_email(confd, requested_email)
 
         if dn_found and entry_found:
@@ -756,25 +727,24 @@ class CompanyLDAP(models.Model):
             except Exception as e:
                 _logger.warning("Partner creation from LDAP failed: %s", e)
 
-            # Create Odoo user
+            # Create Odoo user (race-safe)
             SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = self._map_ldap_attributes(conf, final_login, (dn_found, ldap_attrs)) or {}
             vals.update({
-                'login': final_login,
                 'partner_id': partner.id if partner else False,
                 'active': True,
                 'totp_enabled': False,
             })
             vals.pop('email', None)
             try:
-                new_user = SudoUser.create(vals)
-                _logger.info("Created Odoo user linked to existing LDAP uid=%s", final_login)
+                new_user = _create_user_with_retry(env, vals, final_login)
+                _logger.info("Created Odoo user linked to existing LDAP uid=%s", new_user.login)
                 return new_user.id, True
             except Exception as e:
                 _logger.exception("Failed to create Odoo user from existing LDAP entry: %s", e)
                 return 0, False
 
-        # Step 2: no LDAP by email; maybe an Odoo user already exists with email login
+        # Step 2: no LDAP by email; maybe an Odoo user already exists with email login (legacy)
         try:
             env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (requested_email,))
             row = env.cr.fetchone()
@@ -798,12 +768,11 @@ class CompanyLDAP(models.Model):
                 except Exception:
                     company_id = env.company.id
                 partner = ensure_partner_from_ldap(env, ldap_attrs, company_id)
-                SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
                 vals = self._map_ldap_attributes(conf, final_login, (re_dn, ldap_attrs)) or {}
-                vals.update({'login': final_login, 'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
+                vals.update({'partner_id': partner.id if partner else False, 'active': True, 'totp_enabled': False})
                 vals.pop('email', None)
                 try:
-                    new_user = SudoUser.create(vals)
+                    new_user = _create_user_with_retry(env, vals, final_login)
                     return new_user.id, True
                 except Exception as e:
                     _logger.exception("Failed to create Odoo user after race re-check: %s", e)
@@ -851,18 +820,16 @@ class CompanyLDAP(models.Model):
             except Exception as e:
                 _logger.warning("Partner create after new LDAP failed: %s", e)
 
-            SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = self._map_ldap_attributes(conf, final_login, (dn_provided, attrs_provided)) or {}
             vals.update({
-                'login': final_login,
                 'partner_id': partner.id if partner else False,
                 'active': True,
                 'totp_enabled': False,
             })
             vals.pop('email', None)
             try:
-                new_user = SudoUser.create(vals)
-                _logger.info("Created new LDAP + Odoo user for %s (uid=%s)", requested_email, final_login)
+                new_user = _create_user_with_retry(env, vals, final_login)
+                _logger.info("Created new LDAP + Odoo user for %s (uid=%s)", requested_email, new_user.login)
                 return new_user.id, False
             except Exception as e:
                 _logger.exception("Failed to create Odoo user after new LDAP: %s", e)
