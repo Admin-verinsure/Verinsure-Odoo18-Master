@@ -291,8 +291,14 @@ class LDAPSignupController(AuthSignupController):
                 rotary_id = str(generate_random_number(5, 8))
 
                 proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
+
+                # Ensure ldap_base is present
                 ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
-                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
+                if not ldap_base:
+                    qcontext['error'] = _("LDAP base DN is not configured. Please contact support.")
+                    return request.render('ldap_reset_password.signup_non_member', qcontext)
+
+                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}"
                 cn = f"{fn} {sn}".strip()
 
                 # LDAP attributes WITH password (old behavior)
@@ -418,8 +424,14 @@ class LDAPSignupController(AuthSignupController):
                 rotary_club_id = int(qcontext.get('rotary_club_id') or 0)
 
                 proposed_uid = sanitize_uid((sn + rotary_id) or (email.split('@')[0] if '@' in email else 'user'))
+
+                # Ensure ldap_base is present
                 ldap_base = getattr(ldap_conf, 'ldap_base', False) or ''
-                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
+                if not ldap_base:
+                    qcontext['error'] = _("LDAP base DN is not configured. Please contact support.")
+                    return request.render('ldap_reset_password.signup', qcontext)
+
+                dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}"
                 cn = f"{fn} {sn}".strip()
 
                 attrs = {
@@ -534,7 +546,7 @@ class CompanyLDAP(models.Model):
 
     # ---------- config normalization ----------
     def _as_dict(self, conf):
-        """Normalize conf record/dict to dict."""
+        """Normalize conf record/dict to dict (old behavior)."""
         if isinstance(conf, dict):
             return conf
         return {
@@ -546,7 +558,9 @@ class CompanyLDAP(models.Model):
             'ldap_server_port': getattr(conf, 'ldap_server_port', False),
             'ldap_tls': getattr(conf, 'ldap_tls', False),
             'create_user': getattr(conf, 'create_user', False),
-            'user': getattr(conf, 'user', False),
+            # return a primitive id (old flow expectation)
+            'user': getattr(getattr(conf, 'user', False), 'id', False),
+            # return a (id, name) tuple for company (old flow expectation)
             'company': (conf.company.id, conf.company.name) if getattr(conf, 'company', False) else False,
         }
 
@@ -697,6 +711,31 @@ class CompanyLDAP(models.Model):
         except Exception as e:
             _logger.exception("_set_ldap_password failed: %s", e)
             return False, tools.ustr(e)
+
+    # ---------- attribute mapping override (add company_id + normalize login) ----------
+    def _map_ldap_attributes(self, conf, login, ldap_entry):
+        """
+        Align with older behavior: inject company_id and lowercased, trimmed login.
+        """
+        values = super()._map_ldap_attributes(conf, login, ldap_entry) or {}
+
+        # Derive company_id from conf, else fall back to current env company
+        company_id = False
+        if isinstance(conf, dict):
+            v = conf.get('company')
+            if isinstance(v, (list, tuple)) and v:
+                company_id = v[0]
+            elif isinstance(v, int):
+                company_id = v
+        else:
+            try:
+                company_id = conf.company.id if getattr(conf, 'company', False) else False
+            except Exception:
+                company_id = False
+
+        values['company_id'] = company_id or self.env.company.id
+        values['login'] = tools.ustr(values.get('login') or login).lower().strip()
+        return values
 
     # ---------- main create/find pipeline ----------
     def _get_or_create_user_tuple(self, conf, login, ldap_entry):
