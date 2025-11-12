@@ -261,10 +261,9 @@ class LDAPSignupController(AuthSignupController):
             raise werkzeug.exceptions.NotFound()
 
         if request.httprequest.method == 'POST':
-            env = request.env  # keep request env; sudo explicitly where needed
-            sudo_env = env.sudo()
+            env = request.env  # use recordset-level sudo where needed
             try:
-                ok, msg = validate_signup_fields(sudo_env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(env.sudo(), qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
@@ -280,8 +279,8 @@ class LDAPSignupController(AuthSignupController):
 
                 # Prefer company-specific LDAP config
                 company = env.company
-                ldap_conf = sudo_env['res.company.ldap'].search([('company', '=', company.id)], limit=1) \
-                            or sudo_env['res.company.ldap'].search([], limit=1)
+                ldap_conf = env['res.company.ldap'].sudo().search([('company', '=', company.id)], limit=1) \
+                            or env['res.company.ldap'].sudo().search([], limit=1)
                 if not ldap_conf:
                     qcontext['error'] = _("No LDAP configuration found.")
                     return request.render('ldap_reset_password.signup_non_member', qcontext)
@@ -310,10 +309,10 @@ class LDAPSignupController(AuthSignupController):
                 # LDAP-backed: get/create user via model
                 user = None
                 try:
-                    ldap_model = sudo_env['res.company.ldap']
+                    ldap_model = env['res.company.ldap'].sudo()
                     user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
                     if isinstance(user_id, int) and user_id:
-                        user = sudo_env['res.users'].browse(user_id)
+                        user = env['res.users'].sudo().browse(user_id)
                         # set LDAP password if we just created LDAP entry
                         if not existing and ldap and dn:
                             try:
@@ -327,7 +326,7 @@ class LDAPSignupController(AuthSignupController):
                     user = None
 
                 # Ensure partner and create Odoo user if still missing
-                partner = ensure_partner_from_ldap(sudo_env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
+                partner = ensure_partner_from_ldap(env.sudo(), attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
                 if not user:
                     base_vals = {
                         'partner_id': partner.id,
@@ -335,7 +334,7 @@ class LDAPSignupController(AuthSignupController):
                         'name': cn,
                         'totp_enabled': False,
                     }
-                    user = _create_user_with_retry(sudo_env, base_vals, proposed_uid)
+                    user = _create_user_with_retry(env, base_vals, proposed_uid)
 
                 # Partner extras (guarded)
                 try:
@@ -346,10 +345,10 @@ class LDAPSignupController(AuthSignupController):
 
                 # Assign Guests role
                 try:
-                    role = sudo_env['res.users.role'].search([('name', '=', 'Guests')], limit=1)
-                    sudo_env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
+                    role = env['res.users.role'].sudo().search([('name', '=', 'Guests')], limit=1)
+                    env['res.users.role.line'].sudo().search([('user_id', '=', user.id)]).unlink()
                     if role:
-                        sudo_env['res.users.role.line'].create({
+                        env['res.users.role.line'].sudo().create({
                             'user_id': user.id,
                             'role_id': role.id,
                             'date_from': date.today(),
@@ -381,9 +380,8 @@ class LDAPSignupController(AuthSignupController):
 
         if request.httprequest.method == 'POST':
             env = request.env
-            sudo_env = env.sudo()
             try:
-                ok, msg = validate_signup_fields(sudo_env, qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
+                ok, msg = validate_signup_fields(env.sudo(), qcontext.get('email'), qcontext.get('first_name'), qcontext.get('last_name'))
                 if not ok:
                     qcontext['error'] = msg
                     return request.render('ldap_reset_password.signup', qcontext)
@@ -399,8 +397,8 @@ class LDAPSignupController(AuthSignupController):
 
                 # Prefer company-specific LDAP config
                 company = env.company
-                ldap_conf = sudo_env['res.company.ldap'].search([('company', '=', company.id)], limit=1) \
-                            or sudo_env['res.company.ldap'].search([], limit=1)
+                ldap_conf = env['res.company.ldap'].sudo().search([('company', '=', company.id)], limit=1) \
+                            or env['res.company.ldap'].sudo().search([], limit=1)
                 if not ldap_conf:
                     qcontext['error'] = _("No LDAP configuration found.")
                     return request.render('ldap_reset_password.signup', qcontext)
@@ -430,10 +428,10 @@ class LDAPSignupController(AuthSignupController):
 
                 user = None
                 try:
-                    ldap_model = sudo_env['res.company.ldap']
+                    ldap_model = env['res.company.ldap'].sudo()
                     user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
                     if isinstance(user_id, int) and user_id:
-                        user = sudo_env['res.users'].browse(user_id)
+                        user = env['res.users'].sudo().browse(user_id)
                         if not existing and ldap and dn:
                             try:
                                 ok_pw, msg_pw = ldap_model._set_ldap_password(ldap_conf, dn, pw)
@@ -445,7 +443,7 @@ class LDAPSignupController(AuthSignupController):
                     _logger.debug("LDAP-backed create failed, fallback to Odoo-only: %s", e)
                     user = None
 
-                partner = ensure_partner_from_ldap(sudo_env, attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
+                partner = ensure_partner_from_ldap(env.sudo(), attrs, ldap_conf.company.id if ldap_conf.company else env.company.id)
                 if not user:
                     base_vals = {
                         'partner_id': partner.id,
@@ -453,7 +451,7 @@ class LDAPSignupController(AuthSignupController):
                         'name': cn,
                         'totp_enabled': False,
                     }
-                    user = _create_user_with_retry(sudo_env, base_vals, proposed_uid)
+                    user = _create_user_with_retry(env, base_vals, proposed_uid)
 
                 # Partner enrich
                 vals = {}
@@ -474,10 +472,10 @@ class LDAPSignupController(AuthSignupController):
 
                 # Assign Members role
                 try:
-                    role = sudo_env['res.users.role'].search([('name', '=', 'Members')], limit=1)
-                    sudo_env['res.users.role.line'].search([('user_id', '=', user.id)]).unlink()
+                    role = env['res.users.role'].sudo().search([('name', '=', 'Members')], limit=1)
+                    env['res.users.role.line'].sudo().search([('user_id', '=', user.id)]).unlink()
                     if role:
-                        sudo_env['res.users.role.line'].create({
+                        env['res.users.role.line'].sudo().create({
                             'user_id': user.id,
                             'role_id': role.id,
                             'date_from': date.today(),
