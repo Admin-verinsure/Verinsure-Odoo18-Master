@@ -2,15 +2,15 @@
 """
 Signup controller + LDAP helper for rotary_signup module.
 
-Hardened flow:
- - Always match by email in LDAP.
- - Always use LDAP uid as Odoo login (lowercased, sanitized).
- - If an LDAP entry exists for the submitted email -> ensure partner -> create Odoo user linked to LDAP uid.
- - If no LDAP entry -> create LDAP entry (NO userPassword attribute) -> set password via passwd_s -> ensure partner -> create Odoo user.
- - DN building uses escape_dn_chars; uid is sanitized and collision-checked.
- - Public POST routes use CSRF (default; do not set csrf=False).
+Behavior aligned with the older, working code:
+ - Match in LDAP by email.
+ - Use LDAP uid as Odoo login (lowercased, sanitized).
+ - If LDAP entry exists for submitted email → ensure partner → create Odoo user linked to LDAP uid.
+ - If no LDAP entry → create LDAP entry (WITH userPassword) → ensure partner → create Odoo user.
+ - No passwd_s after creation (password is set during LDAP add).
+ - DN building uses escape_dn_chars; uid is sanitized (collision fallback still retained).
+ - Public POST routes use csrf=False to match old behavior.
  - Password strength + confirmation checks.
- - Gracefully falls back if python-ldap is not installed (creates Odoo-only user with uid login).
 """
 import logging
 import random
@@ -103,16 +103,16 @@ def _email_norm(email: str) -> str:
     return (email or "").strip().lower()
 
 
+# OLD behavior: only block if a USER already has that email (not partners),
+# and use ILIKE to be lenient like the working version.
 def validate_signup_fields(env, email, first_name, last_name):
     if not email:
         return False, _("Email is required.")
     if not _email_is_valid(email):
         return False, _("Please enter a valid email address.")
     U = env['res.users'].with_context(active_test=False)
-    email_norm = _email_norm(email)
-    # strict normalized equality (no substring ILIKE)
-    if U.search(['|', ('email_normalized', '=', email_norm), ('email', '=', email)], limit=1):
-        return False, _("This email is already registered.")
+    if U.search([('email', 'ilike', email)], limit=1):
+        return False, _("This email is already registered as a user.")
     if not (first_name or "").strip():
         return False, _("First name is required.")
     if not (last_name or "").strip():
@@ -218,7 +218,7 @@ from odoo.addons.auth_signup.controllers.main import AuthSignupHome as AuthSignu
 
 
 class LDAPSignupController(AuthSignupController):
-    """Signup flow using ldap_reset_password templates (CSRF-enabled)."""
+    """Signup flow using ldap_reset_password templates (CSRF disabled to match old flow)."""
 
     @http.route('/clubs/by_program', type='json', auth='public', website=True)  # CSRF enabled for JSON-RPC
     def clubs_by_program(self, program_type=None, **kw):
@@ -251,7 +251,7 @@ class LDAPSignupController(AuthSignupController):
         return request.render('ldap_reset_password.signup_is_member', qcontext)
 
     # --- Step 2: Non-member signup ---
-    @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False)
+    @http.route('/web/signup_non_member', type='http', auth='public', website=True, sitemap=False, csrf=False)  # <-- match old
     def web_auth_signup_non_member(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
         qcontext.setdefault('program_types', [])
@@ -295,7 +295,7 @@ class LDAPSignupController(AuthSignupController):
                 dn = f"uid={escape_dn_chars(proposed_uid)},{ldap_base}" if ldap_base else None
                 cn = f"{fn} {sn}".strip()
 
-                # LDAP attributes WITHOUT password
+                # LDAP attributes WITH password (old behavior)
                 attrs = {
                     "uid": [proposed_uid.encode()],
                     "givenname": [fn.encode()],
@@ -303,6 +303,7 @@ class LDAPSignupController(AuthSignupController):
                     "sn": [sn.encode()],
                     "employeeNumber": [rotary_id.encode()],
                     "mail": [email.encode()],
+                    "userPassword": [pw.encode()],  # <-- set during add
                     "objectclass": [b"top", b"inetOrgPerson"],
                 }
 
@@ -311,16 +312,23 @@ class LDAPSignupController(AuthSignupController):
                 try:
                     ldap_model = env['res.company.ldap'].sudo()
                     user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
+
+                    # Old flow: if "existing", show error page
+                    if existing:
+                        return request.render('ldap_reset_password.web_error', {'message': _('Error: User already exists.')})
+
                     if isinstance(user_id, int) and user_id:
-                        user = env['res.users'].sudo().browse(user_id)
-                        # set LDAP password if we just created LDAP entry
-                        if not existing and ldap and dn:
-                            try:
-                                ok_pw, msg_pw = ldap_model._set_ldap_password(ldap_conf, dn, pw)
-                                if not ok_pw:
-                                    _logger.warning("LDAP passwd_s failed for %s: %s", dn, msg_pw)
-                            except Exception:
-                                _logger.warning("Could not set LDAP password for newly created entry (non-member).")
+                        # Double-check LDAP has the entry; if missing, add now
+                        dn_exist, entry_exist = ldap_model._ldap_find_by_attrs(ldap_conf, attrs)
+                        if not entry_exist:
+                            created, message = ldap_model._create_ldap_user(ldap_conf, dn, attrs)
+                            if not created and "Already exists" not in (message or ""):
+                                request.env['res.users'].sudo().browse(user_id).unlink()
+                                return request.render('ldap_reset_password.web_error', {'message': (message or '') + '.'})
+                        user = request.env['res.users'].sudo().browse(user_id)
+                    else:
+                        qcontext['error'] = _("Could not create a new account. " + str(user_id))
+                        return request.render('ldap_reset_password.signup_non_member', qcontext)
                 except Exception as e:
                     _logger.debug("LDAP-backed user create failed (fallback to Odoo-only): %s", e)
                     user = None
@@ -367,7 +375,7 @@ class LDAPSignupController(AuthSignupController):
         return request.render('ldap_reset_password.signup_non_member', qcontext)
 
     # --- Step 3: Member signup ---
-    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False)
+    @http.route('/web/signup', type='http', auth='public', website=True, sitemap=False, csrf=False)  # <-- match old
     def web_auth_signup(self, *args, **kw):
         qcontext = self.get_auth_signup_qcontext()
         qcontext['program_types'] = _program_type_objects()
@@ -421,6 +429,7 @@ class LDAPSignupController(AuthSignupController):
                     "sn": [sn.encode()],
                     "ou": [str(rotary_club_id).encode()],
                     "mail": [email.encode()],
+                    "userPassword": [pw.encode()],  # <-- set during add (old behavior)
                     "objectclass": [b"top", b"inetOrgPerson"],
                 }
                 if rotary_id:
@@ -430,15 +439,23 @@ class LDAPSignupController(AuthSignupController):
                 try:
                     ldap_model = env['res.company.ldap'].sudo()
                     user_id, existing = ldap_model._get_or_create_user_tuple(ldap_conf, email, (dn, attrs))
+
+                    # Old flow: if "existing", show error page
+                    if existing:
+                        return request.render('ldap_reset_password.web_error', {'message': _('Error: User already exists.')})
+
                     if isinstance(user_id, int) and user_id:
-                        user = env['res.users'].sudo().browse(user_id)
-                        if not existing and ldap and dn:
-                            try:
-                                ok_pw, msg_pw = ldap_model._set_ldap_password(ldap_conf, dn, pw)
-                                if not ok_pw:
-                                    _logger.warning("LDAP passwd_s failed for %s: %s", dn, msg_pw)
-                            except Exception:
-                                _logger.warning("Could not set LDAP password for newly created entry (member).")
+                        # Double-check LDAP has the entry; if missing, add now
+                        dn_exist, entry_exist = ldap_model._ldap_find_by_attrs(ldap_conf, attrs)
+                        if not entry_exist:
+                            created, message = ldap_model._create_ldap_user(ldap_conf, dn, attrs)
+                            if not created and "Already exists" not in (message or ""):
+                                request.env['res.users'].sudo().browse(user_id).unlink()
+                                return request.render('ldap_reset_password.web_error', {'message': (message or '') + '.'})
+                        user = request.env['res.users'].sudo().browse(user_id)
+                    else:
+                        qcontext['error'] = _("Could not create a new account. " + str(user_id))
+                        return request.render('ldap_reset_password.signup', qcontext)
                 except Exception as e:
                     _logger.debug("LDAP-backed create failed, fallback to Odoo-only: %s", e)
                     user = None
@@ -630,7 +647,6 @@ class CompanyLDAP(models.Model):
                 return self._query(confd, flt)
             except Exception:
                 return []
-
         try:
             flt = filter_format('(&(objectClass=inetOrgPerson)(uid=%s))', (uid_value,)) if filter_format else f'(&(objectClass=inetOrgPerson)(uid={uid_value}))'
             res = [r for r in _q(flt) if r and r[0]]
@@ -640,31 +656,31 @@ class CompanyLDAP(models.Model):
             _logger.exception("_ldap_find_by_uid failed for uid=%s", uid_value)
         return False, False
 
-    # ---------- create entry WITHOUT password ----------
+    # ---------- create entry (KEEP password if provided) ----------
     def _create_ldap_user(self, conf, user_dn, attributes):
-        """Create LDAP entry WITHOUT password; returns (created:bool, message:str)."""
+        """Create LDAP entry; keeps userPassword if present (old behavior)."""
         if ldap is None or modlist is None:
             return False, "python-ldap not installed"
         confd = self._as_dict(conf)
         admindn = confd.get('ldap_binddn') or ''
         adminpw = confd.get('ldap_password') or ''
         try:
-            attrs = dict(attributes or {})
-            attrs.pop('userPassword', None)  # ensure no cleartext password is added
             conn = self._pyldap_connect(confd)
             if admindn and adminpw:
                 conn.simple_bind_s(admindn, adminpw)
-            ldif = modlist.addModlist(attrs)
-            conn.add_s(user_dn, ldif)
+            conn.add_s(user_dn, modlist.addModlist(attributes))  # DO NOT strip userPassword
             conn.unbind_s()
             return True, 'Success'
-        except getattr(ldap, 'ALREADY_EXISTS', Exception):
-            return False, 'Already exists'
         except Exception as e:
-            _logger.exception("_create_ldap_user failed: %s", e)
-            return False, tools.ustr(e)
+            # Mirror older error surfacing; map Already exists if possible
+            try:
+                if hasattr(e, 'args') and e.args and isinstance(e.args[0], dict) and e.args[0].get('desc') == 'Already exists':
+                    return False, 'Already exists'
+            except Exception:
+                pass
+            return False, 'An LDAP exception occurred: ' + tools.ustr(e)
 
-    # ---------- set password via passwd_s ----------
+    # ---------- set password via passwd_s (NOT used by signup now, retained for compatibility) ----------
     def _set_ldap_password(self, conf, user_dn: str, new_password: str):
         if ldap is None:
             return False, "python-ldap not installed"
@@ -726,7 +742,6 @@ class CompanyLDAP(models.Model):
                 _logger.warning("Partner creation from LDAP failed: %s", e)
 
             # Create Odoo user (race-safe)
-            SudoUser = env['res.users'].with_context(no_reset_password=True).sudo()
             vals = self._map_ldap_attributes(conf, final_login, (dn_found, ldap_attrs)) or {}
             vals.update({
                 'partner_id': partner.id if partner else False,
@@ -776,7 +791,7 @@ class CompanyLDAP(models.Model):
                     _logger.exception("Failed to create Odoo user after race re-check: %s", e)
                     return 0, False
 
-            # sanitize uid and DN
+            # sanitize uid and DN (kept — harmless and avoids obvious conflicts)
             raw_uid = self._get_uid_from_attrs(attrs_provided) or requested_email
             safe_uid = sanitize_uid(raw_uid) or requested_email
             if safe_uid != raw_uid:
