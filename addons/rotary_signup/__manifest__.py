@@ -15,13 +15,14 @@ Custom signup flow for Rotary users:
     'website': 'https://www.verinsure.online',
     'license': 'LGPL-3',
     'depends': [
+        'base',
         'auth_signup',
+        'auth_ldap',              # ← needed because we link to its action/views
         'website',
-        'ldap_reset_password',
-        'rotary_project_map',# ensures compatibility with existing LDAP reset module
+        'rotary_project_map',     # ensures compatibility with existing LDAP reset module
     ],
     'data': [
-        'views/signup_template.xml',  # ✅ corrected filename (consistent with your XML)
+        'views/signup_template.xml',
     ],
     'assets': {
         'web.assets_frontend': [
@@ -29,6 +30,6 @@ Custom signup flow for Rotary users:
         ],
     },
     'installable': True,
-    'application': False,
+    'application': True,   # ← gives you an app icon and shows in Apps
     'auto_install': False,
 }
