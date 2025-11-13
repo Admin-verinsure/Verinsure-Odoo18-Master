@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'LDAP Signup',
+    'name': 'Rotary_LDAP_Signup',
     'version': '1.0',
     'summary': 'Rotary Member and Non-Member Signup using LDAP integration',
     'description': """
