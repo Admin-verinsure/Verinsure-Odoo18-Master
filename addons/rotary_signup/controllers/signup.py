@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Low-level python-ldap for raw LDAP operations (bind, add, passwd, etc.)
 import ldap
 import ldap.modlist as modlist
 
