@@ -40,7 +40,6 @@
           .login-hint { font-size:.92rem; color:#6b7280; }
           .login-hint a { color:#2563eb; text-decoration:none; }
           .login-hint a:hover { text-decoration:underline; }
-          .hint { text-align:left; font-size:.85rem; color:#6b7280; margin-top:.35rem; }
         ]]></style>
 
         <div class="container">
@@ -86,18 +85,36 @@
               </div>
 
               <div class="field">
+                <label>Club Name</label>
+                <select name="rotary_club_id" id="rotary_club_id" class="form-select" required="required">
+                  <t t-set="sel_program" t-value="request.params.get('club_type')"/>
+                  <t t-set="clubs"
+                     t-value="sel_program
+                              and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
+                              or env['res.partner'].browse([])"/>
+                  <t t-if="not sel_program">
+                    <option value="">-- Select Program Type first --</option>
+                  </t>
+                  <t t-if="sel_program and not clubs">
+                    <option value="">-- No clubs found for this program --</option>
+                  </t>
+                  <t t-foreach="clubs" t-as="c">
+                    <option t-att-value="c.id"
+                            t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
+                      <t t-esc="c.club_name or c.name"/>
+                    </option>
+                  </t>
+                </select>
+              </div>
+
+              <div class="field">
                 <label>Password</label>
-                <input type="password" name="password" id="m_password" class="form-control"
-                       required="required" autocomplete="new-password"
-                       title="At least 8 characters, 1 number, 1 special symbol"/>
-                <div class="invalid-feedback" id="m_pwd_msg">Password must be at least 8 characters, include a number and a special symbol.</div>
-                <div class="hint">Use 8+ chars with at least one number and one special symbol (e.g. ! @ # …).</div>
+                <input type="password" name="password" id="m_password" class="form-control" required="required" autocomplete="new-password"/>
               </div>
 
               <div class="field">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" id="m_confirm" class="form-control"
-                       required="required" autocomplete="new-password"/>
+                <input type="password" name="confirm_password" id="m_confirm" class="form-control" required="required" autocomplete="new-password"/>
                 <div class="invalid-feedback" id="m_msg" style="display:none">Passwords do not match</div>
               </div>
 
@@ -113,33 +130,22 @@
           (function () {
             var form = document.querySelector('.needs-validation');
             if (!form) return;
-
             var p = document.getElementById('m_password');
             var c = document.getElementById('m_confirm');
             var msg = document.getElementById('m_msg');
-            var pwdMsg = document.getElementById('m_pwd_msg');
 
-            function meetsPolicy(value) {
-              // >=8 chars, at least one digit and one special symbol
-              return /^(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(value || '');
-            }
-
-            function validatePasswordField() {
+            function validatePassword() {
               if (!p) return true;
-              var ok = meetsPolicy(p.value);
-              if (!ok) {
-                // mark invalid but don't throw popups
+              var value = p.value;
+              var pattern = /^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+              if (!pattern.test(value)) {
                 p.setCustomValidity('weak-password');
-                if (form.classList.contains('was-validated')) {
-                  p.classList.add('is-invalid');
-                }
-                if (pwdMsg) pwdMsg.style.display = '';
+                alert("Password must be at least 8 characters long, contain a number, and a special symbol.");
+                return false;
               } else {
                 p.setCustomValidity('');
-                p.classList.remove('is-invalid');
-                if (pwdMsg) pwdMsg.style.display = 'none';
+                return true;
               }
-              return ok;
             }
 
             function checkMatch() {
@@ -147,24 +153,19 @@
                 c.setCustomValidity('no-match');
                 if (msg) msg.style.display = '';
               } else {
-                c.setCustomValidity('');
+                if (c) c.setCustomValidity('');
                 if (msg) msg.style.display = 'none';
               }
             }
 
-            if (p) p.addEventListener('input', function () { validatePasswordField(); checkMatch(); });
+            if (p) p.addEventListener('input', function () { checkMatch(); validatePassword(); });
             if (c) c.addEventListener('input', checkMatch);
-            if (p) p.addEventListener('blur', validatePasswordField);
 
             form.addEventListener('submit', function (e) {
-              var ok1 = validatePasswordField();
               checkMatch();
-              if (!ok1 || !form.checkValidity()) {
+              if (!validatePassword() || !form.checkValidity()) {
                 e.preventDefault();
                 e.stopPropagation();
-                // Ensure bootstrap-style invalid states show
-                p && p.classList.add('is-invalid');
-                c && c.classList.add('is-invalid');
               }
               form.classList.add('was-validated');
             }, false);
@@ -188,7 +189,6 @@
           .login-hint { font-size:.92rem; color:#6b7280; }
           .login-hint a { color:#2563eb; text-decoration:none; }
           .login-hint a:hover { text-decoration:underline; }
-          .hint { text-align:left; font-size:.85rem; color:#6b7280; margin-top:.35rem; }
         ]]></style>
 
         <div class="container">
@@ -200,7 +200,7 @@
             </t>
 
             <form method="post" action="/web/signup_non_member" class="oe_signup_form needs-validation" novalidate="novalidate">
-              <input type="hidden" name="csrf_token" t-att-value="request.csrf_token"/>
+              <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
               <div class="field">
                 <label>First Name</label>
@@ -219,17 +219,12 @@
 
               <div class="field">
                 <label>Password</label>
-                <input type="password" name="password" id="n_password" class="form-control"
-                       required="required" autocomplete="new-password"
-                       title="At least 8 characters, 1 number, 1 special symbol"/>
-                <div class="invalid-feedback" id="n_pwd_msg">Password must be at least 8 characters, include a number and a special symbol.</div>
-                <div class="hint">Use 8+ chars with at least one number and one special symbol (e.g. ! @ # …).</div>
+                <input type="password" name="password" id="n_password" class="form-control" required="required" autocomplete="new-password"/>
               </div>
 
               <div class="field">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" id="n_confirm" class="form-control"
-                       required="required" autocomplete="new-password"/>
+                <input type="password" name="confirm_password" id="n_confirm" class="form-control" required="required" autocomplete="new-password"/>
                 <div class="invalid-feedback" id="n_msg" style="display:none">Passwords do not match</div>
               </div>
 
@@ -245,31 +240,22 @@
           (function () {
             var form = document.querySelector('.needs-validation');
             if (!form) return;
-
             var p = document.getElementById('n_password');
             var c = document.getElementById('n_confirm');
             var msg = document.getElementById('n_msg');
-            var pwdMsg = document.getElementById('n_pwd_msg');
 
-            function meetsPolicy(value) {
-              return /^(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(value || '');
-            }
-
-            function validatePasswordField() {
+            function validatePassword() {
               if (!p) return true;
-              var ok = meetsPolicy(p.value);
-              if (!ok) {
+              var value = p.value;
+              var pattern = /^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+              if (!pattern.test(value)) {
                 p.setCustomValidity('weak-password');
-                if (form.classList.contains('was-validated')) {
-                  p.classList.add('is-invalid');
-                }
-                if (pwdMsg) pwdMsg.style.display = '';
+                alert("Password must be at least 8 characters long, contain a number, and a special symbol.");
+                return false;
               } else {
                 p.setCustomValidity('');
-                p.classList.remove('is-invalid');
-                if (pwdMsg) pwdMsg.style.display = 'none';
+                return true;
               }
-              return ok;
             }
 
             function checkMatch() {
@@ -277,23 +263,19 @@
                 c.setCustomValidity('no-match');
                 if (msg) msg.style.display = '';
               } else {
-                c.setCustomValidity('');
+                if (c) c.setCustomValidity('');
                 if (msg) msg.style.display = 'none';
               }
             }
 
-            if (p) p.addEventListener('input', function () { validatePasswordField(); checkMatch(); });
+            if (p) p.addEventListener('input', function () { checkMatch(); validatePassword(); });
             if (c) c.addEventListener('input', checkMatch);
-            if (p) p.addEventListener('blur', validatePasswordField);
 
             form.addEventListener('submit', function (e) {
-              var ok1 = validatePasswordField();
               checkMatch();
-              if (!ok1 || !form.checkValidity()) {
+              if (!validatePassword() || !form.checkValidity()) {
                 e.preventDefault();
                 e.stopPropagation();
-                p && p.classList.add('is-invalid');
-                c && c.classList.add('is-invalid');
               }
               form.classList.add('was-validated');
             }, false);
