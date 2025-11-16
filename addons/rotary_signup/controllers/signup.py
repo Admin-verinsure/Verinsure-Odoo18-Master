@@ -284,8 +284,10 @@ class LDAPSignupController(AuthSignupController):
                         env['res.users.role.line'].search([('user_id', '=', user_id)]).unlink()
                         if role:
                             env['res.users.role.line'].create({
-                                'user_id': user.id, 'role_id': role.id,
-                                'date_from': date.today(), 'date_to': date(2099, 12, 31)
+                                'user_id': user.id,
+                                'role_id': role.id,
+                                'date_from': date.today(),
+                                'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
 
@@ -368,8 +370,10 @@ class LDAPSignupController(AuthSignupController):
                         env['res.users.role.line'].search([('user_id', '=', user_id)]).unlink()
                         if role:
                             env['res.users.role.line'].create({
-                                'user_id': user.id, 'role_id': role.id,
-                                'date_from': date.today(), 'date_to': date(2099, 12, 31)
+                                'user_id': user.id,
+                                'role_id': role.id,
+                                'date_from': date.today(),
+                                'date_to': date(2099, 12, 31)
                             })
                             user.set_groups_from_roles()
 
@@ -658,19 +662,42 @@ class CompanyLDAP(models.Model):
         except Exception:
             return ''
 
+    # ---------- EMAIL + NAME matching ----------
     def _ldap_find_by_attrs(self, conf, attrs):
-        """Find LDAP entry **by email only**."""
+        """
+        Find LDAP entry by **email**, and if givenName/sn are provided in `attrs`,
+        require BOTH names to match as well. If names don't both match, behave
+        as if not found (return False, False).
+        """
         confd = self._as_dict(conf)
+
         def _q(flt):
             try:
                 return self._query(confd, flt)
             except Exception:
                 return []
+
         mail = (self._ldap_attr_text(attrs, 'mail') or '').strip()
-        if mail:
-            res = [r for r in _q(filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (mail,))) if r and r[0]]
+        given = (self._ldap_attr_text(attrs, 'givenname') or '').strip()
+        sn = (self._ldap_attr_text(attrs, 'sn') or '').strip()
+
+        if not mail:
+            return False, False
+
+        try:
+            if given and sn:
+                # Require all three: mail + givenName + sn
+                flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s)(givenName=%s)(sn=%s))', (mail, given, sn))
+            else:
+                # Only email provided; this will match by mail alone.
+                flt = filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (mail,))
+            res = [r for r in _q(flt) if r and r[0]]
             if res:
                 return res[0][0], res[0]
+        except Exception:
+            _logger.exception("_ldap_find_by_attrs failed (mail/given/sn)")
+
+        # If an entry exists for email but names do not both match, treat as not found
         return False, False
 
     # ----------- keep core signature; delegate to tuple version -----------
@@ -680,7 +707,7 @@ class CompanyLDAP(models.Model):
 
     def _get_or_create_user_tuple(self, conf, login, ldap_entry):
         """
-        - Lookup LDAP by email; if found use its uid as login (create Odoo user if needed).
+        - Lookup LDAP by email + names (when provided). If found, use its uid as login (create Odoo user if needed).
         - If not found, create LDAP entry, then Odoo partner/user.
         Returns (user_id:int, existing_user:bool).
         """
@@ -758,16 +785,23 @@ class CompanyLDAP(models.Model):
             user = SudoUser.create(vals)
             return user.id, final_login
 
-        # 1) LDAP lookup by e-mail
+        # 1) LDAP lookup by email (+ names when supplied from controller)
         attrs_from_controller = (ldap_entry[1] if ldap_entry else {}) or {}
         dn_found, entry_found = self._ldap_find_by_attrs(confd, attrs_from_controller)
 
+        # Fallback: if controller attrs were empty, try again using just the email and
+        # names if they were sent as part of ldap_entry anyway.
         if not entry_found and requested_email:
             try:
-                results = self._query(confd, filter_format('(&(objectClass=inetOrgPerson)(mail=%s))', (requested_email,)))
-                results = [r for r in results if r and r[0]]
-                if results:
-                    dn_found, entry_found = results[0]
+                # Build a dict that looks like LDAP attrs for search helper
+                probe = {'mail': [requested_email.encode()]}
+                gv = (attrs_from_controller.get('givenname') or [])
+                snv = (attrs_from_controller.get('sn') or [])
+                if gv:
+                    probe['givenname'] = gv
+                if snv:
+                    probe['sn'] = snv
+                dn_found, entry_found = self._ldap_find_by_attrs(confd, probe)
             except Exception:
                 pass
 
