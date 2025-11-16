@@ -3,7 +3,7 @@ import ldap
 import ldap.modlist as modlist
 import logging
 import threading
-from datetime import datetime, timedelta
+from datetime import timedelta
 from ldap.filter import filter_format
 
 from odoo import api, fields, models, tools, SUPERUSER_ID, _, http
@@ -12,6 +12,9 @@ from odoo.http import request
 from odoo import registry as odoo_registry
 
 _logger = logging.getLogger(__name__)
+
+# How long an OTP is valid (minutes)
+TTL_MINUTES = 10
 
 # ---------------------------------------------------------------------------
 # Async mail queue processor
@@ -123,21 +126,46 @@ class LDAPResetController(http.Controller):
 
             otp = env['otp'].sudo().search([('otp_code', '=', otp_code)], limit=1)
             if not otp:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "OTP not found."})
-            if otp.expiration_time < datetime.now() - timedelta(minutes=15):
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "OTP expired."})
+                return request.render('ldap_reset_password.template_otp_entry', {
+                    'error_message': "OTP not found."
+                })
+
+            # --- EXPIRY CHECK (10 minutes) ---
+            now_utc = fields.Datetime.now()
+            if getattr(otp, 'expiration_time', False):
+                expired = now_utc > otp.expiration_time
+            else:
+                # Fallback: create_date + TTL
+                expired = bool(otp.create_date and (now_utc > (otp.create_date + timedelta(minutes=TTL_MINUTES))))
+            if expired:
+                return request.render('ldap_reset_password.template_otp_entry', {
+                    'error_message': "OTP expired. Please re-generate the OTP."
+                })
+            # --- END EXPIRY CHECK ---
 
             user = env['res.users'].sudo().search([('login', '=', login)], limit=1)
             if not user or otp.user_id.id != user.id:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "Invalid user or OTP."})
+                return request.render('ldap_reset_password.template_otp_entry', {
+                    'error_message': "Invalid user or OTP."
+                })
 
             ldap_conf = env['res.company.ldap'].search([], limit=1)
             if not ldap_conf:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "LDAP configuration missing."})
+                return request.render('ldap_reset_password.template_otp_entry', {
+                    'error_message': "LDAP configuration missing."
+                })
 
             changed, message = ldap_conf._change_password_admin_exceptions(ldap_conf, login, new_pwd)
             if not changed:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': f"Password reset failed: {message}"})
+                return request.render('ldap_reset_password.template_otp_entry', {
+                    'error_message': f"Password reset failed: {message}"
+                })
+
+            # Invalidate OTP after successful use (optional but recommended)
+            try:
+                otp.sudo().unlink()
+            except Exception:
+                pass
 
             user.password = ''
             user.sudo()._set_password()
@@ -160,7 +188,9 @@ class LDAPResetController(http.Controller):
             return request.render('ldap_reset_password.template_invalid_login')
 
         # Default initial page
-        return request.render('ldap_reset_password.template_otp', {'message': 'Enter your username to reset password.'})
+        return request.render('ldap_reset_password.template_otp', {
+            'message': 'Enter your username to reset password.'
+        })
 
     @http.route('/web/reset_password', type='http', auth='public', website=True)
     def reset_password_redirect(self):
