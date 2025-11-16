@@ -17,9 +17,9 @@ Custom signup flow for Rotary users:
     'depends': [
         'base',
         'auth_signup',
-        'auth_ldap',              # ← needed because we link to its action/views
+        'auth_ldap',             
         'website',
-        'rotary_project_map',     # ensures compatibility with existing LDAP reset module
+        'rotary_project_map',     
     ],
     'data': [
         'views/signup_template.xml',

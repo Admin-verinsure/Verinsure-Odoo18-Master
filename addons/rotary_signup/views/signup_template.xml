@@ -2,7 +2,7 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- 1) Landing – simple, centered -->
+    
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
