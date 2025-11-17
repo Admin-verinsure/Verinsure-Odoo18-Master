@@ -2,7 +2,7 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- 1) Choose Signup Type -->
+    
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -25,7 +25,7 @@
       </t>
     </template>
 
-    <!-- 2) Member Signup -->
+    <!-- 2) Member Signup – centered layout, minimal CSS/JS -->
     <template id="ldap_reset_password.signup" name="Rotary Member Signup">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -55,29 +55,34 @@
 
               <div class="field">
                 <label>First Name</label>
-                <input type="text" name="first_name" class="form-control" required="required" placeholder="e.g. John" autocomplete="given-name" t-att-value="first_name"/>
+                <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
+                       required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
 
               <div class="field">
                 <label>Last Name</label>
-                <input type="text" name="last_name" class="form-control" required="required" placeholder="e.g. Smith" autocomplete="family-name" t-att-value="last_name"/>
+                <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
+                       required="required" autocomplete="family-name" t-att-value="last_name"/>
               </div>
 
               <div class="field">
                 <label>Email</label>
-                <input type="email" name="email" class="form-control" required="required" placeholder="e.g. example@example.com" autocomplete="email" t-att-value="email"/>
+                <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
+                       required="required" autocomplete="email" t-att-value="email"/>
               </div>
 
               <div class="field">
                 <label>Rotary International Number</label>
-                <input type="text" name="rotary_id" class="form-control" required="required" placeholder="5–8 digit Rotary ID" t-att-value="rotary_id"/>
+                <input type="text" name="rotary_id" class="form-control" placeholder="5–8 digit Rotary ID"
+                       required="required" t-att-value="rotary_id"/>
               </div>
 
               <div class="field">
                 <label>Program Type</label>
                 <select name="club_type" id="club_type" class="form-select" required="required">
                   <option value="">-- Select Program Type --</option>
-                  <t t-set="club_types" t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
+                  <t t-set="club_types"
+                     t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
                   <t t-foreach="club_types" t-as="opt">
                     <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]"><t t-esc="opt[1]"/></option>
                   </t>
@@ -109,12 +114,14 @@
 
               <div class="field">
                 <label>Password</label>
-                <input type="password" name="password" id="m_password" class="form-control" required="required" autocomplete="new-password"/>
+                <input type="password" name="password" id="m_password" class="form-control"
+                       required="required" autocomplete="new-password"/>
               </div>
 
               <div class="field">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" id="m_confirm" class="form-control" required="required" autocomplete="new-password"/>
+                <input type="password" name="confirm_password" id="m_confirm" class="form-control"
+                       required="required" autocomplete="new-password"/>
                 <div class="invalid-feedback" id="m_msg" style="display:none">Passwords do not match</div>
               </div>
 
@@ -134,20 +141,6 @@
             var c = document.getElementById('m_confirm');
             var msg = document.getElementById('m_msg');
 
-            function validatePassword() {
-              if (!p) return true;
-              var value = p.value;
-              var pattern = /^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
-              if (!pattern.test(value)) {
-                p.setCustomValidity('weak-password');
-                alert("Password must be at least 8 characters long, contain a number, and a special symbol.");
-                return false;
-              } else {
-                p.setCustomValidity('');
-                return true;
-              }
-            }
-
             function checkMatch() {
               if (p && c && p.value && c.value && p.value !== c.value) {
                 c.setCustomValidity('no-match');
@@ -157,16 +150,12 @@
                 if (msg) msg.style.display = 'none';
               }
             }
-
-            if (p) p.addEventListener('input', function () { checkMatch(); validatePassword(); });
+            if (p) p.addEventListener('input', checkMatch);
             if (c) c.addEventListener('input', checkMatch);
 
             form.addEventListener('submit', function (e) {
               checkMatch();
-              if (!validatePassword() || !form.checkValidity()) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
+              if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
               form.classList.add('was-validated');
             }, false);
           })();
@@ -174,7 +163,7 @@
       </t>
     </template>
 
-    <!-- 3) Non-Member Signup -->
+    <!-- 3) Non-Member Signup – centered layout, same styles -->
     <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -204,27 +193,32 @@
 
               <div class="field">
                 <label>First Name</label>
-                <input type="text" name="first_name" class="form-control" required="required" placeholder="e.g. John" autocomplete="given-name" t-att-value="first_name"/>
+                <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
+                       required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
 
               <div class="field">
                 <label>Last Name</label>
-                <input type="text" name="last_name" class="form-control" required="required" placeholder="e.g. Smith" autocomplete="family-name" t-att-value="last_name"/>
+                <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
+                       required="required" autocomplete="family-name" t-att-value="last_name"/>
               </div>
 
               <div class="field">
                 <label>Email</label>
-                <input type="email" name="email" class="form-control" required="required" placeholder="e.g. example@example.com" autocomplete="email" t-att-value="email"/>
+                <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
+                       required="required" autocomplete="email" t-att-value="email"/>
               </div>
 
               <div class="field">
                 <label>Password</label>
-                <input type="password" name="password" id="n_password" class="form-control" required="required" autocomplete="new-password"/>
+                <input type="password" name="password" id="n_password" class="form-control"
+                       required="required" autocomplete="new-password"/>
               </div>
 
               <div class="field">
                 <label>Confirm Password</label>
-                <input type="password" name="confirm_password" id="n_confirm" class="form-control" required="required" autocomplete="new-password"/>
+                <input type="password" name="confirm_password" id="n_confirm" class="form-control"
+                       required="required" autocomplete="new-password"/>
                 <div class="invalid-feedback" id="n_msg" style="display:none">Passwords do not match</div>
               </div>
 
@@ -244,20 +238,6 @@
             var c = document.getElementById('n_confirm');
             var msg = document.getElementById('n_msg');
 
-            function validatePassword() {
-              if (!p) return true;
-              var value = p.value;
-              var pattern = /^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
-              if (!pattern.test(value)) {
-                p.setCustomValidity('weak-password');
-                alert("Password must be at least 8 characters long, contain a number, and a special symbol.");
-                return false;
-              } else {
-                p.setCustomValidity('');
-                return true;
-              }
-            }
-
             function checkMatch() {
               if (p && c && p.value && c.value && p.value !== c.value) {
                 c.setCustomValidity('no-match');
@@ -267,16 +247,12 @@
                 if (msg) msg.style.display = 'none';
               }
             }
-
-            if (p) p.addEventListener('input', function () { checkMatch(); validatePassword(); });
+            if (p) p.addEventListener('input', checkMatch);
             if (c) c.addEventListener('input', checkMatch);
 
             form.addEventListener('submit', function (e) {
               checkMatch();
-              if (!validatePassword() || !form.checkValidity()) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
+              if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
               form.classList.add('was-validated');
             }, false);
           })();
