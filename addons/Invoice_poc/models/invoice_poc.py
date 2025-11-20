@@ -56,7 +56,7 @@ class InvoicePocPayload(models.Model):
     # ---------------- helpers ----------------
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
-        """Prefer payload email; keep partner email in sync with payload."""
+        """Prefer payload email; keep partner email/name in sync with payload."""
         Partner = self.env["res.partner"]
         if email:
             dom = [("email", "=", email)]
@@ -78,7 +78,7 @@ class InvoicePocPayload(models.Model):
             vals = {}
             if email and partner.email != email:
                 vals["email"] = email
-            if name and not partner.name:
+            if name and partner.name != name:
                 vals["name"] = name
             if vals:
                 partner.sudo().write(vals)
@@ -143,8 +143,8 @@ class InvoicePocPayload(models.Model):
 
     def _send_invoice_email(self, move, to_email=None):
         """
-        Send the invoice email immediately.
-        Prefer payload email (to_email) over partner email.
+        Send the invoice email immediately to the *payload* email (preferred).
+        Clear partner recipients to avoid MissingError on stale/forbidden partners.
         """
         target = (to_email or "").strip() or (move.partner_id.email or "").strip()
         if not target:
@@ -164,12 +164,16 @@ class InvoicePocPayload(models.Model):
             move.message_post(body=f"Invoice posted; email to {target} not sent (template missing).")
             return
 
+        # Force raw email recipient; clear partner-based recipients.
         template.sudo().send_mail(
             move.id,
-            force_send=True,  # send now
+            force_send=True,  # send now (requires valid outgoing mail server)
             email_values={
                 'email_to': target,
-                # Optionally: 'email_from': move.company_id.email or self.env.user.email_formatted,
+                'recipient_ids': [],  # clear partner recipients
+                'partner_ids': [],    # extra safety
+                'partner_to': False,  # ignore template partner_to
+                # 'email_from': move.company_id.email or self.env.user.email_formatted,
             },
         )
 
@@ -285,7 +289,7 @@ class InvoicePocPayload(models.Model):
             allowed_company_ids=[company.id],
         ).create(move_vals)
 
-        # Post and send email immediately to payload email (if present)
+        # Post and send to payload email (if provided)
         move.action_post()
         try:
             self._send_invoice_email(move, to_email=customer.get("email"))
