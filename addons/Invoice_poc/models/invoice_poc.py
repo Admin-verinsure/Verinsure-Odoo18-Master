@@ -2,7 +2,7 @@ from odoo import models, fields, api
 import json
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Hard-coded defaults (used when payload doesn't provide overrides)
+# Hard-coded defaults
 # ──────────────────────────────────────────────────────────────────────────────
 DEFAULT_TERMS = [
     "By placing an order with Not 4 Profit you agree to these terms and conditions in addition to the terms set out in any Long Term Customer Relationship Agreement.",
@@ -27,6 +27,7 @@ DEFAULT_NOTES_HTML = (
     "<li>(c) it was Incorporated: 01 Jul 1993</li>"
     "<li>(d) has other sources of income from regular charitable events</li>"
     "<li>(e) operates the Not4Profit Foundation and manages the source code</li>"
+    "<li>(f) is itself a registered charity.</li>"
     "</ul>"
 )
 
@@ -55,17 +56,15 @@ class InvoicePocPayload(models.Model):
     # ---------------- helpers ----------------
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
+        """Prefer payload email; keep partner email in sync with payload."""
         Partner = self.env["res.partner"]
-        if email and name:
-            dom = ["|", ("email", "=", email), ("name", "=", name)]
-        elif email:
+        if email:
             dom = [("email", "=", email)]
         elif name:
             dom = [("name", "=", name)]
         else:
             raise ValueError("Provide partner email or name")
 
-        # Prefer same-company or shared partner
         dom = ["&", ("company_id", "in", [False, company_id])] + dom
         partner = Partner.search(dom, limit=1)
         if not partner:
@@ -75,11 +74,18 @@ class InvoicePocPayload(models.Model):
                 "customer_rank": 1,
                 "company_id": company_id,
             })
+        else:
+            vals = {}
+            if email and partner.email != email:
+                vals["email"] = email
+            if name and not partner.name:
+                vals["name"] = name
+            if vals:
+                partner.sudo().write(vals)
         return partner
 
     @api.model
     def _find_currency(self, code=None):
-        # If not provided, default to the company currency
         return (self.env["res.currency"].search([("name", "=", code)], limit=1)
                 if code else self.env.company.currency_id)
 
@@ -99,18 +105,13 @@ class InvoicePocPayload(models.Model):
             names = [names]
         if not names:
             return [(6, 0, [])]
-        taxes = self.env["account.tax"].search([
-            ("name", "in", names),
-            ("company_id", "=", company_id),
-        ])
+        taxes = self.env["account.tax"].search([("name", "in", names), ("company_id", "=", company_id)])
         return [(6, 0, taxes.ids)]
 
     @api.model
     def _fallback_income_account(self, company_id=None):
-        # Prefer a company-compatible account (multi-company friendly builds sometimes use company_ids)
         acc = self.env["account.account"].search(
-            [("account_type", "=", "income"), ("company_ids", "in", [company_id])],
-            limit=1
+            [("account_type", "=", "income"), ("company_ids", "in", [company_id])], limit=1
         ) or self.env["account.account"].search([("account_type", "=", "income")], limit=1)
         if not acc:
             raise ValueError("No income account available to create invoice lines.")
@@ -123,10 +124,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _build_narration_html(self, data):
-        """
-        Build an HTML 'narration' printed by QWeb (Terms + Notes).
-        Uses payload overrides when present, otherwise the defaults above.
-        """
+        """Build HTML (Terms + Notes). Payload overrides default."""
         terms_list = data.get("terms") or DEFAULT_TERMS
         notes_html = (data.get("notes") or data.get("note") or DEFAULT_NOTES_HTML)
         if isinstance(notes_html, str):
@@ -143,38 +141,39 @@ class InvoicePocPayload(models.Model):
 
         return "".join(parts) if parts else False
 
-    def _send_invoice_email(self, move):
+    def _send_invoice_email(self, move, to_email=None):
         """
-        Queue the posted invoice email using the standard template.
-        Safe by default: do not hard-fail if missing recipient/template.
+        Send the invoice email immediately.
+        Prefer payload email (to_email) over partner email.
         """
-        if not move.partner_id.email:
+        target = (to_email or "").strip() or (move.partner_id.email or "").strip()
+        if not target:
             self.env['mail.activity'].create({
                 'res_model_id': self.env['ir.model']._get_id('account.move'),
                 'res_id': move.id,
                 'res_name': move.name,
                 'user_id': self.env.user.id,
                 'summary': 'Missing customer email',
-                'note': 'Could not auto-email invoice: partner has no email.',
+                'note': 'Email not sent: no email in payload and partner has no email.',
                 'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
             })
             return
 
         template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
         if not template:
-            move.message_post(body="Invoice posted, but standard email template was not found.")
+            move.message_post(body=f"Invoice posted; email to {target} not sent (template missing).")
             return
 
         template.sudo().send_mail(
             move.id,
-            force_send=True,  # queued; mail queue / scheduler will send
+            force_send=True,  # send now
             email_values={
-                'email_to': move.partner_id.email,
-                # 'email_from': move.company_id.email,  # set once SMTP aligns
+                'email_to': target,
+                # Optionally: 'email_from': move.company_id.email or self.env.user.email_formatted,
             },
         )
 
-    # Handy serializer for callbacks / API returns
+    # Serialize for API callbacks
     @api.model
     def _move_to_payload(self, move):
         return {
@@ -211,21 +210,17 @@ class InvoicePocPayload(models.Model):
 
     # ---------------- main ----------------
     def action_create_and_post_invoice(self):
-        """
-        Create & post a customer invoice from the stored JSON payload.
-        - Always sets salesperson (system param default, overridable by payload).
-        - Always populates narration (Terms + Notes) with defaults (overridable).
-        """
+        """Create & post from JSON; force email to payload address."""
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
 
-        # Company & default salesperson (system parameter → fallback to current user)
+        # Company & default salesperson
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
         salesperson = self.env['res.users'].search([('login', '=', default_login)], limit=1) or self.env.user
 
-        # Optional payload override for salesperson
+        # Payload override for salesperson
         sp = (data.get("salesperson") or {})
         if sp.get("login"):
             salesperson = self.env['res.users'].search([('login', '=', sp["login"])], limit=1) or salesperson
@@ -261,7 +256,7 @@ class InvoicePocPayload(models.Model):
                 "account_id": income_acct.id,
             }))
 
-        # Narration (Terms + Notes) with defaults/overrides
+        # Narration (Terms + Notes)
         narration_html = self._build_narration_html(data)
 
         move_vals = {
@@ -270,11 +265,10 @@ class InvoicePocPayload(models.Model):
             "partner_id": partner.id,
             "journal_id": journal.id,
             "currency_id": currency.id if currency else False,
-            "invoice_user_id": salesperson.id,      # permanent: set salesperson
+            "invoice_user_id": salesperson.id,
             "invoice_line_ids": line_cmds,
-            "narration": narration_html or False,   # permanent: Terms + Notes
+            "narration": narration_html or False,
         }
-        # Optional printable fields (also used by your QWeb)
         if data.get("ref"):
             move_vals["ref"] = data["ref"]
         if data.get("invoice_date"):
@@ -288,16 +282,15 @@ class InvoicePocPayload(models.Model):
 
         move = self.env["account.move"].with_context(
             default_move_type="out_invoice",
-            allowed_company_ids=[company.id],      # UI-like visibility
+            allowed_company_ids=[company.id],
         ).create(move_vals)
 
-        # Post and (optionally) queue the email
+        # Post and send email immediately to payload email (if present)
         move.action_post()
         try:
-            self._send_invoice_email(move)
+            self._send_invoice_email(move, to_email=customer.get("email"))
         except Exception as e:
-            move.message_post(body=f"Auto-email queueing failed: {e}")
+            move.message_post(body=f"Immediate email send failed: {e}")
 
-        # Link trace & mark as posted
         self.write({"move_id": move.id, "state": "posted"})
         return move
