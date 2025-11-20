@@ -167,7 +167,7 @@ class InvoicePocPayload(models.Model):
 
         template.sudo().send_mail(
             move.id,
-            force_send=False,  # queued; mail queue / scheduler will send
+            force_send=True,  # queued; mail queue / scheduler will send
             email_values={
                 'email_to': move.partner_id.email,
                 # 'email_from': move.company_id.email,  # set once SMTP aligns
