@@ -27,7 +27,6 @@ DEFAULT_NOTES_HTML = (
     "<li>(c) it was Incorporated: 01 Jul 1993</li>"
     "<li>(d) has other sources of income from regular charitable events</li>"
     "<li>(e) operates the Not4Profit Foundation and manages the source code</li>"
-    "<li>(f) is itself a registered charity.</li>"
     "</ul>"
 )
 

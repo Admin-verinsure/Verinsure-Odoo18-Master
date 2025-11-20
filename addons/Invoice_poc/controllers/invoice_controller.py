@@ -72,11 +72,6 @@ class InvoicePocController(http.Controller):
           "id": 1,
           "params": { ...payload... }
         }
-
-        Required (minimal) params:
-          - customer: {name/email}, lines: [{name/description, qty, unit_price, tax_names?}]
-        Optional:
-          - ref, currency, invoice_date, due_date, payment_term, payment_reference, terms, notes, salesperson{login|id}
         """
         rec = None
         try:
@@ -103,7 +98,26 @@ class InvoicePocController(http.Controller):
             if not move:
                 move = rec.sudo().action_create_and_post_invoice()
 
-            # Commit so the invoice is immediately visible to users/UI
+            # --- NEW: send invoice email immediately (no cron wait) ---
+            try:
+                template = request.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
+                if template and move.partner_id.email:
+                    template.sudo().send_mail(
+                        move.id,
+                        force_send=True,  # send now
+                        email_values={
+                            'email_to': move.partner_id.email,
+                            # Use a valid sender to satisfy SPF/DKIM/DMARC
+                            'email_from': move.company_id.email or request.env.user.email_formatted,
+                        },
+                    )
+                else:
+                    move.message_post(body="Invoice posted; email not sent (no template or customer email).")
+            except Exception as mail_e:
+                # Do not fail the API call for mail errors—just log on the chatter
+                move.message_post(body=f"Immediate email send failed: {mail_e}")
+
+            # Commit so the invoice (and mail status) are immediately visible
             request.env.cr.commit()
 
             return {
