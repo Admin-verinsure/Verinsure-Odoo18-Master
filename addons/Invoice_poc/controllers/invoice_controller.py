@@ -1,6 +1,8 @@
 from odoo import http
 from odoo.http import request
 
+import base64, json
+
 # optional: precise handling of unique constraint race/idempotency
 try:
     from psycopg2.errors import UniqueViolation  # type: ignore
@@ -54,6 +56,50 @@ def _invoice_to_dict(move):
     }
 
 
+def _render_invoice_pdf_bytes(move):
+    """
+    Render the invoice PDF bytes using a robust list of likely report xmlids.
+    Adjust ordering if you use a custom report.
+    """
+    Report = request.env['ir.actions.report'].sudo()
+    candidates = [
+        'account.report_invoice_with_payments',  # v16+
+        'account.account_invoices',              # older
+        'account.report_invoice_document',       # alt legacy
+    ]
+    last_err = None
+    for xmlid in candidates:
+        try:
+            report = request.env.ref(xmlid, raise_if_not_found=False)
+            if report:
+                pdf_bytes, _ = Report._render_qweb_pdf(xmlid, [move.id])
+                return pdf_bytes
+        except Exception as e:
+            last_err = e
+            continue
+    # fallback using report on the template used by the template id in move._get_report_base_filename?
+    if last_err:
+        raise last_err
+    raise ValueError("No invoice report definition found to render PDF.")
+
+
+def _create_pdf_attachment(move, pdf_bytes):
+    """
+    Create an ir.attachment for the PDF and return (attachment, pdf_url).
+    """
+    fname = (move.name or f"Invoice-{move.id}") + ".pdf"
+    att = request.env['ir.attachment'].sudo().create({
+        'name': fname,
+        'res_model': 'account.move',
+        'res_id': move.id,
+        'type': 'binary',
+        'mimetype': 'application/pdf',
+        'datas': base64.b64encode(pdf_bytes),
+    })
+    pdf_url = f"/web/content/{att.id}?download=1&filename={att.name}"
+    return att, pdf_url
+
+
 class InvoicePocController(http.Controller):
 
     @http.route(
@@ -70,22 +116,26 @@ class InvoicePocController(http.Controller):
           "jsonrpc": "2.0",
           "method": "call",
           "id": 1,
-          "params": { ...payload... }
+          "params": {
+             ...payload...,
+             "callback_url": "https://your-dotnet/callback",     # optional
+             "callback_api_key": "XYZ",                          # optional
+             "return_pdf_b64": true                              # optional
+          }
         }
         """
         rec = None
         try:
             payload = request.jsonrequest.get("params") or {}
-            ext = payload.get("id") or payload.get("ref")  # your cross-system key
+            ext = payload.get("id") or payload.get("ref")  # cross-system key
 
-            # Create payload row (idempotent by unique ext_id). If duplicate, fall back to existing.
+            # Create payload row (idempotent by unique ext_id). If duplicate, reuse.
             try:
                 rec = request.env["invoice.poc.payload"].sudo().create({
                     "ext_id": ext,
                     "payload_json": request.make_json(payload),
                 })
             except Exception as e:
-                # UniqueViolation handling (idempotency)
                 if UniqueViolation and isinstance(e.__cause__, UniqueViolation) or "unique" in str(e).lower():
                     rec = request.env["invoice.poc.payload"].sudo().search([("ext_id", "=", ext)], limit=1)
                     if not rec:
@@ -93,42 +143,55 @@ class InvoicePocController(http.Controller):
                 else:
                     raise
 
-            # If already processed earlier, reuse that invoice
             move = rec.move_id
             if not move:
                 move = rec.sudo().action_create_and_post_invoice()
 
-            # --- NEW: send invoice email immediately (no cron wait) ---
-            try:
-                template = request.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
-                if template and move.partner_id.email:
-                    template.sudo().send_mail(
-                        move.id,
-                        force_send=True,  # send now
-                        email_values={
-                            'email_to': move.partner_id.email,
-                            # Use a valid sender to satisfy SPF/DKIM/DMARC
-                            'email_from': move.company_id.email or request.env.user.email_formatted,
-                        },
-                    )
-                else:
-                    move.message_post(body="Invoice posted; email not sent (no template or customer email).")
-            except Exception as mail_e:
-                # Do not fail the API call for mail errors—just log on the chatter
-                move.message_post(body=f"Immediate email send failed: {mail_e}")
+            # Render PDF, attach, and prepare response
+            pdf_bytes = _render_invoice_pdf_bytes(move)
+            att, pdf_url = _create_pdf_attachment(move, pdf_bytes)
 
-            # Commit so the invoice (and mail status) are immediately visible
-            request.env.cr.commit()
-
-            return {
+            response = {
                 "ok": True,
                 "ref": ext,
                 "payload_id": rec.id,
+                "pdf_attachment_id": att.id,
+                "pdf_url": pdf_url,
                 "invoice": _invoice_to_dict(move),
             }
+            if payload.get("return_pdf_b64"):
+                response["pdf_base64"] = base64.b64encode(pdf_bytes).decode("ascii")
+
+            # Push to callback if provided
+            callback_url = (payload.get("callback_url") or "").strip()
+            if callback_url:
+                try:
+                    import requests
+                    headers = {
+                        "Content-Type": "application/json",
+                    }
+                    cb_key = (payload.get("callback_api_key") or "").strip()
+                    if cb_key:
+                        headers["Authorization"] = f"Bearer {cb_key}"
+                    body = {
+                        "ok": True,
+                        "ref": ext,
+                        "invoice": response["invoice"],
+                        "pdf_url": pdf_url,
+                        "pdf_attachment_id": att.id,
+                    }
+                    if payload.get("return_pdf_b64"):
+                        body["pdf_base64"] = response["pdf_base64"]
+                    requests.post(callback_url, data=json.dumps(body), headers=headers, timeout=20)
+                except Exception as cb_err:
+                    # Don’t fail the main call; log in chatter
+                    move.message_post(body=f"Callback push failed: {cb_err}")
+
+            # Commit so the invoice/attachment are immediately available
+            request.env.cr.commit()
+            return response
 
         except Exception as e:
-            # Persist error on the payload row (if any)
             if rec:
                 try:
                     rec.sudo().write({"state": "error", "error_message": str(e)})
@@ -165,11 +228,29 @@ class InvoicePocController(http.Controller):
                 return {"ok": False, "error": f"No invoice found for ref '{ext}'."}
 
             move = rec.move_id.sudo()
+
+            # Also return (or regenerate) a PDF URL here for convenience
+            try:
+                # Try to find an existing PDF attachment first
+                att = request.env['ir.attachment'].sudo().search([
+                    ('res_model', '=', 'account.move'),
+                    ('res_id', '=', move.id),
+                    ('mimetype', '=', 'application/pdf'),
+                ], limit=1)
+                if att:
+                    pdf_url = f"/web/content/{att.id}?download=1&filename={att.name}"
+                else:
+                    pdf_bytes = _render_invoice_pdf_bytes(move)
+                    att, pdf_url = _create_pdf_attachment(move, pdf_bytes)
+            except Exception:
+                pdf_url = None
+
             return {
                 "ok": True,
                 "ref": ext,
                 "payload_id": rec.id,
                 "invoice": _invoice_to_dict(move),
+                "pdf_url": pdf_url,
             }
         except Exception as e:
             return {"ok": False, "error": str(e)}
