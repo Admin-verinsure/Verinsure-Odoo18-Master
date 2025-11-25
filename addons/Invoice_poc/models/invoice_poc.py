@@ -177,44 +177,133 @@ class InvoicePocPayload(models.Model):
             },
         )
 
-    # Serialize for API callbacks
+    # ---------------- insurance/policy helpers ----------------
     @api.model
-    def _move_to_payload(self, move):
-        return {
-            "id": move.id,
-            "name": move.name,
-            "state": move.state,
-            "company": move.company_id.name,
-            "company_id": move.company_id.id,
-            "partner_id": move.partner_id.id,
-            "partner_name": move.partner_id.display_name,
-            "currency": move.currency_id.name,
-            "amount_untaxed": move.amount_untaxed,
-            "amount_tax": move.amount_tax,
-            "amount_total": move.amount_total,
-            "invoice_date": move.invoice_date and str(move.invoice_date) or None,
-            "due_date": move.invoice_date_due and str(move.invoice_date_due) or None,
-            "payment_term": move.invoice_payment_term_id and move.invoice_payment_term_id.name or None,
-            "payment_reference": move.payment_reference or None,
-            "ref": move.ref or None,
-            "invoice_user_id": move.invoice_user_id and move.invoice_user_id.id or None,
-            "invoice_user": move.invoice_user_id and move.invoice_user_id.login or None,
-            "backend_url": f"/odoo/action-account.action_move_out_invoice_type?res_id={move.id}&cids={move.company_id.id}",
-            "lines": [
-                {
-                    "name": l.name,
-                    "quantity": l.quantity,
-                    "price_unit": l.price_unit,
-                    "taxes": [t.name for t in l.tax_ids],
-                    "subtotal": l.price_subtotal,
-                }
-                for l in move.invoice_line_ids
-            ],
-        }
+    def _find_or_create_policy_type(self, type_name):
+        """Ensure/return policy.type by name (adjust model if your technical name differs)."""
+        if not type_name:
+            return self.env['policy.type'].browse()
+        PT = self.env['policy.type']
+        rec = PT.search([('name', '=', type_name)], limit=1)
+        return rec or PT.create({'name': type_name})
 
-    # ---------------- main ----------------
-    def action_create_and_post_invoice(self):
-        """Create & post from JSON; force email to payload address."""
+    @api.model
+    def _find_or_create_employee(self, customer, company_id):
+        """
+        Ensure an employee.details for the insured person.
+        Assumes employee.details has partner_id, name, email, phone.
+        """
+        ED = self.env['employee.details']
+        partner = self._find_partner(
+            email=customer.get('email'),
+            name=customer.get('name'),
+            company_id=company_id,
+        )
+        emp = ED.search([('partner_id', '=', partner.id)], limit=1)
+        if not emp:
+            vals = {
+                'name': customer.get('name') or partner.name,
+                'partner_id': partner.id,
+                'email': customer.get('email') or partner.email,
+                'phone': customer.get('phone'),
+            }
+            emp = ED.create({k: v for k, v in vals.items() if v})
+        return partner, emp
+
+    @api.model
+    def _find_or_create_policy(self, payload_policy, partner, emp):
+        """
+        Ensure policy.details (+ insurance.details) exists/linked.
+        Adjust field names if your model differs.
+        """
+        PD = self.env['policy.details']
+        ID = self.env['insurance.details']
+
+        p = payload_policy or {}
+        ptype = self._find_or_create_policy_type(p.get('type_name'))
+
+        dom = []
+        if p.get('policy_no'):
+            dom.append(('policy_no', '=', p['policy_no']))        # adjust if your field differs
+        if ptype:
+            dom.append(('policy_type_id', '=', ptype.id))         # adjust if your field differs
+
+        pol = PD.search(dom or [], limit=1)
+        if not pol:
+            pol_vals = {
+                'name': p.get('policy_no') or p.get('name') or 'Policy',
+                'policy_no': p.get('policy_no'),
+                'policy_type_id': ptype.id if ptype else False,
+                'partner_id': partner.id,
+                'employee_id': emp.id if emp else False,
+                'start_date': p.get('start_date'),
+                'end_date': p.get('end_date'),
+                'sum_insured': p.get('sum_insured'),
+                'premium': p.get('premium'),
+                'insurer': p.get('insurer'),
+            }
+            pol = PD.create({k: v for k, v in pol_vals.items() if v is not None})
+
+        ins = ID.search([('policy_id', '=', pol.id)], limit=1)    # adjust FK if needed
+        if not ins:
+            ins_vals = {
+                'policy_id': pol.id,
+                'partner_id': partner.id,
+                'employee_id': emp.id if emp else False,
+            }
+            ins = ID.create({k: v for k, v in ins_vals.items() if v})
+        return pol, ins
+
+    def _create_invoice_linked_to_policy(self, company, partner, salesperson, line_cmds, narration_html, data, policy):
+        """
+        Create & post invoice and link to policy.
+        Assumes account.move has a M2O 'policy_id' → policy.details.
+        """
+        currency = self._find_currency(data.get("currency"))
+        journal = self._find_journal(data.get("journal"), company_id=company.id)
+        if not journal:
+            raise ValueError("No SALE journal found for this company.")
+        payment_term = self._find_payment_term(data.get("payment_term"))
+
+        move_vals = {
+            "move_type": "out_invoice",
+            "company_id": company.id,
+            "partner_id": partner.id,
+            "journal_id": journal.id,
+            "currency_id": currency.id if currency else False,
+            "invoice_user_id": salesperson.id,
+            "invoice_line_ids": line_cmds,
+            "narration": narration_html or False,
+            "policy_id": policy.id if policy else False,  # <— adjust field if different
+        }
+        if data.get("ref"):
+            move_vals["ref"] = data["ref"]
+        if data.get("invoice_date"):
+            move_vals["invoice_date"] = data["invoice_date"]
+        if data.get("due_date"):
+            move_vals["invoice_date_due"] = data["due_date"]
+        if data.get("payment_reference"):
+            move_vals["payment_reference"] = data["payment_reference"]
+        if payment_term:
+            move_vals["invoice_payment_term_id"] = payment_term.id
+
+        move = self.env["account.move"].with_context(
+            default_move_type="out_invoice",
+            allowed_company_ids=[company.id],
+        ).create(move_vals)
+
+        move.action_post()
+        return move
+
+    # ---------------- main (policy-first) ----------------
+    def action_create_policy_and_invoice(self):
+        """
+        Policy-first flow:
+        1) ensure Policy (+ Insurance) from payload.policy
+        2) ensure Customer/Employee
+        3) create & post invoice linked to policy
+        4) email to payload email (if provided)
+        """
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
 
@@ -231,18 +320,9 @@ class InvoicePocPayload(models.Model):
         elif sp.get("id"):
             salesperson = self.env['res.users'].browse(sp["id"]).exists() or salesperson
 
-        # Header
+        # Customer/Employee
         customer = data.get("customer", {}) or {}
-        partner = self._find_partner(
-            email=customer.get("email"),
-            name=customer.get("name"),
-            company_id=company.id,
-        )
-        currency = self._find_currency(data.get("currency"))
-        journal = self._find_journal(data.get("journal"), company_id=company.id)
-        if not journal:
-            raise ValueError("No SALE journal found for this company.")
-        payment_term = self._find_payment_term(data.get("payment_term"))
+        partner, emp = self._find_or_create_employee(customer, company.id)
 
         # Lines
         lines_in = data.get("lines") or []
@@ -261,6 +341,83 @@ class InvoicePocPayload(models.Model):
             }))
 
         # Narration (Terms + Notes)
+        narration_html = self._build_narration_html(data)
+
+        # Policy + Insurance
+        policy_payload = data.get("policy") or {}
+        policy, insurance = self._find_or_create_policy(policy_payload, partner, emp)
+
+        # Create invoice linked to policy
+        move = self._create_invoice_linked_to_policy(
+            company=company,
+            partner=partner,
+            salesperson=salesperson,
+            line_cmds=line_cmds,
+            narration_html=narration_html,
+            data=data,
+            policy=policy,
+        )
+
+        # Email
+        try:
+            self._send_invoice_email(move, to_email=customer.get("email"))
+        except Exception as e:
+            move.message_post(body=f"Immediate email send failed: {e}")
+
+        self.write({"move_id": move.id, "state": "posted"})
+        return move
+
+    # ---------------- legacy entrypoint (kept for compatibility) ----------------
+    def action_create_and_post_invoice(self):
+        """
+        Backward compatible:
+        - If payload contains 'policy', use policy-first flow.
+        - Else, behave like the previous invoice-only flow.
+        """
+        self.ensure_one()
+        data = json.loads(self.payload_json or "{}")
+        if data.get('policy'):
+            return self.action_create_policy_and_invoice()
+
+        # --- old invoice-only flow (exactly your previous logic) ---
+        company = self.env.user.company_id
+        ICP = self.env['ir.config_parameter'].sudo()
+        default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
+        salesperson = self.env['res.users'].search([('login', '=', default_login)], limit=1) or self.env.user
+
+        sp = (data.get("salesperson") or {})
+        if sp.get("login"):
+            salesperson = self.env['res.users'].search([('login', '=', sp["login"])], limit=1) or salesperson
+        elif sp.get("id"):
+            salesperson = self.env['res.users'].browse(sp["id"]).exists() or salesperson
+
+        customer = data.get("customer", {}) or {}
+        partner = self._find_partner(
+            email=customer.get("email"),
+            name=customer.get("name"),
+            company_id=company.id,
+        )
+        currency = self._find_currency(data.get("currency"))
+        journal = self._find_journal(data.get("journal"), company_id=company.id)
+        if not journal:
+            raise ValueError("No SALE journal found for this company.")
+        payment_term = self._find_payment_term(data.get("payment_term"))
+
+        lines_in = data.get("lines") or []
+        if not lines_in:
+            raise ValueError("At least one line is required")
+        income_acct = self._fallback_income_account(company_id=company.id)
+
+        line_cmds = []
+        for l in lines_in:
+            line_cmds.append((0, 0, {
+                "name": l.get("description") or l.get("name") or "Item",
+                "quantity": float(l.get("qty") or 1.0),
+                "price_unit": float(l.get("unit_price") or 0.0),
+                "tax_ids": self._find_taxes(l.get("tax_names"), company_id=company.id),
+                "account_id": income_acct.id,
+            }))
+
         narration_html = self._build_narration_html(data)
 
         move_vals = {
@@ -289,7 +446,6 @@ class InvoicePocPayload(models.Model):
             allowed_company_ids=[company.id],
         ).create(move_vals)
 
-        # Post and send to payload email (if provided)
         move.action_post()
         try:
             self._send_invoice_email(move, to_email=customer.get("email"))

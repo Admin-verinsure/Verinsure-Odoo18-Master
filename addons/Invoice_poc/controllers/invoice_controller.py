@@ -10,6 +10,26 @@ except Exception:  # pragma: no cover
     UniqueViolation = None
 
 
+def _policy_to_dict(move):
+    """Serialize linked policy (if any). Adjust field names if yours differ."""
+    p = getattr(move, 'policy_id', False)
+    if not p:
+        return None
+    # Tweak field names below to match your policy.details model
+    return {
+        "id": p.id,
+        "name": p.name,
+        "policy_no": getattr(p, 'policy_no', None),
+        "policy_type_id": getattr(p, 'policy_type_id', False) and p.policy_type_id.id or None,
+        "policy_type": getattr(p, 'policy_type_id', False) and p.policy_type_id.name or None,
+        "start_date": getattr(p, 'start_date', None) and p.start_date.isoformat(),
+        "end_date": getattr(p, 'end_date', None) and p.end_date.isoformat(),
+        "sum_insured": getattr(p, 'sum_insured', None),
+        "premium": getattr(p, 'premium', None),
+        "insurer": getattr(p, 'insurer', None),
+    }
+
+
 def _invoice_to_dict(move):
     """Serialize an account.move to a compact JSON-safe dict for API responses."""
     lines = []
@@ -52,6 +72,7 @@ def _invoice_to_dict(move):
         "journal": {"id": move.journal_id.id, "name": move.journal_id.name},
         "tax_totals": move.tax_totals,  # already json-serializable
         "lines": lines,
+        "policy": _policy_to_dict(move),
         "backend_url": f"/odoo/action-account.action_move_out_invoice_type?res_id={move.id}&cids={move.company_id.id}",
     }
 
@@ -77,7 +98,6 @@ def _render_invoice_pdf_bytes(move):
         except Exception as e:
             last_err = e
             continue
-    # fallback using report on the template used by the template id in move._get_report_base_filename?
     if last_err:
         raise last_err
     raise ValueError("No invoice report definition found to render PDF.")
@@ -143,21 +163,24 @@ class InvoicePocController(http.Controller):
                 else:
                     raise
 
-            move = rec.move_id
-            if not move:
+            # ---------- POLICY-FIRST: call the right model method ----------
+            if payload.get("policy"):
+                move = rec.sudo().action_create_policy_and_invoice()
+            else:
                 move = rec.sudo().action_create_and_post_invoice()
 
             # Render PDF, attach, and prepare response
             pdf_bytes = _render_invoice_pdf_bytes(move)
             att, pdf_url = _create_pdf_attachment(move, pdf_bytes)
 
+            invoice_dict = _invoice_to_dict(move)
             response = {
                 "ok": True,
                 "ref": ext,
                 "payload_id": rec.id,
                 "pdf_attachment_id": att.id,
                 "pdf_url": pdf_url,
-                "invoice": _invoice_to_dict(move),
+                "invoice": invoice_dict,
             }
             if payload.get("return_pdf_b64"):
                 response["pdf_base64"] = base64.b64encode(pdf_bytes).decode("ascii")
@@ -167,16 +190,14 @@ class InvoicePocController(http.Controller):
             if callback_url:
                 try:
                     import requests
-                    headers = {
-                        "Content-Type": "application/json",
-                    }
+                    headers = {"Content-Type": "application/json"}
                     cb_key = (payload.get("callback_api_key") or "").strip()
                     if cb_key:
                         headers["Authorization"] = f"Bearer {cb_key}"
                     body = {
                         "ok": True,
                         "ref": ext,
-                        "invoice": response["invoice"],
+                        "invoice": invoice_dict,
                         "pdf_url": pdf_url,
                         "pdf_attachment_id": att.id,
                     }
