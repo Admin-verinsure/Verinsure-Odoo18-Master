@@ -53,7 +53,7 @@ class InvoicePocPayload(models.Model):
         ("ext_id_unique", "unique(ext_id)", "This external reference already exists."),
     ]
 
-    # ---------------- helpers ----------------
+    # ---------------- partner/tax/account helpers ----------------
     @api.model
     def _find_partner(self, email=None, name=None, company_id=None):
         """Prefer payload email; keep partner email/name in sync with payload."""
@@ -164,7 +164,6 @@ class InvoicePocPayload(models.Model):
             move.message_post(body=f"Invoice posted; email to {target} not sent (template missing).")
             return
 
-        # Force raw email recipient; clear partner-based recipients.
         template.sudo().send_mail(
             move.id,
             force_send=True,  # send now (requires valid outgoing mail server)
@@ -180,7 +179,7 @@ class InvoicePocPayload(models.Model):
     # ---------------- insurance/policy helpers ----------------
     @api.model
     def _find_or_create_policy_type(self, type_name):
-        """Ensure/return policy.type by name (adjust model if your technical name differs)."""
+        """Ensure/return policy.type by name."""
         if not type_name:
             return self.env['policy.type'].browse()
         PT = self.env['policy.type']
@@ -191,7 +190,7 @@ class InvoicePocPayload(models.Model):
     def _find_or_create_employee(self, customer, company_id):
         """
         Ensure an employee.details for the insured person.
-        Assumes employee.details has partner_id, name, email, phone.
+        Adjust fields to match your employee.details model.
         """
         ED = self.env['employee.details']
         partner = self._find_partner(
@@ -199,22 +198,25 @@ class InvoicePocPayload(models.Model):
             name=customer.get('name'),
             company_id=company_id,
         )
-        emp = ED.search([('partner_id', '=', partner.id)], limit=1)
+        name = customer.get('name') or partner.name
+        phone = (customer.get('phone') or '').strip()
+
+        dom = [('name', '=', name)]
+        if phone:
+            dom.append(('phone', '=', phone))
+        emp = ED.search(dom, limit=1)
         if not emp:
-            vals = {
-                'name': customer.get('name') or partner.name,
-                'partner_id': partner.id,
-                'email': customer.get('email') or partner.email,
-                'phone': customer.get('phone'),
-            }
-            emp = ED.create({k: v for k, v in vals.items() if v})
+            vals = {'name': name}
+            if phone:
+                vals['phone'] = phone
+            emp = ED.create(vals)
         return partner, emp
 
     @api.model
     def _find_or_create_policy(self, payload_policy, partner, emp):
         """
         Ensure policy.details (+ insurance.details) exists/linked.
-        Adjust field names if your model differs.
+        Keep fields conservative to match your models.
         """
         PD = self.env['policy.details']
         ID = self.env['insurance.details']
@@ -222,42 +224,44 @@ class InvoicePocPayload(models.Model):
         p = payload_policy or {}
         ptype = self._find_or_create_policy_type(p.get('type_name'))
 
-        dom = []
-        if p.get('policy_no'):
-            dom.append(('policy_no', '=', p['policy_no']))        # adjust if your field differs
-        if ptype:
-            dom.append(('policy_type_id', '=', ptype.id))         # adjust if your field differs
-
-        pol = PD.search(dom or [], limit=1)
+        pol_name = p.get('name') or 'Policy'
+        pol = PD.search([('name', '=', pol_name)], limit=1)
         if not pol:
             pol_vals = {
-                'name': p.get('policy_no') or p.get('name') or 'Policy',
-                'policy_no': p.get('policy_no'),
+                'name': pol_name,
                 'policy_type_id': ptype.id if ptype else False,
-                'partner_id': partner.id,
-                'employee_id': emp.id if emp else False,
-                'start_date': p.get('start_date'),
-                'end_date': p.get('end_date'),
-                'sum_insured': p.get('sum_insured'),
-                'premium': p.get('premium'),
-                'insurer': p.get('insurer'),
             }
-            pol = PD.create({k: v for k, v in pol_vals.items() if v is not None})
+            if p.get('amount') is not None:
+                pol_vals['amount'] = p['amount']
+            pol = PD.create(pol_vals)
 
-        ins = ID.search([('policy_id', '=', pol.id)], limit=1)    # adjust FK if needed
+        ins = ID.search([('policy_id', '=', pol.id), ('partner_id', '=', partner.id)], limit=1)
         if not ins:
             ins_vals = {
                 'policy_id': pol.id,
                 'partner_id': partner.id,
                 'employee_id': emp.id if emp else False,
+                # Common fields (adapt to your insurance.details)
+                'payment_type': p.get('payment_type') or 'fixed',
+                'policy_duration': p.get('policy_duration') or 12,
+                'policy_number': p.get('policy_number') or p.get('policy_no') or pol.name,
             }
-            ins = ID.create({k: v for k, v in ins_vals.items() if v})
+            ins = ID.create(ins_vals)
+            # If your model has a confirm action:
+            if hasattr(ins, 'action_confirm_insurance'):
+                try:
+                    ins.action_confirm_insurance()
+                except Exception:
+                    pass
+
         return pol, ins
 
-    def _create_invoice_linked_to_policy(self, company, partner, salesperson, line_cmds, narration_html, data, policy):
+    def _create_invoice_linked_to_insurance(
+        self, *, company, partner, salesperson, line_cmds, narration_html, data, insurance
+    ):
         """
-        Create & post invoice and link to policy.
-        Assumes account.move has a M2O 'policy_id' → policy.details.
+        Create & post invoice and link to insurance (preferred).
+        Assumes account.move has a M2O 'insurance_id' → insurance.details.
         """
         currency = self._find_currency(data.get("currency"))
         journal = self._find_journal(data.get("journal"), company_id=company.id)
@@ -274,7 +278,9 @@ class InvoicePocPayload(models.Model):
             "invoice_user_id": salesperson.id,
             "invoice_line_ids": line_cmds,
             "narration": narration_html or False,
-            "policy_id": policy.id if policy else False,  # <— adjust field if different
+            # Linkage
+            "insurance_id": insurance.id if insurance else False,
+            "invoice_origin": insurance.name if (insurance and insurance.name) else (data.get("ref") or "API"),
         }
         if data.get("ref"):
             move_vals["ref"] = data["ref"]
@@ -295,13 +301,48 @@ class InvoicePocPayload(models.Model):
         move.action_post()
         return move
 
+    # ---------------- handy serializer (optional) ----------------
+    @api.model
+    def _move_to_payload(self, move):
+        return {
+            "id": move.id,
+            "name": move.name,
+            "state": move.state,
+            "company": move.company_id.name,
+            "company_id": move.company_id.id,
+            "partner_id": move.partner_id.id,
+            "partner_name": move.partner_id.display_name,
+            "currency": move.currency_id.name,
+            "amount_untaxed": move.amount_untaxed,
+            "amount_tax": move.amount_tax,
+            "amount_total": move.amount_total,
+            "invoice_date": move.invoice_date and str(move.invoice_date) or None,
+            "due_date": move.invoice_date_due and str(move.invoice_date_due) or None,
+            "payment_term": move.invoice_payment_term_id and move.invoice_payment_term_id.name or None,
+            "payment_reference": move.payment_reference or None,
+            "ref": move.ref or None,
+            "invoice_user_id": move.invoice_user_id and move.invoice_user_id.id or None,
+            "invoice_user": move.invoice_user_id and move.invoice_user_id.login or None,
+            "backend_url": f"/odoo/action-account.action_move_out_invoice_type?res_id={move.id}&cids={move.company_id.id}",
+            "lines": [
+                {
+                    "name": l.name,
+                    "quantity": l.quantity,
+                    "price_unit": l.price_unit,
+                    "taxes": [t.name for t in l.tax_ids],
+                    "subtotal": l.price_subtotal,
+                }
+                for l in move.invoice_line_ids
+            ],
+        }
+
     # ---------------- main (policy-first) ----------------
     def action_create_policy_and_invoice(self):
         """
         Policy-first flow:
         1) ensure Policy (+ Insurance) from payload.policy
         2) ensure Customer/Employee
-        3) create & post invoice linked to policy
+        3) create & post invoice linked to insurance
         4) email to payload email (if provided)
         """
         self.ensure_one()
@@ -347,15 +388,15 @@ class InvoicePocPayload(models.Model):
         policy_payload = data.get("policy") or {}
         policy, insurance = self._find_or_create_policy(policy_payload, partner, emp)
 
-        # Create invoice linked to policy
-        move = self._create_invoice_linked_to_policy(
+        # Create invoice linked to insurance
+        move = self._create_invoice_linked_to_insurance(
             company=company,
             partner=partner,
             salesperson=salesperson,
             line_cmds=line_cmds,
             narration_html=narration_html,
             data=data,
-            policy=policy,
+            insurance=insurance,
         )
 
         # Email
@@ -379,7 +420,7 @@ class InvoicePocPayload(models.Model):
         if data.get('policy'):
             return self.action_create_policy_and_invoice()
 
-        # --- old invoice-only flow (exactly your previous logic) ---
+        # --- old invoice-only flow (same logic you had before) ---
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
