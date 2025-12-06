@@ -1,18 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- BOLD -->
   <template id="patch_external_layout_bold" inherit_id="web.external_layout_bold" priority="199">
-    <!-- Collapse original header -->
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
-    <!-- Insert our block at top of body -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
       <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
     </xpath>
-    <!-- Tighten spacing -->
     <xpath expr="/t" position="inside">
       <style>
         .o_report_layout_bold.article{margin-top:0!important;padding-top:0!important}
@@ -21,30 +17,6 @@
     </xpath>
   </template>
 
-  <!-- BUBBLE -->
-  <template id="patch_external_layout_bubble" inherit_id="web.external_layout_bubble" priority="199">
-    <!-- Collapse original header -->
-    <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout"
-           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
-    </xpath>
-    <!-- Replace the stock address band with our header block, then add a normal H2 title -->
-    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <t t-call="n4p_custom_invoice_header.n4p_header_block"/>
-      <h2 t-out="layout_document_title"/>
-    </xpath>
-    <!-- Bubble-specific tweaks -->
-    <xpath expr="/t" position="inside">
-      <style>
-        /* Hide Bubble’s overlay title safely */
-        .o_report_layout_bubble .o_bubble_title{display:none!important}
-        /* Compact spacing for the injected H2 */
-        .o_report_layout_bubble h2{margin:6px 0 8px 0!important}
-      </style>
-    </xpath>
-  </template>
-
-  <!-- FOLDER -->
   <template id="patch_external_layout_folder" inherit_id="web.external_layout_folder" priority="199">
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
@@ -61,7 +33,6 @@
     </xpath>
   </template>
 
-  <!-- STANDARD -->
   <template id="patch_external_layout_standard" inherit_id="web.external_layout_standard" priority="199">
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
@@ -78,7 +49,6 @@
     </xpath>
   </template>
 
-  <!-- STRIPED -->
   <template id="patch_external_layout_striped" inherit_id="web.external_layout_striped" priority="199">
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
@@ -95,7 +65,6 @@
     </xpath>
   </template>
 
-  <!-- WAVE -->
   <template id="patch_external_layout_wave" inherit_id="web.external_layout_wave" priority="199">
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
