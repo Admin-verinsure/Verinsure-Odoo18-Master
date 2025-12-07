@@ -103,7 +103,7 @@ class ChangePasswordUser(models.TransientModel):
 
 class LDAPResetController(http.Controller):
 
-    @http.route('/web/reset_ldap_password', type='http', auth='public', website=True, csrf=False)
+    @http.route('/web/Morris_reset_ldap_password', type='http', auth='public', website=True, csrf=False)
     def reset_ldap_password(self, **kwargs):
         """Two-phase LDAP password reset process using OTP."""
         env = api.Environment(http.request.cr, SUPERUSER_ID, {})
@@ -179,7 +179,7 @@ class LDAPResetController(http.Controller):
     @http.route('/web/reset_password', type='http', auth='public', website=True)
     def reset_password_redirect(self):
         """Redirect old route to new one."""
-        return request.redirect('/web/reset_ldap_password')
+        return request.redirect('/web/Morris_reset_ldap_password')
 
 
 # ---------------------------------------------------------------------------
