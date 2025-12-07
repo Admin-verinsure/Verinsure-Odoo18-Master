@@ -13,10 +13,10 @@ from odoo import registry as odoo_registry
 
 _logger = logging.getLogger(__name__)
 
+
 # ---------------------------------------------------------------------------
 # Async mail queue processor
 # ---------------------------------------------------------------------------
-
 def _kick_async_mail_send(db_name: str):
     """Run mail queue processing asynchronously."""
     def _runner():
@@ -42,7 +42,6 @@ def _kick_async_mail_send(db_name: str):
 # ---------------------------------------------------------------------------
 # Partner Extension
 # ---------------------------------------------------------------------------
-
 class ResPartner(models.Model):
     _inherit = 'res.partner'
     rotary_membership_id = fields.Char(string="Rotary ID")
@@ -51,7 +50,6 @@ class ResPartner(models.Model):
 # ---------------------------------------------------------------------------
 # Password Change Wizard
 # ---------------------------------------------------------------------------
-
 class ChangePasswordWizard(models.TransientModel):
     _name = 'change.password.wizard'
     _inherit = 'change.password.wizard'
@@ -98,9 +96,8 @@ class ChangePasswordUser(models.TransientModel):
 
 
 # ---------------------------------------------------------------------------
-# LDAP Reset Controller
+# LDAP Reset Controller  (FIXED)
 # ---------------------------------------------------------------------------
-
 class LDAPResetController(http.Controller):
 
     @http.route('/web/Morris_reset_ldap_password', type='http', auth='public', website=True, csrf=False)
@@ -116,46 +113,51 @@ class LDAPResetController(http.Controller):
             confirm = kwargs.get('confirm_password')
 
             if new_pwd != confirm:
-                return request.render('ldap_reset_password.template_otp_entry', {
+                return request.render('Morris_ldap_reset_password.template_otp_entry', {
                     'login': login,
                     'password_error': "Passwords do not match!"
                 })
 
             otp = env['otp'].sudo().search([('otp_code', '=', otp_code)], limit=1)
             if not otp:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "OTP not found."})
+                return request.render('Morris_ldap_reset_password.template_otp_entry', {
+                    'error_message': "OTP not found."
+                })
 
-            # --- EXPIRY CHECK: 10 minutes ---
             now_utc = fields.Datetime.now()
             if getattr(otp, 'expiration_time', False):
-                # If explicit expiration_time exists, it's expired when now > expiration_time
                 if now_utc > otp.expiration_time:
-                    return request.render('ldap_reset_password.template_otp_entry', {
+                    return request.render('Morris_ldap_reset_password.template_otp_entry', {
                         'error_message': "OTP expired. Please re-generate the OTP."
                     })
             else:
-                # Fallback to create_date + 10 minutes
                 if otp.create_date and now_utc > (otp.create_date + timedelta(minutes=10)):
-                    return request.render('ldap_reset_password.template_otp_entry', {
+                    return request.render('Morris_ldap_reset_password.template_otp_entry', {
                         'error_message': "OTP expired. Please re-generate the OTP."
                     })
-            # --- END EXPIRY CHECK ---
 
             user = env['res.users'].sudo().search([('login', '=', login)], limit=1)
             if not user or otp.user_id.id != user.id:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "Invalid user or OTP."})
+                return request.render('Morris_ldap_reset_password.template_otp_entry', {
+                    'error_message': "Invalid user or OTP."
+                })
 
             ldap_conf = env['res.company.ldap'].search([], limit=1)
             if not ldap_conf:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': "LDAP configuration missing."})
+                return request.render('Morris_ldap_reset_password.template_otp_entry', {
+                    'error_message': "LDAP configuration missing."
+                })
 
             changed, message = ldap_conf._change_password_admin_exceptions(ldap_conf, login, new_pwd)
             if not changed:
-                return request.render('ldap_reset_password.template_otp_entry', {'error_message': f"Password reset failed: {message}"})
+                return request.render('Morris_ldap_reset_password.template_otp_entry', {
+                    'error_message': f"Password reset failed: {message}"
+                })
 
             user.password = ''
             user.sudo()._set_password()
-            return request.render('ldap_reset_password.portal_thanks', {
+
+            return request.render('Morris_ldap_reset_password.template_otp', {
                 'message': f"Password reset successful for {login}."
             })
 
@@ -167,14 +169,23 @@ class LDAPResetController(http.Controller):
                 try:
                     user.sudo().action_reset_password()
                     _kick_async_mail_send(env.cr.dbname)
-                    return request.render('ldap_reset_password.template_otp_entry', {'login': login})
+                    return request.render('Morris_ldap_reset_password.template_otp_entry', {
+                        'login': login
+                    })
                 except Exception as e:
                     _logger.error("Error sending OTP: %s", e)
-                    return request.render('ldap_reset_password.template_contact_admin')
-            return request.render('ldap_reset_password.template_invalid_login')
+                    return request.render('Morris_ldap_reset_password.template_otp', {
+                        'message': "Error sending OTP — please contact admin."
+                    })
+
+            return request.render('Morris_ldap_reset_password.template_otp', {
+                'message': "Username not found."
+            })
 
         # Default initial page
-        return request.render('ldap_reset_password.template_otp', {'message': 'Enter your username to reset password.'})
+        return request.render('Morris_ldap_reset_password.template_otp', {
+            'message': 'Enter your username to reset password.'
+        })
 
     @http.route('/web/reset_password', type='http', auth='public', website=True)
     def reset_password_redirect(self):
@@ -185,7 +196,6 @@ class LDAPResetController(http.Controller):
 # ---------------------------------------------------------------------------
 # LDAP Model Extension
 # ---------------------------------------------------------------------------
-
 class CompanyLDAP(models.Model):
     _inherit = 'res.company.ldap'
 
@@ -216,6 +226,7 @@ class CompanyLDAP(models.Model):
             'ldap_server_port': conf.ldap_server_port,
             'ldap_tls': conf.ldap_tls,
         }
+
 
     def _get_entry(self, conf, login):
         confd = self._as_dict(conf)
