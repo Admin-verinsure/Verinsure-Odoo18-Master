@@ -4,7 +4,8 @@
         <field name="name">youth.volunteer.application.form</field>
         <field name="model">youth.volunteer.application</field>
         <field name="arch" type="xml">
-            <form string="Volunteer Application">
+            <form string="Volunteer Application" class="o_notebook_wizard">
+
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,reviewed"/>
                     <button name="action_submit" type="object" string="Submit" class="btn-primary"

@@ -13,10 +13,14 @@
         "views/portal_templates.xml",
     ],
     "assets": {
-        "web.assets_frontend": [
-            "775_youth_program_application/static/src/js/portal_form.js",
-        ],
-    },
+    "web.assets_backend": [
+        "775_youth_program_application/static/src/js/notebook_wizard.js",
+        "775_youth_program_application/static/src/scss/notebook_wizard.scss",
+        "775_youth_program_application/static/src/js/portal_form.js",
+        
+    ],
+},
+
     "application": True,
     "installable": True
 }
