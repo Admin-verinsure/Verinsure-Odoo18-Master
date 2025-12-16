@@ -10,6 +10,7 @@
                     <button name="action_submit" type="object" string="Submit" class="btn-primary"
                             attrs="{'invisible':[('state','!=','draft')]}"/>
                 </header>
+
                 <sheet>
                     <group>
                         <field name="partner_id"/>
@@ -20,6 +21,7 @@
                     </group>
 
                     <notebook>
+
                         <page string="1A - Applicant">
                             <group>
                                 <field name="address_line1"/>
@@ -50,13 +52,22 @@
                                 <field name="youth_volunteer_history"/>
                                 <separator string="References"/>
                                 <group>
-                                    <field name="ref1_name"/><field name="ref1_relationship"/><field name="ref1_phone"/><field name="ref1_email"/>
+                                    <field name="ref1_name"/>
+                                    <field name="ref1_relationship"/>
+                                    <field name="ref1_phone"/>
+                                    <field name="ref1_email"/>
                                 </group>
                                 <group>
-                                    <field name="ref2_name"/><field name="ref2_relationship"/><field name="ref2_phone"/><field name="ref2_email"/>
+                                    <field name="ref2_name"/>
+                                    <field name="ref2_relationship"/>
+                                    <field name="ref2_phone"/>
+                                    <field name="ref2_email"/>
                                 </group>
                                 <group>
-                                    <field name="ref3_name"/><field name="ref3_relationship"/><field name="ref3_phone"/><field name="ref3_email"/>
+                                    <field name="ref3_name"/>
+                                    <field name="ref3_relationship"/>
+                                    <field name="ref3_phone"/>
+                                    <field name="ref3_email"/>
                                 </group>
                                 <field name="qualifications_training"/>
                                 <field name="homestay_confirmation_ack"/>
@@ -89,16 +100,14 @@
                         </page>
 
                         <page string="Privacy (1B - Internal)">
-                            <!-- Use comodel view explicitly to avoid field validation against parent -->
-                            <field name="privacy_id" nolabel="1" readonly="1" context="{'default_application_id': active_id}">
-                                <tree string="Privacy Records">
-                                    <field name="rotary_member"/>
-                                    <field name="club_name_year_joined"/>
-                                    <field name="criminal_q1"/>
-                                    <field name="criminal_q2"/>
-                                </tree>
-                            </field>
+                            <!-- Do NOT inline a tree here. Let Odoo pick the comodel views we defined. -->
+                            <field name="privacy_id"
+                                   nolabel="1"
+                                   readonly="1"
+                                   context="{'default_application_id': active_id}"
+                                   mode="tree,form"/>
                         </page>
+
                     </notebook>
                 </sheet>
             </form>
@@ -151,7 +160,9 @@
                     <group string="Criminal History">
                         <field name="criminal_q1"/>
                         <field name="criminal_q2"/>
-                        <field name="criminal_explain" attrs="{'invisible':[('criminal_q1','=',False),('criminal_q2','=',False)]}"/>
+                        <!-- Invisible only when both are false -->
+                        <field name="criminal_explain"
+                               attrs="{'invisible':[('criminal_q1','=',False),('criminal_q2','=',False)]}"/>
                     </group>
                 </sheet>
             </form>
@@ -165,6 +176,9 @@
     </record>
 
     <menuitem id="menu_youth_root" name="Youth Programs" sequence="10" groups="base.group_user"/>
-    <menuitem id="menu_youth_volunteer_applications" name="Volunteer Applications" parent="menu_youth_root"
-              action="action_youth_volunteer_applications" sequence="20" groups="base.group_user"/>
+    <menuitem id="menu_youth_volunteer_applications" name="Volunteer Applications"
+              parent="menu_youth_root"
+              action="action_youth_volunteer_applications"
+              sequence="20"
+              groups="base.group_user"/>
 </odoo>
