@@ -1,10 +1,13 @@
 /** @odoo-module **/
 
-import { patch } from "@web/core/utils/patch";
 import { FormRenderer } from "@web/views/form/form_renderer";
+import { patch } from "@web/core/utils/patch";
 import { onMounted, onPatched } from "@odoo/owl";
 
-// 1. Helper function remains the same
+/**
+ * Helper function to create the wizard buttons.
+ * This remains mostly the same, but kept clean for Odoo 18.
+ */
 function ensureWizardNav(rootEl) {
   const notebook = rootEl.querySelector(".o_notebook");
   if (!notebook) return;
@@ -14,29 +17,30 @@ function ensureWizardNav(rootEl) {
   );
   if (!headerLinks.length) return;
 
-  // prevent duplicate
+  // Prevent duplicates
   if (rootEl.querySelector(".o_wizard_nav")) return;
 
+  // Create container
   const nav = document.createElement("div");
   nav.className = "o_wizard_nav";
 
+  // Create Buttons
   const prevBtn = document.createElement("button");
-  prevBtn.type = "button";
-  prevBtn.className = "btn btn-secondary";
+  prevBtn.classList.add("btn", "btn-secondary");
   prevBtn.textContent = "Previous";
 
   const nextBtn = document.createElement("button");
-  nextBtn.type = "button";
-  nextBtn.className = "btn btn-primary";
+  nextBtn.classList.add("btn", "btn-primary");
   nextBtn.textContent = "Next";
 
   nav.appendChild(prevBtn);
   nav.appendChild(nextBtn);
 
+  // Append to sheet or root
   const sheet = rootEl.querySelector(".o_form_sheet");
-  // Fallback to rootEl if sheet not found (e.g. dialogs)
   (sheet || rootEl).appendChild(nav);
 
+  // Navigation Logic
   const getLinks = () =>
     notebook.querySelectorAll(".o_notebook_headers .nav-link");
 
@@ -51,9 +55,10 @@ function ensureWizardNav(rootEl) {
 
   const goTo = (idx) => {
     const links = Array.from(getLinks());
-    if (idx < 0 || idx >= links.length) return;
-    links[idx].click();
-    updateButtons();
+    if (idx >= 0 && idx < links.length) {
+      links[idx].click();
+      updateButtons();
+    }
   };
 
   const updateButtons = () => {
@@ -63,21 +68,24 @@ function ensureWizardNav(rootEl) {
     nextBtn.disabled = idx >= links.length - 1;
   };
 
-  prevBtn.addEventListener("click", () => goTo(getActiveIndex() - 1));
-  nextBtn.addEventListener("click", () => goTo(getActiveIndex() + 1));
+  prevBtn.onclick = () => goTo(getActiveIndex() - 1);
+  nextBtn.onclick = () => goTo(getActiveIndex() + 1);
 
   updateButtons();
 }
 
-// 2. Patch the Class (FormRenderer), NOT the prototype
-patch(FormRenderer, "775_youth_program_application.notebook_wizard", {
+/**
+ * PATCHING FOR ODOO 18
+ * 1. Target: FormRenderer.prototype
+ * 2. Arguments: Only 2 (Target, Methods) - DO NOT pass a string ID.
+ * 3. Super: Use super.setup()
+ */
+patch(FormRenderer.prototype, {
   setup() {
-    // 3. REMOVED: this._super(...arguments);
-    // OWL setup methods run in parallel, no super call needed.
+    super.setup(); // Correct Odoo 18 super call
 
     const run = () => {
-      // Ensure this.el exists (it does in onMounted/onPatched)
-      // Check specifically for your wizard class to avoid affecting all forms
+      // Check if this specific form is a wizard
       if (this.el && this.el.classList.contains("o_notebook_wizard")) {
         ensureWizardNav(this.el);
       }
