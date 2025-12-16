@@ -2,10 +2,10 @@
 
 import { patch } from "@web/core/utils/patch";
 import { FormRenderer } from "@web/views/form/form_renderer";
+import { onMounted, onPatched } from "@odoo/owl";
 
-function _ensureWizardNav(el) {
-  // Find the notebook headers and pages
-  const notebook = el.querySelector(".o_notebook");
+function ensureWizardNav(rootEl) {
+  const notebook = rootEl.querySelector(".o_notebook");
   if (!notebook) return;
 
   const headerLinks = notebook.querySelectorAll(
@@ -13,10 +13,9 @@ function _ensureWizardNav(el) {
   );
   if (!headerLinks.length) return;
 
-  // Prevent duplicate nav
-  if (el.querySelector(".o_wizard_nav")) return;
+  // prevent duplicate
+  if (rootEl.querySelector(".o_wizard_nav")) return;
 
-  // Create nav container
   const nav = document.createElement("div");
   nav.className = "o_wizard_nav";
 
@@ -33,29 +32,33 @@ function _ensureWizardNav(el) {
   nav.appendChild(prevBtn);
   nav.appendChild(nextBtn);
 
-  // Put buttons at end of sheet (nice UX)
-  const sheet = el.querySelector(".o_form_sheet");
-  (sheet || el).appendChild(nav);
+  const sheet = rootEl.querySelector(".o_form_sheet");
+  (sheet || rootEl).appendChild(nav);
+
+  const getLinks = () =>
+    notebook.querySelectorAll(".o_notebook_headers .nav-link");
 
   const getActiveIndex = () => {
+    const links = Array.from(getLinks());
     const active = notebook.querySelector(
       ".o_notebook_headers .nav-link.active"
     );
-    if (!active) return 0;
-    return Array.from(headerLinks).indexOf(active);
+    const idx = links.indexOf(active);
+    return idx < 0 ? 0 : idx;
   };
 
   const goTo = (idx) => {
-    const links = notebook.querySelectorAll(".o_notebook_headers .nav-link");
+    const links = Array.from(getLinks());
     if (idx < 0 || idx >= links.length) return;
-    links[idx].click(); // Switch page (works even if headers are hidden)
+    links[idx].click();
     updateButtons();
   };
 
   const updateButtons = () => {
     const idx = getActiveIndex();
+    const links = getLinks();
     prevBtn.disabled = idx <= 0;
-    nextBtn.disabled = idx >= headerLinks.length - 1;
+    nextBtn.disabled = idx >= links.length - 1;
   };
 
   prevBtn.addEventListener("click", () => goTo(getActiveIndex() - 1));
@@ -65,16 +68,16 @@ function _ensureWizardNav(el) {
 }
 
 patch(FormRenderer.prototype, "775_youth_program_application.notebook_wizard", {
-  mounted() {
+  setup() {
     this._super(...arguments);
-    if (this.el?.classList?.contains("o_notebook_wizard")) {
-      _ensureWizardNav(this.el);
-    }
-  },
-  patched() {
-    this._super(...arguments);
-    if (this.el?.classList?.contains("o_notebook_wizard")) {
-      _ensureWizardNav(this.el);
-    }
+
+    const run = () => {
+      if (this.el && this.el.classList.contains("o_notebook_wizard")) {
+        ensureWizardNav(this.el);
+      }
+    };
+
+    onMounted(run);
+    onPatched(run);
   },
 });
