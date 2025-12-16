@@ -8,7 +8,18 @@
 
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,reviewed"/>
-                    <button name="action_submit" type="object" string="Submit" class="btn-primary"
+
+                    <!-- Backend stepper (draft only) -->
+                    <field name="form_step" widget="statusbar"
+                           statusbar_visible="step_1a,step_1b,step_homestay,step_1c,step_2e"
+                           invisible="state != 'draft'"/>
+
+                    <button name="action_prev_step" type="object" string="Previous" class="btn-secondary"
+                            invisible="state != 'draft' or form_step == 'step_1a'"/>
+                    <button name="action_next_step" type="object" string="Next" class="btn-primary"
+                            invisible="state != 'draft'"/>
+
+                    <button name="action_submit" type="object" string="Submit" class="btn-success"
                             invisible="state != 'draft'"/>
                 </header>
 
@@ -21,98 +32,94 @@
                         <field name="mobile"/>
                     </group>
 
-                    <notebook>
+                    <!-- STEP 1A ------------------------------------------------------- -->
+                    <group string="1A - Applicant" invisible="form_step != 'step_1a'">
+                        <field name="address_line1"/>
+                        <field name="address_line2"/>
+                        <field name="city"/>
+                        <field name="region"/>
+                        <field name="postal_code"/>
+                        <field name="how_long_at_address"/>
+                        <field name="previous_addresses_notes"/>
+                        <field name="date_of_birth"/>
+                        <field name="id_provided"/>
+                        <field name="id_number"/>
+                        <field name="consent_ack"/>
+                        <field name="waiver_ack"/>
+                        <field name="applicant_signature_name"/>
+                        <field name="applicant_signed_on"/>
+                    </group>
 
-                        <page string="1A - Applicant">
+                    <!-- STEP 1B ------------------------------------------------------- -->
+                    <group string="1B - Privacy (Internal)" invisible="form_step != 'step_1b'" groups="base.group_user">
+                        <field name="privacy_id"
+                               nolabel="1"
+                               readonly="1"
+                               context="{'default_application_id': id}"
+                               mode="list,form"/>
+                    </group>
+
+                    <!-- STEP 2B-2D (conditional) -------------------------------------- -->
+                    <group string="Home Stay (2B-2D)" invisible="form_step != 'step_homestay'">
+                        <field name="is_homestay_volunteer"/>
+
+                        <group invisible="not is_homestay_volunteer">
+                            <field name="employment_current"/>
+                            <field name="employment_previous"/>
+                            <field name="rotary_youth_program_history"/>
+                            <field name="youth_volunteer_history"/>
+                            <separator string="References"/>
+
                             <group>
-                                <field name="address_line1"/>
-                                <field name="address_line2"/>
-                                <field name="city"/>
-                                <field name="region"/>
-                                <field name="postal_code"/>
-                                <field name="how_long_at_address"/>
-                                <field name="previous_addresses_notes"/>
-                                <field name="date_of_birth"/>
-                                <field name="id_provided"/>
-                                <field name="id_number"/>
-                                <field name="consent_ack"/>
-                                <field name="waiver_ack"/>
-                                <field name="applicant_signature_name"/>
-                                <field name="applicant_signed_on"/>
+                                <field name="ref1_name"/>
+                                <field name="ref1_relationship"/>
+                                <field name="ref1_phone"/>
+                                <field name="ref1_email"/>
                             </group>
-                        </page>
-
-                        <page string="Home Stay (2B-2D)">
                             <group>
-                                <field name="is_homestay_volunteer"/>
+                                <field name="ref2_name"/>
+                                <field name="ref2_relationship"/>
+                                <field name="ref2_phone"/>
+                                <field name="ref2_email"/>
                             </group>
-
-                            <group invisible="not is_homestay_volunteer">
-                                <field name="employment_current"/>
-                                <field name="employment_previous"/>
-                                <field name="rotary_youth_program_history"/>
-                                <field name="youth_volunteer_history"/>
-                                <separator string="References"/>
-
-                                <group>
-                                    <field name="ref1_name"/>
-                                    <field name="ref1_relationship"/>
-                                    <field name="ref1_phone"/>
-                                    <field name="ref1_email"/>
-                                </group>
-                                <group>
-                                    <field name="ref2_name"/>
-                                    <field name="ref2_relationship"/>
-                                    <field name="ref2_phone"/>
-                                    <field name="ref2_email"/>
-                                </group>
-                                <group>
-                                    <field name="ref3_name"/>
-                                    <field name="ref3_relationship"/>
-                                    <field name="ref3_phone"/>
-                                    <field name="ref3_email"/>
-                                </group>
-
-                                <field name="qualifications_training"/>
-                                <field name="homestay_confirmation_ack"/>
-                                <field name="homestay_signature_name"/>
-                                <field name="homestay_signed_on"/>
-                            </group>
-                        </page>
-
-                        <page string="1C - Sponsor">
                             <group>
-                                <field name="sponsor_name"/>
-                                <field name="sponsor_club"/>
-                                <field name="sponsor_years_known"/>
-                                <field name="sponsor_role"/>
-                                <field name="sponsor_role_other" invisible="sponsor_role != 'other'"/>
-                                <field name="sponsor_signature_name"/>
-                                <field name="sponsor_signed_on"/>
+                                <field name="ref3_name"/>
+                                <field name="ref3_relationship"/>
+                                <field name="ref3_phone"/>
+                                <field name="ref3_email"/>
                             </group>
-                        </page>
 
-                        <page string="2E - District Use Only">
-                            <group>
-                                <field name="district_police_check"/>
-                                <field name="district_reference_checks"/>
-                                <field name="district_home_visit"/>
-                                <field name="district_notes"/>
-                                <field name="district_signed_by"/>
-                                <field name="district_signed_on"/>
-                            </group>
-                        </page>
+                            <field name="qualifications_training"/>
+                            <field name="homestay_confirmation_ack"/>
+                            <field name="homestay_signature_name"/>
+                            <field name="homestay_signed_on"/>
+                        </group>
 
-                        <!-- Privacy page: internal only -->
-                        <page string="Privacy (1B - Internal)" groups="base.group_user">
-                            <field name="privacy_id"
-                                   nolabel="1"
-                                   readonly="1"
-                                   context="{'default_application_id': id}"
-                                   mode="list,form"/>
-                        </page>
+                        <div class="text-muted" invisible="is_homestay_volunteer">
+                            Home Stay sections are skipped because “Home Stay volunteer” is not checked.
+                        </div>
+                    </group>
 
-                    </notebook>
+                    <!-- STEP 1C ------------------------------------------------------- -->
+                    <group string="1C - Sponsor" invisible="form_step != 'step_1c'">
+                        <field name="sponsor_name"/>
+                        <field name="sponsor_club"/>
+                        <field name="sponsor_years_known"/>
+                        <field name="sponsor_role"/>
+                        <field name="sponsor_role_other" invisible="sponsor_role != 'other'"/>
+                        <field name="sponsor_signature_name"/>
+                        <field name="sponsor_signed_on"/>
+                    </group>
+
+                    <!-- STEP 2E ------------------------------------------------------- -->
+                    <group string="2E - District Use Only" invisible="form_step != 'step_2e'">
+                        <field name="district_police_check"/>
+                        <field name="district_reference_checks"/>
+                        <field name="district_home_visit"/>
+                        <field name="district_notes"/>
+                        <field name="district_signed_by"/>
+                        <field name="district_signed_on"/>
+                    </group>
                 </sheet>
             </form>
         </field>

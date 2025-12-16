@@ -13,6 +13,65 @@ class YouthVolunteerApplication(models.Model):
         ("reviewed", "Reviewed"),
     ], default="draft", tracking=True, index=True)
 
+    # ------------------------------------------------------------
+    # UI Flow (Backend Stepper)
+    # ------------------------------------------------------------
+    # Odoo 17+ removed legacy attrs/states from views. To provide a
+    # "Next/Previous" experience in the backend, we store the current
+    # step on the record and use the new inline expressions for
+    # invisibility.
+    form_step = fields.Selection([
+        ("step_1a", "1A - Applicant"),
+        ("step_1b", "1B - Privacy"),
+        ("step_2b2d", "Home Stay (2B-2D)"),
+        ("step_1c", "1C - Sponsor"),
+        ("step_2e", "2E - District Use Only"),
+    ], default="step_1a", copy=False, tracking=False, index=True)
+
+    def _step_sequence(self):
+        """Return ordered steps; homestay step is optional."""
+        self.ensure_one()
+        steps = ["step_1a", "step_1b"]
+        if self.is_homestay_volunteer:
+            steps.append("step_2b2d")
+        steps += ["step_1c", "step_2e"]
+        return steps
+
+    def action_next_step(self):
+        for rec in self:
+            if rec.state != "draft":
+                continue
+            seq = rec._step_sequence()
+            try:
+                idx = seq.index(rec.form_step or "step_1a")
+            except ValueError:
+                idx = 0
+            if idx < len(seq) - 1:
+                rec.form_step = seq[idx + 1]
+        return True
+
+    def action_prev_step(self):
+        for rec in self:
+            if rec.state != "draft":
+                continue
+            seq = rec._step_sequence()
+            try:
+                idx = seq.index(rec.form_step or "step_1a")
+            except ValueError:
+                idx = 0
+            if idx > 0:
+                rec.form_step = seq[idx - 1]
+        return True
+
+    def action_go_to_step(self, step):
+        """Optional helper if you ever want to jump steps from buttons."""
+        self.ensure_one()
+        if self.state != "draft":
+            return True
+        if step in self._step_sequence():
+            self.form_step = step
+        return True
+
     # -----------------------------
     # SECTION 1A - Required for all
     # -----------------------------
