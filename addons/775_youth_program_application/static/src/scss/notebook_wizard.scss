@@ -1,0 +1,15 @@
+/* Hide notebook tabs when wizard mode is enabled */
+.o_form_view.o_notebook_wizard {
+  .o_notebook_headers {
+    display: none !important;
+  }
+
+  .o_wizard_nav {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 0 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 16px;
+  }
+}
