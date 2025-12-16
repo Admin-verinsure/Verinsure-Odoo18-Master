@@ -1,5 +1,4 @@
 <odoo>
-    <!-- Internal backend views for admins/district staff -->
     <record id="view_youth_volunteer_application_form" model="ir.ui.view">
         <field name="name">youth.volunteer.application.form</field>
         <field name="model">youth.volunteer.application</field>
@@ -9,7 +8,6 @@
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,reviewed"/>
 
-                    <!-- Backend stepper (draft only) -->
                     <field name="form_step" widget="statusbar"
                            statusbar_visible="step_1a,step_1b,step_homestay,step_1c,step_2e"
                            invisible="state != 'draft'"/>
@@ -32,7 +30,6 @@
                         <field name="mobile"/>
                     </group>
 
-                    <!-- STEP 1A ------------------------------------------------------- -->
                     <group string="1A - Applicant" invisible="form_step != 'step_1a'">
                         <field name="address_line1"/>
                         <field name="address_line2"/>
@@ -50,7 +47,6 @@
                         <field name="applicant_signed_on"/>
                     </group>
 
-                    <!-- STEP 1B ------------------------------------------------------- -->
                     <group string="1B - Privacy (Internal)" invisible="form_step != 'step_1b'" groups="base.group_user">
                         <field name="privacy_id"
                                nolabel="1"
@@ -59,7 +55,6 @@
                                mode="list,form"/>
                     </group>
 
-                    <!-- STEP 2B-2D (conditional) -------------------------------------- -->
                     <group string="Home Stay (2B-2D)" invisible="form_step != 'step_homestay'">
                         <field name="is_homestay_volunteer"/>
 
@@ -100,7 +95,6 @@
                         </div>
                     </group>
 
-                    <!-- STEP 1C ------------------------------------------------------- -->
                     <group string="1C - Sponsor" invisible="form_step != 'step_1c'">
                         <field name="sponsor_name"/>
                         <field name="sponsor_club"/>
@@ -111,7 +105,6 @@
                         <field name="sponsor_signed_on"/>
                     </group>
 
-                    <!-- STEP 2E ------------------------------------------------------- -->
                     <group string="2E - District Use Only" invisible="form_step != 'step_2e'">
                         <field name="district_police_check"/>
                         <field name="district_reference_checks"/>
@@ -125,7 +118,6 @@
         </field>
     </record>
 
-    <!-- Application list view (Odoo 17+ uses <list>, not <tree>) -->
     <record id="view_youth_volunteer_application_tree" model="ir.ui.view">
         <field name="name">youth.volunteer.application.tree</field>
         <field name="model">youth.volunteer.application</field>
@@ -140,7 +132,6 @@
         </field>
     </record>
 
-    <!-- Privacy model internal views -->
     <record id="view_youth_volunteer_privacy_tree" model="ir.ui.view">
         <field name="name">youth.volunteer.application.privacy.tree</field>
         <field name="model">youth.volunteer.application.privacy</field>
