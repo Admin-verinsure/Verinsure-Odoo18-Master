@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 from odoo import http
 from odoo.http import request
 import base64
+
 
 class YouthVolunteerPortal(http.Controller):
 
@@ -18,6 +20,7 @@ class YouthVolunteerPortal(http.Controller):
         return app
 
     def _get_or_create_privacy(self, app):
+        # Privacy is internal-only model; use sudo for create/write from portal route
         Privacy = request.env["youth.volunteer.application.privacy"].sudo()
         priv = Privacy.search([("application_id", "=", app.id)], limit=1)
         if not priv:
@@ -39,7 +42,7 @@ class YouthVolunteerPortal(http.Controller):
         if app.state != "draft":
             return request.redirect("/my/volunteer-application")
 
-        # Record rules also enforce write only in draft for portal users.
+        # Main application values
         vals = {
             "position_applied_for": post.get("position_applied_for") or False,
             "full_name": post.get("full_name") or False,
@@ -72,10 +75,12 @@ class YouthVolunteerPortal(http.Controller):
             "ref1_relationship": post.get("ref1_relationship") or False,
             "ref1_phone": post.get("ref1_phone") or False,
             "ref1_email": post.get("ref1_email") or False,
+
             "ref2_name": post.get("ref2_name") or False,
             "ref2_relationship": post.get("ref2_relationship") or False,
             "ref2_phone": post.get("ref2_phone") or False,
             "ref2_email": post.get("ref2_email") or False,
+
             "ref3_name": post.get("ref3_name") or False,
             "ref3_relationship": post.get("ref3_relationship") or False,
             "ref3_phone": post.get("ref3_phone") or False,
@@ -96,7 +101,7 @@ class YouthVolunteerPortal(http.Controller):
         }
         app.write(vals)
 
-        # Privacy record is sudo + locked from portal read; but portal can submit it here
+        # Privacy values (Section 1B) - stored in separate model with sudo
         priv = self._get_or_create_privacy(app)
         priv_vals = {
             "rotary_member": True if post.get("rotary_member") else False,
@@ -108,17 +113,17 @@ class YouthVolunteerPortal(http.Controller):
             "criminal_explain": post.get("criminal_explain") or False,
         }
 
-        # Handle CV upload (optional)
-upload = request.httprequest.files.get("cv_file")
-if upload and getattr(upload, "filename", ""):
-    data = upload.read()  # bytes
-    if data:
-        attachment = request.env["ir.attachment"].sudo().create({
-            "name": upload.filename,
-            "datas": base64.b64encode(data),
-            "mimetype": getattr(upload, "mimetype", "application/octet-stream"),
-        })
-        priv_vals["cv_attachment_id"] = attachment.id
+        # CV upload (optional)
+        upload = request.httprequest.files.get("cv_file")
+        if upload and getattr(upload, "filename", ""):
+            data = upload.read()  # bytes
+            if data:
+                attachment = request.env["ir.attachment"].sudo().create({
+                    "name": upload.filename,
+                    "datas": base64.b64encode(data),
+                    "mimetype": getattr(upload, "mimetype", "application/octet-stream"),
+                })
+                priv_vals["cv_attachment_id"] = attachment.id
 
         priv.write(priv_vals)
 
