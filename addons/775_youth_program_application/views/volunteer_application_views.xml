@@ -99,12 +99,12 @@
                             </group>
                         </page>
 
-                        <page string="Privacy (1B - Internal)">
-                            <!-- Do NOT inline a tree here. Let Odoo pick the comodel views we defined. -->
+                        <!-- ✅ FIXED PRIVACY PAGE -->
+                        <page string="Privacy (1B - Internal)" groups="base.group_user">
                             <field name="privacy_id"
                                    nolabel="1"
                                    readonly="1"
-                                   context="{'default_application_id': active_id}"
+                                   context="{'default_application_id': id}"
                                    mode="tree,form"/>
                         </page>
 
@@ -160,7 +160,6 @@
                     <group string="Criminal History">
                         <field name="criminal_q1"/>
                         <field name="criminal_q2"/>
-                        <!-- Invisible only when both are false -->
                         <field name="criminal_explain"
                                attrs="{'invisible':[('criminal_q1','=',False),('criminal_q2','=',False)]}"/>
                     </group>
