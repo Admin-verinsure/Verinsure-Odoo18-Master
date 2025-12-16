@@ -19,7 +19,8 @@ Custom signup flow for Rotary users:
         'auth_signup',
         'auth_ldap',             
         'website',
-        'rotary_project_map',     
+        'rotary_project_map', 
+        'ldap_reset_password',    
     ],
     'data': [
         'views/signup_template.xml',
