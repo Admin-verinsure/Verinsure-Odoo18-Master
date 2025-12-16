@@ -18,7 +18,7 @@
         <form action="/my/volunteer-application/save" method="post" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
-          <h4 class="mt-3">Section 1A — Application & Assurances (required)</h4>
+          <h4 class="mt-3">Section 1A — Application &amp; Assurances (required)</h4>
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Position applied for</label>
@@ -172,7 +172,7 @@
 
           <hr class="my-4"/>
 
-          <h4>Consent & Waiver</h4>
+          <h4>Consent &amp; Waiver</h4>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" id="consent_ack" name="consent_ack"
                    t-att-checked="app.consent_ack and 'checked' or None"
