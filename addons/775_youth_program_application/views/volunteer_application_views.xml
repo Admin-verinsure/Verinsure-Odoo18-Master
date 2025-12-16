@@ -108,7 +108,7 @@
                                    nolabel="1"
                                    readonly="1"
                                    context="{'default_application_id': id}"
-                                   mode="tree,form"/>
+                                   mode="list,form"/>
                         </page>
 
                     </notebook>
@@ -117,17 +117,18 @@
         </field>
     </record>
 
+    <!-- Application list view (Odoo 17+ uses <list>, not <tree>) -->
     <record id="view_youth_volunteer_application_tree" model="ir.ui.view">
         <field name="name">youth.volunteer.application.tree</field>
         <field name="model">youth.volunteer.application</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="full_name"/>
                 <field name="partner_id"/>
                 <field name="state"/>
                 <field name="is_homestay_volunteer"/>
                 <field name="applicant_signed_on"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -136,13 +137,13 @@
         <field name="name">youth.volunteer.application.privacy.tree</field>
         <field name="model">youth.volunteer.application.privacy</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="application_id"/>
                 <field name="rotary_member"/>
                 <field name="club_name_year_joined"/>
                 <field name="criminal_q1"/>
                 <field name="criminal_q2"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -164,7 +165,6 @@
                     <group string="Criminal History">
                         <field name="criminal_q1"/>
                         <field name="criminal_q2"/>
-                        <!-- show only if at least one is true -->
                         <field name="criminal_explain"
                                invisible="not criminal_q1 and not criminal_q2"/>
                     </group>
@@ -176,7 +176,7 @@
     <record id="action_youth_volunteer_applications" model="ir.actions.act_window">
         <field name="name">Volunteer Applications</field>
         <field name="res_model">youth.volunteer.application</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <menuitem id="menu_youth_root" name="Youth Programs" sequence="10" groups="base.group_user"/>
