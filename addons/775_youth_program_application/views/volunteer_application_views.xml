@@ -89,8 +89,9 @@
                         </page>
 
                         <page string="Privacy (1B - Internal)">
-                            <field name="privacy_id" readonly="1">
-                                <tree>
+                            <!-- Use comodel view explicitly to avoid field validation against parent -->
+                            <field name="privacy_id" nolabel="1" readonly="1" context="{'default_application_id': active_id}">
+                                <tree string="Privacy Records">
                                     <field name="rotary_member"/>
                                     <field name="club_name_year_joined"/>
                                     <field name="criminal_q1"/>
@@ -115,6 +116,45 @@
                 <field name="is_homestay_volunteer"/>
                 <field name="applicant_signed_on"/>
             </tree>
+        </field>
+    </record>
+
+    <!-- Privacy model internal views -->
+    <record id="view_youth_volunteer_privacy_tree" model="ir.ui.view">
+        <field name="name">youth.volunteer.application.privacy.tree</field>
+        <field name="model">youth.volunteer.application.privacy</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="application_id"/>
+                <field name="rotary_member"/>
+                <field name="club_name_year_joined"/>
+                <field name="criminal_q1"/>
+                <field name="criminal_q2"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_youth_volunteer_privacy_form" model="ir.ui.view">
+        <field name="name">youth.volunteer.application.privacy.form</field>
+        <field name="model">youth.volunteer.application.privacy</field>
+        <field name="arch" type="xml">
+            <form string="Volunteer Privacy (1B)">
+                <sheet>
+                    <group>
+                        <field name="application_id"/>
+                        <field name="rotary_member"/>
+                        <field name="club_name_year_joined"/>
+                        <field name="linkedin_profile"/>
+                        <field name="facebook_profile"/>
+                        <field name="cv_attachment_id"/>
+                    </group>
+                    <group string="Criminal History">
+                        <field name="criminal_q1"/>
+                        <field name="criminal_q2"/>
+                        <field name="criminal_explain" attrs="{'invisible':[('criminal_q1','=',False),('criminal_q2','=',False)]}"/>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 

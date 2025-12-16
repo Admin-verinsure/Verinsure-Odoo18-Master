@@ -109,16 +109,16 @@ class YouthVolunteerPortal(http.Controller):
         }
 
         # Handle CV upload (optional)
-        upload = request.httprequest.files.get("cv_file")
-        if upload and upload.filename:
-            upload.stream.seek(0)
-            data = upload.read()
-            attachment = request.env["ir.attachment"].sudo().create({
-                "name": upload.filename,
-                "datas": base64.b64encode(data),
-                "mimetype": upload.mimetype,
-            })
-            priv_vals["cv_attachment_id"] = attachment.id
+upload = request.httprequest.files.get("cv_file")
+if upload and getattr(upload, "filename", ""):
+    data = upload.read()  # bytes
+    if data:
+        attachment = request.env["ir.attachment"].sudo().create({
+            "name": upload.filename,
+            "datas": base64.b64encode(data),
+            "mimetype": getattr(upload, "mimetype", "application/octet-stream"),
+        })
+        priv_vals["cv_attachment_id"] = attachment.id
 
         priv.write(priv_vals)
 
