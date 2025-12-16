@@ -17,6 +17,6 @@
             "775_youth_program_application/static/src/js/portal_form.js",
         ],
     },
-    "application": False,
+    "application": True,
     "installable": True
 }
