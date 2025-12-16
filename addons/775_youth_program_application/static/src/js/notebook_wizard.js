@@ -4,6 +4,7 @@ import { patch } from "@web/core/utils/patch";
 import { FormRenderer } from "@web/views/form/form_renderer";
 import { onMounted, onPatched } from "@odoo/owl";
 
+// 1. Helper function remains the same
 function ensureWizardNav(rootEl) {
   const notebook = rootEl.querySelector(".o_notebook");
   if (!notebook) return;
@@ -33,6 +34,7 @@ function ensureWizardNav(rootEl) {
   nav.appendChild(nextBtn);
 
   const sheet = rootEl.querySelector(".o_form_sheet");
+  // Fallback to rootEl if sheet not found (e.g. dialogs)
   (sheet || rootEl).appendChild(nav);
 
   const getLinks = () =>
@@ -67,11 +69,15 @@ function ensureWizardNav(rootEl) {
   updateButtons();
 }
 
-patch(FormRenderer.prototype, "775_youth_program_application.notebook_wizard", {
+// 2. Patch the Class (FormRenderer), NOT the prototype
+patch(FormRenderer, "775_youth_program_application.notebook_wizard", {
   setup() {
-    this._super(...arguments);
+    // 3. REMOVED: this._super(...arguments);
+    // OWL setup methods run in parallel, no super call needed.
 
     const run = () => {
+      // Ensure this.el exists (it does in onMounted/onPatched)
+      // Check specifically for your wizard class to avoid affecting all forms
       if (this.el && this.el.classList.contains("o_notebook_wizard")) {
         ensureWizardNav(this.el);
       }
