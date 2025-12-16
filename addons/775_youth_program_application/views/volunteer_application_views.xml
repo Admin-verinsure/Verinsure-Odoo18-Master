@@ -8,7 +8,7 @@
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,reviewed"/>
                     <button name="action_submit" type="object" string="Submit" class="btn-primary"
-                            attrs="{'invisible':[('state','!=','draft')]}"/>
+                            invisible="state != 'draft'"/>
                 </header>
 
                 <sheet>
@@ -45,12 +45,14 @@
                             <group>
                                 <field name="is_homestay_volunteer"/>
                             </group>
-                            <group attrs="{'invisible':[('is_homestay_volunteer','=',False)]}">
+
+                            <group invisible="not is_homestay_volunteer">
                                 <field name="employment_current"/>
                                 <field name="employment_previous"/>
                                 <field name="rotary_youth_program_history"/>
                                 <field name="youth_volunteer_history"/>
                                 <separator string="References"/>
+
                                 <group>
                                     <field name="ref1_name"/>
                                     <field name="ref1_relationship"/>
@@ -69,6 +71,7 @@
                                     <field name="ref3_phone"/>
                                     <field name="ref3_email"/>
                                 </group>
+
                                 <field name="qualifications_training"/>
                                 <field name="homestay_confirmation_ack"/>
                                 <field name="homestay_signature_name"/>
@@ -82,7 +85,7 @@
                                 <field name="sponsor_club"/>
                                 <field name="sponsor_years_known"/>
                                 <field name="sponsor_role"/>
-                                <field name="sponsor_role_other" attrs="{'invisible':[('sponsor_role','!=','other')]}"/>
+                                <field name="sponsor_role_other" invisible="sponsor_role != 'other'"/>
                                 <field name="sponsor_signature_name"/>
                                 <field name="sponsor_signed_on"/>
                             </group>
@@ -99,7 +102,7 @@
                             </group>
                         </page>
 
-                        <!-- ✅ FIXED PRIVACY PAGE -->
+                        <!-- Privacy page: internal only -->
                         <page string="Privacy (1B - Internal)" groups="base.group_user">
                             <field name="privacy_id"
                                    nolabel="1"
@@ -157,11 +160,13 @@
                         <field name="facebook_profile"/>
                         <field name="cv_attachment_id"/>
                     </group>
+
                     <group string="Criminal History">
                         <field name="criminal_q1"/>
                         <field name="criminal_q2"/>
+                        <!-- show only if at least one is true -->
                         <field name="criminal_explain"
-                               attrs="{'invisible':[('criminal_q1','=',False),('criminal_q2','=',False)]}"/>
+                               invisible="not criminal_q1 and not criminal_q2"/>
                     </group>
                 </sheet>
             </form>
