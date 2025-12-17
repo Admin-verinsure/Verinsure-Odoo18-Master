@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_x_form_question_list" model="ir.ui.view">
+    <field name="name">x.form.question.list</field>
+    <field name="model">x_form.question</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="sequence" widget="handle"/>
+        <field name="label"/>
+        <field name="field_type"/>
+        <field name="required"/>
+        <field name="step_id"/>
+        <field name="template_id"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_x_form_question_form" model="ir.ui.view">
+    <field name="name">x.form.question.form</field>
+    <field name="model">x_form.question</field>
+    <field name="arch" type="xml">
+      <form string="Question">
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="label" placeholder="Type your question"/></h1>
+          </div>
+
+          <group>
+            <field name="template_id" readonly="1"/>
+            <field name="step_id" required="1"/>
+            <field name="field_type" required="1"/>
+            <field name="required"/>
+          </group>
+
+          <notebook>
+            <page string="Basic">
+              <group>
+                <field name="placeholder"/>
+                <field name="help"/>
+              </group>
+            </page>
+
+            <page string="Options" attrs="{'invisible': [('field_type','not in', ('selection','multiselect'))]}">
+              <field name="option_ids">
+                <list editable="bottom">
+                  <field name="sequence" widget="handle"/>
+                  <field name="label"/>
+                  <field name="value"/>
+                </list>
+              </field>
+            </page>
+
+            <page string="Conditional Display" help="Show this question only when conditions match (optional).">
+              <group>
+                <field name="condition_logic"/>
+              </group>
+              <field name="condition_ids">
+                <list editable="bottom">
+                  <field name="depends_on_question_id"/>
+                  <field name="operator"/>
+                  <field name="value"/>
+                </list>
+              </field>
+            </page>
+
+            <page string="Validation">
+              <group>
+                <field name="validation_regex"/>
+                <field name="min_value"/>
+                <field name="max_value"/>
+                <field name="key"/>
+              </group>
+            </page>
+          </notebook>
+
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_x_form_question" model="ir.actions.act_window">
+    <field name="name">Questions</field>
+    <field name="res_model">x_form.question</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>

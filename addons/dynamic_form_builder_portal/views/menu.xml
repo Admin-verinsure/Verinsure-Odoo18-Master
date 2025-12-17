@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+  <!-- App tile -->
   <menuitem id="menu_dynamic_forms_root"
             name="Dynamic Forms"
             sequence="10"
@@ -8,16 +9,30 @@
             web_icon="dynamic_form_builder_portal,static/description/icon.png"/>
 
   <menuitem id="menu_form_templates"
-            name="Form Templates"
+            name="Forms"
             parent="menu_dynamic_forms_root"
             sequence="10"
             action="action_x_form_template"
             groups="dynamic_form_builder_portal.group_form_manager"/>
 
+  <menuitem id="menu_form_sections"
+            name="Sections"
+            parent="menu_dynamic_forms_root"
+            sequence="20"
+            action="action_x_form_step"
+            groups="dynamic_form_builder_portal.group_form_manager"/>
+
+  <menuitem id="menu_form_questions"
+            name="Questions"
+            parent="menu_dynamic_forms_root"
+            sequence="30"
+            action="action_x_form_question"
+            groups="dynamic_form_builder_portal.group_form_manager"/>
+
   <menuitem id="menu_form_submissions"
             name="Submissions"
             parent="menu_dynamic_forms_root"
-            sequence="20"
+            sequence="40"
             action="action_x_form_submission"
             groups="dynamic_form_builder_portal.group_form_manager,dynamic_form_builder_portal.group_form_reviewer"/>
 
