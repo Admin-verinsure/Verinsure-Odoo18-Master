@@ -1,0 +1,28 @@
+.o_df_portal_container{
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.o_df_header{
+  padding: 18px 0 6px 0;
+}
+
+.o_df_steps .list-group-item{
+  cursor: pointer;
+}
+
+.o_df_question{
+  padding: 14px;
+  border: 1px solid rgba(0,0,0,.07);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.o_df_question:focus-within{
+  border-color: rgba(13,110,253,.35);
+  box-shadow: 0 0 0 .2rem rgba(13,110,253,.12);
+}
+
+.o_df_save_status{
+  opacity: .75;
+}

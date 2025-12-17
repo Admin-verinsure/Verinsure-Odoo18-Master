@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+
+    <record id="view_x_form_submission_tree" model="ir.ui.view">
+      <field name="name">x.form.submission.tree</field>
+      <field name="model">x_form.submission</field>
+      <field name="arch" type="xml">
+        <tree>
+          <field name="name"/>
+          <field name="template_id"/>
+          <field name="partner_id"/>
+          <field name="state"/>
+          <field name="submitted_on"/>
+        </tree>
+      </field>
+    </record>
+
+    <record id="view_x_form_submission_form" model="ir.ui.view">
+      <field name="name">x.form.submission.form</field>
+      <field name="model">x_form.submission</field>
+      <field name="arch" type="xml">
+        <form string="Submission">
+          <header>
+            <button name="action_submit" type="object" string="Submit" class="btn-primary"
+                    attrs="{'invisible':[('state','!=','draft')]}"/>
+            <button name="action_under_review" type="object" string="Mark Under Review" class="btn-secondary"
+                    attrs="{'invisible':[('state','not in',('submitted','draft'))]}"/>
+            <button name="action_approve" type="object" string="Approve" class="btn-success"
+                    attrs="{'invisible':[('state','!=','under_review')]}"/>
+            <button name="action_reject" type="object" string="Reject" class="btn-danger"
+                    attrs="{'invisible':[('state','!=','under_review')]}"/>
+            <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,approved,rejected"/>
+          </header>
+          <sheet>
+            <div class="oe_title">
+              <h1><field name="name" readonly="1"/></h1>
+            </div>
+            <group>
+              <field name="template_id" readonly="1"/>
+              <field name="partner_id" readonly="1"/>
+              <field name="submitted_on" readonly="1"/>
+              <field name="reviewed_on" readonly="1"/>
+            </group>
+
+            <notebook>
+              <page string="Answers (Non-sensitive)">
+                <field name="answer_ids" readonly="1">
+                  <tree>
+                    <field name="step_id"/>
+                    <field name="question_id"/>
+                    <field name="value_char"/>
+                    <field name="value_text"/>
+                    <field name="value_date"/>
+                    <field name="value_bool"/>
+                    <field name="value_option_id"/>
+                  </tree>
+                </field>
+              </page>
+              <page string="Sensitive Answers" groups="dynamic_form_builder_portal.group_form_sensitive_viewer,dynamic_form_builder_portal.group_form_manager">
+                <field name="sensitive_answer_ids" readonly="1">
+                  <tree>
+                    <field name="step_id"/>
+                    <field name="question_id"/>
+                    <field name="value_char"/>
+                    <field name="value_text"/>
+                    <field name="value_date"/>
+                    <field name="value_bool"/>
+                    <field name="value_option_id"/>
+                  </tree>
+                </field>
+              </page>
+            </notebook>
+          </sheet>
+          <chatter/>
+        </form>
+      </field>
+    </record>
+
+    <record id="action_x_form_submission" model="ir.actions.act_window">
+      <field name="name">Submissions</field>
+      <field name="res_model">x_form.submission</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+  </data>
+</odoo>

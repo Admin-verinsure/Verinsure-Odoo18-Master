@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_x_form_template_manager,x.form.template manager,model_x_form_template,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_step_manager,x.form.step manager,model_x_form_step,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_question_manager,x.form.question manager,model_x_form_question,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_question_option_manager,x.form.question.option manager,model_x_form_question_option,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_condition_manager,x.form.condition manager,model_x_form_condition,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+
+access_x_form_submission_reviewer,x.form.submission reviewer,model_x_form_submission,dynamic_form_builder_portal.group_form_reviewer,1,0,0,0
+access_x_form_answer_reviewer,x.form.answer reviewer,model_x_form_answer,dynamic_form_builder_portal.group_form_reviewer,1,0,0,0
+access_x_form_sensitive_answer_sensitive_viewer,x.form.sensitive.answer sensitive_viewer,model_x_form_sensitive_answer,dynamic_form_builder_portal.group_form_sensitive_viewer,1,0,0,0
+
+access_x_form_submission_manager,x.form.submission manager,model_x_form_submission,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_answer_manager,x.form.answer manager,model_x_form_answer,dynamic_form_builder_portal.group_form_manager,1,1,1,1
+access_x_form_sensitive_answer_manager,x.form.sensitive.answer manager,model_x_form_sensitive_answer,dynamic_form_builder_portal.group_form_manager,1,1,1,1
