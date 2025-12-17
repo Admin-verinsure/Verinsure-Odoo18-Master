@@ -34,7 +34,7 @@
 
           <notebook>
             <page string="Questions">
-              <field name="question_ids" context="{'default_step_id': active_id, 'default_template_id': template_id}">
+              <field name="question_ids" context="{'default_template_id': template_id}">
                 <list editable="bottom">
                   <field name="sequence" widget="handle"/>
                   <field name="label"/>
