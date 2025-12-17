@@ -15,10 +15,19 @@ class XFormTemplate(models.Model):
     description = fields.Html()
 
     step_ids = fields.One2many("x_form.step", "template_id", string="Steps", copy=True)
+    
+    # --- ADDED FIELD ---
+    # This field was missing and causing the XML ParseError.
+    # It works because XFormQuestion has a stored template_id field.
+    question_ids = fields.One2many(
+        "x_form.question", 
+        "template_id", 
+        string="All Questions"
+    )
+    # -------------------
 
     portal_intro = fields.Html(string="Portal Intro", help="Shown on portal start page.")
     portal_success = fields.Html(string="Portal Success Message", help="Shown after submission.")
-
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -71,6 +80,8 @@ class XFormQuestion(models.Model):
     _order = "sequence, id"
 
     step_id = fields.Many2one("x_form.step", required=True, ondelete="cascade")
+    
+    # Note: store=True is crucial here for the One2many in XFormTemplate to work
     template_id = fields.Many2one(related="step_id.template_id", store=True, index=True)
 
     sequence = fields.Integer(default=10)
