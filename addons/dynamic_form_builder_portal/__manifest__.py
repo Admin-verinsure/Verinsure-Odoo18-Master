@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Dynamic Form Builder (Portal)",
-    "summary": "Build multi-step portal forms with conditional branching (Odoo 18)",
-    "version": "18.0.1.0.0",
+    "summary": "Build portal forms with sections and conditional branching (Odoo 18)",
+    "version": "18.0.1.0.1",
     "category": "Website/Portal",
     "license": "LGPL-3",
     "author": "Custom",
@@ -12,10 +12,9 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/sequence.xml",
+
         "views/form_template_views.xml",
         "views/form_submission_views.xml",
-        "views/step_views.xml",
-        "views/question_views.xml",
         "views/menu.xml",
         "views/portal_templates.xml",
     ],

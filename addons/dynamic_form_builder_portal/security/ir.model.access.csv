@@ -7,7 +7,7 @@ access_x_form_condition_manager,x.form.condition manager,model_x_form_condition,
 
 access_x_form_submission_reviewer,x.form.submission reviewer,model_x_form_submission,dynamic_form_builder_portal.group_form_reviewer,1,0,0,0
 access_x_form_answer_reviewer,x.form.answer reviewer,model_x_form_answer,dynamic_form_builder_portal.group_form_reviewer,1,0,0,0
-access_x_form_sensitive_answer_sensitive_viewer,x.form.sensitive.answer sensitive_viewer,model_x_form_sensitive_answer,dynamic_form_builder_portal.group_form_sensitive_viewer,1,0,0,0
+access_x_form_sensitive_answer_sensitive_viewer,x.form.sensitive.answer viewer,model_x_form_sensitive_answer,dynamic_form_builder_portal.group_form_sensitive_viewer,1,0,0,0
 
 access_x_form_submission_manager,x.form.submission manager,model_x_form_submission,dynamic_form_builder_portal.group_form_manager,1,1,1,1
 access_x_form_answer_manager,x.form.answer manager,model_x_form_answer,dynamic_form_builder_portal.group_form_manager,1,1,1,1

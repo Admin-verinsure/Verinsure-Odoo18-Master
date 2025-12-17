@@ -19,68 +19,16 @@ class XFormTemplate(models.Model):
     portal_intro = fields.Html(string="Portal Intro", help="Shown on portal start page.")
     portal_success = fields.Html(string="Portal Success Message", help="Shown after submission.")
 
-    # --- FIX: Moved these fields INSIDE the class ---
-    step_count = fields.Integer(compute="_compute_counts", string="Sections", store=False)
-    question_count = fields.Integer(compute="_compute_counts", string="Questions", store=False)
-    submission_count = fields.Integer(compute="_compute_counts", string="Submissions", store=False)
-
-    # --- FIX: Moved method INSIDE the class ---
-    def _compute_counts(self):
-        Question = self.env["x_form.question"]
-        Submission = self.env["x_form.submission"]
-        for rec in self:
-            rec.step_count = len(rec.step_ids)
-            rec.question_count = Question.search_count([("template_id", "=", rec.id)])
-            rec.submission_count = Submission.search_count([("template_id", "=", rec.id)])
 
     @api.model_create_multi
     def create(self, vals_list):
-        recs = super().create(vals_list)
-        # Ensure every template has at least one default section (Google-Forms style)
-        for rec in recs:
+        records = super().create(vals_list)
+        # Google-Forms-like: always create a default section so admins can add questions immediately
+        for rec in records:
             if not rec.step_ids:
-                self.env["x_form.step"].create({
-                    "template_id": rec.id,
-                    "name": _("Main"),
-                    "code": "1",
-                    "sequence": 10,
-                })
-        return recs
+                rec.step_ids = [(0, 0, {"name": "Main", "code": "1", "sequence": 10})]
+        return records
 
-    def action_open_sections(self):
-        self.ensure_one()
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Sections"),
-            "res_model": "x_form.step",
-            "view_mode": "list,form",
-            "domain": [("template_id", "=", self.id)],
-            "context": {"default_template_id": self.id},
-        }
-
-    def action_open_questions(self):
-        self.ensure_one()
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Questions"),
-            "res_model": "x_form.question",
-            "view_mode": "list,form",
-            "domain": [("template_id", "=", self.id)],
-            "context": {"default_template_id": self.id},
-        }
-
-    def action_open_submissions(self):
-        self.ensure_one()
-        return {
-            "type": "ir.actions.act_window",
-            "name": _("Submissions"),
-            "res_model": "x_form.submission",
-            "view_mode": "list,form",
-            "domain": [("template_id", "=", self.id)],
-            "context": {"default_template_id": self.id},
-        }
-
-    # --- FIX: Corrected indentation (was too far right) ---
     def action_new_version(self):
         for rec in self:
             rec.version += 1
