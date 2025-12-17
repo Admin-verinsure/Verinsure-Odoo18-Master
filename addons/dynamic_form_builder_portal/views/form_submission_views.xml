@@ -2,22 +2,15 @@
 <odoo>
   <data>
 
-    <record id="view_x_form_submission_list" model="ir.ui.view">
-      <field name="name">x.form.submission.list</field>
+    <record id="view_x_form_submission_tree" model="ir.ui.view">
+      <field name="name">x.form.submission.tree</field>
       <field name="model">x_form.submission</field>
       <field name="arch" type="xml">
-        <list decoration-info="state == 'draft'" 
-              decoration-warning="state == 'under_review'" 
-              decoration-success="state == 'approved'" 
-              decoration-danger="state == 'rejected'">
+        <list>
           <field name="name"/>
           <field name="template_id"/>
           <field name="partner_id"/>
-          <field name="state" widget="badge" 
-                 decoration-info="state == 'draft'" 
-                 decoration-warning="state == 'under_review'" 
-                 decoration-success="state == 'approved'" 
-                 decoration-danger="state == 'rejected'"/>
+          <field name="state"/>
           <field name="submitted_on"/>
         </list>
       </field>
@@ -30,70 +23,56 @@
         <form string="Submission">
           <header>
             <button name="action_submit" type="object" string="Submit" class="btn-primary"
-                    invisible="state != 'draft'"/>
+                    attrs="{'invisible':[('state','!=','draft')]}"/>
             <button name="action_under_review" type="object" string="Mark Under Review" class="btn-secondary"
-                    invisible="state not in ('submitted', 'draft')"/>
+                    attrs="{'invisible':[('state','not in',('submitted','draft'))]}"/>
             <button name="action_approve" type="object" string="Approve" class="btn-success"
-                    invisible="state != 'under_review'"/>
+                    attrs="{'invisible':[('state','!=','under_review')]}"/>
             <button name="action_reject" type="object" string="Reject" class="btn-danger"
-                    invisible="state != 'under_review'"/>
+                    attrs="{'invisible':[('state','!=','under_review')]}"/>
             <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,approved,rejected"/>
           </header>
-
           <sheet>
             <div class="oe_title">
               <h1><field name="name" readonly="1"/></h1>
             </div>
-
             <group>
-              <group>
-                <field name="template_id" readonly="1"/>
-                <field name="partner_id" readonly="1"/>
-              </group>
-              <group>
-                <field name="submitted_on" readonly="1"/>
-                <field name="reviewed_on" readonly="1"/>
-              </group>
+              <field name="template_id" readonly="1"/>
+              <field name="partner_id" readonly="1"/>
+              <field name="submitted_on" readonly="1"/>
+              <field name="reviewed_on" readonly="1"/>
             </group>
 
             <notebook>
               <page string="Answers (Non-sensitive)">
                 <field name="answer_ids" readonly="1">
-                  <list default_order="step_id, sequence" decoration-muted="value_char == False and value_text == False">
+                  <list>
                     <field name="step_id"/>
                     <field name="question_id"/>
-                    <field name="value_char" optional="show"/>
-                    <field name="value_text" optional="hide"/>
-                    <field name="value_date" optional="hide"/>
-                    <field name="value_bool" optional="hide"/>
-                    <field name="value_option_id" optional="hide"/>
+                    <field name="value_char"/>
+                    <field name="value_text"/>
+                    <field name="value_date"/>
+                    <field name="value_bool"/>
+                    <field name="value_option_id"/>
                   </list>
                 </field>
               </page>
-
-              <page string="Sensitive Answers"
-                    groups="dynamic_form_builder_portal.group_form_sensitive_viewer,dynamic_form_builder_portal.group_form_manager">
+              <page string="Sensitive Answers" groups="dynamic_form_builder_portal.group_form_sensitive_viewer,dynamic_form_builder_portal.group_form_manager">
                 <field name="sensitive_answer_ids" readonly="1">
-                  <list default_order="step_id, sequence">
+                  <list>
                     <field name="step_id"/>
                     <field name="question_id"/>
-                    <field name="value_char" optional="show"/>
-                    <field name="value_text" optional="hide"/>
-                    <field name="value_date" optional="hide"/>
-                    <field name="value_bool" optional="hide"/>
-                    <field name="value_option_id" optional="hide"/>
+                    <field name="value_char"/>
+                    <field name="value_text"/>
+                    <field name="value_date"/>
+                    <field name="value_bool"/>
+                    <field name="value_option_id"/>
                   </list>
                 </field>
               </page>
             </notebook>
-
           </sheet>
-
-          <div class="oe_chatter">
-            <field name="message_follower_ids" widget="mail_followers"/>
-            <field name="activity_ids" widget="mail_activity"/>
-            <field name="message_ids" widget="mail_thread"/>
-          </div>
+          <chatter/>
         </form>
       </field>
     </record>
@@ -101,7 +80,7 @@
     <record id="action_x_form_submission" model="ir.actions.act_window">
       <field name="name">Submissions</field>
       <field name="res_model">x_form.submission</field>
-      <field name="view_mode">list,form</field>
+      <field name="view_mode">tree,form</field>
     </record>
 
   </data>
