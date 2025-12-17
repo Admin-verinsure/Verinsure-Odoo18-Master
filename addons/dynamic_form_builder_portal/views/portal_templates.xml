@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- Portal: My Forms -->
   <template id="portal_my_forms" name="My Forms">
     <t t-call="portal.portal_layout">
       <t t-set="breadcrumbs_searchbar" t-value="True"/>
@@ -61,7 +60,6 @@
   </template>
 
 
-  <!-- Portal: Form Fill Page -->
   <template id="portal_form_fill" name="Form Fill">
     <t t-call="portal.portal_layout">
       <t t-set="title"><t t-esc="submission.template_id.name"/></t>
@@ -98,7 +96,7 @@
         <t t-if="submission.template_id.portal_intro">
           <div class="card shadow-sm rounded-4 mt-3">
             <div class="card-body">
-              <t t-raw="submission.template_id.portal_intro"/>
+              <t t-out="submission.template_id.portal_intro"/>
             </div>
           </div>
         </t>
@@ -164,7 +162,6 @@
 
                             <t t-set="val" t-value="answers.get(q.id)"/>
 
-                            <!-- char/email/phone/signature -->
                             <t t-if="q.field_type in ('char','email','phone','signature')">
                               <input class="form-control"
                                      t-att-type="('email' if q.field_type=='email' else ('tel' if q.field_type=='phone' else 'text'))"
@@ -174,7 +171,6 @@
                                      t-att-data-required="'1' if q.required else '0'"/>
                             </t>
 
-                            <!-- text -->
                             <t t-elif="q.field_type == 'text'">
                               <textarea class="form-control" rows="4"
                                         t-att-name="'q_%s' % q.id"
@@ -182,7 +178,6 @@
                                         t-att-data-required="'1' if q.required else '0'"><t t-esc="val or ''"/></textarea>
                             </t>
 
-                            <!-- date -->
                             <t t-elif="q.field_type == 'date'">
                               <input class="form-control" type="date"
                                      t-att-name="'q_%s' % q.id"
@@ -190,7 +185,6 @@
                                      t-att-data-required="'1' if q.required else '0'"/>
                             </t>
 
-                            <!-- numeric -->
                             <t t-elif="q.field_type in ('integer','float')">
                               <input class="form-control" type="number"
                                      t-att-name="'q_%s' % q.id"
@@ -199,7 +193,6 @@
                                      t-att-data-required="'1' if q.required else '0'"/>
                             </t>
 
-                            <!-- bool -->
                             <t t-elif="q.field_type == 'bool'">
                               <div class="form-check">
                                 <input class="form-check-input" type="checkbox"
@@ -209,7 +202,6 @@
                               </div>
                             </t>
 
-                            <!-- selection -->
                             <t t-elif="q.field_type == 'selection'">
                               <select class="form-select"
                                       t-att-name="'q_%s' % q.id"
@@ -225,7 +217,6 @@
                               </select>
                             </t>
 
-                            <!-- multiselect -->
                             <t t-elif="q.field_type == 'multiselect'">
                               <t t-set="vals" t-value="val or []"/>
                               <t t-set="vals_str" t-value="[str(v) for v in vals]"/>
@@ -244,7 +235,6 @@
                               </div>
                             </t>
 
-                            <!-- file -->
                             <t t-elif="q.field_type == 'file'">
                               <input class="form-control" type="file"
                                      t-att-name="'q_%s' % q.id"/>

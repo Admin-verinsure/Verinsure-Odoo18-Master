@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- ROOT MENU: App tile (NO parent, NO groups) -->
   <menuitem id="menu_dynamic_forms_root"
             name="Dynamic Forms"
             sequence="10"
-            action="action_x_form_template"
             web_icon="dynamic_form_builder_portal,static/description/icon.png"/>
 
-  <!-- Form Templates -->
   <menuitem id="menu_form_templates"
             name="Form Templates"
             parent="menu_dynamic_forms_root"
@@ -16,7 +13,6 @@
             action="action_x_form_template"
             groups="dynamic_form_builder_portal.group_form_manager"/>
 
-  <!-- Submissions -->
   <menuitem id="menu_form_submissions"
             name="Submissions"
             parent="menu_dynamic_forms_root"
