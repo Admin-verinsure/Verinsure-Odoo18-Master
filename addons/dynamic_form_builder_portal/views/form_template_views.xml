@@ -20,8 +20,7 @@
       <field name="arch" type="xml">
         <form string="Form Template">
           <header>
-            <button name="action_new_version" type="object" string="New Version" class="btn-secondary"
-                    invisible="not id"/>
+            <button name="action_new_version" type="object" string="New Version" class="btn-secondary" invisible="not id"/>
           </header>
           <sheet>
             <div class="oe_title">
@@ -45,19 +44,19 @@
                   </ol>
                 </div>
 
-                <field name="question_ids" context="{'default_template_id': active_id}">
+                <field name="question_ids">
                   <list editable="bottom" limit="20">
                     <field name="sequence" widget="handle"/>
-                    <field name="step_id" options="{'no_create': True}"/>
+                    <field name="step_id" options="{'no_create': True}" domain="[('template_id', '=', parent.id)]"/>
                     <field name="label"/>
                     <field name="field_type"/>
-                    <field name="required"/>
+                    <field name="required" widget="boolean_toggle"/>
                   </list>
                 </field>
               </page>
 
               <page string="Sections">
-                <field name="step_ids" context="{'default_template_id': active_id}">
+                <field name="step_ids">
                   <list editable="bottom">
                     <field name="sequence" widget="handle"/>
                     <field name="code" optional="hide"/>
@@ -133,12 +132,12 @@
 
             <notebook>
               <page string="Questions">
-                <field name="question_ids" context="{'default_step_id': active_id}">
+                <field name="question_ids" context="{'default_template_id': template_id}">
                   <list editable="bottom">
                     <field name="sequence" widget="handle"/>
                     <field name="label"/>
                     <field name="field_type"/>
-                    <field name="required"/>
+                    <field name="required" widget="boolean_toggle"/>
                   </list>
                 </field>
               </page>
@@ -152,7 +151,7 @@
                 </group>
                 <field name="condition_ids">
                   <list editable="bottom">
-                    <field name="depends_on_question_id"/>
+                    <field name="depends_on_question_id" domain="[('template_id', '=', parent.template_id)]"/>
                     <field name="operator"/>
                     <field name="value"/>
                   </list>
@@ -198,7 +197,8 @@
             </div>
             <group>
               <group>
-                <field name="step_id" required="1"/>
+                <field name="template_id" invisible="1"/>
+                <field name="step_id" required="1" domain="[('template_id', '=', template_id)]"/>
                 <field name="field_type"/>
                 <field name="required" widget="boolean_toggle"/>
               </group>
@@ -230,7 +230,7 @@
                 </group>
                 <field name="condition_ids">
                   <list editable="bottom">
-                    <field name="depends_on_question_id"/>
+                    <field name="depends_on_question_id" domain="[('template_id', '=', parent.template_id)]"/>
                     <field name="operator"/>
                     <field name="value"/>
                   </list>
