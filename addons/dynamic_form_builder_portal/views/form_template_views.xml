@@ -2,7 +2,6 @@
 <odoo>
   <data>
 
-    <!-- LIST view (Odoo 18 uses <list>, not <tree>) -->
     <record id="view_x_form_template_list" model="ir.ui.view">
       <field name="name">x.form.template.list</field>
       <field name="model">x_form.template</field>
@@ -47,7 +46,7 @@
               </page>
 
               <page string="Steps / Sections">
-                <field name="step_ids" context="{'default_template_id': active_id}">
+                <field name="step_ids">
                   <list editable="bottom">
                     <field name="sequence" widget="handle"/>
                     <field name="code"/>
@@ -76,7 +75,7 @@
                       </group>
 
                       <group string="Questions">
-                        <field name="question_ids" context="{'default_step_id': active_id}">
+                        <field name="question_ids">
                           <list editable="bottom">
                             <field name="sequence" widget="handle"/>
                             <field name="label"/>
@@ -113,7 +112,7 @@
                                 </field>
                               </group>
 
-                              <group string="Options" attrs="{'invisible': [('field_type','not in', ('selection','multiselect'))]}">
+                              <group string="Options" invisible="field_type not in ('selection','multiselect')">
                                 <field name="option_ids">
                                   <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
@@ -136,7 +135,11 @@
 
           </sheet>
 
-          <chatter/>
+          <div class="oe_chatter">
+            <field name="message_follower_ids"/>
+            <field name="activity_ids"/>
+            <field name="message_ids"/>
+          </div>
         </form>
       </field>
     </record>
