@@ -14,6 +14,8 @@
         "data/sequence.xml",
         "views/form_template_views.xml",
         "views/form_submission_views.xml",
+        "views/step_views.xml",
+        "views/question_views.xml",
         "views/menu.xml",
         "views/portal_templates.xml",
     ],

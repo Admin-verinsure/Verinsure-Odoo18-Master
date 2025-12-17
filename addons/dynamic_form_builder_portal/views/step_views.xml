@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_x_form_step_list" model="ir.ui.view">
+    <field name="name">x.form.step.list</field>
+    <field name="model">x_form.step</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="sequence" widget="handle"/>
+        <field name="code"/>
+        <field name="name"/>
+        <field name="template_id"/>
+        <field name="is_sensitive"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_x_form_step_form" model="ir.ui.view">
+    <field name="name">x.form.step.form</field>
+    <field name="model">x_form.step</field>
+    <field name="arch" type="xml">
+      <form string="Section">
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="name" placeholder="e.g., Applicant Details"/></h1>
+          </div>
+
+          <group>
+            <field name="template_id" required="1"/>
+            <field name="code" placeholder="e.g., 1A"/>
+            <field name="sequence"/>
+            <field name="is_sensitive"/>
+          </group>
+
+          <notebook>
+            <page string="Questions">
+              <field name="question_ids" context="{'default_step_id': active_id, 'default_template_id': template_id}">
+                <list editable="bottom">
+                  <field name="sequence" widget="handle"/>
+                  <field name="label"/>
+                  <field name="field_type"/>
+                  <field name="required"/>
+                </list>
+              </field>
+            </page>
+
+            <page string="Conditional Display" help="Show/hide this section based on answers (optional).">
+              <group>
+                <field name="condition_logic"/>
+              </group>
+              <field name="condition_ids">
+                <list editable="bottom">
+                  <field name="depends_on_question_id"/>
+                  <field name="operator"/>
+                  <field name="value"/>
+                </list>
+              </field>
+            </page>
+          </notebook>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_x_form_step" model="ir.actions.act_window">
+    <field name="name">Sections</field>
+    <field name="res_model">x_form.step</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>
