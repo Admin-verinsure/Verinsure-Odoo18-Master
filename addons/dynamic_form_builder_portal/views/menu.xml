@@ -4,6 +4,7 @@
   <menuitem id="menu_dynamic_forms_root"
             name="Dynamic Forms"
             sequence="10"
+            action="action_x_form_template"
             web_icon="dynamic_form_builder_portal,static/description/icon.png"/>
 
   <menuitem id="menu_form_templates"
