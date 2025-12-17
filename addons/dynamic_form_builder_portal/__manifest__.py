@@ -12,9 +12,9 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/sequence.xml",
-        "views/menu.xml",
         "views/form_template_views.xml",
         "views/form_submission_views.xml",
+        "views/menu.xml",
         "views/portal_templates.xml",
     ],
     "assets": {
