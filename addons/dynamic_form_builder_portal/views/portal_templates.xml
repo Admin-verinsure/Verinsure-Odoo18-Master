@@ -43,7 +43,7 @@
                   <div>
                     <div class="fw-semibold"><t t-esc="s.template_id.name"/></div>
                     <div class="small text-muted">
-                      <t t-esc="s.name"/> • <t t-esc="s.state"/>
+                      <span t-esc="s.name"/> • <span t-esc="s.state"/>
                     </div>
                   </div>
                   <span class="badge bg-light text-dark border">Open</span>
@@ -85,7 +85,8 @@
               <form method="post" t-att-action="'/my/forms/%s/submit' % submission.id">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                 <button class="btn btn-primary"
-                        t-att-disabled="submission.state != 'draft'">
+                        type="submit"
+                        t-att-disabled="submission.state != 'draft' and 'disabled' or None">
                   Submit
                 </button>
               </form>
@@ -108,18 +109,19 @@
                 <div class="fw-semibold mb-2">Sections</div>
                 <ol class="list-group list-group-numbered">
                   <t t-foreach="steps" t-as="st">
-                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                    <li class="list-group-item d-flex justify-content-between align-items-center action-jump-to-step"
+                        style="cursor: pointer;"
                         t-att-data-step-id="st.id">
                       <div>
                         <span class="fw-semibold">
                           <t t-if="st.code"><t t-esc="st.code"/> — </t>
                           <t t-esc="st.name"/>
                         </span>
-                        <div class="small text-muted">
-                          <t t-if="st.is_sensitive">Sensitive section</t>
+                        <div class="small text-muted" t-if="st.is_sensitive">
+                          Sensitive section
                         </div>
                       </div>
-                      <span class="badge bg-light text-dark border">Edit</span>
+                      <i class="fa fa-chevron-right text-muted small"></i>
                     </li>
                   </t>
                 </ol>
@@ -133,6 +135,7 @@
 
                 <t t-foreach="steps" t-as="st">
                   <section class="o_df_step" t-att-data-step-id="st.id">
+                    
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                       <h4 class="mb-0">
                         <t t-if="st.code"><t t-esc="st.code"/> — </t><t t-esc="st.name"/>
@@ -145,11 +148,12 @@
 
                     <div class="o_df_questions">
                       <t t-foreach="st.question_ids.sorted('sequence')" t-as="q">
-                        <t t-if="visible_questions.get(q.id)">
+                        
+                        <t t-if="visible_questions and visible_questions.get(q.id)">
                           <div class="o_df_question mb-3"
                                t-att-data-question-id="q.id"
                                t-att-data-type="q.field_type"
-                               t-att-data-condition-json="condition_json.get(q.id) or ''">
+                               t-att-data-condition-json="condition_json and condition_json.get(q.id) or ''">
 
                             <label class="form-label fw-semibold">
                               <t t-esc="q.label"/>
@@ -160,7 +164,7 @@
                               <div class="text-muted small mb-1"><t t-esc="q.help"/></div>
                             </t>
 
-                            <t t-set="val" t-value="answers.get(q.id)"/>
+                            <t t-set="val" t-value="answers and answers.get(q.id)"/>
 
                             <t t-if="q.field_type in ('char','email','phone','signature')">
                               <input class="form-control"
@@ -197,7 +201,7 @@
                               <div class="form-check">
                                 <input class="form-check-input" type="checkbox"
                                        t-att-name="'q_%s' % q.id"
-                                       t-att-checked="True if val else None"/>
+                                       t-att-checked="'checked' if val else None"/>
                                 <label class="form-check-label">Yes</label>
                               </div>
                             </t>
@@ -210,7 +214,7 @@
                                 <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
                                   <t t-set="opt_val" t-value="opt.value or opt.label"/>
                                   <option t-att-value="opt.id"
-                                          t-att-selected="True if (val == opt_val or val == opt.id) else None">
+                                          t-att-selected="'selected' if (str(val) == str(opt.id) or str(val) == str(opt_val)) else None">
                                     <t t-esc="opt.label"/>
                                   </option>
                                 </t>
@@ -219,7 +223,7 @@
 
                             <t t-elif="q.field_type == 'multiselect'">
                               <t t-set="vals" t-value="val or []"/>
-                              <t t-set="vals_str" t-value="[str(v) for v in vals]"/>
+                              <t t-set="vals_str" t-value="[str(v) for v in vals] if vals else []"/>
                               <div class="row g-2">
                                 <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
                                   <div class="col-12 col-md-6">
@@ -227,7 +231,7 @@
                                       <input class="form-check-input" type="checkbox"
                                              t-att-name="'q_%s' % q.id"
                                              t-att-value="opt.id"
-                                             t-att-checked="True if (str(opt.id) in vals_str) else None"/>
+                                             t-att-checked="'checked' if str(opt.id) in vals_str else None"/>
                                       <label class="form-check-label"><t t-esc="opt.label"/></label>
                                     </div>
                                   </div>
@@ -239,14 +243,17 @@
                               <input class="form-control" type="file"
                                      t-att-name="'q_%s' % q.id"/>
                               <t t-if="val">
-                                <div class="small text-muted mt-1">Uploaded: <t t-esc="len(val)"/> file(s)</div>
+                                <div class="small text-muted mt-1">
+                                  <i class="fa fa-check-circle text-success"></i> File uploaded
+                                </div>
                               </t>
                             </t>
 
                             <div class="o_df_save_status small mt-1 text-muted"
+                                 style="font-size: 0.8rem; height: 1.2em;"
                                  t-att-data-status-for="'q_%s' % q.id">
-                              Saved automatically
                             </div>
+
                           </div>
                         </t>
                       </t>
@@ -256,9 +263,12 @@
                   </section>
                 </t>
 
-                <div class="alert alert-light border rounded-4 mb-0">
-                  <div class="fw-semibold">Tip</div>
-                  <div class="small text-muted">Your answers are saved automatically. You can come back later to continue.</div>
+                <div class="alert alert-light border rounded-4 mb-0 d-flex gap-3 align-items-center">
+                  <i class="fa fa-info-circle text-primary h4 mb-0"></i>
+                  <div>
+                    <div class="fw-semibold">Auto-save Enabled</div>
+                    <div class="small text-muted">Your answers are saved automatically as you type.</div>
+                  </div>
                 </div>
 
               </div>
