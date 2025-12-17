@@ -1,265 +1,283 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <data>
 
-    <!-- Portal menu entry -->
-    <record id="portal_my_forms" model="ir.ui.view">
-      <field name="name">portal_my_forms</field>
-      <field name="type">qweb</field>
-      <field name="key">dynamic_form_builder_portal.portal_my_forms</field>
-      <field name="arch" type="xml">
-        <t t-call="portal.portal_layout">
-          <t t-set="breadcrumbs_searchbar" t-value="True"/>
-          <t t-set="title">My Forms</t>
+  <!-- Portal: My Forms -->
+  <template id="portal_my_forms" name="My Forms">
+    <t t-call="portal.portal_layout">
+      <t t-set="breadcrumbs_searchbar" t-value="True"/>
+      <t t-set="title">My Forms</t>
 
-          <div class="o_df_portal_container">
-            <div class="o_df_header">
-              <h2 class="mb-1">My Forms</h2>
-              <p class="text-muted mb-0">Start a new application or continue an existing draft.</p>
-            </div>
+      <div class="o_df_portal_container">
+        <div class="o_df_header">
+          <h2 class="mb-1">My Forms</h2>
+          <p class="text-muted mb-0">Start a new application or continue an existing draft.</p>
+        </div>
 
-            <div class="card shadow-sm rounded-4 mt-3">
-              <div class="card-body">
-                <form method="get" action="/my/forms/start">
-                  <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-8">
-                      <label class="form-label">Choose a form</label>
-                      <select class="form-select" name="template_id" required="required">
-                        <option value="" selected="selected" disabled="disabled">Select…</option>
-                        <t t-foreach="templates" t-as="tpl">
-                          <option t-att-value="tpl.id"><t t-esc="tpl.name"/></option>
-                        </t>
-                      </select>
-                    </div>
-                    <div class="col-12 col-md-4">
-                      <button class="btn btn-primary w-100">Start</button>
+        <div class="card shadow-sm rounded-4 mt-3">
+          <div class="card-body">
+            <form method="get" action="/my/forms/start">
+              <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-8">
+                  <label class="form-label">Choose a form</label>
+                  <select class="form-select" name="template_id" required="required">
+                    <option value="" selected="selected" disabled="disabled">Select…</option>
+                    <t t-foreach="templates" t-as="tpl">
+                      <option t-att-value="tpl.id"><t t-esc="tpl.name"/></option>
+                    </t>
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <button class="btn btn-primary w-100" type="submit">Start</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h4 class="mb-2">Your submissions</h4>
+          <t t-if="submissions">
+            <div class="list-group shadow-sm rounded-4 overflow-hidden">
+              <t t-foreach="submissions" t-as="s">
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                   t-att-href="'/my/forms/%s' % s.id">
+                  <div>
+                    <div class="fw-semibold"><t t-esc="s.template_id.name"/></div>
+                    <div class="small text-muted">
+                      <t t-esc="s.name"/> • <t t-esc="s.state"/>
                     </div>
                   </div>
-                </form>
-              </div>
+                  <span class="badge bg-light text-dark border">Open</span>
+                </a>
+              </t>
+            </div>
+          </t>
+          <t t-else="">
+            <div class="alert alert-light border rounded-4">No submissions yet.</div>
+          </t>
+        </div>
+      </div>
+    </t>
+  </template>
+
+
+  <!-- Portal: Form Fill Page -->
+  <template id="portal_form_fill" name="Form Fill">
+    <t t-call="portal.portal_layout">
+      <t t-set="title"><t t-esc="submission.template_id.name"/></t>
+
+      <div class="o_df_portal_container" id="o_df_root"
+           t-att-data-submission-id="submission.id"
+           t-att-data-csrf-token="request.csrf_token()">
+
+        <div class="o_df_header">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <h2 class="mb-1"><t t-esc="submission.template_id.name"/></h2>
+              <p class="text-muted mb-0">
+                Submission: <strong><t t-esc="submission.name"/></strong>
+                • Status:
+                <span class="badge bg-light text-dark border"><t t-esc="submission.state"/></span>
+              </p>
             </div>
 
-            <div class="mt-4">
-              <h4 class="mb-2">Your submissions</h4>
-              <t t-if="submissions">
-                <div class="list-group shadow-sm rounded-4 overflow-hidden">
-                  <t t-foreach="submissions" t-as="s">
-                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                       t-att-href="'/my/forms/%s' % s.id">
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-secondary" href="/my/forms">Back</a>
+
+              <form method="post" t-att-action="'/my/forms/%s/submit' % submission.id">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <button class="btn btn-primary"
+                        t-att-disabled="submission.state != 'draft'">
+                  Submit
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <t t-if="submission.template_id.portal_intro">
+          <div class="card shadow-sm rounded-4 mt-3">
+            <div class="card-body">
+              <t t-raw="submission.template_id.portal_intro"/>
+            </div>
+          </div>
+        </t>
+
+        <div class="row g-3 mt-2">
+          <div class="col-12 col-lg-4">
+            <div class="card shadow-sm rounded-4 o_df_steps">
+              <div class="card-body">
+                <div class="fw-semibold mb-2">Sections</div>
+                <ol class="list-group list-group-numbered">
+                  <t t-foreach="steps" t-as="st">
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        t-att-data-step-id="st.id">
                       <div>
-                        <div class="fw-semibold"><t t-esc="s.template_id.name"/></div>
+                        <span class="fw-semibold">
+                          <t t-if="st.code"><t t-esc="st.code"/> — </t>
+                          <t t-esc="st.name"/>
+                        </span>
                         <div class="small text-muted">
-                          <t t-esc="s.name"/> • <t t-esc="s.state"/>
+                          <t t-if="st.is_sensitive">Sensitive section</t>
                         </div>
                       </div>
-                      <span class="badge bg-light text-dark border">Open</span>
-                    </a>
+                      <span class="badge bg-light text-dark border">Edit</span>
+                    </li>
                   </t>
-                </div>
-              </t>
-              <t t-else="">
-                <div class="alert alert-light border rounded-4">No submissions yet.</div>
-              </t>
+                </ol>
+              </div>
             </div>
           </div>
-        </t>
-      </field>
-    </record>
 
-    <!-- Form fill page -->
-    <record id="portal_form_fill" model="ir.ui.view">
-      <field name="name">portal_form_fill</field>
-      <field name="type">qweb</field>
-      <field name="key">dynamic_form_builder_portal.portal_form_fill</field>
-      <field name="arch" type="xml">
-        <t t-call="portal.portal_layout">
-          <t t-set="title"><t t-esc="submission.template_id.name"/></t>
+          <div class="col-12 col-lg-8">
+            <div class="card shadow-sm rounded-4">
+              <div class="card-body">
 
-          <div class="o_df_portal_container" id="o_df_root"
-               t-att-data-submission-id="submission.id"
-               t-att-data-csrf-token="request.csrf_token()">
+                <t t-foreach="steps" t-as="st">
+                  <section class="o_df_step" t-att-data-step-id="st.id">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                      <h4 class="mb-0">
+                        <t t-if="st.code"><t t-esc="st.code"/> — </t><t t-esc="st.name"/>
+                      </h4>
+                      <span t-if="st.is_sensitive"
+                            class="badge bg-warning-subtle text-warning-emphasis border rounded-pill">
+                        Sensitive
+                      </span>
+                    </div>
 
-            <div class="o_df_header">
-              <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                <div>
-                  <h2 class="mb-1"><t t-esc="submission.template_id.name"/></h2>
-                  <p class="text-muted mb-0">
-                    Submission: <strong><t t-esc="submission.name"/></strong>
-                    • Status: <span class="badge bg-light text-dark border"><t t-esc="submission.state"/></span>
-                  </p>
-                </div>
-                <div class="d-flex gap-2">
-                  <a class="btn btn-outline-secondary" href="/my/forms">Back</a>
-                  <form method="post" t-att-action="'/my/forms/%s/submit' % submission.id">
-                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                    <button class="btn btn-primary" t-att-disabled="submission.state != 'draft' and 'disabled' or None">
-                      Submit
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
+                    <div class="o_df_questions">
+                      <t t-foreach="st.question_ids.sorted('sequence')" t-as="q">
+                        <t t-if="visible_questions.get(q.id)">
+                          <div class="o_df_question mb-3"
+                               t-att-data-question-id="q.id"
+                               t-att-data-type="q.field_type"
+                               t-att-data-condition-json="condition_json.get(q.id) or ''">
 
-            <t t-if="submission.template_id.portal_intro">
-              <div class="card shadow-sm rounded-4 mt-3">
-                <div class="card-body">
-                  <t t-raw="submission.template_id.portal_intro"/>
-                </div>
-              </div>
-            </t>
+                            <label class="form-label fw-semibold">
+                              <t t-esc="q.label"/>
+                              <t t-if="q.required"><span class="text-danger">*</span></t>
+                            </label>
 
-            <div class="row g-3 mt-2">
-              <div class="col-12 col-lg-4">
-                <div class="card shadow-sm rounded-4 o_df_steps">
-                  <div class="card-body">
-                    <div class="fw-semibold mb-2">Sections</div>
-                    <ol class="list-group list-group-numbered">
-                      <t t-foreach="steps" t-as="st">
-                        <li class="list-group-item d-flex justify-content-between align-items-center"
-                            t-att-data-step-id="st.id">
-                          <div>
-                            <span class="fw-semibold">
-                              <t t-if="st.code"><t t-esc="st.code"/> — </t>
-                              <t t-esc="st.name"/>
-                            </span>
-                            <div class="small text-muted"><t t-if="st.is_sensitive">Sensitive section</t></div>
-                          </div>
-                          <span class="badge bg-light text-dark border">Edit</span>
-                        </li>
-                      </t>
-                    </ol>
-                  </div>
-                </div>
-              </div>
+                            <t t-if="q.help">
+                              <div class="text-muted small mb-1"><t t-esc="q.help"/></div>
+                            </t>
 
-              <div class="col-12 col-lg-8">
-                <div class="card shadow-sm rounded-4">
-                  <div class="card-body">
-                    <t t-foreach="steps" t-as="st">
-                      <section class="o_df_step" t-att-data-step-id="st.id">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                          <h4 class="mb-0">
-                            <t t-if="st.code"><t t-esc="st.code"/> — </t><t t-esc="st.name"/>
-                          </h4>
-                          <span t-if="st.is_sensitive" class="badge bg-warning-subtle text-warning-emphasis border rounded-pill">
-                            Sensitive
-                          </span>
-                        </div>
+                            <t t-set="val" t-value="answers.get(q.id)"/>
 
-                        <div class="o_df_questions">
-                          <t t-foreach="st.question_ids.sorted('sequence')" t-as="q">
-                            <t t-if="visible_questions.get(q.id)">
-                              <div class="o_df_question mb-3"
-                                   t-att-data-question-id="q.id"
-                                   t-att-data-type="q.field_type"
-                                   t-att-data-condition-json="condition_json.get(q.id) or ''">
-                                <label class="form-label fw-semibold">
-                                  <t t-esc="q.label"/>
-                                  <t t-if="q.required"><span class="text-danger">*</span></t>
-                                </label>
-                                <t t-if="q.help"><div class="text-muted small mb-1"><t t-esc="q.help"/></div></t>
+                            <!-- char/email/phone/signature -->
+                            <t t-if="q.field_type in ('char','email','phone','signature')">
+                              <input class="form-control"
+                                     t-att-type="('email' if q.field_type=='email' else ('tel' if q.field_type=='phone' else 'text'))"
+                                     t-att-name="'q_%s' % q.id"
+                                     t-att-placeholder="q.placeholder or ''"
+                                     t-att-value="val or ''"
+                                     t-att-data-required="'1' if q.required else '0'"/>
+                            </t>
 
-                                <!-- Render input by type -->
-                                <t t-set="val" t-value="answers.get(q.id)"/>
+                            <!-- text -->
+                            <t t-elif="q.field_type == 'text'">
+                              <textarea class="form-control" rows="4"
+                                        t-att-name="'q_%s' % q.id"
+                                        t-att-placeholder="q.placeholder or ''"
+                                        t-att-data-required="'1' if q.required else '0'"><t t-esc="val or ''"/></textarea>
+                            </t>
 
-                                <t t-if="q.field_type in ('char','email','phone','signature')">
-                                  <input class="form-control"
-                                         t-att-type="('email' if q.field_type=='email' else ('tel' if q.field_type=='phone' else 'text'))"
-                                         t-att-name="'q_%s' % q.id"
-                                         t-att-placeholder="q.placeholder or ''"
-                                         t-att-value="val or ''"
-                                         t-att-data-required="q.required and '1' or '0'"/>
-                                </t>
+                            <!-- date -->
+                            <t t-elif="q.field_type == 'date'">
+                              <input class="form-control" type="date"
+                                     t-att-name="'q_%s' % q.id"
+                                     t-att-value="val or ''"
+                                     t-att-data-required="'1' if q.required else '0'"/>
+                            </t>
 
-                                <t t-elif="q.field_type == 'text'">
-                                  <textarea class="form-control" rows="4"
-                                            t-att-name="'q_%s' % q.id"
-                                            t-att-placeholder="q.placeholder or ''"
-                                            t-att-data-required="q.required and '1' or '0'"><t t-esc="val or ''"/></textarea>
-                                </t>
+                            <!-- numeric -->
+                            <t t-elif="q.field_type in ('integer','float')">
+                              <input class="form-control" type="number"
+                                     t-att-name="'q_%s' % q.id"
+                                     t-att-value="val or ''"
+                                     t-att-step="'1' if q.field_type=='integer' else 'any'"
+                                     t-att-data-required="'1' if q.required else '0'"/>
+                            </t>
 
-                                <t t-elif="q.field_type == 'date'">
-                                  <input class="form-control" type="date" t-att-name="'q_%s' % q.id"
-                                         t-att-value="val or ''"
-                                         t-att-data-required="q.required and '1' or '0'"/>
-                                </t>
-
-                                <t t-elif="q.field_type in ('integer','float')">
-                                  <input class="form-control" type="number" t-att-name="'q_%s' % q.id"
-                                         t-att-value="val or ''"
-                                         t-att-step="('1' if q.field_type=='integer' else 'any')"
-                                         t-att-data-required="q.required and '1' or '0'"/>
-                                </t>
-
-                                <t t-elif="q.field_type == 'bool'">
-                                  <div class="form-check">
-                                    <input class="form-check-input" type="checkbox"
-                                           t-att-name="'q_%s' % q.id"
-                                           t-att-checked="val and 'checked' or None"/>
-                                    <label class="form-check-label">Yes</label>
-                                  </div>
-                                </t>
-
-                                <t t-elif="q.field_type == 'selection'">
-                                  <select class="form-select" t-att-name="'q_%s' % q.id" t-att-data-required="q.required and '1' or '0'">
-                                    <option value="">Select…</option>
-                                    <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
-                                      <option t-att-value="opt.id" t-att-selected="(val == (opt.value or opt.label)) and 'selected' or None">
-                                        <t t-esc="opt.label"/>
-                                      </option>
-                                    </t>
-                                  </select>
-                                </t>
-
-                                <t t-elif="q.field_type == 'multiselect'">
-                                  <t t-set="vals" t-value="val or []"/>
-                                  <div class="row g-2">
-                                    <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
-                                      <div class="col-12 col-md-6">
-                                        <div class="form-check">
-                                          <input class="form-check-input" type="checkbox"
-                                                 t-att-name="'q_%s' % q.id"
-                                                 t-att-value="opt.id"
-                                                 t-att-checked="((opt.value or opt.label) in vals) and 'checked' or None"/>
-                                          <label class="form-check-label"><t t-esc="opt.label"/></label>
-                                        </div>
-                                      </div>
-                                    </t>
-                                  </div>
-                                </t>
-
-                                <t t-elif="q.field_type == 'file'">
-                                  <input class="form-control" type="file" t-att-name="'q_%s' % q.id"/>
-                                  <t t-if="val">
-                                    <div class="small text-muted mt-1">Uploaded: <t t-esc="len(val)"/> file(s)</div>
-                                  </t>
-                                </t>
-
-                                <div class="o_df_save_status small mt-1 text-muted" t-att-data-status-for="'q_%s' % q.id">
-                                  Saved automatically
-                                </div>
+                            <!-- bool -->
+                            <t t-elif="q.field_type == 'bool'">
+                              <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       t-att-name="'q_%s' % q.id"
+                                       t-att-checked="True if val else None"/>
+                                <label class="form-check-label">Yes</label>
                               </div>
                             </t>
-                          </t>
-                        </div>
 
-                        <hr class="my-4"/>
-                      </section>
-                    </t>
+                            <!-- selection -->
+                            <t t-elif="q.field_type == 'selection'">
+                              <select class="form-select"
+                                      t-att-name="'q_%s' % q.id"
+                                      t-att-data-required="'1' if q.required else '0'">
+                                <option value="">Select…</option>
+                                <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
+                                  <t t-set="opt_val" t-value="opt.value or opt.label"/>
+                                  <option t-att-value="opt.id"
+                                          t-att-selected="True if (val == opt_val or val == opt.id) else None">
+                                    <t t-esc="opt.label"/>
+                                  </option>
+                                </t>
+                              </select>
+                            </t>
 
-                    <div class="alert alert-light border rounded-4 mb-0">
-                      <div class="fw-semibold">Tip</div>
-                      <div class="small text-muted">Your answers are saved automatically. You can come back later to continue.</div>
+                            <!-- multiselect -->
+                            <t t-elif="q.field_type == 'multiselect'">
+                              <t t-set="vals" t-value="val or []"/>
+                              <t t-set="vals_str" t-value="[str(v) for v in vals]"/>
+                              <div class="row g-2">
+                                <t t-foreach="q.option_ids.sorted('sequence')" t-as="opt">
+                                  <div class="col-12 col-md-6">
+                                    <div class="form-check">
+                                      <input class="form-check-input" type="checkbox"
+                                             t-att-name="'q_%s' % q.id"
+                                             t-att-value="opt.id"
+                                             t-att-checked="True if (str(opt.id) in vals_str) else None"/>
+                                      <label class="form-check-label"><t t-esc="opt.label"/></label>
+                                    </div>
+                                  </div>
+                                </t>
+                              </div>
+                            </t>
+
+                            <!-- file -->
+                            <t t-elif="q.field_type == 'file'">
+                              <input class="form-control" type="file"
+                                     t-att-name="'q_%s' % q.id"/>
+                              <t t-if="val">
+                                <div class="small text-muted mt-1">Uploaded: <t t-esc="len(val)"/> file(s)</div>
+                              </t>
+                            </t>
+
+                            <div class="o_df_save_status small mt-1 text-muted"
+                                 t-att-data-status-for="'q_%s' % q.id">
+                              Saved automatically
+                            </div>
+                          </div>
+                        </t>
+                      </t>
                     </div>
-                  </div>
+
+                    <hr class="my-4"/>
+                  </section>
+                </t>
+
+                <div class="alert alert-light border rounded-4 mb-0">
+                  <div class="fw-semibold">Tip</div>
+                  <div class="small text-muted">Your answers are saved automatically. You can come back later to continue.</div>
                 </div>
+
               </div>
             </div>
-
           </div>
-        </t>
-      </field>
-    </record>
+        </div>
 
-  </data>
+      </div>
+    </t>
+  </template>
+
 </odoo>

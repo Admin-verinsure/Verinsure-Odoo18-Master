@@ -1,26 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <data>
-    <!-- Top-level menu (no parent) => appears as an App tile -->
-    <menuitem id="menu_dynamic_forms_root"
-              name="Dynamic Forms"
-              sequence="10"
-              action="action_x_form_template"
-              web_icon="dynamic_form_builder_portal,static/description/icon.png"
-              groups="dynamic_form_builder_portal.group_form_manager,dynamic_form_builder_portal.group_form_reviewer"/>
 
-    <menuitem id="menu_form_templates"
-              name="Form Templates"
-              parent="menu_dynamic_forms_root"
-              sequence="10"
-              action="action_x_form_template"
-              groups="dynamic_form_builder_portal.group_form_manager"/>
+  <!-- ROOT MENU: App tile (NO parent, NO groups) -->
+  <menuitem id="menu_dynamic_forms_root"
+            name="Dynamic Forms"
+            sequence="10"
+            action="action_x_form_template"
+            web_icon="dynamic_form_builder_portal,static/description/icon.png"/>
 
-    <menuitem id="menu_form_submissions"
-              name="Submissions"
-              parent="menu_dynamic_forms_root"
-              sequence="20"
-              action="action_x_form_submission"
-              groups="dynamic_form_builder_portal.group_form_manager,dynamic_form_builder_portal.group_form_reviewer"/>
-  </data>
+  <!-- Form Templates -->
+  <menuitem id="menu_form_templates"
+            name="Form Templates"
+            parent="menu_dynamic_forms_root"
+            sequence="10"
+            action="action_x_form_template"
+            groups="dynamic_form_builder_portal.group_form_manager"/>
+
+  <!-- Submissions -->
+  <menuitem id="menu_form_submissions"
+            name="Submissions"
+            parent="menu_dynamic_forms_root"
+            sequence="20"
+            action="action_x_form_submission"
+            groups="dynamic_form_builder_portal.group_form_manager,dynamic_form_builder_portal.group_form_reviewer"/>
+
 </odoo>
