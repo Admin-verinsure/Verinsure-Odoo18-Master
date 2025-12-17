@@ -41,7 +41,7 @@
               </group>
             </page>
 
-            <page string="Options" attrs="{'invisible': [('field_type','not in', ('selection','multiselect'))]}">
+            <page string="Options" invisible="field_type not in ('selection', 'multiselect')">
               <field name="option_ids">
                 <list editable="bottom">
                   <field name="sequence" widget="handle"/>
@@ -67,8 +67,8 @@
             <page string="Validation">
               <group>
                 <field name="validation_regex"/>
-                <field name="min_value"/>
-                <field name="max_value"/>
+                <field name="min_value" invisible="field_type not in ('integer', 'float')"/>
+                <field name="max_value" invisible="field_type not in ('integer', 'float')"/>
                 <field name="key"/>
               </group>
             </page>
