@@ -5,12 +5,10 @@
     "version": "18.0.1.0.1",
     "author": "Verinsure",
     "license": "LGPL-3",
-    'depends': ['base','account','mail'],
-
+    "depends": ["base", "account", "mail"],
     "data": [
         "data/email_template.xml",
     ],
-    "post_init_hook": "post_init_hook",
     "application": False,
     "installable": True,
 }
