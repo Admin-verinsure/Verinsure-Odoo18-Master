@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_insurance_details_rpc,insurance.details rpc access,insurance.model_insurance_details,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
+access_account_move_insurance_link,account.move insurance link access,account.model_account_move,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
