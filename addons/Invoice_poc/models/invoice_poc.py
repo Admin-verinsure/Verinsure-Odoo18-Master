@@ -226,7 +226,11 @@ class InvoicePocPayload(models.Model):
         Ensure employee.details for insured person.
         employee.details has NO partner_id.
         """
-        ED = self.env['employee.details']
+        # NOTE:
+        # Some deployments have record rules on employee.details that can
+        # reference fields not present in the base model (e.g. partner_id).
+        # Using sudo() avoids rule-induced crashes during integration flows.
+        ED = self.env['employee.details'].sudo()
 
         name = (person.get('name') or '').strip() or 'Customer'
         email = (person.get('email') or '').strip()
@@ -255,6 +259,16 @@ class InvoicePocPayload(models.Model):
             company_id=company_id,
         )
 
+        # If employee.details has a partner_id (added by this module for
+        # compatibility), keep it in sync.
+        if emp and partner and 'partner_id' in emp._fields and not emp.partner_id:
+            try:
+                emp.write({'partner_id': partner.id})
+            except Exception:
+                # Never fail invoice creation just because this optional link
+                # couldn't be written.
+                pass
+
         return partner, emp
 
     @api.model
@@ -263,7 +277,7 @@ class InvoicePocPayload(models.Model):
         Ensure employee.details for agent.
         NO partner_id here.
         """
-        ED = self.env['employee.details']
+        ED = self.env['employee.details'].sudo()
         if not agent_payload:
             return ED.browse()
 
