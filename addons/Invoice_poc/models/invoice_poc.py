@@ -378,9 +378,11 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_or_create_policy(self, payload_policy, partner, emp):
-        """
-        Ensure policy.details (+ insurance.details) exists/linked.
-        Also set agent_id on policy/insurance if those fields exist.
+        """Ensure policy.details (+ insurance.details) exists/linked.
+
+        Agent linking is best-effort and supports either:
+          - policy.details.agent_id / insurance.details.agent_id (if those exist), OR
+          - policy.details.x_agent_id / insurance.details.x_agent_id (from this module)
         """
         PD = self.env['policy.details'].sudo()
         ID = self.env['insurance.details'].sudo()
@@ -389,6 +391,9 @@ class InvoicePocPayload(models.Model):
         ptype = self._find_or_create_policy_type(p.get('type_name'))
 
         agent = self._find_or_create_agent(p.get('agent'), company_id=self.env.user.company_id.id)
+
+        pd_agent_field = 'agent_id' if 'agent_id' in PD._fields else ('x_agent_id' if 'x_agent_id' in PD._fields else None)
+        id_agent_field = 'agent_id' if 'agent_id' in ID._fields else ('x_agent_id' if 'x_agent_id' in ID._fields else None)
 
         # Policy
         pol_name = p.get('name') or p.get('policy_no') or 'Policy'
@@ -403,13 +408,13 @@ class InvoicePocPayload(models.Model):
             }
             if p.get('amount') is not None and 'amount' in PD._fields:
                 pol_vals['amount'] = p['amount']
-            if 'agent_id' in PD._fields and agent:
-                pol_vals['agent_id'] = agent.id
+            if pd_agent_field and agent:
+                pol_vals[pd_agent_field] = agent.id
             pol = PD.create(pol_vals)
         else:
-            if 'agent_id' in PD._fields and agent and not getattr(pol, 'agent_id', False):
+            if pd_agent_field and agent and not getattr(pol, pd_agent_field, False):
                 try:
-                    pol.write({'agent_id': agent.id})
+                    pol.sudo().write({pd_agent_field: agent.id})
                 except Exception:
                     pass
 
@@ -426,33 +431,34 @@ class InvoicePocPayload(models.Model):
             }
             if 'partner_id' in ID._fields:
                 ins_vals['partner_id'] = partner.id
-            if 'employee_id' in ID._fields:
-                ins_vals['employee_id'] = emp.id if emp else False
+            if 'employee_id' in ID._fields and emp:
+                ins_vals['employee_id'] = emp.id
             if 'payment_type' in ID._fields:
                 ins_vals['payment_type'] = p.get('payment_type') or 'fixed'
             if 'policy_duration' in ID._fields:
                 ins_vals['policy_duration'] = p.get('policy_duration') or 12
             if policy_number_val and 'policy_number' in ID._fields:
                 ins_vals['policy_number'] = policy_number_val
-            if 'agent_id' in ID._fields and agent:
-                ins_vals['agent_id'] = agent.id
+            if id_agent_field and agent:
+                ins_vals[id_agent_field] = agent.id
 
             ins = ID.create(ins_vals)
+
             if hasattr(ins, 'action_confirm_insurance'):
                 try:
                     ins.action_confirm_insurance()
                 except Exception:
                     pass
         else:
-            policy_number_val = self._coerce_policy_number(p.get('policy_number'))
             to_write = {}
+            policy_number_val = self._coerce_policy_number(p.get('policy_number'))
             if policy_number_val and 'policy_number' in ID._fields and getattr(ins, 'policy_number', None) in (False, 0, '', None):
                 to_write['policy_number'] = policy_number_val
-            if 'agent_id' in ID._fields and agent and not getattr(ins, 'agent_id', False):
-                to_write['agent_id'] = agent.id
+            if id_agent_field and agent and not getattr(ins, id_agent_field, False):
+                to_write[id_agent_field] = agent.id
             if to_write:
                 try:
-                    ins.write(to_write)
+                    ins.sudo().write(to_write)
                 except Exception:
                     pass
 

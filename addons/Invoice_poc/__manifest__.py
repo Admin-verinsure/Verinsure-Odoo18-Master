@@ -3,9 +3,10 @@
     "name": "Invoice POC",
     "summary": "Store payload, create & post customer invoice",
     "version": "18.0.1.0.1",
-    "author": "Your Team",
+    "author": "Verinsure",
     "license": "LGPL-3",
-    "depends": ["base", "account"],
+    'depends': ['base','account','mail'],
+
     "data": [
         "data/email_template.xml",
     ],
