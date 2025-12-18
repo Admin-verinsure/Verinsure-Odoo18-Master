@@ -8,5 +8,5 @@ class AccountMove(models.Model):
         "insurance.details",
         string="Insurance",
         index=True,
-        ondelete="cascade",
+        ondelete="set null",
     )
