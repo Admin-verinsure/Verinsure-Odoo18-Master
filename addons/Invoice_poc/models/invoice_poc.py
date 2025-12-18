@@ -49,7 +49,6 @@ class InvoicePocPayload(models.Model):
     )
     error_message = fields.Text()
 
-    # Idempotency on external reference
     _sql_constraints = [
         ("ext_id_unique", "unique(ext_id)", "This external reference already exists."),
     ]
@@ -63,10 +62,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _sanitize_phone_10(self, s):
-        """
-        Return exactly 10 trailing digits if present, else ''.
-        Matches your employee.details phone validator expectation.
-        """
+        """Return exactly 10 trailing digits if present, else '' (matches validator)."""
         d = self._digits_only(s)
         return d[-10:] if len(d) >= 10 else (d if len(d) == 10 else "")
 
@@ -74,7 +70,7 @@ class InvoicePocPayload(models.Model):
     def _coerce_policy_number(self, val):
         """
         Coerce payload policy_number to insurance.details field type.
-        - If insurance.details.policy_number is integer → keep digits and int()
+        - If integer field → keep digits and int()
         - If char → keep string
         """
         ID = self.env['insurance.details']
@@ -133,9 +129,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_taxes(self, names=None, company_id=None):
-        """
-        Lookup taxes by name or description to support inputs like 'GST 15%'.
-        """
+        """Lookup taxes by name or description (supports inputs like 'GST 15%')."""
         names = names or []
         if isinstance(names, str):
             names = [names]
@@ -153,7 +147,7 @@ class InvoicePocPayload(models.Model):
     @api.model
     def _fallback_income_account(self, company_id=None):
         Account = self.env["account.account"]
-        # In v16+, company relation is via company_ids m2m; avoid invalid domain on company_id
+        # In v16+, company relation is via company_ids m2m
         acc = Account.search(
             [("account_type", "=", "income"), ("company_ids", "in", [company_id])], limit=1
         ) or Account.search([("account_type", "=", "income")], limit=1)
@@ -186,9 +180,7 @@ class InvoicePocPayload(models.Model):
         return "".join(parts) if parts else False
 
     def _send_invoice_email(self, move, to_email=None):
-        """
-        Send the invoice email immediately to the payload email (preferred).
-        """
+        """Send the invoice email immediately to the payload email (preferred)."""
         target = (to_email or "").strip() or (move.partner_id.email or "").strip()
         if not target:
             self.env['mail.activity'].create({
@@ -220,10 +212,45 @@ class InvoicePocPayload(models.Model):
 
     # ---------------- agent / insurance / policy helpers ----------------
     @api.model
+    def _find_or_create_policy_type(self, type_name):
+        """Ensure/return policy.type by name."""
+        if not type_name:
+            return self.env['policy.type'].browse()
+        PT = self.env['policy.type']
+        rec = PT.search([('name', '=', type_name)], limit=1)
+        return rec or PT.create({'name': type_name})
+
+    @api.model
+    def _find_or_create_employee(self, person, company_id):
+        """
+        Ensure res.partner + employee.details for {name,email,phone}.
+        Phone sanitized to exactly 10 digits (fits your validator).
+        """
+        ED = self.env['employee.details']
+        partner = self._find_partner(
+            email=(person.get('email') or '').strip() or None,
+            name=(person.get('name') or '').strip() or None,
+            company_id=company_id,
+        )
+        phone10 = self._sanitize_phone_10(person.get('phone'))
+        emp = ED.search([('partner_id', '=', partner.id)], limit=1)
+        if not emp:
+            vals = {
+                'name': person.get('name') or partner.name,
+                'partner_id': partner.id,
+            }
+            if person.get('email'):
+                vals['email'] = person['email']
+            if phone10:
+                vals['phone'] = phone10
+            emp = ED.create(vals)
+        return partner, emp
+
+    @api.model
     def _find_or_create_agent(self, agent_payload, company_id):
         """
         Ensure an employee.details record representing the policy agent.
-        Tries by email, then by 10-digit phone. Creates a partner if needed.
+        Tries by email, then by 10-digit phone. Creates partner if needed.
         """
         ED = self.env['employee.details']
         if not agent_payload:
@@ -240,7 +267,6 @@ class InvoicePocPayload(models.Model):
             agent = ED.search([('phone', '=', phone10)], limit=1)
 
         if not agent:
-            # Create a partner for the agent if your employee.details expects partner_id
             partner = self._find_partner(email=email or None, name=name, company_id=company_id)
             vals = {'name': name, 'partner_id': partner.id}
             if email:
@@ -255,7 +281,7 @@ class InvoicePocPayload(models.Model):
     def _find_or_create_policy(self, payload_policy, partner, emp):
         """
         Ensure policy.details (+ insurance.details) exists/linked.
-        Also set agent_id on policy/insurance if fields exist.
+        Also set agent_id on policy/insurance if those fields exist.
         """
         PD = self.env['policy.details']
         ID = self.env['insurance.details']
@@ -264,6 +290,7 @@ class InvoicePocPayload(models.Model):
         ptype = self._find_or_create_policy_type(p.get('type_name'))
         agent = self._find_or_create_agent(p.get('agent'), company_id=self.env.user.company_id.id)
 
+        # Policy
         pol_name = p.get('name') or p.get('policy_no') or 'Policy'
         dom = [('name', '=', pol_name)]
         if ptype:
@@ -276,19 +303,17 @@ class InvoicePocPayload(models.Model):
             }
             if p.get('amount') is not None:
                 pol_vals['amount'] = p['amount']
-            # set agent on policy if the field exists
-            if hasattr(PD, 'agent_id') and agent:
+            if 'agent_id' in PD._fields and agent:
                 pol_vals['agent_id'] = agent.id
             pol = PD.create(pol_vals)
         else:
-            # keep agent in sync if there is a field and none set
-            if hasattr(PD, 'agent_id') and agent and not getattr(pol, 'agent_id', False):
+            if 'agent_id' in PD._fields and agent and not getattr(pol, 'agent_id', False):
                 try:
                     pol.sudo().write({'agent_id': agent.id})
                 except Exception:
                     pass
 
-        # Insurance record
+        # Insurance
         ins = ID.search([('policy_id', '=', pol.id), ('partner_id', '=', partner.id)], limit=1)
         if not ins:
             policy_number_val = self._coerce_policy_number(p.get('policy_number'))
@@ -301,24 +326,21 @@ class InvoicePocPayload(models.Model):
             }
             if policy_number_val:
                 ins_vals['policy_number'] = policy_number_val
-            # set agent on insurance if the field exists
-            if hasattr(ID, 'agent_id') and agent:
+            if 'agent_id' in ID._fields and agent:
                 ins_vals['agent_id'] = agent.id
 
             ins = ID.create(ins_vals)
-            # optional confirm
             if hasattr(ins, 'action_confirm_insurance'):
                 try:
                     ins.action_confirm_insurance()
                 except Exception:
                     pass
         else:
-            # keep policy_number / agent in sync if provided
             policy_number_val = self._coerce_policy_number(p.get('policy_number'))
             to_write = {}
             if policy_number_val and getattr(ins, 'policy_number', None) in (False, 0, '', None):
                 to_write['policy_number'] = policy_number_val
-            if hasattr(ID, 'agent_id') and agent and not getattr(ins, 'agent_id', False):
+            if 'agent_id' in ID._fields and agent and not getattr(ins, 'agent_id', False):
                 to_write['agent_id'] = agent.id
             if to_write:
                 try:
@@ -434,7 +456,6 @@ class InvoicePocPayload(models.Model):
 
         # Customer/Employee
         customer = data.get("customer", {}) or {}
-        # sanitize phone for employee_details validation if present there
         if customer.get("phone"):
             customer = dict(customer)
             customer["phone"] = self._sanitize_phone_10(customer["phone"])
@@ -459,7 +480,7 @@ class InvoicePocPayload(models.Model):
         # Narration (Terms + Notes)
         narration_html = self._build_narration_html(data)
 
-        # Policy + Insurance (+ Agent if provided)
+        # Policy + Insurance (+ Agent)
         policy_payload = data.get("policy") or {}
         policy, insurance = self._find_or_create_policy(policy_payload, partner, emp)
 
@@ -483,19 +504,17 @@ class InvoicePocPayload(models.Model):
         self.write({"move_id": move.id, "state": "posted"})
         return move
 
-    # ---------------- legacy entrypoint (kept for compatibility) ----------------
+    # ---------------- legacy entrypoint ----------------
     def action_create_and_post_invoice(self):
         """
-        Backward compatible:
-        - If payload contains 'policy', use policy-first flow.
-        - Else, behave like the previous invoice-only flow.
+        If payload contains 'policy', use policy-first flow.
+        Else, create a plain customer invoice.
         """
         self.ensure_one()
         data = json.loads(self.payload_json or "{}")
         if data.get('policy'):
             return self.action_create_policy_and_invoice()
 
-        # --- simplified invoice-only fallback ---
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
