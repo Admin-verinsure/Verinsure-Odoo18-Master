@@ -1,112 +1,160 @@
 # -*- coding: utf-8 -*-
 import base64
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 
-class InsuranceDetailsRPC(models.Model):
+class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
     @api.model
-    def rpc_create_insurance_invoice_and_email(self, payload):
-        payload = payload or {}
-        customer = (payload.get("customer") or {})
-        employee = (payload.get("employee") or {})
-        policy = (payload.get("policy") or {})
-        inv = (payload.get("invoice") or {})
+    def _rpc_pick_company_safe_product(self, company, line_name):
+        Product = self.env["product.product"].sudo().with_company(company)
+        product = Product.search([
+            ("sale_ok", "=", True),
+            "|", ("company_id", "=", False), ("company_id", "=", company.id),
+        ], limit=1)
+        if product:
+            return product
 
-        # ---- Customer ----
-        cust_name = (customer.get("name") or "").strip()
-        cust_email = (customer.get("email") or "").strip()
+        # Create safe service product
+        tmpl = self.env["product.template"].sudo().with_company(company).create({
+            "name": line_name or "Insurance Service",
+            "type": "service",
+            "sale_ok": True,
+            "purchase_ok": False,
+            "company_id": company.id,
+        })
+        return tmpl.product_variant_id
 
-        if not cust_name:
-            raise UserError("Payload missing customer.name")
-        if not cust_email:
+    @api.model
+    def _rpc_find_or_create_partner(self, customer):
+        Partner = self.env["res.partner"].sudo()
+        email = (customer.get("email") or "").strip()
+        name = (customer.get("name") or "").strip() or email or "Customer"
+        if not email:
             raise UserError("Payload missing customer.email")
 
-        email_norm = cust_email.strip().lower()
-
-        Partner = self.env["res.partner"].sudo()
-        # Try to find by email (case-insensitive)
-        partner = Partner.search([("email", "=ilike", email_norm)], limit=1)
-        if not partner:
-            # Some systems store emails with spaces/case; fallback to ilike contains
-            partner = Partner.search([("email", "ilike", email_norm)], limit=1)
-
+        # Case-insensitive match
+        partner = Partner.search([("email", "=ilike", email)], limit=1)
         if partner:
-            # IMPORTANT: do NOT write email (your duplicate email module can raise even on no-op writes)
-            write_vals = {
-                "name": cust_name or partner.name,
-            }
-            if customer.get("phone"):
-                write_vals["phone"] = customer.get("phone")
-            if customer.get("mobile"):
-                write_vals["mobile"] = customer.get("mobile")
-            if customer.get("gst"):
-                write_vals["vat"] = customer.get("gst")
-            # Only write if something actually changes
-            if any(partner[field] != val for field, val in write_vals.items() if field in partner._fields):
-                partner.write(write_vals)
-        else:
-            # Create partner. If duplicate email validation triggers, fallback to re-search and use that partner.
-            try:
-                partner = Partner.create({
-                    "name": cust_name,
-                    "email": email_norm,
-                    "phone": customer.get("phone"),
-                    "mobile": customer.get("mobile"),
-                    "vat": customer.get("gst"),
-                    "customer_rank": 1,
-                })
-            except ValidationError:
-                partner = Partner.search([("email", "=ilike", email_norm)], limit=1)
-                if not partner:
-                    partner = Partner.search([("email", "ilike", email_norm)], limit=1)
-                if not partner:
-                    raise
+            # Don't write email again (your duplicate_email module may block writes)
+            vals = {}
+            if name and partner.name != name:
+                vals["name"] = name
+            phone = customer.get("phone")
+            if phone and partner.phone != phone:
+                vals["phone"] = phone
+            mobile = customer.get("mobile")
+            if mobile and partner.mobile != mobile:
+                vals["mobile"] = mobile
+            gst = customer.get("gst") or customer.get("vat")
+            if gst and partner.vat != gst:
+                vals["vat"] = gst
+            if vals:
+                partner.write(vals)
+            if partner.customer_rank < 1:
+                partner.write({"customer_rank": 1})
+            return partner
 
-        # ---- Employee ----
+        # Create new partner
+        try:
+            return Partner.create({
+                "name": name,
+                "email": email,
+                "phone": customer.get("phone"),
+                "mobile": customer.get("mobile"),
+                "vat": customer.get("gst") or customer.get("vat"),
+                "customer_rank": 1,
+            })
+        except Exception:
+            # In case custom validation blocks due to duplicates, re-search and reuse
+            partner = Partner.search([("email", "=ilike", email)], limit=1)
+            if partner:
+                return partner
+            raise
+
+    @api.model
+    def _rpc_find_or_create_employee(self, employee):
         emp_name = (employee.get("name") or "").strip()
         if not emp_name:
             raise UserError("Payload missing employee.name")
 
-        emp_rec = None
+        # Prefer employee_details table (your custom)
         if "employee.details" in self.env:
             Emp = self.env["employee.details"].sudo()
-            emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
-            if not emp_rec:
-                emp_rec = Emp.create({"name": emp_name})
-        else:
-            Emp = self.env["hr.employee"].sudo()
-            emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
-            if not emp_rec:
-                emp_rec = Emp.create({"name": emp_name})
+            rec = Emp.search([("name", "=", emp_name)], limit=1)
+            if rec:
+                return rec, "employee.details"
+            return Emp.create({"name": emp_name}), "employee.details"
 
-        # ---- Policy ----
+        # Fallback hr.employee
+        Emp = self.env["hr.employee"].sudo()
+        rec = Emp.search([("name", "=", emp_name)], limit=1)
+        if rec:
+            return rec, "hr.employee"
+        return Emp.create({"name": emp_name}), "hr.employee"
+
+    @api.model
+    def _rpc_get_policy(self, policy):
         Policy = self.env["policy.details"].sudo()
-        policy_id = policy.get("id")
-        if policy_id:
-            policy_rec = Policy.browse(int(policy_id))
-            if not policy_rec.exists():
-                raise UserError(f"Invalid policy.id: {policy_id}")
-        else:
-            policy_name = (policy.get("name") or "").strip()
-            if not policy_name:
-                raise UserError("Payload missing policy.id or policy.name")
-            policy_rec = Policy.search([("name", "=", policy_name)], limit=1)
-            if not policy_rec:
-                raise UserError(f"Policy not found: {policy_name}")
+        pol_id = policy.get("id")
+        if pol_id:
+            rec = Policy.browse(int(pol_id))
+            if not rec.exists():
+                raise UserError(f"Invalid policy.id: {pol_id}")
+            return rec
+        name = (policy.get("name") or "").strip()
+        if not name:
+            raise UserError("Payload missing policy.id or policy.name")
+        rec = Policy.search([("name", "=", name)], limit=1)
+        if not rec:
+            raise UserError(f"Policy not found: {name}")
+        return rec
 
-        # ---- Currency ----
-        currency_code = (payload.get("currency") or "AUD").strip()
-        currency = self.env["res.currency"].sudo().search([("name", "=", currency_code)], limit=1)
-        if not currency:
-            raise UserError(f"Currency not found: {currency_code}")
+    @api.model
+    def _rpc_get_currency(self, code):
+        code = (code or "AUD").strip()
+        cur = self.env["res.currency"].sudo().search([("name", "=", code)], limit=1)
+        if not cur:
+            raise UserError(f"Currency not found: {code}")
+        return cur
 
-        # ---- Create insurance.details ----
-        start_date = payload.get("start_date") or fields.Date.context_today(self)
+    @api.model
+    def _rpc_get_invoice_report(self):
+        # Try common invoice report xmlids across versions/localizations
+        xmlids = [
+            "account.account_invoices",     # older
+            "account.report_invoice",       # common report action
+            "account.account_invoices_without_payment",  # sometimes exists
+        ]
+        for xid in xmlids:
+            rep = self.env.ref(xid, raise_if_not_found=False)
+            if rep and rep._name == "ir.actions.report":
+                return rep
+        # fallback: any qweb-pdf report for account.move
+        rep = self.env["ir.actions.report"].sudo().search([
+            ("model", "=", "account.move"),
+            ("report_type", "=", "qweb-pdf"),
+        ], limit=1)
+        return rep
+
+    @api.model
+    def rpc_create_insurance_invoice_and_email(self, payload):
+        payload = payload or {}
+        customer = payload.get("customer") or {}
+        employee = payload.get("employee") or {}
+        policy = payload.get("policy") or {}
+        inv = payload.get("invoice") or {}
+
+        partner = self._rpc_find_or_create_partner(customer)
+        emp_rec, emp_model = self._rpc_find_or_create_employee(employee)
+        policy_rec = self._rpc_get_policy(policy)
+        currency = self._rpc_get_currency(payload.get("currency"))
+
+        # Ensure NOT NULL required fields for insurance_details
         insurance_vals = {
             "partner_id": partner.id,
-            "employee_id": emp_rec.id,
+            "employee_id": emp_rec.id,  # your insurance_details column expects int; employee_details id matches
             "policy_id": policy_rec.id,
             "policy_duration": int(payload.get("policy_duration") or 12),
             "currency_id": currency.id,
@@ -114,45 +162,35 @@ class InsuranceDetailsRPC(models.Model):
             "name": payload.get("name") or f"{partner.name} - {policy_rec.name}",
             "payment_type": payload.get("payment_type") or "fixed",
             "state": payload.get("state") or "draft",
-            "start_date": start_date,
+            "start_date": payload.get("start_date") or fields.Date.context_today(self),
         }
+
         insurance = self.sudo().create(insurance_vals)
 
-        # ---- Create invoice ----
         company = self.env.company
-        journal = self.env["account.journal"].sudo().search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
+        journal = self.env["account.journal"].sudo().with_company(company).search([
+            ("type", "=", "sale"),
+            ("company_id", "=", company.id),
+        ], limit=1)
         if not journal:
             raise UserError("No Sales Journal found for current company.")
 
-        Product = self.env["product.product"].sudo()
-        product = None
+        # product handling
         product_id = inv.get("product_id")
+        line_name = inv.get("line_name") or "Insurance Premium"
         if product_id:
-            product = Product.browse(int(product_id))
+            product = self.env["product.product"].sudo().browse(int(product_id))
             if not product.exists():
-                raise UserError("invoice.product_id not found")
+                raise UserError(f"Invalid invoice.product_id: {product_id}")
             if product.company_id and product.company_id.id != company.id:
-                raise UserError("invoice.product_id belongs to another company")
+                raise UserError("Provided product_id belongs to another company.")
         else:
-            product = Product.search([
-                ("sale_ok", "=", True),
-                "|", ("company_id", "=", False), ("company_id", "=", company.id)
-            ], limit=1)
-
-        if not product:
-            # create safe service product in this company
-            product = Product.create({
-                "name": "Insurance Service",
-                "type": "service",
-                "sale_ok": True,
-                "purchase_ok": False,
-                "company_id": company.id,
-            })
+            product = self._rpc_pick_company_safe_product(company, line_name)
 
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
 
-        move = self.env["account.move"].sudo().create({
+        move = self.env["account.move"].sudo().with_company(company).create({
             "move_type": "out_invoice",
             "company_id": company.id,
             "partner_id": partner.id,
@@ -162,7 +200,7 @@ class InsuranceDetailsRPC(models.Model):
             "insurance_details_id": insurance.id,
             "invoice_line_ids": [(0, 0, {
                 "product_id": product.id,
-                "name": inv.get("line_name") or f"Insurance: {insurance.name}",
+                "name": line_name,
                 "quantity": qty,
                 "price_unit": price_unit,
             })],
@@ -170,33 +208,33 @@ class InsuranceDetailsRPC(models.Model):
 
         move.action_post()
 
-        # ---- Render PDF ----
-        report = self.env.ref("account.account_invoices", raise_if_not_found=False)
-        if not report:
-            report = self.env["ir.actions.report"].sudo().search([("model", "=", "account.move"), ("report_type", "=", "qweb-pdf")], limit=1)
-        if not report:
-            raise UserError("Invoice PDF report not found.")
-
-        pdf_content, _ = report._render_qweb_pdf([move.id])
-        attachment = self.env["ir.attachment"].sudo().create({
-            "name": f"{move.name}.pdf",
-            "type": "binary",
-            "datas": base64.b64encode(pdf_content),
-            "res_model": "account.move",
-            "res_id": move.id,
-            "mimetype": "application/pdf",
-        })
-
-        emailed = True
+        emailed = False
         email_error = None
         try:
+            report = self._rpc_get_invoice_report()
+            if not report:
+                raise UserError("Invoice PDF report not found.")
+            # IMPORTANT: in Odoo 18 the signature expects report_ref if called on model.
+            # Calling on record with keyword avoids confusion.
+            pdf_content, _ = report._render_qweb_pdf(res_ids=[move.id])
+
+            attachment = self.env["ir.attachment"].sudo().create({
+                "name": f"{move.name}.pdf",
+                "type": "binary",
+                "datas": base64.b64encode(pdf_content),
+                "res_model": "account.move",
+                "res_id": move.id,
+                "mimetype": "application/pdf",
+            })
+
             mail = self.env["mail.mail"].sudo().create({
                 "subject": f"Invoice {move.name}",
-                "email_to": email_norm,
+                "email_to": partner.email,
                 "body_html": f"<p>Hello {partner.name},</p><p>Please find your invoice attached.</p>",
                 "attachment_ids": [(4, attachment.id)],
             })
             mail.send()
+            emailed = True
         except Exception as e:
             emailed = False
             email_error = str(e)
@@ -205,7 +243,8 @@ class InsuranceDetailsRPC(models.Model):
             "insurance_id": insurance.id,
             "invoice_id": move.id,
             "invoice_name": move.name,
-            "emailed_to": email_norm,
+            "emailed_to": partner.email,
             "emailed": emailed,
             "email_error": email_error,
+            "employee_model_used": emp_model,
         }
