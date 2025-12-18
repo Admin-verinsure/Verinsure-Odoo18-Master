@@ -1,4 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_youth_volunteer_application_portal,portal youth volunteer application,model_youth_volunteer_application,base.group_portal,1,1,1,0
-access_youth_volunteer_application_user,internal youth volunteer application,model_youth_volunteer_application,base.group_user,1,1,1,1
-access_youth_volunteer_privacy_user,internal youth volunteer privacy,model_youth_volunteer_application_privacy,base.group_user,1,1,1,1
