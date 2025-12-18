@@ -1,30 +1,29 @@
 # -*- coding: utf-8 -*-
+from odoo import SUPERUSER_ID
 
-from odoo import api, SUPERUSER_ID
+def post_init_hook(env):
+    """Post-init hook (Odoo 18 calls this with a single `env` argument).
 
+    Goal: ensure `employee.details` has a `partner_id` field if that model exists.
+    This prevents crashes when an ir.rule/domain references employee.details.partner_id.
 
-def post_init_hook(cr, registry):
-    """Create missing `partner_id` on `employee.details` if that model exists.
-
-    This avoids registry crashes from Python `_inherit = 'employee.details'` on
-    databases where that model isn't installed yet, while still fixing the
-    runtime crash you saw when an ir.rule references `partner_id`.
+    We create a *manual* ir.model.fields entry only if the field doesn't already exist.
     """
-    env = api.Environment(cr, SUPERUSER_ID, {})
+    # Make sure we run with superuser privileges
+    env = env(su=True)
 
     # If the model doesn't exist in this DB, do nothing.
     if 'employee.details' not in env:
         return
 
-    model = env['ir.model'].sudo().search([('model', '=', 'employee.details')], limit=1)
+    Model = env['ir.model'].sudo()
+    Fields = env['ir.model.fields'].sudo()
+
+    model = Model.search([('model', '=', 'employee.details')], limit=1)
     if not model:
         return
 
-    Fields = env['ir.model.fields'].sudo()
-    existing = Fields.search([
-        ('model_id', '=', model.id),
-        ('name', '=', 'partner_id'),
-    ], limit=1)
+    existing = Fields.search([('model_id', '=', model.id), ('name', '=', 'partner_id')], limit=1)
     if existing:
         return
 
