@@ -1,0 +1,419 @@
+<odoo>
+    <record id="view_form_builder_list" model="ir.ui.view">
+        <field name="name">form.builder.list</field>
+        <field name="model">form.builder</field>
+        <field name="arch" type="xml">
+            <list string="Forms">
+                <field name="name" />
+                <field name="status" />
+                <field name="total_views" />
+                <field name="submission_count" />
+                <field name="conversion_rate" widget="float" options="{'precision': 1}" />
+                <field name="error_score" widget="float" options="{'precision': 1}" />
+                <field name="created_by" />
+                <field name="created_date" />
+                <field name="availability_status" />
+            </list>
+        </field>
+    </record>
+    <record id="view_form_builder_search" model="ir.ui.view">
+        <field name="name">form.builder.search</field>
+        <field name="model">form.builder</field>
+        <field name="arch" type="xml">
+            <search string="Forms Search">
+                <field name="name" string="Form Name" filter_domain="[('name', 'ilike', self)]" />
+
+                <filter name="my_forms" string="My Forms"
+                    domain="[('created_by', '=', uid)]" />
+                <filter name="draft_forms" string="Draft"
+                    domain="[('status', '=', 'draft')]" />
+                <filter name="published_forms" string="Published"
+                    domain="[('status', '=', 'published')]" />
+
+                <filter name="upublished_forms" string="Unpublished"
+                    domain="[('status', '=', 'unpublished')]" />
+
+                <separator />
+
+                <filter name="has_submissions" string="Has Submissions"
+                    domain="[('submission_count', '>', 0)]" />
+                <filter name="no_submissions" string="No Submissions"
+                    domain="[('submission_count', '=', 0)]" />
+
+                <group expand="0" string="Group By">
+                    <filter name="group_by_status" string="Status" context="{'group_by': 'status'}" />
+                    <filter name="group_by_created_by" string="Created By"
+                        context="{'group_by': 'created_by'}" />
+                    <filter name="group_by_created_date" string="Created Date"
+                        context="{'group_by': 'created_date:month'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_form_builder_form" model="ir.ui.view">
+        <field name="name">form.builder.form</field>
+        <field name="model">form.builder</field>
+        <field name="arch" type="xml">
+            <form string="Form Builder">
+                <header>
+                    <button name="action_preview_form" string="Preview Form" type="object"
+                        class="btn-primary" />
+                    <button name="action_share_form" string="Share Form" type="object"
+                        class="btn-success"
+                        invisible="status == 'draft'" />
+                    <button name="action_download_qr_code" string="Download QR Code" type="object"
+                        class="btn-info" invisible="not qr_code_image" />
+
+                    <button name="action_view_responses" string="Responses" type="object"
+                        class="btn-secondary" />
+
+                    <button name="action_view_detailed_analytics" string="Analytics" type="object"
+                        class="btn-info" />
+                    <button name="action_view_regional_analytics" string="Regional Data"
+                        type="object" class="btn-warning" />
+                </header>
+                <header>
+                    <button name="action_publish" string="Publish" type="object"
+                        invisible="status == 'published'" class="btn-primary" />
+                    <button name="action_unpublish" string="Unpublish" type="object"
+                        invisible="status != 'published'" class="btn-primary" />
+                    <field name="status" widget="statusbar"
+                        statusbar_visible="draft,published,unpublished" />
+                </header>
+                <sheet>
+
+                    <group>
+                        <field name="name" />
+                        <field name="created_by" readonly="1" />
+                        <field name="created_date" readonly="1" />
+                    </group>
+                    <group>
+                        <field name="thank_you_message"
+                            placeholder="Write thank you message here..." />
+                        <field name="message_on_unpublish"
+                            placeholder="Write Form expired message here..." />
+                    </group>
+
+                <notebook>
+                    <page string="Form Fields">
+                        <field name="field_ids">
+                            <list editable="bottom">
+                                <field name="label" />
+                                <field name="field_type" />
+
+                                <button name="open_phone_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'phone'"
+                                    title="Configure Phone Field" />
+                                <button name="open_text_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'text'"
+                                    title="Configure Text Field" />
+                                <button name="open_email_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'email'"
+                                    title="Configure Email Field" />
+                                <button name="open_number_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'number'"
+                                    title="Configure Number Field" />
+                                <button name="open_textarea_field_wizard" type="object"
+                                    icon="fa-cog" class="btn-link"
+                                    invisible="field_type != 'textarea'"
+                                    title="Configure Textarea Field" />
+                                <button name="open_select_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link"
+                                    invisible="field_type not in ('select', 'radio')"
+                                    title="Configure Options" />
+                                <button name="open_checkbox_field_wizard" type="object"
+                                    icon="fa-cog" class="btn-link"
+                                    invisible="field_type != 'checkbox'"
+                                    title="Configure Checkbox Field" />
+                                <button name="open_date_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'date'"
+                                    title="Configure Date Field" />
+                                <button name="open_time_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'time'"
+                                    title="Configure Time Field" />
+                                <button name="open_month_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'month'"
+                                    title="Configure Month Field" />
+                                <button name="open_year_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'year'"
+                                    title="Configure Year Field" />
+                                <button name="open_rating_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'rating'"
+                                    title="Configure Rating Field" />
+
+                                <button name="open_password_field_wizard" type="object"
+                                    icon="fa-cog" class="btn-link"
+                                    invisible="field_type != 'password'"
+                                    title="Configure password Field" />
+                                <button name="open_file_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'file'"
+                                    title="Configure file Field" />
+
+                                <button name="open_address_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'address'"
+                                    title="Configure address Field" />
+                                <button name="open_url_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'url'"
+                                    title="Configure url Field" />
+
+                                <button name="open_captcha_field_wizard" type="object" icon="fa-cog"
+                                    class="btn-link" invisible="field_type != 'captcha'"
+                                    title="Configure CAPTCHA Field" />
+
+
+                                <field name="placeholder" />
+                                <field name="required" />
+                            </list>
+                            <form>
+                                <group>
+                                    <field name="label" />
+                                    <field name="field_type" />
+                                    <field name="placeholder" />
+                                    <field name="required" />
+                                    <field name="help_text" />
+                                </group>
+                            </form>
+                        </field>
+                    </page>
+                        <page string="Form Layout">
+                            <group>
+                                <field name="layout_type" widget="radio" />
+                            </group>
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle" /> Vertical: Labels above inputs
+                                (mobile-friendly) <br /> Horizontal: Labels beside inputs (desktop
+                                view) </div>
+                        </page>
+                    <page string="Email Notifications">
+                        <group>
+                            <field name="email_notifications_enabled" />
+                        </group>
+                        <group invisible="not email_notifications_enabled">
+                            <group string="Recipients">
+                                <field name="send_to_owner" />
+                                <field name="send_to_customer" />
+                                <field name="cc_emails"
+                                    placeholder="email1@example.com, email2@example.com" />
+                                <field name="bcc_emails"
+                                    placeholder="email1@example.com, email2@example.com" />
+                            </group>
+                            <group string="Customer Settings" invisible="not send_to_customer">
+                                <field name="require_email_consent" />
+                            </group>
+                        </group>
+                        <group string="Email Templates" invisible="not email_notifications_enabled">
+                            <group string="Owner Notification">
+                                <field name="owner_email_subject" />
+                                <field name="owner_email_template" widget="html"
+                                    options="{'style-inline': true}" />
+                            </group>
+                            <group string="Customer Confirmation" invisible="not send_to_customer">
+                                <field name="customer_email_subject" />
+                                <field name="customer_email_template" widget="html"
+                                    options="{'style-inline': true}" />
+                            </group>
+                        </group>
+                        <group string="Response Settings">
+                            <field name="response_limit" />
+                        </group>
+                    </page>
+                    <page string="Form Availability">
+                        <group>
+                            <field name="availability_type" widget="radio" />
+                        </group>
+                        <group invisible="availability_type == 'always'">
+                            <field name="availability_message"
+                                placeholder="Enter message to show when form is not available..." />
+                        </group>
+                        <group string="Date Range Settings"
+                            invisible="availability_type != 'between_dates'">
+                            <field name="available_from_date"
+                                required="availability_type == 'between_dates'" />
+                            <field name="available_to_date"
+                                required="availability_type == 'between_dates'" />
+                        </group>
+                        <group string="DateTime Range Settings"
+                            invisible="availability_type != 'between_datetime'">
+                            <field name="available_from_datetime"
+                                required="availability_type == 'between_datetime'" />
+                            <field name="available_to_datetime"
+                                required="availability_type == 'between_datetime'" />
+                        </group>
+                    </page>
+                    <page string="QR Code &amp; Sharing">
+                        <group>
+                            <group string="Form Sharing">
+                                <field name="share_token" readonly="1" password="True" />
+                                    <div invisible="not qr_code_image" class="mt-3">
+                                        <button name="action_download_qr_code"
+                                            string="Download QR Code"
+                                            type="object" class="btn-success me-2"
+                                            icon="fa-download" />
+                                        <button name="action_copy_qr_url" string="Copy Form URL"
+                                            type="object" class="btn-info" icon="fa-copy" />
+                                    </div>
+                            </group>
+                            <group string="QR Code" invisible="not qr_code_image">
+                                <field name="qr_code_image" widget="image"
+                                    options="{'size': [200, 200]}" readonly="1" />
+                            </group>
+                        </group>
+
+                        <div invisible="not qr_code_image" class="mt-2">
+                            <p class="text-muted">
+                                <i class="fa fa-info-circle" /> Share this QR code for easy access
+                                to your form. Users can scan it with their mobile devices to open
+                                the form directly. </p>
+                        </div>
+                    </page>
+                </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <record id="view_form_builder_kanban" model="ir.ui.view">
+        <field name="name">form.builder.kanban</field>
+        <field name="model">form.builder</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="status" class="o_kanban_small_column">
+                <field name="name" />
+                <field name="status" />
+                <field name="submission_count" />
+                <field name="total_views" />
+                <field name="conversion_rate" />
+                <field name="created_date" />
+                <field name="created_by" />
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <div class="oe_kanban_content">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <field name="name" />
+                                        </strong>
+                                    </div>
+                                    <div class="o_kanban_manage_button_section">
+                                        <a class="o_kanban_manage_toggle_button" href="#"
+                                            role="button">
+                                            <i class="fa fa-ellipsis-v" role="img"
+                                                aria-label="Manage" title="Manage" />
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="text-muted">Views</div>
+                                            <div class="font-weight-bold text-primary">
+                                                <field name="total_views" />
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted">Submissions</div>
+                                            <div class="font-weight-bold text-success">
+                                                <field name="submission_count" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="text-muted">Conversion Rate</div>
+                                        <div class="font-weight-bold">
+                                            <field name="conversion_rate" widget="float"
+                                                options="{'precision': 1}" />% </div>
+                                    </div>
+                                    <div class="mt-2 text-muted"> Created: <field
+                                            name="created_date" widget="date" />
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_bottom">
+                                    <div class="oe_kanban_bottom_left">
+                                        <field name="created_by" widget="many2one_avatar_user" />
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <field name="status" widget="label_selection"
+                                            options="{'classes': {'draft': 'secondary', 'published': 'success', 'unpublished': 'warning'}}" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="oe_kanban_manage_button_section" style="display: none;">
+                                <div class="o_kanban_manage_button_container">
+                                    <button name="action_view_analytics" type="object"
+                                        class="btn btn-sm btn-secondary">
+                                        <i class="fa fa-bar-chart" /> Analytics </button>
+                                    <button name="action_preview_form" type="object"
+                                        class="btn btn-sm btn-primary">
+                                        <i class="fa fa-eye" /> Preview </button>
+                                    <button name="action_share_form" type="object"
+                                        class="btn btn-sm btn-success">
+                                        <i class="fa fa-share" /> Share </button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_form_analytics_search" model="ir.ui.view">
+        <field name="name">form.analytics.search</field>
+        <field name="model">form.analytics</field>
+        <field name="arch" type="xml">
+            <search string="Analytics Search">
+                <field name="form_name" />
+                <field name="country" />
+                <field name="date" />
+                <filter name="last_30_days" string="Last 30 Days"
+                    domain="[('date', '&gt;=', (context_today() - datetime.timedelta(days=30)))]" />
+                <filter name="last_12_months" string="Last 12 Months"
+                    domain="[('date', '&gt;=', (context_today() - datetime.timedelta(days=365)))]" />
+                <group expand="0" string="Group By">
+                    <filter name="group_form" string="Form" context="{'group_by': 'form_name'}" />
+                    <filter name="group_country" string="Country" context="{'group_by': 'country'}" />
+                    <filter name="group_date_month" string="Month"
+                        context="{'group_by': 'date:month'}" />
+                    <filter name="group_date_week" string="Week" context="{'group_by': 'date:week'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_form_regional_analytics_list" model="ir.ui.view">
+        <field name="name">form.regional.analytics.list</field>
+        <field name="model">form.regional.analytics</field>
+        <field name="arch" type="xml">
+            <list string="Regional Analytics">
+                <field name="country" />
+                <field name="total_views" />
+                <field name="total_submissions" />
+                <field name="conversion_rate" widget="float" options="{'precision': 1}" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_form_regional_analytics_graph" model="ir.ui.view">
+        <field name="name">form.regional.analytics.graph</field>
+        <field name="model">form.regional.analytics</field>
+        <field name="arch" type="xml">
+            <graph string="Regional Analytics" type="bar">
+                <field name="country" type="row" />
+                <field name="total_views" type="measure" />
+                <field name="total_submissions" type="measure" />
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_form_builder" model="ir.actions.act_window">
+        <field name="name">Forms</field>
+        <field name="res_model">form.builder</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="search_view_id" ref="view_form_builder_search" />
+        <field name="context">{
+            'search_default_my_forms': 1
+            }</field>
+    </record>
+</odoo>
