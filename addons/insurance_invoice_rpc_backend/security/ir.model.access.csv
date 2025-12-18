@@ -1,9 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_insurance_details_rpc,insurance.details rpc,model_insurance_details,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_account_move_ins_rpc,account.move insurance link,model_account_move,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_res_partner_rpc,res.partner rpc,model_res_partner,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_employee_details_rpc,employee.details rpc,model_employee_details,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_hr_employee_rpc,hr.employee rpc,model_hr_employee,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_policy_details_rpc,policy.details rpc,model_policy_details,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,0,0,0
-access_mail_mail_rpc,mail.mail rpc,model_mail_mail,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
-access_ir_attachment_rpc,ir.attachment rpc,model_ir_attachment,insurance_invoice_rpc_backend.group_insurance_rpc_user,1,1,1,0
