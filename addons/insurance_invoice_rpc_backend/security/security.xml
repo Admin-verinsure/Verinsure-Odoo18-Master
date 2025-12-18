@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="group_insurance_rpc_user" model="res.groups">
         <field name="name">Insurance RPC User</field>
