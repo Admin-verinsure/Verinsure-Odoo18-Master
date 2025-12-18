@@ -1,6 +1,8 @@
 <odoo>
-    <record id="group_insurance_rpc_user" model="res.groups">
-        <field name="name">Insurance RPC User</field>
-        <field name="category_id" ref="base.module_category_hidden"/>
-    </record>
+    <data noupdate="1">
+        <record id="group_insurance_rpc_user" model="res.groups">
+            <field name="name">Insurance RPC User</field>
+            <field name="category_id" ref="base.module_category_hidden"/>
+        </record>
+    </data>
 </odoo>
