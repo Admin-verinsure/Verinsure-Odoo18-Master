@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="form_expired_template" name="Form Expired">
+        <t t-call="web.layout">
+            <script type="text/javascript"> window.FORM_LANGUAGE = '<t t-esc="user_lang or 'en'" />
+            '; </script>
+            <div class="container mt-5">
+                <div class="row justify-content-center">
+                    <div class="col-md-8 col-lg-6">
+                        <div class="card shadow-lg border-0">
+                            <div class="card-body text-center p-5">
+                                <div class="mb-4">
+                                    <i class="fa fa-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+                                </div>
+                                <h2 class="card-title text-muted mb-3" id="formNotAvailableTitle">Form Not Available</h2>
+                                    <p class="text-muted mb-4">
+                                        <t t-esc="message_on_unpublish or 'If you believe this is an error, please contact the form administrator.'"/>
+                                    </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <link rel="stylesheet" href="/zehntech_form_builder/static/src/css/form_expired.css"/>
+            <script src="/zehntech_form_builder/static/src/js/translations.js"></script>
+            <script src="/zehntech_form_builder/static/src/js/public_translations.js"></script>
+            
+            <script type="text/javascript">
+                document.addEventListener('DOMContentLoaded', function() {
+                if (typeof window._t === 'function') {
+                document.getElementById('formNotAvailableTitle').textContent = window._t('Form Not
+                Available');
+                }
+                });
+            </script>
+
+        </t>
+    </template>
+</odoo>

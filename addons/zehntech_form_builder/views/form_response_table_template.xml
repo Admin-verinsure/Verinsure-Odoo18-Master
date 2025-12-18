@@ -1,0 +1,449 @@
+<odoo>
+    <template id="form_response_table_template" name="Form Submission Table">
+        <t t-call="web.layout">
+            <!-- Include FontAwesome and Bootstrap -->
+            <t t-set="head">
+                <link
+                    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+                    rel="stylesheet" />
+                <link
+                    href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"
+                    rel="stylesheet" />
+            </t>
+
+            <div class="form-response-container">
+                <!-- Header Section -->
+                <div class="response-header">
+                    <h2>
+                        <i class="fas fa-chart-bar me-3"></i>Responses for "<t t-esc="form.name" />" </h2>
+                    <p>Collected form submissions are displayed below with advanced controls.</p>
+                </div>
+
+                <!-- Controls Section -->
+                <div class="controls-section">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-3">
+                                <!-- Export Button -->
+                                <a t-attf-href="/form_builder/export/{{form.id}}" class="btn-export">
+                                    <i class="fas fa-download"></i>Export CSV </a>
+
+                                <!-- Sort Dropdown -->
+                                <div class="dropdown">
+                                    <button class="btn dropdown-toggle"
+                                        id="dropdown-toggle-form-builder" type="button"
+                                        data-bs-toggle="dropdown">
+                                        <i class="fas fa-sort"></i>Sort by Date </button>
+                                    <ul class="dropdown-menu" id="dropdown-menu-zt">
+                                        <li>
+                                            <a class="dropdown-item"
+                                                t-attf-href="/form_builder/responses/{{form.id}}?order=desc&amp;page=1">
+                                                <i class="fas fa-arrow-down"></i>Newest First <t
+                                                    t-if="current_order == 'desc'">
+                                                    <i class="fas fa-check"></i>
+                                                </t>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" id="dropdown-item-zt"
+                                                t-attf-href="/form_builder/responses/{{form.id}}?order=asc&amp;page=1">
+                                                <i class="fas fa-arrow-up"></i>Oldest First <t
+                                                    t-if="current_order == 'asc'">
+                                                    <i class="fas fa-check"></i>
+                                                </t>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="pagination-info">
+                                <i class="fas fa-info-circle"></i> Showing <strong>
+                                    <t t-esc="pagination['start_record']" />
+                                </strong>
+                                to <strong>
+                                    <t t-esc="pagination['end_record']" />
+                                </strong>
+                                of <strong>
+                                    <t t-esc="pagination['total_records']" />
+                                </strong>
+                                submissions </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table or No Data Message -->
+                <t t-if="submissions">
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table class="table form-response-table">
+                            <thead class="table-header-custom">
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <t t-foreach="fields" t-as="f">
+                                        <th scope="col">
+                                            <t t-esc="f.label" />
+                                        </th>
+                                    </t>
+                                    <th scope="col">Submitted On</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="counter" t-value="pagination['start_record']" />
+                                <t t-foreach="submissions" t-as="submission">
+                                    <tr class="submission-row">
+                                        <th scope="row">
+                                            <t t-esc="counter" />
+                                        </th>
+                                        <t t-foreach="fields" t-as="f">
+                                            <td>
+                                                <t t-set="field_value"
+                                                    t-value="submission.submitted_data.get('field_' + str(f.id), '')" />
+                                                <t
+                                                    t-if="f.field_type == 'address' and submission.submitted_data.get('field_' + str(f.id) + '_components')">
+                                                    <t t-set="components"
+                                                        t-value="submission.submitted_data.get('field_' + str(f.id) + '_components', {})" />
+                                                    <t t-set="address_parts" t-value="[]" />
+                                                    <t t-if="components.get('street')"
+                                                        t-set="address_parts"
+                                                        t-value="address_parts + [components.get('street')]" />
+                                                    <t t-if="components.get('city')"
+                                                        t-set="address_parts"
+                                                        t-value="address_parts + [components.get('city')]" />
+                                                    <t t-if="components.get('state')"
+                                                        t-set="address_parts"
+                                                        t-value="address_parts + [components.get('state')]" />
+                                                    <t t-if="components.get('zip')"
+                                                        t-set="address_parts"
+                                                        t-value="address_parts + [components.get('zip')]" />
+                                                    <t t-if="components.get('country')"
+                                                        t-set="address_parts"
+                                                        t-value="address_parts + [components.get('country')]" />
+                                                    <t t-esc="', '.join(address_parts)" />
+                                                </t>
+                                                <t t-if="f.field_type == 'password'">
+                                                    <div class="password-view-wrapper"
+                                                        style="display:flex; align-items:center; gap:8px;">
+                                                        <!-- Masked password span (initially masked) -->
+                                                        <span class="password-field"
+                                                            style="font-family: monospace; background-color: #f8f9fa; padding: 2px 8px; border-radius: 4px; color: #495057; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                                            data-visible="false"
+                                                            t-att-data-real-length="len(field_value or '')">
+                                                            <t
+                                                                t-esc="('*' * len(field_value or ''))" />
+                                                        </span>
+
+                                                        <!-- Eye icon — store the real password in
+                                                        data-password -->
+                                                        <i class="fa-regular fa-eye"
+                                                            aria-hidden="true"
+                                                            t-att-data-password="field_value"
+                                                            title="Show / hide password"
+                                                            style="cursor: pointer; color: #495057; font-size: 1rem;"
+                                                            onclick="(function(icon){
+           try {
+               const wrapper = icon.closest('.password-view-wrapper');
+               if (!wrapper) return;
+               const span = wrapper.querySelector('.password-field');
+               if (!span) return;
+               const isVisible = span.getAttribute('data-visible') === 'true';
+               const real = icon.getAttribute('data-password') || '';
+               if (isVisible) {
+                   span.textContent = '*'.repeat(real.length);
+                   span.setAttribute('data-visible','false');
+                   icon.classList.remove('fa-eye-slash');
+                   icon.classList.add('fa-eye');
+               } else {
+                   span.textContent = real;
+                   span.setAttribute('data-visible','true');
+                   icon.classList.remove('fa-eye');
+                   icon.classList.add('fa-eye-slash');
+               }
+           } catch (e) {
+               console.error('toggle password error', e);
+           }
+       })(this);">
+                                                        </i>
+                                                    </div>
+                                                </t>
+
+
+                                                <t t-elif="f.field_type == 'file'">
+                                                    <t t-set="field_value"
+                                                        t-value="submission.submitted_data.get('field_' + str(f.id))" />
+                                                    <t t-if="field_value">
+                                                        <!-- Multiple files (list) -->
+                                                        <t
+                                                            t-if="isinstance(field_value, list) and len(field_value) > 0">
+                                                            <div class="list-group">
+                                                                <!-- t-foreach-index provides
+                                                                file_info_index -->
+                                                                <t t-foreach="field_value"
+                                                                    t-as="file_info"
+                                                                    t-foreach-index="file_info_index">
+                                                                    <t
+                                                                        t-if="isinstance(file_info, dict) and file_info.get('filename')">
+                                                                        <div
+                                                                            class="list-group-item d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-2 gap-sm-3">
+                                                                            <!-- icon -->
+                                                                            <div
+                                                                                class="me-2 flex-shrink-0">
+                                                                                <i
+                                                                                    class="fas fa-file-alt fa-lg text-primary"
+                                                                                    aria-hidden="true"></i>
+                                                                            </div>
+
+                                                                            <!-- filename -->
+                                                                            <div
+                                                                                class="flex-grow-1 min-w-0">
+                                                                                <div
+                                                                                    class="d-flex align-items-center">
+                                                                                    <strong
+                                                                                        class="me-2 text-truncate"
+                                                                                        style="max-width: 220px;"
+                                                                                        t-att-title="file_info.get('filename', 'Unknown')">
+                                                                                        <t
+                                                                                            t-esc="file_info.get('filename', 'Unknown')" />
+                                                                                    </strong>
+                                                                                    <small
+                                                                                        class="text-muted ms-1"
+                                                                                        t-if="file_info.get('filesize')">
+                                                                                        (<t
+                                                                                            t-esc="file_info.get('filesize')" />
+                                                                                        )
+                                    </small>
+                                                                                </div>
+                                                                                <div
+                                                                                    class="small text-muted"
+                                                                                    t-if="file_info.get('mimetype')">
+                                                                                    <t
+                                                                                        t-esc="file_info.get('mimetype')" />
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <!-- actions -->
+                                                                            <div
+                                                                                class="mt-2 mt-sm-0 ms-sm-3 flex-shrink-0">
+                                                                                <div
+                                                                                    class="btn-group"
+                                                                                    role="group"
+                                                                                    aria-label="file actions">
+                                                                                    <a href="#"
+                                                                                        class="btn btn-sm btn-info"
+                                                                                        t-attf-onclick="viewFile({{ submission.id }}, '{{ f.id }}', {{ file_info_index }}); return false;">
+                                                                                        <i
+                                                                                            class="fas fa-eye"></i>
+
+                                                                                    </a>
+                                                                                    <a href="#"
+                                                                                        class="btn btn-sm btn-success"
+                                                                                        t-attf-onclick="downloadFile({{ submission.id }}, '{{ f.id }}', {{ file_info_index }}); return false;">
+                                                                                        <i
+                                                                                            class="fas fa-download"></i>
+
+                                                                                    </a>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </t>
+                                                                </t>
+                                                            </div>
+                                                        </t>
+
+                                                        <!-- Single file (dict) -->
+                                                        <t
+                                                            t-elif="isinstance(field_value, dict) and field_value.get('filename')">
+                                                            <div class="list-group">
+                                                                <div
+                                                                    class="list-group-item d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-2 gap-sm-3">
+                                                                    <div class="me-2 flex-shrink-0">
+                                                                        <i
+                                                                            class="fas fa-file-alt fa-lg text-primary"
+                                                                            aria-hidden="true"></i>
+                                                                    </div>
+
+                                                                    <div class="flex-grow-1 min-w-0">
+                                                                        <div
+                                                                            class="d-flex align-items-center">
+                                                                            <strong
+                                                                                class="me-2 text-truncate"
+                                                                                style="max-width: 220px;"
+                                                                                t-att-title="field_value.get('filename', 'Unknown')">
+                                                                                <t
+                                                                                    t-esc="field_value.get('filename', 'Unknown')" />
+                                                                            </strong>
+                                                                            <small
+                                                                                class="text-muted ms-1"
+                                                                                t-if="field_value.get('filesize')">
+                                                                                (<t
+                                                                                    t-esc="field_value.get('filesize')" />
+                                                                                )
+                            </small>
+                                                                        </div>
+                                                                        <div
+                                                                            class="small text-muted"
+                                                                            t-if="field_value.get('mimetype')">
+                                                                            <t
+                                                                                t-esc="field_value.get('mimetype')" />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div
+                                                                        class="mt-2 mt-sm-0 ms-sm-3 flex-shrink-0">
+                                                                        <div class="btn-group"
+                                                                            role="group"
+                                                                            aria-label="file actions">
+                                                                            <!-- For single file the
+                                                                            index is 0 -->
+                                                                            <a href="#"
+                                                                                class="btn btn-sm btn-info"
+                                                                                t-attf-onclick="viewFile({{ submission.id }}, '{{ f.id }}', 0); return false;">
+                                                                                <i
+                                                                                    class="fas fa-eye"></i>
+
+                                                                            </a>
+                                                                            <a href="#"
+                                                                                class="btn btn-sm btn-success"
+                                                                                t-attf-onclick="downloadFile({{ submission.id }}, '{{ f.id }}', 0); return false;">
+                                                                                <i
+                                                                                    class="fas fa-download"></i>
+
+                                                                            </a>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </t>
+
+                                                        <!-- Invalid data -->
+                                                        <t t-else="">
+                                                            <span
+                                                                class="text-warning d-inline-flex align-items-center gap-1">
+                                                                <i
+                                                                    class="fas fa-exclamation-triangle"></i>
+                                                                Invalid file data </span>
+                                                        </t>
+                                                    </t>
+
+                                                    <!-- No file uploaded -->
+                                                    <t t-else="">
+                                                        <span
+                                                            class="text-muted d-inline-flex align-items-center gap-1">
+                                                            <i class="fas fa-minus-circle"></i> No
+                                                            file uploaded </span>
+                                                    </t>
+                                                </t>
+
+
+                                                <t t-else="">
+                                                    <t t-esc="field_value" />
+                                                </t>
+                                            </td>
+                                        </t>
+                                        <td>
+                                            <t t-esc="submission.submitted_on_local" />
+                                        </td>
+                                    </tr>
+                                    <t t-set="counter" t-value="counter + 1" />
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div class="pagination-summary"> Page <strong>
+                                <t t-esc="pagination['current_page']" />
+                            </strong>
+                            of <strong>
+                                <t t-esc="pagination['total_pages']" />
+                            </strong>
+                        </div>
+
+                        <nav aria-label="Submissions pagination">
+                            <ul class="pagination">
+                                <li
+                                    t-attf-class="page-item {{'disabled' if not pagination['has_previous'] else ''}}">
+                                    <t t-if="pagination['has_previous']">
+                                        <a class="page-link"
+                                            t-attf-href="/form_builder/responses/{{form.id}}?page={{pagination['previous_page']}}&amp;order={{current_order}}">
+                                            <i class="fas fa-chevron-left"></i> Previous </a>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="page-link">
+                                            <i class="fas fa-chevron-left"></i> Previous </span>
+                                    </t>
+                                </li>
+
+                                <t t-set="start_page"
+                                    t-value="max(1, pagination['current_page'] - 2)" />
+                                <t t-set="end_page"
+                                    t-value="min(pagination['total_pages'], pagination['current_page'] + 2)" />
+
+                                <t t-foreach="range(start_page, end_page + 1)" t-as="page_num">
+                                    <li
+                                        t-attf-class="page-item {{'active' if page_num == pagination['current_page'] else ''}}">
+                                        <a class="page-link"
+                                            t-attf-href="/form_builder/responses/{{form.id}}?page={{page_num}}&amp;order={{current_order}}">
+                                            <t t-esc="page_num" />
+                                        </a>
+                                    </li>
+                                </t>
+
+                                <li
+                                    t-attf-class="page-item {{'disabled' if not pagination['has_next'] else ''}}">
+                                    <t t-if="pagination['has_next']">
+                                        <a class="page-link"
+                                            t-attf-href="/form_builder/responses/{{form.id}}?page={{pagination['next_page']}}&amp;order={{current_order}}">
+                                            Next <i class="fas fa-chevron-right"></i>
+                                        </a>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="page-link"> Next <i
+                                                class="fas fa-chevron-right"></i>
+                                        </span>
+                                    </t>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="no-submissions">
+                        <i class="fas fa-inbox fa-4x"></i>
+                        <h4>No submissions yet</h4>
+                        <p>When people submit your form, their responses will appear here.</p>
+                    </div>
+                </t>
+            </div>
+            <link rel="stylesheet" type="text/css"
+                href="/zehntech_form_builder/static/src/css/response_page.css" />
+
+            <style t-raw="True">
+                /* Include the complete CSS from the first artifact here */
+            </style>
+            <style></style>
+
+            <script
+                src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+            <script>
+                function viewFile(submissionId, fieldId, fileIndex) {
+                window.open('/form_builder/view_file/' + submissionId + '/' + fieldId + '/' +
+                fileIndex, '_blank');
+                return false;
+                }
+
+                function downloadFile(submissionId, fieldId, fileIndex) {
+                window.location.href = '/form_builder/download_file/' + submissionId + '/' + fieldId
+                + '/' + fileIndex;
+                return false;
+                }
+            </script>
+            <link rel="stylesheet"
+                href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+            <script type="module" src="/zehntech_form_builder/static/src/js/form_validation.js"></script>
+        </t>
+    </template>
+</odoo>
