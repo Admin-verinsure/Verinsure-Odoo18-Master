@@ -223,52 +223,58 @@ class InvoicePocPayload(models.Model):
     @api.model
     def _find_or_create_employee(self, person, company_id):
         """
-        Ensure res.partner + employee.details for {name,email,phone}.
-        Phone sanitized to exactly 10 digits (fits your validator).
+        Ensure employee.details for the insured person.
+        NOTE: employee.details has no partner_id in your DB → search on email/phone/name.
         """
         ED = self.env['employee.details']
-        partner = self._find_partner(
-            email=(person.get('email') or '').strip() or None,
-            name=(person.get('name') or '').strip() or None,
-            company_id=company_id,
-        )
+        name = (person.get('name') or '').strip() or 'Customer'
+        email = (person.get('email') or '').strip()
         phone10 = self._sanitize_phone_10(person.get('phone'))
-        emp = ED.search([('partner_id', '=', partner.id)], limit=1)
+
+        emp = False
+        if email:
+            emp = ED.search([('email', '=', email)], limit=1)
+        if not emp and phone10:
+            emp = ED.search([('phone', '=', phone10)], limit=1)
         if not emp:
-            vals = {
-                'name': person.get('name') or partner.name,
-                'partner_id': partner.id,
-            }
-            if person.get('email'):
-                vals['email'] = person['email']
+            emp = ED.search([('name', '=', name)], limit=1)
+
+        if not emp:
+            vals = {'name': name}
+            if email:
+                vals['email'] = email
             if phone10:
                 vals['phone'] = phone10
             emp = ED.create(vals)
+
+        # we still return a commercial partner for the invoice itself
+        partner = self._find_partner(email=email or None, name=name, company_id=company_id)
         return partner, emp
 
     @api.model
     def _find_or_create_agent(self, agent_payload, company_id):
         """
         Ensure an employee.details record representing the policy agent.
-        Tries by email, then by 10-digit phone. Creates partner if needed.
+        No partner_id in employee.details → search by email/phone/name and create with those fields only.
         """
         ED = self.env['employee.details']
         if not agent_payload:
             return ED.browse()
 
+        name = (agent_payload.get('name') or '').strip() or 'Agent'
         email = (agent_payload.get('email') or '').strip()
         phone10 = self._sanitize_phone_10(agent_payload.get('phone'))
-        name = (agent_payload.get('name') or '').strip() or (email or phone10) or "Agent"
 
         agent = False
         if email:
             agent = ED.search([('email', '=', email)], limit=1)
         if not agent and phone10:
             agent = ED.search([('phone', '=', phone10)], limit=1)
+        if not agent:
+            agent = ED.search([('name', '=', name)], limit=1)
 
         if not agent:
-            partner = self._find_partner(email=email or None, name=name, company_id=company_id)
-            vals = {'name': name, 'partner_id': partner.id}
+            vals = {'name': name}
             if email:
                 vals['email'] = email
             if phone10:
