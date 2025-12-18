@@ -7,7 +7,7 @@
     "description": "Backend-only helper module. Adds an XML-RPC callable method on insurance.details to create/update partner and employee, create insurance, create+post invoice, render PDF and email it.",
     "author": "Custom",
     "license": "LGPL-3",
-    "depends": ["base", "mail", "account", "insurance"],
+    "depends": ["base", "mail", "account", "insurance Management"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
