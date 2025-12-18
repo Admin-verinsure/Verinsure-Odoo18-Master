@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api
 import json
 import re
@@ -62,9 +63,13 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _sanitize_phone_10(self, s):
-        """Return exactly 10 trailing digits if present, else '' (matches validator)."""
+        """
+        Return exactly 10 digits if possible.
+        - If >=10 digits: last 10 digits
+        - Else: ''
+        """
         d = self._digits_only(s)
-        return d[-10:] if len(d) >= 10 else (d if len(d) == 10 else "")
+        return d[-10:] if len(d) >= 10 else ""
 
     @api.model
     def _coerce_policy_number(self, val):
@@ -84,43 +89,57 @@ class InvoicePocPayload(models.Model):
 
     # ---------------- partner/tax/account helpers ----------------
     @api.model
-    def _find_partner(self, email=None, name=None, company_id=None):
-        """Prefer payload email; keep partner email/name in sync with payload."""
-        Partner = self.env["res.partner"]
-        if email:
-            dom = [("email", "=", email)]
-        elif name:
-            dom = [("name", "=", name)]
-        else:
-            raise ValueError("Provide partner email or name")
+    def _find_partner(self, email=None, name=None, company_id=None, phone=None):
+        """
+        Prefer email → phone → name.
+        Keep partner fields in sync with payload.
+        NOTE: res.partner is usually shared (company_id False), so we do not force company_id filtering.
+        """
+        Partner = self.env["res.partner"].sudo()
 
-        dom = ["&", ("company_id", "in", [False, company_id])] + dom
-        partner = Partner.search(dom, limit=1)
+        email = (email or "").strip().lower()
+        name = (name or "").strip()
+        phone = (phone or "").strip()
+
+        partner = False
+        if email:
+            partner = Partner.search([("email", "=", email)], limit=1)
+        if not partner and phone:
+            partner = Partner.search([("phone", "=", phone)], limit=1)
+        if not partner and name:
+            partner = Partner.search([("name", "=", name)], limit=1)
+
         if not partner:
-            partner = Partner.create({
-                "name": name or email,
-                "email": email,
+            vals = {
+                "name": name or email or "Customer",
                 "customer_rank": 1,
-                "company_id": company_id,
-            })
-        else:
-            vals = {}
-            if email and partner.email != email:
+            }
+            if email:
                 vals["email"] = email
+            if phone:
+                vals["phone"] = phone
+            partner = Partner.create(vals)
+        else:
+            upd = {}
+            if email and partner.email != email:
+                upd["email"] = email
+            if phone and partner.phone != phone:
+                upd["phone"] = phone
             if name and partner.name != name:
-                vals["name"] = name
-            if vals:
-                partner.sudo().write(vals)
+                upd["name"] = name
+            if upd:
+                partner.write(upd)
+
         return partner
 
     @api.model
     def _find_currency(self, code=None):
-        return (self.env["res.currency"].search([("name", "=", code)], limit=1)
+        return (self.env["res.currency"].sudo().search([("name", "=", code)], limit=1)
                 if code else self.env.company.currency_id)
 
     @api.model
     def _find_journal(self, name=None, company_id=None):
-        Journal = self.env["account.journal"]
+        Journal = self.env["account.journal"].sudo()
         if name:
             j = Journal.search([("name", "=", name), ("company_id", "=", company_id)], limit=1)
             if j:
@@ -133,20 +152,25 @@ class InvoicePocPayload(models.Model):
         names = names or []
         if isinstance(names, str):
             names = [names]
+        names = [n for n in names if n]
         if not names:
             return [(6, 0, [])]
-        Tax = self.env["account.tax"]
-        taxes = Tax.search([
+
+        Tax = self.env["account.tax"].sudo()
+        # Correct domain: company AND (name in names OR description in names)
+        dom = [
+            "&",
+            ("company_id", "=", company_id),
             "|",
             ("name", "in", names),
             ("description", "in", names),
-            ("company_id", "=", company_id),
-        ])
+        ]
+        taxes = Tax.search(dom)
         return [(6, 0, taxes.ids)]
 
     @api.model
     def _fallback_income_account(self, company_id=None):
-        Account = self.env["account.account"]
+        Account = self.env["account.account"].sudo()
         # In v16+, company relation is via company_ids m2m
         acc = Account.search(
             [("account_type", "=", "income"), ("company_ids", "in", [company_id])], limit=1
@@ -157,7 +181,7 @@ class InvoicePocPayload(models.Model):
 
     @api.model
     def _find_payment_term(self, name=None):
-        return (self.env['account.payment.term'].search([('name', '=', name)], limit=1)
+        return (self.env['account.payment.term'].sudo().search([('name', '=', name)], limit=1)
                 if name else self.env['account.payment.term'].browse())
 
     @api.model
@@ -183,7 +207,8 @@ class InvoicePocPayload(models.Model):
         """Send the invoice email immediately to the payload email (preferred)."""
         target = (to_email or "").strip() or (move.partner_id.email or "").strip()
         if not target:
-            self.env['mail.activity'].create({
+            # create an activity instead of failing hard
+            self.env['mail.activity'].sudo().create({
                 'res_model_id': self.env['ir.model']._get_id('account.move'),
                 'res_id': move.id,
                 'res_name': move.name,
@@ -216,90 +241,138 @@ class InvoicePocPayload(models.Model):
         """Ensure/return policy.type by name."""
         if not type_name:
             return self.env['policy.type'].browse()
-        PT = self.env['policy.type']
+        PT = self.env['policy.type'].sudo()
         rec = PT.search([('name', '=', type_name)], limit=1)
         return rec or PT.create({'name': type_name})
 
     @api.model
     def _find_or_create_employee(self, person, company_id):
         """
-        Ensure employee.details for insured person.
-        employee.details has NO partner_id.
+        Ensure employee.details WITHOUT assuming fields exist.
+
+        Strategy:
+          1) Find/Create res.partner using email/phone/name
+          2) Link/find employee.details via x_partner_id (preferred) or partner_id (if exists)
+          3) Only search/write fields that exist on employee.details
+        Returns: (partner, emp_recordset_or_empty)
         """
-        # NOTE:
-        # Some deployments have record rules on employee.details that can
-        # reference fields not present in the base model (e.g. partner_id).
-        # Using sudo() avoids rule-induced crashes during integration flows.
-        ED = self.env['employee.details'].sudo()
+        person = person or {}
+        name = (person.get("name") or "").strip() or "Customer"
+        email = (person.get("email") or "").strip().lower()
+        phone10 = self._sanitize_phone_10(person.get("phone"))
 
-        name = (person.get('name') or '').strip() or 'Customer'
-        email = (person.get('email') or '').strip()
-        phone10 = self._sanitize_phone_10(person.get('phone'))
-
-        emp = False
-        if email:
-            emp = ED.search([('email', '=', email)], limit=1)
-        if not emp and phone10:
-            emp = ED.search([('phone', '=', phone10)], limit=1)
-        if not emp:
-            emp = ED.search([('name', '=', name)], limit=1)
-
-        if not emp:
-            vals = {'name': name}
-            if email:
-                vals['email'] = email
-            if phone10:
-                vals['phone'] = phone10
-            emp = ED.create(vals)
-
-        # Partner is ONLY for invoice
         partner = self._find_partner(
             email=email or None,
             name=name,
             company_id=company_id,
+            phone=phone10 or None,
         )
 
-        # If employee.details has a partner_id (added by this module for
-        # compatibility), keep it in sync.
-        if emp and partner and 'partner_id' in emp._fields and not emp.partner_id:
-            try:
-                emp.write({'partner_id': partner.id})
-            except Exception:
-                # Never fail invoice creation just because this optional link
-                # couldn't be written.
-                pass
+        if "employee.details" not in self.env:
+            return partner, self.env["employee.details"].browse()
+
+        ED = self.env["employee.details"].sudo()
+
+        def has(field_name):
+            return field_name in ED._fields
+
+        link_field = "x_partner_id" if has("x_partner_id") else ("partner_id" if has("partner_id") else None)
+
+        emp = False
+        if link_field:
+            emp = ED.search([(link_field, "=", partner.id)], limit=1)
+
+        if not emp and has("email") and email:
+            emp = ED.search([("email", "=", email)], limit=1)
+        if not emp and has("phone") and phone10:
+            emp = ED.search([("phone", "=", phone10)], limit=1)
+        if not emp and has("name") and name:
+            emp = ED.search([("name", "=", name)], limit=1)
+
+        if not emp:
+            vals = {}
+            if has("name"):
+                vals["name"] = name
+            if has("email") and email:
+                vals["email"] = email
+            if has("phone") and phone10:
+                vals["phone"] = phone10
+            if has("company_id") and company_id:
+                vals["company_id"] = company_id
+            if link_field:
+                vals[link_field] = partner.id
+
+            emp = ED.create(vals) if vals else ED.browse()
+        else:
+            if link_field and not getattr(emp, link_field, False):
+                try:
+                    emp.write({link_field: partner.id})
+                except Exception:
+                    pass
 
         return partner, emp
 
     @api.model
     def _find_or_create_agent(self, agent_payload, company_id):
         """
-        Ensure employee.details for agent.
-        NO partner_id here.
+        Ensure employee.details for agent WITHOUT assuming fields exist.
+        Returns: employee.details recordset (or empty browse)
         """
-        ED = self.env['employee.details'].sudo()
+        if "employee.details" not in self.env:
+            return self.env["employee.details"].browse()
+
+        ED = self.env["employee.details"].sudo()
         if not agent_payload:
             return ED.browse()
 
-        name = (agent_payload.get('name') or '').strip() or 'Agent'
-        email = (agent_payload.get('email') or '').strip()
-        phone10 = self._sanitize_phone_10(agent_payload.get('phone'))
+        name = (agent_payload.get("name") or "").strip() or "Agent"
+        email = (agent_payload.get("email") or "").strip().lower()
+        phone10 = self._sanitize_phone_10(agent_payload.get("phone"))
+
+        def has(field_name):
+            return field_name in ED._fields
+
+        link_field = "x_partner_id" if has("x_partner_id") else ("partner_id" if has("partner_id") else None)
+
+        # Optional: create partner for agent too (helps linking if link field exists)
+        partner = self._find_partner(
+            email=email or None,
+            name=name,
+            company_id=company_id,
+            phone=phone10 or None,
+        )
 
         agent = False
-        if email:
-            agent = ED.search([('email', '=', email)], limit=1)
-        if not agent and phone10:
-            agent = ED.search([('phone', '=', phone10)], limit=1)
-        if not agent:
-            agent = ED.search([('name', '=', name)], limit=1)
+        if link_field:
+            agent = ED.search([(link_field, "=", partner.id)], limit=1)
+
+        if not agent and has("email") and email:
+            agent = ED.search([("email", "=", email)], limit=1)
+        if not agent and has("phone") and phone10:
+            agent = ED.search([("phone", "=", phone10)], limit=1)
+        if not agent and has("name") and name:
+            agent = ED.search([("name", "=", name)], limit=1)
 
         if not agent:
-            vals = {'name': name}
-            if email:
-                vals['email'] = email
-            if phone10:
-                vals['phone'] = phone10
-            agent = ED.create(vals)
+            vals = {}
+            if has("name"):
+                vals["name"] = name
+            if has("email") and email:
+                vals["email"] = email
+            if has("phone") and phone10:
+                vals["phone"] = phone10
+            if has("company_id") and company_id:
+                vals["company_id"] = company_id
+            if link_field:
+                vals[link_field] = partner.id
+
+            agent = ED.create(vals) if vals else ED.browse()
+        else:
+            if link_field and not getattr(agent, link_field, False):
+                try:
+                    agent.write({link_field: partner.id})
+                except Exception:
+                    pass
 
         return agent
 
@@ -309,11 +382,12 @@ class InvoicePocPayload(models.Model):
         Ensure policy.details (+ insurance.details) exists/linked.
         Also set agent_id on policy/insurance if those fields exist.
         """
-        PD = self.env['policy.details']
-        ID = self.env['insurance.details']
+        PD = self.env['policy.details'].sudo()
+        ID = self.env['insurance.details'].sudo()
 
         p = payload_policy or {}
         ptype = self._find_or_create_policy_type(p.get('type_name'))
+
         agent = self._find_or_create_agent(p.get('agent'), company_id=self.env.user.company_id.id)
 
         # Policy
@@ -327,7 +401,7 @@ class InvoicePocPayload(models.Model):
                 'name': pol_name,
                 'policy_type_id': ptype.id if ptype else False,
             }
-            if p.get('amount') is not None:
+            if p.get('amount') is not None and 'amount' in PD._fields:
                 pol_vals['amount'] = p['amount']
             if 'agent_id' in PD._fields and agent:
                 pol_vals['agent_id'] = agent.id
@@ -335,22 +409,30 @@ class InvoicePocPayload(models.Model):
         else:
             if 'agent_id' in PD._fields and agent and not getattr(pol, 'agent_id', False):
                 try:
-                    pol.sudo().write({'agent_id': agent.id})
+                    pol.write({'agent_id': agent.id})
                 except Exception:
                     pass
 
         # Insurance
-        ins = ID.search([('policy_id', '=', pol.id), ('partner_id', '=', partner.id)], limit=1)
+        ins_dom = [('policy_id', '=', pol.id)]
+        if 'partner_id' in ID._fields:
+            ins_dom.append(('partner_id', '=', partner.id))
+        ins = ID.search(ins_dom, limit=1)
+
         if not ins:
             policy_number_val = self._coerce_policy_number(p.get('policy_number'))
             ins_vals = {
                 'policy_id': pol.id,
-                'partner_id': partner.id,
-                'employee_id': emp.id if emp else False,
-                'payment_type': p.get('payment_type') or 'fixed',
-                'policy_duration': p.get('policy_duration') or 12,
             }
-            if policy_number_val:
+            if 'partner_id' in ID._fields:
+                ins_vals['partner_id'] = partner.id
+            if 'employee_id' in ID._fields:
+                ins_vals['employee_id'] = emp.id if emp else False
+            if 'payment_type' in ID._fields:
+                ins_vals['payment_type'] = p.get('payment_type') or 'fixed'
+            if 'policy_duration' in ID._fields:
+                ins_vals['policy_duration'] = p.get('policy_duration') or 12
+            if policy_number_val and 'policy_number' in ID._fields:
                 ins_vals['policy_number'] = policy_number_val
             if 'agent_id' in ID._fields and agent:
                 ins_vals['agent_id'] = agent.id
@@ -364,13 +446,13 @@ class InvoicePocPayload(models.Model):
         else:
             policy_number_val = self._coerce_policy_number(p.get('policy_number'))
             to_write = {}
-            if policy_number_val and getattr(ins, 'policy_number', None) in (False, 0, '', None):
+            if policy_number_val and 'policy_number' in ID._fields and getattr(ins, 'policy_number', None) in (False, 0, '', None):
                 to_write['policy_number'] = policy_number_val
             if 'agent_id' in ID._fields and agent and not getattr(ins, 'agent_id', False):
                 to_write['agent_id'] = agent.id
             if to_write:
                 try:
-                    ins.sudo().write(to_write)
+                    ins.write(to_write)
                 except Exception:
                     pass
 
@@ -398,9 +480,13 @@ class InvoicePocPayload(models.Model):
             "invoice_user_id": salesperson.id,
             "invoice_line_ids": line_cmds,
             "narration": narration_html or False,
-            "insurance_id": insurance.id if insurance else False,
-            "invoice_origin": insurance.name if (insurance and getattr(insurance, 'name', False)) else (data.get("ref") or "API"),
         }
+
+        # link insurance if field exists on account.move
+        if insurance and 'insurance_id' in self.env['account.move']._fields:
+            move_vals["insurance_id"] = insurance.id
+            move_vals["invoice_origin"] = getattr(insurance, 'name', False) or (data.get("ref") or "API")
+
         if data.get("ref"):
             move_vals["ref"] = data["ref"]
         if data.get("invoice_date"):
@@ -412,7 +498,7 @@ class InvoicePocPayload(models.Model):
         if payment_term:
             move_vals["invoice_payment_term_id"] = payment_term.id
 
-        move = self.env["account.move"].with_context(
+        move = self.env["account.move"].sudo().with_context(
             default_move_type="out_invoice",
             allowed_company_ids=[company.id],
         ).create(move_vals)
@@ -471,20 +557,21 @@ class InvoicePocPayload(models.Model):
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
-        salesperson = self.env['res.users'].search([('login', '=', default_login)], limit=1) or self.env.user
+        salesperson = self.env['res.users'].sudo().search([('login', '=', default_login)], limit=1) or self.env.user
 
         # Payload override for salesperson
         sp = (data.get("salesperson") or {})
         if sp.get("login"):
-            salesperson = self.env['res.users'].search([('login', '=', sp["login"])], limit=1) or salesperson
+            salesperson = self.env['res.users'].sudo().search([('login', '=', sp["login"])], limit=1) or salesperson
         elif sp.get("id"):
-            salesperson = self.env['res.users'].browse(sp["id"]).exists() or salesperson
+            salesperson = self.env['res.users'].sudo().browse(sp["id"]).exists() or salesperson
 
         # Customer/Employee
         customer = data.get("customer", {}) or {}
         if customer.get("phone"):
             customer = dict(customer)
             customer["phone"] = self._sanitize_phone_10(customer["phone"])
+
         partner, emp = self._find_or_create_employee(customer, company.id)
 
         # Lines
@@ -527,7 +614,7 @@ class InvoicePocPayload(models.Model):
         except Exception as e:
             move.message_post(body=f"Immediate email send failed: {e}")
 
-        self.write({"move_id": move.id, "state": "posted"})
+        self.sudo().write({"move_id": move.id, "state": "posted"})
         return move
 
     # ---------------- legacy entrypoint ----------------
@@ -544,23 +631,26 @@ class InvoicePocPayload(models.Model):
         company = self.env.user.company_id
         ICP = self.env['ir.config_parameter'].sudo()
         default_login = ICP.get_param('invoice_poc.default_salesperson_login', default='admin@verinsure.online')
-        salesperson = self.env['res.users'].search([('login', '=', default_login)], limit=1) or self.env.user
+        salesperson = self.env['res.users'].sudo().search([('login', '=', default_login)], limit=1) or self.env.user
 
         sp = (data.get("salesperson") or {})
         if sp.get("login"):
-            salesperson = self.env['res.users'].search([('login', '=', sp["login"])], limit=1) or salesperson
+            salesperson = self.env['res.users'].sudo().search([('login', '=', sp["login"])], limit=1) or salesperson
         elif sp.get("id"):
-            salesperson = self.env['res.users'].browse(sp["id"]).exists() or salesperson
+            salesperson = self.env['res.users'].sudo().browse(sp["id"]).exists() or salesperson
 
         customer = data.get("customer", {}) or {}
         if customer.get("phone"):
             customer = dict(customer)
             customer["phone"] = self._sanitize_phone_10(customer["phone"])
+
         partner = self._find_partner(
             email=customer.get("email"),
             name=customer.get("name"),
             company_id=company.id,
+            phone=customer.get("phone"),
         )
+
         currency = self._find_currency(data.get("currency"))
         journal = self._find_journal(data.get("journal"), company_id=company.id)
         if not journal:
@@ -605,7 +695,7 @@ class InvoicePocPayload(models.Model):
         if payment_term:
             move_vals["invoice_payment_term_id"] = payment_term.id
 
-        move = self.env["account.move"].with_context(
+        move = self.env["account.move"].sudo().with_context(
             default_move_type="out_invoice",
             allowed_company_ids=[company.id],
         ).create(move_vals)
@@ -616,5 +706,5 @@ class InvoicePocPayload(models.Model):
         except Exception as e:
             move.message_post(body=f"Immediate email send failed: {e}")
 
-        self.write({"move_id": move.id, "state": "posted"})
+        self.sudo().write({"move_id": move.id, "state": "posted"})
         return move
