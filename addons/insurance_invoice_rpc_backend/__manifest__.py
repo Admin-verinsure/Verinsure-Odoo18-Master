@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Insurance Insurance+Invoice RPC Backend",
-    "version": "18.0.1.0.0",
+    "name": "Insurance RPC: Create Insurance + Invoice + Email (Cybro)",
+    "version": "18.0.1.0.2",
     "category": "Accounting",
-    "summary": "Create insurance, invoice and email invoice via XML-RPC (backend only)",
-    "depends": ["base", "account", "mail", "insurance_management_cybro"],
+    "summary": "RPC method to create insurance.details, generate invoice PDF, and email it (backend-only).",
+    "depends": ["base", "account", "mail", "hr", "insurance_management_cybro"],
     "data": [
         "security/security.xml",
-        "security/ir.model.access.csv",
     ],
     "installable": True,
     "application": False,
