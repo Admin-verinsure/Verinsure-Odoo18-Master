@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from odoo import http
 from odoo.http import request
 import json
@@ -74,9 +75,9 @@ def _invoice_to_dict(move):
     }
 
 
-def _jsonrpc_error(msg, code=200):
-    # type="json" always returns 200 to the client; include ok=False + error message in body
-    return {"ok": False, "error": msg}
+def _jsonrpc_error(msg, error_code="ERROR"):
+    # type="json" responds 200; clients should check ok=false
+    return {"ok": False, "error": {"code": error_code, "message": msg}}
 
 
 def _require_api_token():
@@ -86,16 +87,38 @@ def _require_api_token():
     """
     cfg = request.env['ir.config_parameter'].sudo()
     expected = (cfg.get_param('invoice_poc.api_key') or '').strip()
+
     auth = (request.httprequest.headers.get('Authorization') or '').strip()
     token = ''
     if auth.lower().startswith('bearer '):
         token = auth[7:].strip()
 
     if not expected:
-        return _jsonrpc_error("Server misconfiguration: missing system parameter 'invoice_poc.api_key'.")
+        return _jsonrpc_error(
+            "Server misconfiguration: missing system parameter 'invoice_poc.api_key'.",
+            "SERVER_MISCONFIG"
+        )
     if token != expected:
-        return _jsonrpc_error("Unauthorized: missing/invalid bearer token.")
+        return _jsonrpc_error("Unauthorized: missing/invalid bearer token.", "UNAUTHORIZED")
+
     return None
+
+
+def _extract_params():
+    """
+    Robustly extract params for JSON routes.
+    Accepts:
+      {"params": {...}}
+    and also nested:
+      {"params": {"params": {...}}}
+    """
+    data = request.jsonrequest or {}
+    params = data.get("params") or {}
+    if isinstance(params, dict) and "params" in params and isinstance(params.get("params"), dict):
+        params = params["params"]
+    if not isinstance(params, dict):
+        params = {}
+    return params
 
 
 class InvoicePocController(http.Controller):
@@ -103,7 +126,7 @@ class InvoicePocController(http.Controller):
     @http.route(
         "/invoice_poc/jsonrpc/invoices",
         type="json",
-        auth="public",            # <- Option B: use our own Bearer token check
+        auth="none",      # IMPORTANT: no Odoo login; we do Bearer auth ourselves
         methods=["POST"],
         csrf=False,
     )
@@ -112,41 +135,48 @@ class InvoicePocController(http.Controller):
         Creates payload row → (policy+insurance if present) → creates & posts invoice → emails customer (no PDF attach).
         Requires: Authorization: Bearer <token set in invoice_poc.api_key>
         """
-        # Header auth
         err = _require_api_token()
         if err:
             return err
 
         rec = None
         try:
-            payload = request.jsonrequest.get("params") or {}
+            payload = _extract_params()
             ext = payload.get("id") or payload.get("ref")
             if not ext:
-                return _jsonrpc_error("Payload must include 'id' or 'ref'")
+                return _jsonrpc_error("Payload must include 'id' or 'ref'", "BAD_REQUEST")
+
+            PayloadModel = request.env["invoice.poc.payload"].sudo()
 
             # Create payload row (idempotent)
             try:
-                rec = request.env["invoice.poc.payload"].sudo().create({
+                rec = PayloadModel.create({
                     "ext_id": ext,
-                    "payload_json": json.dumps(payload),
+                    "payload_json": json.dumps(payload, ensure_ascii=False),
                 })
             except Exception as e:
-                if UniqueViolation and isinstance(e.__cause__, UniqueViolation) or "unique" in str(e).lower():
-                    rec = request.env["invoice.poc.payload"].sudo().search([("ext_id", "=", ext)], limit=1)
+                # detect unique constraint safely
+                is_unique = False
+                if UniqueViolation:
+                    cause = getattr(e, "__cause__", None)
+                    is_unique = isinstance(cause, UniqueViolation)
+
+                # fallback check (narrow)
+                if not is_unique and "duplicate key value violates unique constraint" in str(e).lower():
+                    is_unique = True
+
+                if is_unique:
+                    rec = PayloadModel.search([("ext_id", "=", ext)], limit=1)
                     if not rec:
                         raise
                 else:
                     raise
 
             # Process payload via model (policy-first if present)
-            move = (
-                rec.sudo().action_create_policy_and_invoice()
-                if payload.get("policy")
-                else rec.sudo().action_create_and_post_invoice()
-            )
-
-            # Commit so invoice + mail status are visible immediately
-            request.env.cr.commit()
+            if payload.get("policy"):
+                move = rec.action_create_policy_and_invoice()
+            else:
+                move = rec.action_create_and_post_invoice()
 
             return {
                 "ok": True,
@@ -156,35 +186,34 @@ class InvoicePocController(http.Controller):
             }
 
         except Exception as e:
+            # best-effort: store error on payload row
             if rec:
                 try:
                     rec.sudo().write({"state": "error", "error_message": str(e)})
-                    request.env.cr.commit()
                 except Exception:
                     pass
-            return _jsonrpc_error(str(e))
+            return _jsonrpc_error(str(e), "SERVER_ERROR")
 
     @http.route(
         "/invoice_poc/jsonrpc/invoices/get",
         type="json",
-        auth="public",            # <- same token gate
+        auth="none",
         methods=["POST"],
         csrf=False,
     )
     def get_invoice_by_ref(self, **kwargs):
-        # Header auth
         err = _require_api_token()
         if err:
             return err
 
-        payload = request.jsonrequest.get("params") or {}
-        ext = payload.get("ref") or payload.get("id")
+        params = _extract_params()
+        ext = params.get("ref") or params.get("id")
         if not ext:
-            return _jsonrpc_error("Missing 'ref' (or 'id') in params")
+            return _jsonrpc_error("Missing 'ref' (or 'id') in params", "BAD_REQUEST")
 
         rec = request.env["invoice.poc.payload"].sudo().search([("ext_id", "=", ext)], limit=1)
         if not rec or not rec.move_id:
-            return _jsonrpc_error(f"No invoice found for '{ext}'")
+            return _jsonrpc_error(f"No invoice found for '{ext}'", "NOT_FOUND")
 
         return {
             "ok": True,

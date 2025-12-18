@@ -2,17 +2,12 @@
 from odoo import SUPERUSER_ID
 
 def post_init_hook(env):
-    """Post-init hook (Odoo 18 calls this with a single `env` argument).
+    """Odoo 18 calls post_init_hook(env) with a single env."""
 
-    Goal: ensure `employee.details` has a `partner_id` field if that model exists.
-    This prevents crashes when an ir.rule/domain references employee.details.partner_id.
+    # Run as superuser
+    env = env(user=SUPERUSER_ID)
 
-    We create a *manual* ir.model.fields entry only if the field doesn't already exist.
-    """
-    # Make sure we run with superuser privileges
-    env = env(su=True)
-
-    # If the model doesn't exist in this DB, do nothing.
+    # If model doesn't exist, do nothing
     if 'employee.details' not in env:
         return
 
@@ -23,12 +18,15 @@ def post_init_hook(env):
     if not model:
         return
 
-    existing = Fields.search([('model_id', '=', model.id), ('name', '=', 'partner_id')], limit=1)
+    # IMPORTANT: custom (manual) fields must start with x_
+    field_name = 'x_partner_id'
+
+    existing = Fields.search([('model_id', '=', model.id), ('name', '=', field_name)], limit=1)
     if existing:
         return
 
     Fields.create({
-        'name': 'partner_id',
+        'name': field_name,
         'field_description': 'Related Partner',
         'ttype': 'many2one',
         'relation': 'res.partner',
