@@ -223,10 +223,11 @@ class InvoicePocPayload(models.Model):
     @api.model
     def _find_or_create_employee(self, person, company_id):
         """
-        Ensure employee.details for the insured person.
-        NOTE: employee.details has no partner_id in your DB → search on email/phone/name.
+        Ensure employee.details for insured person.
+        employee.details has NO partner_id.
         """
         ED = self.env['employee.details']
+
         name = (person.get('name') or '').strip() or 'Customer'
         email = (person.get('email') or '').strip()
         phone10 = self._sanitize_phone_10(person.get('phone'))
@@ -247,15 +248,20 @@ class InvoicePocPayload(models.Model):
                 vals['phone'] = phone10
             emp = ED.create(vals)
 
-        # we still return a commercial partner for the invoice itself
-        partner = self._find_partner(email=email or None, name=name, company_id=company_id)
+        # Partner is ONLY for invoice
+        partner = self._find_partner(
+            email=email or None,
+            name=name,
+            company_id=company_id,
+        )
+
         return partner, emp
 
     @api.model
     def _find_or_create_agent(self, agent_payload, company_id):
         """
-        Ensure an employee.details record representing the policy agent.
-        No partner_id in employee.details → search by email/phone/name and create with those fields only.
+        Ensure employee.details for agent.
+        NO partner_id here.
         """
         ED = self.env['employee.details']
         if not agent_payload:
