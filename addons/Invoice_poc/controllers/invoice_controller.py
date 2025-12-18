@@ -74,25 +74,55 @@ def _invoice_to_dict(move):
     }
 
 
+def _jsonrpc_error(msg, code=200):
+    # type="json" always returns 200 to the client; include ok=False + error message in body
+    return {"ok": False, "error": msg}
+
+
+def _require_api_token():
+    """
+    Validate Authorization: Bearer <token> against ir.config_parameter('invoice_poc.api_key').
+    Returns None if valid; json error dict if invalid.
+    """
+    cfg = request.env['ir.config_parameter'].sudo()
+    expected = (cfg.get_param('invoice_poc.api_key') or '').strip()
+    auth = (request.httprequest.headers.get('Authorization') or '').strip()
+    token = ''
+    if auth.lower().startswith('bearer '):
+        token = auth[7:].strip()
+
+    if not expected:
+        return _jsonrpc_error("Server misconfiguration: missing system parameter 'invoice_poc.api_key'.")
+    if token != expected:
+        return _jsonrpc_error("Unauthorized: missing/invalid bearer token.")
+    return None
+
+
 class InvoicePocController(http.Controller):
 
     @http.route(
         "/invoice_poc/jsonrpc/invoices",
         type="json",
-        auth="api_key",   # Authorization: Bearer <KEY>
+        auth="public",            # <- Option B: use our own Bearer token check
         methods=["POST"],
         csrf=False,
     )
     def create_invoice_jsonrpc(self, **kwargs):
         """
-        Creates payload row → generates policy + insurance if present → creates & posts invoice → emails invoice
+        Creates payload row → (policy+insurance if present) → creates & posts invoice → emails customer (no PDF attach).
+        Requires: Authorization: Bearer <token set in invoice_poc.api_key>
         """
+        # Header auth
+        err = _require_api_token()
+        if err:
+            return err
+
         rec = None
         try:
             payload = request.jsonrequest.get("params") or {}
             ext = payload.get("id") or payload.get("ref")
             if not ext:
-                return {"ok": False, "error": "Payload must include 'id' or 'ref'"}
+                return _jsonrpc_error("Payload must include 'id' or 'ref'")
 
             # Create payload row (idempotent)
             try:
@@ -103,17 +133,20 @@ class InvoicePocController(http.Controller):
             except Exception as e:
                 if UniqueViolation and isinstance(e.__cause__, UniqueViolation) or "unique" in str(e).lower():
                     rec = request.env["invoice.poc.payload"].sudo().search([("ext_id", "=", ext)], limit=1)
+                    if not rec:
+                        raise
                 else:
                     raise
 
-            # Process payload
+            # Process payload via model (policy-first if present)
             move = (
                 rec.sudo().action_create_policy_and_invoice()
                 if payload.get("policy")
                 else rec.sudo().action_create_and_post_invoice()
             )
 
-            request.env.cr.commit()  # show invoice + email status immediately
+            # Commit so invoice + mail status are visible immediately
+            request.env.cr.commit()
 
             return {
                 "ok": True,
@@ -129,24 +162,29 @@ class InvoicePocController(http.Controller):
                     request.env.cr.commit()
                 except Exception:
                     pass
-            return {"ok": False, "error": str(e)}
+            return _jsonrpc_error(str(e))
 
     @http.route(
         "/invoice_poc/jsonrpc/invoices/get",
         type="json",
-        auth="api_key",
+        auth="public",            # <- same token gate
         methods=["POST"],
         csrf=False,
     )
     def get_invoice_by_ref(self, **kwargs):
+        # Header auth
+        err = _require_api_token()
+        if err:
+            return err
+
         payload = request.jsonrequest.get("params") or {}
         ext = payload.get("ref") or payload.get("id")
         if not ext:
-            return {"ok": False, "error": "Missing 'ref' (or 'id') in params"}
+            return _jsonrpc_error("Missing 'ref' (or 'id') in params")
 
         rec = request.env["invoice.poc.payload"].sudo().search([("ext_id", "=", ext)], limit=1)
         if not rec or not rec.move_id:
-            return {"ok": False, "error": f"No invoice found for '{ext}'"}
+            return _jsonrpc_error(f"No invoice found for '{ext}'")
 
         return {
             "ok": True,
