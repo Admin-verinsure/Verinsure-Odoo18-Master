@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Insurance RPC: Create Insurance + Invoice + Email (Cybro)",
-    "version": "18.0.1.1.1",
+    "version": "18.0.1.2.0",
     "category": "Insurance",
-    "summary": "RPC create insurance.details + invoice + email. Links invoice to Cybro invoice_ids if that relation exists and sets invoice_origin=INS/xxx.",
+    "summary": "RPC create insurance.details + invoice + email. Links invoice under Insurance (invoice_ids) and supports creating new agents.",
     "depends": ["base", "account", "mail", "insurance_management_cybro"],
     "data": [
         "views/account_move_view.xml",

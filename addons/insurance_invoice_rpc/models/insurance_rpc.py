@@ -7,7 +7,7 @@ class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
     def _try_confirm_and_sequence(self, insurance):
-        """Confirm through Cybro workflow (if available) so sequence (INS/xxx) is assigned."""
+        """Confirm through Cybro workflow (if available) so sequence is assigned."""
         tried = []
         for method in ("action_confirm", "button_confirm", "confirm", "action_validate"):
             if hasattr(insurance, method):
@@ -38,9 +38,10 @@ class InsuranceDetails(models.Model):
         """Cybro insurance.details has invoice_ids (one2many). Set its inverse field on account.move if present."""
         move_fields = self.env["account.move"]._fields
 
-        # Always set our explicit link
+        # Always set our explicit link (useful for reporting)
         move_vals["insurance_details_id"] = insurance.id
 
+        # Cybro inverse M2O is typically insurance_id
         candidates = ["insurance_id", "insurance_detail_id", "insurance_claim_id"]
         for fname in candidates:
             if fname in move_fields:
@@ -50,6 +51,50 @@ class InsuranceDetails(models.Model):
                     move_vals["_cybro_link_field_used"] = fname
                     break
         return move_vals
+
+    def _get_or_create_agent(self, emp_name: str):
+        """Create agent if missing, and ensure it's linked to current user if a user_id field exists.
+        Fixes Cybro visibility rules for newly created agents.
+        """
+        employee_model_used = None
+
+        def ensure_user_link(rec, Model):
+            if "user_id" in Model._fields:
+                try:
+                    if not rec.user_id:
+                        rec.write({"user_id": self.env.user.id})
+                        return True
+                except Exception:
+                    return False
+            return False
+
+        if "employee.details" in self.env:
+            Emp = self.env["employee.details"].sudo()
+            emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
+            if not emp_rec:
+                vals = {"name": emp_name}
+                if "user_id" in Emp._fields:
+                    vals["user_id"] = self.env.user.id
+                emp_rec = Emp.create(vals)
+            else:
+                ensure_user_link(emp_rec, Emp)
+            employee_model_used = "employee.details"
+            return emp_rec, employee_model_used
+
+        if "hr.employee" in self.env:
+            Emp = self.env["hr.employee"].sudo()
+            emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
+            if not emp_rec:
+                vals = {"name": emp_name}
+                if "user_id" in Emp._fields:
+                    vals["user_id"] = self.env.user.id
+                emp_rec = Emp.create(vals)
+            else:
+                ensure_user_link(emp_rec, Emp)
+            employee_model_used = "hr.employee"
+            return emp_rec, employee_model_used
+
+        raise UserError("No employee model found (employee.details/hr.employee).")
 
     @api.model
     def rpc_create_insurance_invoice_and_email(self, payload: dict):
@@ -82,22 +127,11 @@ class InsuranceDetails(models.Model):
             if cust_name and partner.name != cust_name:
                 partner.write({"name": cust_name})
 
-        # Employee
+        # Agent (create if missing + link to current user if possible)
         emp_name = (employee.get("name") or "").strip()
         if not emp_name:
             raise UserError("Payload missing employee.name")
-
-        employee_model_used = None
-        if "employee.details" in self.env:
-            Emp = self.env["employee.details"].sudo()
-            emp_rec = Emp.search([("name", "=", emp_name)], limit=1) or Emp.create({"name": emp_name})
-            employee_model_used = "employee.details"
-        elif "hr.employee" in self.env:
-            Emp = self.env["hr.employee"].sudo()
-            emp_rec = Emp.search([("name", "=", emp_name)], limit=1) or Emp.create({"name": emp_name})
-            employee_model_used = "hr.employee"
-        else:
-            raise UserError("No employee model found (employee.details/hr.employee).")
+        emp_rec, employee_model_used = self._get_or_create_agent(emp_name)
 
         # Policy
         if "policy.details" not in self.env:
@@ -122,7 +156,7 @@ class InsuranceDetails(models.Model):
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
-        # Insurance in draft (let workflow set INS/xxx)
+        # Insurance in draft (let workflow set sequence)
         start_date = payload.get("start_date") or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
