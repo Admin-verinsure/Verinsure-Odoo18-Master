@@ -6,7 +6,7 @@ class AccountMove(models.Model):
 
     insurance_details_id = fields.Many2one(
         "insurance.details",
-        string="Insurance",
+        string="Insurance (RPC Link)",
         index=True,
         ondelete="cascade",
     )
