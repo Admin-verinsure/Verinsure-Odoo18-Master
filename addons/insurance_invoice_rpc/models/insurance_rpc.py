@@ -6,16 +6,50 @@ import base64
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
-    def _cybro_confirm_insurance(self, insurance):
-        """Try common confirm methods used by custom modules. Return True if a method ran."""
+    def _try_confirm_and_sequence(self, insurance):
+        """Confirm through Cybro workflow (if available) so sequence (INS/xxx) is assigned."""
+        tried = []
         for method in ("action_confirm", "button_confirm", "confirm", "action_validate"):
             if hasattr(insurance, method):
+                tried.append(method)
                 try:
                     getattr(insurance, method)()
-                    return True
+                    return True, tried
                 except Exception:
                     continue
-        return False
+        return False, tried
+
+    def _force_ins_sequence_if_needed(self, insurance):
+        """If insurance.name is still '/', try to assign a sequence with prefix INS (best-effort)."""
+        if not insurance.name or insurance.name == "/":
+            seq = self.env["ir.sequence"].sudo().search(
+                ["|", ("prefix", "ilike", "INS"), ("name", "ilike", "Insurance")],
+                order="id desc",
+                limit=1,
+            )
+            if seq:
+                nxt = seq.next_by_id()
+                if nxt:
+                    insurance.write({"name": nxt})
+                    return {"forced_sequence": True, "sequence_id": seq.id, "sequence_name": seq.name, "new_name": nxt}
+        return {"forced_sequence": False}
+
+    def _set_cybro_invoice_link_fields(self, move_vals, insurance):
+        """Cybro insurance.details has invoice_ids (one2many). Set its inverse field on account.move if present."""
+        move_fields = self.env["account.move"]._fields
+
+        # Always set our explicit link
+        move_vals["insurance_details_id"] = insurance.id
+
+        candidates = ["insurance_id", "insurance_detail_id", "insurance_claim_id"]
+        for fname in candidates:
+            if fname in move_fields:
+                f = move_fields[fname]
+                if getattr(f, "comodel_name", None) == "insurance.details":
+                    move_vals[fname] = insurance.id
+                    move_vals["_cybro_link_field_used"] = fname
+                    break
+        return move_vals
 
     @api.model
     def rpc_create_insurance_invoice_and_email(self, payload: dict):
@@ -39,27 +73,14 @@ class InsuranceDetails(models.Model):
         partner = Partner.search([("email", "ilike", cust_email)], limit=1)
         if not partner:
             try:
-                partner = Partner.create({
-                    "name": cust_name,
-                    "email": cust_email,
-                    "phone": customer.get("phone"),
-                    "mobile": customer.get("mobile"),
-                    "customer_rank": 1,
-                })
+                partner = Partner.create({"name": cust_name, "email": cust_email, "customer_rank": 1})
             except Exception:
                 partner = Partner.search([("email", "ilike", cust_email)], limit=1)
                 if not partner:
                     raise
         else:
-            vals = {}
             if cust_name and partner.name != cust_name:
-                vals["name"] = cust_name
-            if customer.get("phone") and partner.phone != customer.get("phone"):
-                vals["phone"] = customer.get("phone")
-            if customer.get("mobile") and partner.mobile != customer.get("mobile"):
-                vals["mobile"] = customer.get("mobile")
-            if vals:
-                partner.write(vals)
+                partner.write({"name": cust_name})
 
         # Employee
         emp_name = (employee.get("name") or "").strip()
@@ -101,7 +122,7 @@ class InsuranceDetails(models.Model):
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
-        # Insurance: create in draft so Cybro confirm assigns INS/xxx
+        # Insurance in draft (let workflow set INS/xxx)
         start_date = payload.get("start_date") or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
@@ -117,34 +138,23 @@ class InsuranceDetails(models.Model):
         }
         insurance = self.sudo().create(insurance_vals)
 
-        # Confirm using workflow
-        if target_state in ("confirmed", "confirm", "validated", "posted"):
-            ran = self._cybro_confirm_insurance(insurance)
-            if not ran and "state" in insurance._fields:
-                insurance.write({"state": "confirmed"})
+        confirm_ran = False
+        confirm_tried = []
+        force_seq_info = {"forced_sequence": False}
 
-        insurance_name = insurance.name  # should now be INS/xxx if workflow ran
+        if target_state in ("confirmed", "confirm", "validated", "posted"):
+            confirm_ran, confirm_tried = self._try_confirm_and_sequence(insurance)
+            if "state" in insurance._fields and insurance.state == "draft":
+                insurance.write({"state": "confirmed"})
+            force_seq_info = self._force_ins_sequence_if_needed(insurance)
+
+        insurance_name = insurance.name
 
         # Product (company-safe)
         Product = self.env["product.product"].sudo()
-        product = None
-        product_id = inv.get("product_id")
-        if product_id:
-            p = Product.browse(int(product_id))
-            if p.exists() and (not p.company_id or p.company_id.id == company.id):
-                product = p
-            else:
-                raise UserError("Provided product_id belongs to another company.")
+        product = Product.search([("sale_ok", "=", True), "|", ("company_id", "=", False), ("company_id", "=", company.id)], limit=1)
         if not product:
-            product = Product.search([("sale_ok", "=", True), "|", ("company_id", "=", False), ("company_id", "=", company.id)], limit=1)
-        if not product:
-            product = Product.create({
-                "name": "Insurance Service",
-                "type": "service",
-                "sale_ok": True,
-                "purchase_ok": False,
-                "company_id": company.id,
-            })
+            product = Product.create({"name": "Insurance Service", "type": "service", "sale_ok": True, "company_id": company.id})
 
         journal = self.env["account.journal"].sudo().search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
         if not journal:
@@ -153,7 +163,7 @@ class InsuranceDetails(models.Model):
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
 
-        move = self.env["account.move"].sudo().with_company(company).create({
+        move_vals = {
             "move_type": "out_invoice",
             "company_id": company.id,
             "partner_id": partner.id,
@@ -161,16 +171,19 @@ class InsuranceDetails(models.Model):
             "invoice_date": fields.Date.context_today(self),
             "journal_id": journal.id,
             "invoice_user_id": self.env.user.id,
-            "invoice_origin": insurance_name,   # Cybro Invoices tab uses this
+            "invoice_origin": insurance_name,
             "ref": insurance_name,
-            "insurance_details_id": insurance.id,
             "invoice_line_ids": [(0, 0, {
                 "product_id": product.id,
                 "name": inv.get("line_name") or f"Insurance: {insurance_name}",
                 "quantity": qty,
                 "price_unit": price_unit,
             })],
-        })
+        }
+        move_vals = self._set_cybro_invoice_link_fields(move_vals, insurance)
+        cybro_link_field_used = move_vals.pop("_cybro_link_field_used", None)
+
+        move = self.env["account.move"].sudo().with_company(company).create(move_vals)
         move.action_post()
 
         # PDF + email
@@ -222,4 +235,8 @@ class InsuranceDetails(models.Model):
             "emailed": emailed,
             "email_error": email_error,
             "employee_model_used": employee_model_used,
+            "confirm_method_tried": confirm_tried,
+            "confirm_method_ran": confirm_ran,
+            "forced_sequence": force_seq_info,
+            "cybro_link_field_used": cybro_link_field_used,
         }
