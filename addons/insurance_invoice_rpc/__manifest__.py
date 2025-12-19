@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Insurance RPC: Create Insurance + Invoice + Email (Cybro)",
-    "version": "18.0.1.0.9",
+    "version": "18.0.1.1.0",
     "category": "Insurance",
-    "summary": "RPC create insurance.details + posted invoice + PDF email. Matches Cybro Insurance 'Invoices' tab via invoice_origin=INS/xxx.",
+    "summary": "RPC create insurance.details + posted invoice + PDF email. Uses Cybro workflow confirm to assign INS/xxx then sets invoice_origin.",
     "depends": ["base", "account", "mail", "insurance_management_cybro"],
     "data": [
         "views/account_move_view.xml",

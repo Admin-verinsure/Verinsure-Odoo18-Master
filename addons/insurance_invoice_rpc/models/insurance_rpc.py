@@ -6,6 +6,17 @@ import base64
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
+    def _cybro_confirm_insurance(self, insurance):
+        """Try common confirm methods used by custom modules. Return True if a method ran."""
+        for method in ("action_confirm", "button_confirm", "confirm", "action_validate"):
+            if hasattr(insurance, method):
+                try:
+                    getattr(insurance, method)()
+                    return True
+                except Exception:
+                    continue
+        return False
+
     @api.model
     def rpc_create_insurance_invoice_and_email(self, payload: dict):
         customer = payload.get("customer") or {}
@@ -21,8 +32,9 @@ class InsuranceDetails(models.Model):
             raise UserError("Payload missing customer.email")
 
         company = self.env.company
+        target_state = (payload.get("state") or "confirmed").strip().lower()
 
-        # Partner: find by email; avoid writing email again (duplicate email validator)
+        # Partner
         Partner = self.env["res.partner"].sudo()
         partner = Partner.search([("email", "ilike", cust_email)], limit=1)
         if not partner:
@@ -89,7 +101,7 @@ class InsuranceDetails(models.Model):
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
-        # Insurance create (do NOT override sequence name like INS/006)
+        # Insurance: create in draft so Cybro confirm assigns INS/xxx
         start_date = payload.get("start_date") or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
@@ -99,11 +111,19 @@ class InsuranceDetails(models.Model):
             "currency_id": currency.id,
             "policy_number": int(payload.get("policy_number") or 0),
             "payment_type": payload.get("payment_type") or "fixed",
-            "state": payload.get("state") or "draft",
+            "state": "draft",
             "start_date": start_date,
-            "name": payload.get("insurance_no") or "/",
+            "name": "/",
         }
         insurance = self.sudo().create(insurance_vals)
+
+        # Confirm using workflow
+        if target_state in ("confirmed", "confirm", "validated", "posted"):
+            ran = self._cybro_confirm_insurance(insurance)
+            if not ran and "state" in insurance._fields:
+                insurance.write({"state": "confirmed"})
+
+        insurance_name = insurance.name  # should now be INS/xxx if workflow ran
 
         # Product (company-safe)
         Product = self.env["product.product"].sudo()
@@ -133,7 +153,6 @@ class InsuranceDetails(models.Model):
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
 
-        # KEY for Cybro UI: Source Document column = invoice_origin (set to INS/xxx)
         move = self.env["account.move"].sudo().with_company(company).create({
             "move_type": "out_invoice",
             "company_id": company.id,
@@ -142,17 +161,16 @@ class InsuranceDetails(models.Model):
             "invoice_date": fields.Date.context_today(self),
             "journal_id": journal.id,
             "invoice_user_id": self.env.user.id,
-            "invoice_origin": insurance.name,
-            "ref": insurance.name,
+            "invoice_origin": insurance_name,   # Cybro Invoices tab uses this
+            "ref": insurance_name,
             "insurance_details_id": insurance.id,
             "invoice_line_ids": [(0, 0, {
                 "product_id": product.id,
-                "name": inv.get("line_name") or f"Insurance: {insurance.name}",
+                "name": inv.get("line_name") or f"Insurance: {insurance_name}",
                 "quantity": qty,
                 "price_unit": price_unit,
             })],
         })
-
         move.action_post()
 
         # PDF + email
@@ -196,8 +214,10 @@ class InsuranceDetails(models.Model):
         return {
             "insurance_id": insurance.id,
             "insurance_name": insurance.name,
+            "insurance_state": insurance.state if "state" in insurance._fields else None,
             "invoice_id": move.id,
             "invoice_name": move.name,
+            "invoice_origin": move.invoice_origin,
             "emailed_to": cust_email,
             "emailed": emailed,
             "email_error": email_error,
