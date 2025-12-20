@@ -226,7 +226,7 @@ class InsuranceDetails(models.Model):
         emp_rec, employee_model_used = self._get_or_create_agent(employee)
 
         # -------------------------
-        # Policy (AUTO-CREATE if missing)
+        # Policy (FIXED: Auto-create if not found)
         # -------------------------
         if "policy.details" not in self.env:
             raise UserError("policy.details model not found.")
@@ -239,24 +239,30 @@ class InsuranceDetails(models.Model):
 
         policy_rec = None
 
-        # 1) Use id if valid
+        # 1) Try to use ID if valid
         if policy_id:
-            policy_rec = Policy.browse(int(policy_id))
-            if not policy_rec.exists():
-                raise UserError(f"Invalid policy.id: {policy_id}")
+            try:
+                temp_rec = Policy.browse(int(policy_id))
+                if temp_rec.exists():
+                    policy_rec = temp_rec
+            except (ValueError, TypeError):
+                pass
 
-        # 2) Search by name
-        if not policy_rec:
-            if not policy_name:
-                # policy_id is REQUIRED on insurance.details -> must have something
-                policy_name = "Default Policy"
+        # 2) If not found by ID, search by name
+        if not policy_rec and policy_name:
             policy_rec = Policy.search([("name", "=", policy_name)], limit=1)
 
-        # 3) Create if still missing
+        # 3) CREATE if still missing (Auto-Create Logic)
         if not policy_rec:
-            base_vals = {"name": policy_name}
+            # If no name was provided, use a default
+            final_policy_name = policy_name or "Default Policy"
+            
+            # Use helper to fill other required fields for policy.details
+            base_vals = {"name": final_policy_name}
             vals = self._build_required_vals(Policy, base_vals)
-            vals["name"] = policy_name
+            
+            # Ensure name is exactly what we wanted
+            vals["name"] = final_policy_name
             policy_rec = Policy.create(vals)
 
         # -------------------------
