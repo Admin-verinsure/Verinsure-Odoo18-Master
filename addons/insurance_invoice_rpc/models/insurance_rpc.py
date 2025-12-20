@@ -92,7 +92,7 @@ class InsuranceDetails(models.Model):
                 vals[fname] = self.env.user.id
                 continue
 
-            # Char required fields → safe placeholder
+            # Char/Text required fields → safe placeholder
             if field.type in ("char", "text"):
                 vals[fname] = "N/A"
                 continue
@@ -118,8 +118,7 @@ class InsuranceDetails(models.Model):
                 continue
 
             # Many2one required: can't guess safely without a valid record.
-            # We leave it; if DB requires it too, you must provide it in payload later.
-            # (But MOST cybro employee_details required fields are char/selection/company/user/phone)
+            # Leave it. If DB requires it too, then payload must provide it.
             continue
 
         return vals
@@ -146,25 +145,19 @@ class InsuranceDetails(models.Model):
             emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
 
             if not emp_rec:
-                # NOTE: do NOT rely on ("phone" in Emp._fields) check. DB requires it anyway.
                 base_vals = {"name": emp_name, "phone": emp_phone}
 
-                # if user_id exists, link for record-rule visibility
                 if "user_id" in Emp._fields:
                     base_vals["user_id"] = self.env.user.id
 
-                # fill other required ORM fields (best-effort)
                 vals = self._build_required_vals(Emp, base_vals)
 
-                # final hard guarantee (even if _build_required_vals overwrote or skipped)
+                # hard guarantee for DB NOT NULL
                 vals["phone"] = emp_phone
 
                 emp_rec = Emp.create(vals)
             else:
-                # keep it visible if record rules rely on user_id
                 ensure_user_link(emp_rec, Emp)
-
-                # if phone is empty somehow, set it (also helps UI 'required' validation)
                 try:
                     if hasattr(emp_rec, "phone") and not emp_rec.phone:
                         emp_rec.write({"phone": emp_phone})
@@ -211,7 +204,9 @@ class InsuranceDetails(models.Model):
         company = self.env.company
         target_state = (payload.get("state") or "confirmed").strip().lower()
 
+        # -------------------------
         # Partner
+        # -------------------------
         Partner = self.env["res.partner"].sudo()
         partner = Partner.search([("email", "ilike", cust_email)], limit=1)
         if not partner:
@@ -225,33 +220,56 @@ class InsuranceDetails(models.Model):
             if cust_name and partner.name != cust_name:
                 partner.write({"name": cust_name})
 
+        # -------------------------
         # Agent
+        # -------------------------
         emp_rec, employee_model_used = self._get_or_create_agent(employee)
 
-        # Policy
+        # -------------------------
+        # Policy (AUTO-CREATE if missing)
+        # -------------------------
         if "policy.details" not in self.env:
             raise UserError("policy.details model not found.")
+
         Policy = self.env["policy.details"].sudo()
-        policy_id = policy.get("id")
+
+        policy_payload = policy or {}
+        policy_id = policy_payload.get("id")
+        policy_name = (policy_payload.get("name") or "").strip()
+
+        policy_rec = None
+
+        # 1) Use id if valid
         if policy_id:
             policy_rec = Policy.browse(int(policy_id))
             if not policy_rec.exists():
                 raise UserError(f"Invalid policy.id: {policy_id}")
-        else:
-            policy_name = (policy.get("name") or "").strip()
-            if not policy_name:
-                raise UserError("Payload missing policy.id or policy.name")
-            policy_rec = Policy.search([("name", "=", policy_name)], limit=1)
-            if not policy_rec:
-                raise UserError(f"Policy not found: {policy_name}")
 
+        # 2) Search by name
+        if not policy_rec:
+            if not policy_name:
+                # policy_id is REQUIRED on insurance.details -> must have something
+                policy_name = "Default Policy"
+            policy_rec = Policy.search([("name", "=", policy_name)], limit=1)
+
+        # 3) Create if still missing
+        if not policy_rec:
+            base_vals = {"name": policy_name}
+            vals = self._build_required_vals(Policy, base_vals)
+            vals["name"] = policy_name
+            policy_rec = Policy.create(vals)
+
+        # -------------------------
         # Currency
+        # -------------------------
         currency_code = (payload.get("currency") or "AUD").strip()
         currency = self.env["res.currency"].sudo().search([("name", "=", currency_code)], limit=1)
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
+        # -------------------------
         # Insurance
+        # -------------------------
         start_date = payload.get("start_date") or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
@@ -279,7 +297,9 @@ class InsuranceDetails(models.Model):
 
         insurance_name = insurance.name
 
+        # -------------------------
         # Product (company-safe)
+        # -------------------------
         Product = self.env["product.product"].sudo()
         product = Product.search(
             [("sale_ok", "=", True), "|", ("company_id", "=", False), ("company_id", "=", company.id)],
@@ -290,15 +310,22 @@ class InsuranceDetails(models.Model):
                 {"name": "Insurance Service", "type": "service", "sale_ok": True, "company_id": company.id}
             )
 
+        # -------------------------
         # Journal
-        journal = self.env["account.journal"].sudo().search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
+        # -------------------------
+        journal = self.env["account.journal"].sudo().search(
+            [("type", "=", "sale"), ("company_id", "=", company.id)],
+            limit=1,
+        )
         if not journal:
             raise UserError("No Sales Journal found for this company.")
 
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
 
+        # -------------------------
         # Invoice
+        # -------------------------
         move_vals = {
             "move_type": "out_invoice",
             "company_id": company.id,
@@ -324,7 +351,9 @@ class InsuranceDetails(models.Model):
         move = self.env["account.move"].sudo().with_company(company).create(move_vals)
         move.action_post()
 
+        # -------------------------
         # Email PDF
+        # -------------------------
         emailed = False
         email_error = None
         try:
@@ -334,6 +363,7 @@ class InsuranceDetails(models.Model):
             )
             if not report:
                 raise UserError("No PDF report found for account.move.")
+
             ext = report.get_external_id()
             report_ref = ext.get(report.id)
             if not report_ref:
