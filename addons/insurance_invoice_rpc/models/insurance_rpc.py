@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
 from odoo.exceptions import UserError
-import base64
 
 
 class InsuranceDetails(models.Model):
@@ -47,11 +46,9 @@ class InsuranceDetails(models.Model):
     def _set_cybro_invoice_link_fields(self, move_vals, insurance):
         move_fields = self.env["account.move"]._fields
 
-        # custom link if exists
         if "insurance_details_id" in move_fields:
             move_vals["insurance_details_id"] = insurance.id
 
-        # cybro inverse candidates
         candidates = ["insurance_id", "insurance_detail_id", "insurance_claim_id"]
         for fname in candidates:
             if fname in move_fields:
@@ -63,14 +60,11 @@ class InsuranceDetails(models.Model):
         return move_vals
 
     def _finalize_insurance_invoice_link(self, insurance, move, cybro_link_field_used=None):
-        # ensure inverse is set on move
         if cybro_link_field_used and cybro_link_field_used in move._fields:
             try:
                 move.sudo().write({cybro_link_field_used: insurance.id})
             except Exception:
                 pass
-
-        # ensure insurance.invoice_ids has this invoice if such field exists
         if "invoice_ids" in insurance._fields:
             try:
                 insurance.sudo().write({"invoice_ids": [(4, move.id)]})
@@ -78,7 +72,7 @@ class InsuranceDetails(models.Model):
                 pass
 
     # -------------------------
-    # Helpers: Fill ORM required fields
+    # Helpers: Fill required ORM fields
     # -------------------------
     def _build_required_vals(self, Model, base_vals: dict):
         vals = dict(base_vals or {})
@@ -114,13 +108,74 @@ class InsuranceDetails(models.Model):
         return vals
 
     # -------------------------
+    # Fix: ensure company_id is set (CRITICAL for currency list display)
+    # -------------------------
+    def _ensure_company_on_record(self, rec):
+        if "company_id" in rec._fields:
+            try:
+                if not rec.company_id:
+                    rec.sudo().write({"company_id": self.env.company.id})
+            except Exception:
+                pass
+
+    # -------------------------
+    # Fix: amount is related → write to the SOURCE field
+    # -------------------------
+    def _write_related_amount_source(self, insurance, amount_value):
+        if "amount" not in insurance._fields:
+            return {"written": False, "reason": "insurance.details has no amount field"}
+
+        f = insurance._fields["amount"]
+
+        related = getattr(f, "related", None)
+        if not related:
+            # not related, try direct write
+            try:
+                insurance.sudo().write({"amount": amount_value})
+                return {"written": True, "path": "insurance.details.amount"}
+            except Exception as e:
+                return {"written": False, "reason": str(e)}
+
+        # related is like ('policy_id', 'amount') or longer
+        try:
+            path = list(related)
+        except Exception:
+            return {"written": False, "reason": "Could not read related chain"}
+
+        rec = insurance
+        for step in path[:-1]:
+            if step not in rec._fields:
+                return {"written": False, "reason": f"Missing related step field: {step}"}
+            rec = rec[step]
+            if not rec:
+                return {"written": False, "reason": f"Related step {step} is empty (False)"}
+
+        target_field = path[-1]
+        if target_field not in rec._fields:
+            return {"written": False, "reason": f"Target field not found: {'.'.join(path)}"}
+
+        # If target itself is related/computed, we still try write (may fail), but we can fallback below
+        try:
+            rec.sudo().write({target_field: amount_value})
+            return {"written": True, "path": ".".join(path)}
+        except Exception as e:
+            # fallback: try common money fields on policy/details
+            for fallback in ("amount", "premium", "sum_insured"):
+                if fallback in rec._fields:
+                    try:
+                        rec.sudo().write({fallback: amount_value})
+                        return {"written": True, "path": ".".join(path[:-1] + [fallback]), "fallback_used": True}
+                    except Exception:
+                        continue
+            return {"written": False, "reason": str(e), "path": ".".join(path)}
+
+    # -------------------------
     # Agent
     # -------------------------
     def _get_or_create_agent(self, employee_dict: dict):
         emp_name = (employee_dict.get("name") or "").strip()
         if not emp_name:
             raise UserError("Payload missing employee.name")
-
         emp_phone = (employee_dict.get("phone") or "").strip() or "0000000000"
 
         if "employee.details" in self.env:
@@ -159,7 +214,6 @@ class InsuranceDetails(models.Model):
 
         Policy = self.env["policy.details"].sudo()
         policy_dict = policy_dict or {}
-
         policy_id = policy_dict.get("id")
         policy_name = (policy_dict.get("name") or "").strip()
 
@@ -167,6 +221,7 @@ class InsuranceDetails(models.Model):
             try:
                 rec = Policy.browse(int(policy_id))
                 if rec.exists():
+                    self._ensure_company_on_record(rec)
                     return rec
             except Exception:
                 pass
@@ -174,6 +229,7 @@ class InsuranceDetails(models.Model):
         if policy_name:
             rec = Policy.search([("name", "=", policy_name)], limit=1)
             if rec:
+                self._ensure_company_on_record(rec)
                 return rec
 
         final_name = policy_name or "Default Policy"
@@ -181,14 +237,13 @@ class InsuranceDetails(models.Model):
         vals = self._build_required_vals(Policy, vals)
         vals["name"] = final_name
 
+        # set company/currency if available
         if "company_id" in Policy._fields and not vals.get("company_id"):
             vals["company_id"] = self.env.company.id
         if "currency_id" in Policy._fields and not vals.get("currency_id"):
             vals["currency_id"] = self.env.company.currency_id.id
-        if "amount" in Policy._fields and vals.get("amount") in (None, False, ""):
-            vals["amount"] = 0.0
 
-        # handle NOT NULL policy_type_id in prod
+        # handle NOT NULL policy_type_id (prod)
         if "policy_type_id" in Policy._fields and not vals.get("policy_type_id"):
             comodel = Policy._fields["policy_type_id"].comodel_name
             TypeModel = self.env[comodel].sudo()
@@ -200,37 +255,40 @@ class InsuranceDetails(models.Model):
                 )
             vals["policy_type_id"] = t.id
 
-        return Policy.create(vals)
+        rec = Policy.create(vals)
+        self._ensure_company_on_record(rec)
+        return rec
 
     # -------------------------
-    # Email send (always creates a mail record you can see)
+    # Email sending (force visible mail + process queue)
     # -------------------------
-    def _send_invoice_email(self, move, partner, email_to):
-        # try standard invoice template
-        template = self.env.ref("account.email_template_edi_invoice", raise_if_not_found=False)
+    def _send_invoice_email_force(self, move, partner, email_to):
+        # ensure email_from exists
+        email_from = (self.env.company.email or self.env.user.email or "no-reply@" + (self.env.company.name or "example").replace(" ", "").lower() + ".com")
 
-        if template:
-            # ensure partner email exists
-            if partner and not partner.email:
-                partner.sudo().write({"email": email_to})
-
-            mail_id = template.sudo().send_mail(
-                move.id,
-                force_send=True,
-                raise_exception=True,
-                email_values={"email_to": email_to, "auto_delete": False},
-            )
-            mail = self.env["mail.mail"].sudo().browse(mail_id)
-            return mail_id, getattr(mail, "state", None), getattr(mail, "failure_reason", None)
-
-        # fallback manual mail.mail (still visible in Technical > Emails)
         mail = self.env["mail.mail"].sudo().create({
             "subject": f"Invoice {move.name}",
             "email_to": email_to,
-            "body_html": f"<p>Hello {partner.name if partner else ''},</p><p>Please find invoice {move.name}.</p>",
+            "email_from": email_from,
+            "body_html": f"<p>Hello {partner.name},</p><p>Please find your invoice {move.name}.</p>",
             "auto_delete": False,
+            "model": "account.move",
+            "res_id": move.id,
         })
-        mail.sudo().send(raise_exception=True)
+
+        # commit so you can see it even if send fails
+        self.env.cr.commit()
+
+        # send now
+        mail.sudo().send(raise_exception=False)
+
+        # force process queue (important when server works but queue not running)
+        try:
+            self.env["mail.mail"].sudo().process_email_queue()
+        except Exception:
+            pass
+
+        mail = mail.sudo().browse(mail.id)  # refresh
         return mail.id, getattr(mail, "state", None), getattr(mail, "failure_reason", None)
 
     # -------------------------
@@ -268,27 +326,18 @@ class InsuranceDetails(models.Model):
         # Policy
         policy_rec = self._get_or_create_policy(policy)
 
-        # Currency (requested)
+        # Currency
         currency_code = (payload.get("currency") or "AUD").strip()
         currency = self.env["res.currency"].sudo().search([("name", "=", currency_code)], limit=1)
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
-        # Prepare invoice numbers
+        # Invoice numbers
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
-        gross_total = price_unit * qty
+        expected_total = price_unit * qty
 
-        # ✅ also set policy amount if policy has it (this often drives insurance.amount)
-        for fname in ("amount", "premium", "sum_insured"):
-            if fname in policy_rec._fields:
-                try:
-                    policy_rec.sudo().write({fname: gross_total})
-                    break
-                except Exception:
-                    pass
-
-        # Insurance
+        # Insurance create
         start_date = payload.get("start_date") or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
@@ -301,20 +350,22 @@ class InsuranceDetails(models.Model):
             "start_date": start_date,
             "name": "/",
         }
-
-        # ✅ company_id is CRITICAL for currency related fields
         if "company_id" in self._fields:
             insurance_vals["company_id"] = company.id
 
         insurance = self.sudo().create(insurance_vals)
 
-        # ✅ write currency_id AFTER create (important when currency_id is related/computed)
+        # 🔥 ensure company is set (your current issue)
+        self._ensure_company_on_record(insurance)
+
+        # if currency_id exists, write it (even if related, write may fail silently -> ok)
         if "currency_id" in insurance._fields:
             try:
                 insurance.sudo().write({"currency_id": currency.id})
             except Exception:
                 pass
 
+        # Confirm/sequence
         confirm_ran = False
         confirm_tried = []
         force_seq_info = {"forced_sequence": False}
@@ -364,49 +415,26 @@ class InsuranceDetails(models.Model):
         move = self.env["account.move"].sudo().with_company(company).create(move_vals)
         move.action_post()
 
-        # ✅ link invoice to insurance so any computed totals can work
+        # link invoice
         self._finalize_insurance_invoice_link(insurance, move, cybro_link_field_used)
 
-        # ✅ now set insurance amount if writable, else keep policy as source
-        amount_written = False
-        if "amount" in insurance._fields and not getattr(insurance._fields["amount"], "compute", False):
-            try:
-                insurance.sudo().write({"amount": move.amount_total})
-                amount_written = True
-            except Exception:
-                pass
+        # ✅ FIX amount (your amount is related → set its source)
+        amount_fix = self._write_related_amount_source(insurance, move.amount_total)
 
-        # Email
-        mailed = False
-        mail_error = None
-        mail_id = None
-        mail_state = None
-        mail_failure_reason = None
-        try:
-            mail_id, mail_state, mail_failure_reason = self._send_invoice_email(move, partner, cust_email)
-            mailed = True
-            # commit so you can see the mail in Technical > Emails immediately
-            self.env.cr.commit()
-        except Exception as e:
-            mailed = False
-            mail_error = str(e)
-            # commit anyway so created mail (if any) remains visible
-            self.env.cr.commit()
+        # ✅ Email (force create + queue process)
+        mail_id, mail_state, mail_failure_reason = self._send_invoice_email_force(move, partner, cust_email)
 
         return {
             "insurance_id": insurance.id,
             "insurance_name": insurance.name,
-            "insurance_state": getattr(insurance, "state", None),
+            "insurance_company_id": insurance.company_id.id if "company_id" in insurance._fields and insurance.company_id else None,
             "insurance_currency_id": insurance.currency_id.id if "currency_id" in insurance._fields and insurance.currency_id else None,
             "insurance_currency_name": insurance.currency_id.name if "currency_id" in insurance._fields and insurance.currency_id else None,
-            "insurance_amount_field": getattr(insurance, "amount", None) if "amount" in insurance._fields else None,
-            "insurance_amount_written": amount_written,
+            "insurance_amount": getattr(insurance, "amount", None) if "amount" in insurance._fields else None,
+            "amount_fix": amount_fix,
             "invoice_id": move.id,
             "invoice_name": move.name,
             "invoice_amount_total": move.amount_total,
-            "emailed_to": cust_email,
-            "emailed": mailed,
-            "email_error": mail_error,
             "mail_id": mail_id,
             "mail_state": mail_state,
             "mail_failure_reason": mail_failure_reason,
