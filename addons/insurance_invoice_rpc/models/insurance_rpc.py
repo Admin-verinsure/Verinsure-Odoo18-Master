@@ -45,17 +45,12 @@ class InsuranceDetails(models.Model):
     # Helpers: Link invoice -> Insurance (Cybro)
     # -------------------------
     def _set_cybro_invoice_link_fields(self, move_vals, insurance):
-        """
-        Cybro insurance.details shows invoices via insurance.details.invoice_ids (O2M).
-        That O2M needs an inverse M2O on account.move, usually 'insurance_id'.
-        We set that field if it exists + also set our own insurance_details_id.
-        """
         move_fields = self.env["account.move"]._fields
 
-        # Always set our explicit link (custom field added by our module)
+        # our custom explicit link (from your module)
         move_vals["insurance_details_id"] = insurance.id
 
-        # Try set Cybro inverse field if present
+        # Cybro inverse field (account.move -> insurance.details)
         candidates = ["insurance_id", "insurance_detail_id", "insurance_claim_id"]
         for fname in candidates:
             if fname in move_fields:
@@ -71,19 +66,14 @@ class InsuranceDetails(models.Model):
     # Helpers: Fill ORM required fields (best-effort)
     # -------------------------
     def _build_required_vals(self, Model, base_vals: dict):
-        """
-        Fill required fields (ORM required=True). This prevents many DB NOT NULL crashes,
-        but NOTE: DB-level NOT NULL can still exist even if ORM field isn't required=True.
-        """
         vals = dict(base_vals or {})
 
         for fname, field in Model._fields.items():
-            if not field.required:
+            if not getattr(field, "required", False):
                 continue
             if fname in vals and vals[fname] not in (False, None, ""):
                 continue
 
-            # Common safe defaults:
             if fname == "company_id" and field.type == "many2one":
                 vals[fname] = self.env.company.id
                 continue
@@ -92,12 +82,10 @@ class InsuranceDetails(models.Model):
                 vals[fname] = self.env.user.id
                 continue
 
-            # Char/Text required fields → safe placeholder
             if field.type in ("char", "text"):
                 vals[fname] = "N/A"
                 continue
 
-            # Selection required → first allowed value
             if field.type == "selection":
                 try:
                     sel = field.selection(self.env)
@@ -107,30 +95,25 @@ class InsuranceDetails(models.Model):
                     vals[fname] = sel[0][0]
                 continue
 
-            # Numeric required → 0
             if field.type in ("integer", "float", "monetary"):
                 vals[fname] = 0
                 continue
 
-            # Boolean required → False
             if field.type == "boolean":
                 vals[fname] = False
                 continue
 
-            # Many2one required: can't guess safely
-            continue
-
         return vals
 
     # -------------------------
-    # Helpers: create agent safely (handles DB NOT NULL constraints)
+    # Helpers: create agent safely
     # -------------------------
     def _get_or_create_agent(self, employee_dict: dict):
         emp_name = (employee_dict.get("name") or "").strip()
         if not emp_name:
             raise UserError("Payload missing employee.name")
 
-        # PHONE IS DB NOT NULL in employee_details → always set a non-empty value
+        # DB NOT NULL in prod (employee_details.phone)
         emp_phone = (employee_dict.get("phone") or "").strip() or "0000000000"
 
         def ensure_user_link(rec, Model):
@@ -141,23 +124,17 @@ class InsuranceDetails(models.Model):
                 except Exception:
                     pass
 
-        # Prefer Cybro's employee.details
         if "employee.details" in self.env:
             Emp = self.env["employee.details"].sudo()
             emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
 
             if not emp_rec:
                 base_vals = {"name": emp_name, "phone": emp_phone}
-
                 if "user_id" in Emp._fields:
                     base_vals["user_id"] = self.env.user.id
-
                 vals = self._build_required_vals(Emp, base_vals)
-
-                # hard guarantee for DB NOT NULL
-                vals["phone"] = emp_phone
                 vals["name"] = emp_name
-
+                vals["phone"] = emp_phone
                 emp_rec = Emp.create(vals)
             else:
                 ensure_user_link(emp_rec, Emp)
@@ -169,11 +146,9 @@ class InsuranceDetails(models.Model):
 
             return emp_rec, "employee.details"
 
-        # Fallback to hr.employee if employee.details doesn't exist
         if "hr.employee" in self.env:
             Emp = self.env["hr.employee"].sudo()
             emp_rec = Emp.search([("name", "=", emp_name)], limit=1)
-
             if not emp_rec:
                 vals = {"name": emp_name}
                 if "user_id" in Emp._fields:
@@ -183,20 +158,14 @@ class InsuranceDetails(models.Model):
                 emp_rec = Emp.create(vals)
             else:
                 ensure_user_link(emp_rec, Emp)
-
             return emp_rec, "hr.employee"
 
         raise UserError("No employee model found (employee.details/hr.employee).")
 
     # -------------------------
-    # Helpers: Get or Create Policy (PROD SAFE)
+    # Helpers: Policy (auto-create, prod safe)
     # -------------------------
     def _get_or_create_policy(self, policy_dict: dict):
-        """
-        Production issue: policy.details table can have DB NOT NULL constraints
-        (e.g. policy_type_id) that are NOT represented as ORM required=True.
-        So we must explicitly set them.
-        """
         if "policy.details" not in self.env:
             raise UserError("policy.details model not found.")
 
@@ -205,9 +174,8 @@ class InsuranceDetails(models.Model):
 
         policy_id = policy_dict.get("id")
         policy_name = (policy_dict.get("name") or "").strip()
-        policy_rec = False
 
-        # 1) Try by ID
+        # by ID
         if policy_id:
             try:
                 rec = Policy.browse(int(policy_id))
@@ -216,29 +184,29 @@ class InsuranceDetails(models.Model):
             except Exception:
                 pass
 
-        # 2) Try by name
+        # by name
         if policy_name:
-            policy_rec = Policy.search([("name", "=", policy_name)], limit=1)
-            if policy_rec:
-                return policy_rec
+            rec = Policy.search([("name", "=", policy_name)], limit=1)
+            if rec:
+                return rec
 
-        # 3) Auto-create
+        # auto-create
         final_name = policy_name or "Default Policy"
         vals = {"name": final_name}
 
-        # Best-effort fill ORM-required fields
         vals = self._build_required_vals(Policy, vals)
-        vals["name"] = final_name  # keep exact name
+        vals["name"] = final_name
 
-        # Common fields if exist
         if "company_id" in Policy._fields and not vals.get("company_id"):
             vals["company_id"] = self.env.company.id
+
         if "currency_id" in Policy._fields and not vals.get("currency_id"):
             vals["currency_id"] = self.env.company.currency_id.id
+
         if "amount" in Policy._fields and vals.get("amount") in (None, False, ""):
             vals["amount"] = 0.0
 
-        # 🔥 CRITICAL: DB NOT NULL policy_type_id (seen in prod)
+        # DB NOT NULL policy_type_id in your prod
         if "policy_type_id" in Policy._fields and not vals.get("policy_type_id"):
             comodel = Policy._fields["policy_type_id"].comodel_name
             TypeModel = self.env[comodel].sudo()
@@ -246,11 +214,43 @@ class InsuranceDetails(models.Model):
             if not default_type:
                 raise UserError(
                     "Cannot auto-create Policy because no Policy Type exists. "
-                    "Create at least one record in the Policy Type master."
+                    "Create at least one record in Policy Type master."
                 )
             vals["policy_type_id"] = default_type.id
 
         return Policy.create(vals)
+
+    # -------------------------
+    # Helpers: write insurance amount from invoice
+    # -------------------------
+    def _sync_insurance_amount_from_invoice(self, insurance, move):
+        inv_total = float(move.amount_total or 0.0)
+        for fname in ("amount", "premium", "policy_amount", "total_amount"):
+            if fname in insurance._fields:
+                try:
+                    insurance.sudo().write({fname: inv_total})
+                    return fname, inv_total
+                except Exception:
+                    continue
+        return None, inv_total
+
+    # -------------------------
+    # Helpers: pick mail server + email_from
+    # -------------------------
+    def _get_outgoing_server_and_from(self):
+        MailServer = self.env["ir.mail_server"].sudo()
+        server = MailServer.search([("active", "=", True)], order="sequence asc, id asc", limit=1)
+
+        # strong defaults for email_from
+        company = self.env.company.sudo()
+        email_from = (
+            (server and server.smtp_user) or
+            company.email or
+            (company.partner_id and company.partner_id.email) or
+            self.env.user.email or
+            "no-reply@localhost"
+        )
+        return server, email_from
 
     # -------------------------
     # Main RPC
@@ -271,10 +271,9 @@ class InsuranceDetails(models.Model):
 
         company = self.env.company
         target_state = (payload.get("state") or "confirmed").strip().lower()
+        force_send = bool(payload.get("force_send", True))  # default True
 
-        # -------------------------
         # Partner
-        # -------------------------
         Partner = self.env["res.partner"].sudo()
         partner = Partner.search([("email", "ilike", cust_email)], limit=1)
         if not partner:
@@ -285,33 +284,23 @@ class InsuranceDetails(models.Model):
                 if not partner:
                     raise
         else:
-            # avoid duplicate_contact_details_alert email exception by not re-writing email
             if cust_name and partner.name != cust_name:
                 partner.write({"name": cust_name})
 
-        # -------------------------
         # Agent
-        # -------------------------
         emp_rec, employee_model_used = self._get_or_create_agent(employee)
 
-        # -------------------------
-        # Policy (auto-create safe)
-        # -------------------------
+        # Policy
         policy_rec = self._get_or_create_policy(policy)
 
-        # -------------------------
         # Currency
-        # -------------------------
         currency_code = (payload.get("currency") or "AUD").strip()
         currency = self.env["res.currency"].sudo().search([("name", "=", currency_code)], limit=1)
         if not currency:
             raise UserError(f"Currency not found: {currency_code}")
 
-        # -------------------------
         # Insurance
-        # -------------------------
         start_date = payload.get("start_date") or fields.Date.context_today(self)
-
         insurance_vals = {
             "partner_id": partner.id,
             "employee_id": emp_rec.id,
@@ -324,8 +313,6 @@ class InsuranceDetails(models.Model):
             "start_date": start_date,
             "name": "/",
         }
-
-        # If insurance model has company_id, set it (helps record rules visibility)
         if "company_id" in self._fields:
             insurance_vals["company_id"] = company.id
 
@@ -343,22 +330,16 @@ class InsuranceDetails(models.Model):
 
         insurance_name = insurance.name
 
-        # -------------------------
-        # Product (company-safe)
-        # -------------------------
+        # Product
         Product = self.env["product.product"].sudo()
         product = Product.search(
             [("sale_ok", "=", True), "|", ("company_id", "=", False), ("company_id", "=", company.id)],
             limit=1,
         )
         if not product:
-            product = Product.create(
-                {"name": "Insurance Service", "type": "service", "sale_ok": True, "company_id": company.id}
-            )
+            product = Product.create({"name": "Insurance Service", "type": "service", "sale_ok": True, "company_id": company.id})
 
-        # -------------------------
         # Journal
-        # -------------------------
         journal = self.env["account.journal"].sudo().search(
             [("type", "=", "sale"), ("company_id", "=", company.id)],
             limit=1,
@@ -369,9 +350,7 @@ class InsuranceDetails(models.Model):
         price_unit = float(inv.get("price_unit") or 0.0)
         qty = float(inv.get("qty") or 1.0)
 
-        # -------------------------
         # Invoice
-        # -------------------------
         move_vals = {
             "move_type": "out_invoice",
             "company_id": company.id,
@@ -382,14 +361,12 @@ class InsuranceDetails(models.Model):
             "invoice_user_id": self.env.user.id,
             "invoice_origin": insurance_name,
             "ref": insurance_name,
-            "invoice_line_ids": [
-                (0, 0, {
-                    "product_id": product.id,
-                    "name": inv.get("line_name") or f"Insurance: {insurance_name}",
-                    "quantity": qty,
-                    "price_unit": price_unit,
-                })
-            ],
+            "invoice_line_ids": [(0, 0, {
+                "product_id": product.id,
+                "name": inv.get("line_name") or f"Insurance: {insurance_name}",
+                "quantity": qty,
+                "price_unit": price_unit,
+            })],
         }
         move_vals = self._set_cybro_invoice_link_fields(move_vals, insurance)
         cybro_link_field_used = move_vals.pop("_cybro_link_field_used", None)
@@ -397,11 +374,13 @@ class InsuranceDetails(models.Model):
         move = self.env["account.move"].sudo().with_company(company).create(move_vals)
         move.action_post()
 
-        # -------------------------
-        # Email PDF (best-effort)
-        # -------------------------
+        # ✅ FIX #1: sync insurance amount from invoice
+        amount_field_used, synced_amount = self._sync_insurance_amount_from_invoice(insurance, move)
+
+        # Email PDF (force visible + logged)
         emailed = False
         email_error = None
+        mail_id = None
         try:
             report = self.env["ir.actions.report"].sudo().search(
                 [("model", "=", "account.move"), ("report_type", "=", "qweb-pdf")],
@@ -426,14 +405,26 @@ class InsuranceDetails(models.Model):
                 "mimetype": "application/pdf",
             })
 
-            mail = self.env["mail.mail"].sudo().create({
+            server, email_from = self._get_outgoing_server_and_from()
+
+            mail_vals = {
                 "subject": f"Invoice {move.name}",
+                "email_from": email_from,             # ✅ ensures mail is created properly
                 "email_to": cust_email,
                 "body_html": f"<p>Hello {partner.name},</p><p>Please find your invoice attached.</p>",
                 "attachment_ids": [(4, attachment.id)],
-            })
-            mail.send()
+            }
+            mail = self.env["mail.mail"].sudo().create(mail_vals)
+            mail_id = mail.id
+
+            # ✅ ensures it either sends or raises a visible error
+            if server:
+                mail.sudo().send(raise_exception=True, smtp_server_id=server.id)
+            else:
+                mail.sudo().send(raise_exception=True)
+
             emailed = True
+
         except Exception as e:
             emailed = False
             email_error = str(e)
@@ -442,10 +433,14 @@ class InsuranceDetails(models.Model):
             "insurance_id": insurance.id,
             "insurance_name": insurance.name,
             "insurance_state": insurance.state if "state" in insurance._fields else None,
+            "insurance_currency": insurance.currency_id.name if insurance.currency_id else None,
+            "insurance_amount_synced": synced_amount,
+            "insurance_amount_field_used": amount_field_used,
             "invoice_id": move.id,
             "invoice_name": move.name,
             "invoice_origin": move.invoice_origin,
             "emailed_to": cust_email,
+            "mail_id": mail_id,
             "emailed": emailed,
             "email_error": email_error,
             "employee_model_used": employee_model_used,
