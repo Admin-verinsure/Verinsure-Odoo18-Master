@@ -1,0 +1,3752 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* zehntech_form_builder
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-10-27 05:21+0000\n"
+"PO-Revision-Date: 2025-10-27 10:54+0530\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.6\n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_step__60
+msgid "1 hour"
+msgstr "1 hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_step__1
+msgid "1 minute"
+msgstr "1 minuto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_format__12
+msgid "12 Hour (AM/PM)"
+msgstr "12 horas (AM/PM)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_step__15
+msgid "15 minutes"
+msgstr "15 minutos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_format__24
+msgid "24 Hour"
+msgstr "24 Horas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_step__30
+msgid "30 minutes"
+msgstr "30 minutos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_step__5
+msgid "5 minutes"
+msgstr "5 minutos"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "<i class=\"fa fa-bar-chart\"/> Analytics"
+msgstr "<i class=\"\\fa\" fa-bar-chart=\"\"/> AnÃ¡lisis"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "<i class=\"fa fa-ellipsis-v\" role=\"img\" aria-label=\"Manage\" title=\"Manage\"/>"
+msgstr ""
+"<i clase=\"\\fa\" fa-ellipsis-v=\"\" role=\"\\img\\\" aria-label=\"\\Manage\\\" title=\"\\Manage\\/\">\n"
+"                                        </i>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "<i class=\"fa fa-eye\"/> Preview"
+msgstr "<i clase=\"\\fa\" fa-eye=\"\"/> Vista previa"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid ""
+"<i class=\"fa fa-info-circle\"/> Share this QR code for easy access\n"
+"                                to your form. Users can scan it with their mobile devices to open\n"
+"                                the form directly."
+msgstr ""
+"<i class=\"fa fa-info-circle\"/> Comparte este código QR para acceder fácilmente\n"
+"                               a su formulario. Los usuarios pueden escanearlo con sus dispositivos móviles para abrirlo.\n"
+"                               el formulario directamente."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid ""
+"<i class=\"fa fa-info-circle\"/> Vertical: Labels above inputs\n"
+"                                (mobile-friendly) <br/> Horizontal: Labels beside inputs (desktop\n"
+"                                view)"
+msgstr ""
+"<i class=\"fa fa-info-circle\"/> Vertical: Etiquetas sobre las entradas \n"
+"(compatible con dispositivos móviles) <br/> Horizontal: Etiquetas junto a las entradas (vista de escritorio)"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "<i class=\"fa fa-plus\"/> Add More Files"
+msgstr "<i class=\"\\fa\" fa-plus=\"\"/> Agregar mÃ¡s archivos"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "<i class=\"fa fa-share\"/> Share"
+msgstr "<i clase=\"\\fa\" fa-share=\"\"/> Compartir"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-arrow-down\"/>Newest First"
+msgstr "<i class=\"\\fas\" fa-arrow-down=\"\"/>MÃ¡s nuevo primero"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-arrow-up\"/>Oldest First"
+msgstr "<i class=\"\\fas\" fa-arrow-up=\"\"/>MÃ¡s antiguo primero"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-chart-bar me-3\"/>Responses for \""
+msgstr "<i class=\"\\fas\" fa-chart-bar=\"\" me-3=\"\"/>Respuestas para \\"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-chevron-left\"/> Previous"
+msgstr "<i class=\"\\fas\" fa-chevron-left=\"\"/> Anterior"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-download\"/>Export CSV"
+msgstr "<i class=\"\\fas\" fa-download=\"\"/>Exportar CSV"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid ""
+"<i class=\"fas fa-info-circle\"/>\n"
+"                                Showing"
+msgstr ""
+"<i class=\"fas fa-info-circle\"/>\n"
+"Mostrando"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "<i class=\"fas fa-sort\"/>Sort by Date"
+msgstr "<i class=\"\\fas\" fa-sort=\"\"/>Ordenar por fecha"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "<option value=\"\">-- Select --</option>"
+msgstr "<option value=\"\">-- Seleccionar --</option>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "<option value=\"\">-- Select Country --</option>"
+msgstr "<option value=\"\\\\\">-- Seleccionar paÃ­s --</option>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid ""
+"<span class=\"page-link\">\n"
+"                                            <i class=\"fas fa-chevron-left\"/> Previous\n"
+"                                        </span>"
+msgstr ""
+"<span class=\"page-link\">\n"
+"<i class=\"fas fa-chevron-left\"/> Anterior\n"
+"</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid ""
+"<span class=\"page-link\">\n"
+"                                            Next <i class=\"fas fa-chevron-right\"/>\n"
+"                                        </span>"
+msgstr ""
+"<span class=\"page-link\">\n"
+"Siguiente <i class=\"fas fa-chevron-right\"/>\n"
+"</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid ""
+"<span class=\"text-muted d-inline-flex align-items-center gap-1\">\n"
+"            <i class=\"fas fa-minus-circle\"/> No file uploaded\n"
+"        </span>"
+msgstr ""
+"<span class=\"text-muted d-inline-flex align-items-center gap-1\">\n"
+"<i class=\"fas fa-minus-circle\"/> No se ha subido ningún archivo\n"
+"</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid ""
+"<span class=\"text-warning d-inline-flex align-items-center gap-1\">\n"
+"                <i class=\"fas fa-exclamation-triangle\"/>\n"
+"                Invalid file data\n"
+"            </span>"
+msgstr ""
+"<span class=\"text-warning d-inline-flex align-items-center gap-1\">\n"
+"<i class=\"fas fa-exclamation-triangle\"/>\n"
+"Datos de archivo no válidos\n"
+"</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_thank_you_template
+msgid ""
+"<span id=\"redirectText\">Redirecting to form in</span>\n"
+"              <span id=\"countdown\">5</span>\n"
+"              <span id=\"secondsText\">seconds...</span>"
+msgstr ""
+"<span id=\"redirectText\">Redireccionando al formulario en</span>\n"
+"<span id=\"countdown\">5</span>\n"
+"<span id=\"secondsText\">segundos...</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_thank_you_template
+msgid "<span id=\"submitBtnText\">Submit Another Response</span>"
+msgstr "<span id=\"\\submitBtnText\\\">Enviar otra respuesta</span>"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_captcha_field_config_wizard
+msgid "<strong>Important:</strong> Make sure you create keys for the selected version at"
+msgstr "<strong>Importante:</strong> Asegúrese de crear claves para la versión seleccionada en"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_needaction
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_needaction
+msgid "Action Needed"
+msgstr "AcciÃ³n necesaria"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_ids
+msgid "Activities"
+msgstr "Actividades"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_exception_decoration
+msgid "Activity Exception Decoration"
+msgstr "DecoraciÃ³n de excepciÃ³n de actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_state
+msgid "Activity State"
+msgstr "Estado de actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_type_icon
+msgid "Activity Type Icon"
+msgstr "Icono de tipo de actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__help_text
+#: model:ir.model.fields,help:zehntech_form_builder.field_month_field_config_wizard__help_text
+msgid "Additional help text displayed below the field"
+msgstr "Texto de ayuda adicional que se muestra debajo del campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__address
+msgid "Address"
+msgstr "DIRECCIÃ“N"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+msgid "Address Components"
+msgstr "Componentes de direcciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+msgid "Address Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de direcciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_address_field_config_wizard
+msgid "Address Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo de direcciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_allow_clear
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__allow_clear
+msgid "Allow Clear/Reset"
+msgstr "Permitir borrar/restablecer"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__url_allow_external
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__allow_external
+msgid "Allow External URLs"
+msgstr "Permitir URL externas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_allow_half
+msgid "Allow Half Ratings"
+msgstr "Permitir medias calificaciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__multiple
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__file_multiple
+msgid "Allow Multiple Files"
+msgstr "Permitir mÃºltiples archivos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__email_domain_restriction_type__include
+msgid "Allow Only"
+msgstr "Permitir solo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__email_field_config_wizard__domain_restriction_type__include
+msgid "Allow Only These Domains"
+msgstr "Permitir sÃ³lo estos dominios"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__email_notifications_enabled
+msgid "Allow sending email notifications on form submission."
+msgstr "Permitir el envÃ­o de notificaciones por correo electrÃ³nico al enviar el formulario."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__allowed_extensions
+msgid "Allowed Extensions"
+msgstr "Extensiones permitidas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__file_allowed_extensions
+msgid "Allowed File Extensions"
+msgstr "Extensiones de archivo permitidas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__allowed_domains
+msgid "Allowed/Blocked Domains"
+msgstr "Dominios permitidos/bloqueados"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__availability_type__always
+msgid "Always Available"
+msgstr "Siempre disponible"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__require_email_consent
+msgid "Always send email to customer"
+msgstr "Enviar siempre correo electrÃ³nico al cliente"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Analytics"
+msgstr "AnalÃ­tica"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Analytics Search"
+msgstr "BÃºsqueda analÃ­tica"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__url_required_protocol__any
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__url_field_config_wizard__required_protocol__any
+msgid "Any Protocol"
+msgstr "Cualquier protocolo"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__04
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__04
+msgid "April"
+msgstr "Abril"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_attachment_count
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_attachment_count
+msgid "Attachment Count"
+msgstr "Recuento de archivos adjuntos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__08
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__08
+msgid "August"
+msgstr "Agosto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__availability_status
+msgid "Availability"
+msgstr "Disponibilidad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__available_from_date
+msgid "Available From Date"
+msgstr "Disponible desde la fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__available_from_datetime
+msgid "Available From Date & Time"
+msgstr "Disponible desde fecha y hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__available_to_date
+msgid "Available To Date"
+msgstr "Disponible hasta la fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__available_to_datetime
+msgid "Available To Date & Time"
+msgstr "Disponible hasta la fecha y hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__bcc_emails
+msgid "BCC Recipients"
+msgstr "Destinatarios BCC"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__availability_type__between_dates
+msgid "Between Dates"
+msgstr "Entre fechas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__availability_type__between_datetime
+msgid "Between Specific Date & Time"
+msgstr "Entre fecha y hora especÃ­ficas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__email_domain_restriction_type__exclude
+msgid "Block"
+msgstr "Bloquear"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__email_field_config_wizard__domain_restriction_type__exclude
+msgid "Block These Domains"
+msgstr "Bloquear estos dominios"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_business_end
+msgid "Business End Hour"
+msgstr "Hora de finalizaciÃ³n del negocio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_business_start
+msgid "Business Start Hour"
+msgstr "Hora de inicio del negocio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__button
+msgid "Button"
+msgstr "BotÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__button_label
+msgid "Button Label"
+msgstr "Etiqueta del botÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_captcha_field_config_wizard
+msgid "CAPTCHA Field Configuration"
+msgstr "ConfiguraciÃ³n del campo CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_captcha_field_config_wizard
+msgid "CAPTCHA Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__captcha_secret_key
+msgid "CAPTCHA Secret Key"
+msgstr "Clave secreta CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__captcha_site_key
+msgid "CAPTCHA Site Key"
+msgstr "Clave del sitio CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__captcha_size
+msgid "CAPTCHA Size"
+msgstr "TamaÃ±o CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__captcha_theme
+msgid "CAPTCHA Theme"
+msgstr "Tema CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__captcha_version
+msgid "CAPTCHA Version"
+msgstr "VersiÃ³n CAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__cc_emails
+msgid "CC Recipients"
+msgstr "Destinatarios de CC"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_default_value__calculated
+msgid "Calculated Date"
+msgstr "Fecha calculada"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_captcha_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_checkbox_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_date_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_email_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_file_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_number_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_phone_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_rating_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_select_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_text_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_textarea_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_time_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_url_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_year_field_config_wizard
+msgid "Cancel"
+msgstr "Cancelar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__captcha
+msgid "Captcha"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Check this box if you want to receive a confirmation email."
+msgstr "Marque esta casilla si desea recibir un correo electrÃ³nico de confirmaciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__checkbox
+msgid "Checkbox"
+msgstr "Caja"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_checkbox_field_config_wizard
+msgid "Checkbox Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de casilla de verificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_checkbox_field_config_wizard
+msgid "Checkbox Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campo de casilla de verificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__checkbox_layout
+msgid "Checkbox Layout"
+msgstr "DiseÃ±o de casilla de verificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__checkbox_options
+msgid "Checkbox Options (one per line)"
+msgstr "Opciones de casilla de verificaciÃ³n (una por lÃ­nea)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__time_format
+msgid "Choose 12-hour or 24-hour format."
+msgstr "Elija el formato de 12 o 24 horas."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__checkbox_layout
+msgid "Choose how checkboxes are arranged."
+msgstr "Elija cÃ³mo se organizan las casillas de verificaciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__layout_type
+msgid "Choose the default layout for form fields"
+msgstr "Elija el diseño predeterminado para los campos de formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__field_type
+msgid "Choose the type of a field"
+msgstr "Elija el tipo de campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__required
+msgid "Choose weather to make field required or not"
+msgstr "Elija el clima para que el campo sea obligatorio o no"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "City"
+msgstr "Ciudad"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Collected form submissions are displayed below with advanced controls."
+msgstr "Los envÃ­os de formularios recopilados se muestran a continuaciÃ³n con controles avanzados."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__file_allowed_extensions
+msgid "Comma-separated (e.g., pdf,doc,docx,jpg,png)"
+msgstr "Separados por comas (por ejemplo, pdf,doc,docx,jpg,png)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__bcc_emails
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__cc_emails
+msgid "Comma-separated email addresses"
+msgstr "Direcciones de correo electrÃ³nico separadas por comas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_address_field_config_wizard__required_fields
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_required_fields
+msgid "Comma-separated: street,city,state,zip,country"
+msgstr "Separados por comas: calle, ciudad, estado, cÃ³digo postal, paÃ­s"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__size__compact
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_size__compact
+msgid "Compact"
+msgstr "Compacto"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Complexity Requirements"
+msgstr "Requisitos de complejidad"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure Address Field"
+msgstr "Configurar el campo de dirección"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure CAPTCHA Field"
+msgstr "Configurar el campo CAPTCHA"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Checkbox Field"
+msgstr "Configurar campo de casilla de verificaciÃ³n"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Date Field"
+msgstr "Configurar campo de fecha"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Email Field"
+msgstr "Configurar campo de correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure File Upload Field"
+msgstr "Configurar el campo de carga de archivos"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Month Field"
+msgstr "Configurar el campo del mes"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Number Field"
+msgstr "Configurar campo numÃ©rico"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Options"
+msgstr "Configurar opciones"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure Password Field"
+msgstr "Configurar campo de contraseña"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Phone Field"
+msgstr "Configurar campo de telÃ©fono"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Rating Field"
+msgstr "Configurar campo de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure Select Field"
+msgstr "Configurar campo de selección"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Text Field"
+msgstr "Configurar campo de texto"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure Text Fields"
+msgstr "Configurar campos de texto"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Textarea Field"
+msgstr "Configurar el campo de Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Time Field"
+msgstr "Configurar campo de hora"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Configure URL Field"
+msgstr "Configurar campo URL"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0 model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure Year Field"
+msgstr "Configurar el campo AÃ±o"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure address Field"
+msgstr "Configurar campo de direcciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure file Field"
+msgstr "Configurar campo de archivo"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure password Field"
+msgstr "Configurar campo de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Configure url Field"
+msgstr "Configurar campo URL"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__consent_text
+msgid "Consent Text"
+msgstr "Texto de consentimiento"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__response_limit
+msgid "Control how many times users can submit this form"
+msgstr "Controle cuÃ¡ntas veces los usuarios pueden enviar este formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "Conversion Rate"
+msgstr "Tasa de conversiÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__conversion_rate
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__conversion_rate
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__conversion_rate
+msgid "Conversion Rate (%)"
+msgstr "Tasa de conversiÃ³n (%)"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Copy Form URL"
+msgstr "Copiar URL del formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__country
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__country
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__country
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Country"
+msgstr "PaÃ­s"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__phone_country_code
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__country_code
+msgid "Country Code"
+msgstr "CÃ³digo del paÃ­s"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__created_by
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Created By"
+msgstr "Creado por"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__created_date
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Created Date"
+msgstr "Fecha de creaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__create_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__create_uid
+msgid "Created by"
+msgstr "Creado por"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__create_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__create_date
+msgid "Created on"
+msgstr "Creado el"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "Created:"
+msgstr "Creado:"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_default_value__current
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__default_value__current
+msgid "Current Month"
+msgstr "Mes actual"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_default_value__current
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__time_field_config_wizard__default_time__current
+msgid "Current Time"
+msgstr "Hora actual"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__status
+msgid "Current publication status of the form"
+msgstr "Estado de publicaciÃ³n actual del formulario."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__custom_styles
+msgid "Custom CSS styles for the form"
+msgstr "Estilos CSS personalizados para el formulario."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_default_value__custom
+msgid "Custom Date"
+msgstr "Fecha personalizada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_custom_default
+msgid "Custom Default Date"
+msgstr "Fecha predeterminada personalizada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_custom_default
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_custom_month
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__custom_month
+msgid "Custom Default Month"
+msgstr "Mes predeterminado personalizado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_custom_default
+msgid "Custom Default Time (Hours)"
+msgstr "Tiempo predeterminado personalizado (horas)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_custom_year
+msgid "Custom Default Year"
+msgstr "AÃ±o predeterminado personalizado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_custom_hour
+msgid "Custom Hour"
+msgstr "Hora personalizada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__custom_hour
+msgid "Custom Hour (0-23)"
+msgstr "Hora personalizada (0-23)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_custom_minute
+msgid "Custom Minute"
+msgstr "Minuto personalizado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__custom_minute
+msgid "Custom Minute (0-59)"
+msgstr "Minuto personalizado (0-59)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_default_value__custom
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__default_value__custom
+msgid "Custom Month"
+msgstr "Mes personalizado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__custom_styles
+msgid "Custom Styles"
+msgstr "Estilos personalizados"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_default_value__custom
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__time_field_config_wizard__default_time__custom
+msgid "Custom Time"
+msgstr "Hora personalizada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__file_validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__validation_message
+msgid "Description"
+msgstr "Descripción"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__custom_year
+msgid "Custom Year"
+msgstr "AÃ±o personalizado"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_url_field_config_wizard
+msgid "Custom error message for invalid URLs"
+msgstr "Mensaje de error personalizado para URL no vÃ¡lidas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__url_validation_message
+msgid "Custom error message for invalid URLs."
+msgstr "Mensaje de error personalizado para URL no vÃ¡lidas."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__email_validation_message
+msgid "Custom error message for invalid emails"
+msgstr "Mensaje de error personalizado para correos electrÃ³nicos no vÃ¡lidos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__thank_you_message
+msgid "Custom message displayed after successful form submission"
+msgstr "Mensaje personalizado que se muestra despuÃ©s del envÃ­o exitoso del formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Customer Confirmation"
+msgstr "ConfirmaciÃ³n del cliente"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__customer_email
+msgid "Customer Email"
+msgstr "Correo electrÃ³nico del cliente"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__customer_email_subject
+msgid "Customer Email Subject"
+msgstr "Asunto del correo electrÃ³nico del cliente"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__customer_email_template
+msgid "Customer Email Template"
+msgstr "Plantilla de correo electrÃ³nico del cliente"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Customer Settings"
+msgstr "ConfiguraciÃ³n del cliente"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_format__dd/mm/yyyy
+msgid "DD/MM/YYYY"
+msgstr "DD/MM/AAAA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__theme__dark
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_theme__dark
+msgid "Dark"
+msgstr "Oscuro"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__date
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__date
+msgid "Date"
+msgstr "Fecha"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_date_field_config_wizard
+msgid "Date Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_date_field_config_wizard
+msgid "Date Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo de fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_format
+msgid "Date Format"
+msgstr "Formato de fecha"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Date Range Settings"
+msgstr "ConfiguraciÃ³n de rango de fechas"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "DateTime Range Settings"
+msgstr "ConfiguraciÃ³n del rango de fecha y hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_calculation_days
+msgid "Days from Today"
+msgstr "DÃ­as a partir de hoy"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__12
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__12
+msgid "December"
+msgstr "Diciembre"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__default_country
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_default_country
+msgid "Default Country"
+msgstr "PaÃ­s predeterminado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_default_value
+msgid "Default Date"
+msgstr "Fecha predeterminada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_default_value
+msgid "Default Month Value"
+msgstr "Valor de mes predeterminado"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+msgid "Default Settings"
+msgstr "ConfiguraciÃ³n predeterminada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__default_time
+msgid "Default Time"
+msgstr "Hora predeterminada"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_default_value
+msgid "Default Time Value"
+msgstr "Valor de tiempo predeterminado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__default_value
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+msgid "Default Value"
+msgstr "Valor predeterminado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_default_country
+msgid "Default country shown in the form."
+msgstr "PaÃ­s predeterminado que se muestra en el formulario."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_custom_default
+msgid "Default date to pre-fill in the field"
+msgstr "Fecha predeterminada para precompletar el campo"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Detailed Analytics - %s"
+msgstr "Análisis detallados: %s"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+msgid "Display & Validation"
+msgstr "VisualizaciÃ³n y validaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_month_field_config_wizard__show_month_names
+msgid "Display 'September 2025' instead of '2025-09'"
+msgstr "Mostrar \\'septiembre de 2025\\' en lugar de \\'2025-09\\'"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__display_name
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__display_name
+msgid "Display Name"
+msgstr "Nombre para mostrar"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Display Options"
+msgstr "Opciones de visualizaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__label
+msgid "Display label for this form field"
+msgstr "Mostrar etiqueta para este campo de formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_domain_restriction
+msgid "Domain Restriction"
+msgstr "RestricciÃ³n de dominio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_domain_restriction_type
+msgid "Domain Restriction Type"
+msgstr "Tipo de restricciÃ³n de dominio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__domain_validation_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_domain_validation_message
+msgid "Domain Validation Message"
+msgstr "Mensaje de validaciÃ³n de dominio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_allowed_domains
+msgid "Domains List"
+msgstr "Lista de dominios"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Download QR Code"
+msgstr "Descargar CÃ³digo QR"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__status__draft
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Draft"
+msgstr "Borrador"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+msgid "Drag to reorder field"
+msgstr "Arrastrar para reordenar el campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__select
+msgid "Dropdown"
+msgstr "MenÃº desplegable"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_min_date
+msgid "Earliest date that can be selected"
+msgstr "Fecha mÃ¡s temprana que se puede seleccionar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__year_min
+msgid "Earliest selectable year."
+msgstr "Primer aÃ±o seleccionable."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__email
+msgid "Email"
+msgstr "Correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_email_field_config_wizard
+msgid "Email Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_email_field_config_wizard
+msgid "Email Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campos de correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Email Field Required"
+msgstr "Campo de correo electrónico obligatorio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_hover_text
+msgid "Email Hover Text"
+msgstr "Texto al pasar el cursor por correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Email Notifications"
+msgstr "Notificaciones por correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Email Templates"
+msgstr "Plantillas de correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__enable_city
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_enable_city
+msgid "Enable City"
+msgstr "Habilitar ciudad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__enable_country
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_enable_country
+msgid "Enable Country"
+msgstr "Habilitar paÃ­s"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__enable_domain_restriction
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__email_enable_domain_restriction
+msgid "Enable Domain Restriction"
+msgstr "Habilitar restricciÃ³n de dominio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__email_notifications_enabled
+msgid "Enable Email Notifications"
+msgstr "Habilitar notificaciones por correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_enable_max
+msgid "Enable Max Month"
+msgstr "Habilitar mes mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_enable_max
+msgid "Enable Max Time"
+msgstr "Habilitar tiempo mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__enable_max_month
+msgid "Enable Maximum Month"
+msgstr "Habilitar mes mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_enable_min
+msgid "Enable Min Month"
+msgstr "Habilitar mes mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_enable_min
+msgid "Enable Min Time"
+msgstr "Habilitar tiempo mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__enable_min_month
+msgid "Enable Minimum Month"
+msgstr "Habilitar mes mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__enable_state
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_enable_state
+msgid "Enable State/Province"
+msgstr "Habilitar estado/provincia"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__enable_street
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_enable_street
+msgid "Enable Street Address"
+msgstr "Habilitar direcciÃ³n postal"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__enable_zip
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_enable_zip
+msgid "Enable ZIP/Postal Code"
+msgstr "Habilitar cÃ³digo postal"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__rating_allow_half
+msgid "Enable half-point ratings (e.g., 4.5)."
+msgstr "Habilite calificaciones de medio punto (por ejemplo, 4,5)."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__is_shared
+msgid "Enable public sharing of this form"
+msgstr "Habilitar el uso compartido pÃºblico de este formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__name
+msgid "Enter a descriptive title for your form"
+msgstr "Ingrese un tÃ­tulo descriptivo para su formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Enter custom validation message"
+msgstr "Ingrese un mensaje de validaciÃ³n personalizado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_checkbox_field_config_wizard__checkbox_options
+#: model:ir.model.fields,help:zehntech_form_builder.field_select_field_config_wizard__option_values
+msgid "Enter each option on a new line"
+msgstr "Ingrese cada opciÃ³n en una nueva lÃ­nea"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Enter message to show when form is not available..."
+msgstr "Ingrese el mensaje para mostrar cuando el formulario no estÃ© disponible..."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__checkbox_options
+msgid "Enter one option per line for checkboxes."
+msgstr "Ingrese una opciÃ³n por lÃ­nea para las casillas de verificaciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__option_values
+msgid "Enter one option per line."
+msgstr "Ingrese una opciÃ³n por lÃ­nea."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__error_score
+msgid "Error Score"
+msgstr "PuntuaciÃ³n de error"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__available_from_datetime
+msgid "Exact date and time when form becomes available"
+msgstr "Fecha y hora exactas en que el formulario estarÃ¡ disponible"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__available_to_datetime
+msgid "Exact date and time when form stops accepting submissions"
+msgstr "Fecha y hora exactas en que el formulario deja de aceptar envÃ­os"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "External URLs are not allowed."
+msgstr "No se permiten URL externas."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_customizer.js:0
+msgid "Failed to load styles"
+msgstr "No se pudieron cargar los estilos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Fair"
+msgstr "Justo"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__02
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__02
+msgid "February"
+msgstr "Febrero"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__field_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__field_id
+msgid "Field"
+msgstr "Campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__properties
+msgid "Field Configuration"
+msgstr "ConfiguraciÃ³n de campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__field_type
+msgid "Field Type"
+msgstr "Tipo de campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__field_ids
+msgid "Fields"
+msgstr "Campos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__file
+msgid "File Upload"
+msgstr "Carga de archivos"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_file_field_config_wizard
+msgid "File Upload Configuration"
+msgstr "ConfiguraciÃ³n de carga de archivos"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_file_field_config_wizard
+msgid "File Upload Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de carga de archivos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "File size must not exceed"
+msgstr "El tamaÃ±o del archivo no debe exceder"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__qr_code_filename
+msgid "Filename for QR code download"
+msgstr "Nombre de archivo para descargar el cÃ³digo QR"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_follower_ids
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_follower_ids
+msgid "Followers"
+msgstr "Seguidores"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_partner_ids
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_partner_ids
+msgid "Followers (Partners)"
+msgstr "Seguidores (socios)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__activity_type_icon
+msgid "Font awesome icon e.g. fa-tasks"
+msgstr "Icono de fuente impresionante, p. tareas fa"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__require_email_consent
+msgid "Force sending email to the customer after submission."
+msgstr "Forzar el envÃ­o de correo electrÃ³nico al cliente despuÃ©s del envÃ­o."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__form_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__form_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__form_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__form_id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__form_id
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Form"
+msgstr "Forma"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_analytics
+msgid "Form Analytics"
+msgstr "AnÃ¡lisis de formularios"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__availability_type
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Form Availability"
+msgstr "Disponibilidad del formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_builder model:ir.ui.menu,name:zehntech_form_builder.menu_form_builder_root
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Form Builder"
+msgstr "Creador de formularios"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_builder_field
+msgid "Form Builder Field"
+msgstr "Campo del generador de formularios"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Form Fields"
+msgstr "Campos de formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__layout_type
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Form Layout"
+msgstr "Diseño de formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__form_name
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Form Name"
+msgstr "Nombre del formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_expired_template
+msgid "Form Not Available"
+msgstr "Formulario no disponible"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_regional_analytics
+msgid "Form Regional Analytics"
+msgstr "Formulario de anÃ¡lisis regional"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid "Regional Analytics - %s"
+msgstr "Análisis regionales: %s"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Form Sharing"
+msgstr "Compartir formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__form_styles
+msgid "Form Styles JSON"
+msgstr "Estilos de formulario JSON"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_submission
+msgid "Form Submission"
+msgstr "EnvÃ­o de formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_error_template
+msgid "Form Submission Error"
+msgstr "Error de envÃ­o del formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__name
+msgid "Form Title"
+msgstr "TÃ­tulo del formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_form_view_tracker
+msgid "Form View Tracker"
+msgstr "Seguimiento de vista de formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__available_from_date
+msgid "Form becomes available from this date"
+msgstr "El formulario estarÃ¡ disponible a partir de esta fecha."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__created_date
+msgid "Form created on this date"
+msgstr "Formulario creado en esta fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__created_by
+msgid "Form is created by"
+msgstr "El formulario es creado por"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__available_to_date
+msgid "Form stops accepting submissions after this date"
+msgstr "El formulario deja de aceptar envÃ­os despuÃ©s de esta fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.constraint,message:zehntech_form_builder.constraint_form_builder_unique_form_title
+msgid "Form title must be unique!"
+msgstr "Â¡El tÃ­tulo del formulario debe ser Ãºnico!"
+
+#. module: zehntech_form_builder
+#: model:ir.actions.act_window,name:zehntech_form_builder.action_form_builder
+#: model:ir.ui.menu,name:zehntech_form_builder.menu_form_builder_forms
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_list
+msgid "Forms"
+msgstr "Formularios"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Forms Search"
+msgstr "BÃºsqueda de formularios"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Future months are not allowed."
+msgstr "No se permiten meses futuros."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Generate/Update QR Code"
+msgstr "Generar/Actualizar CÃ³digo QR"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_error_template
+msgid "Go Back"
+msgstr "Volver"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_captcha_field_config_wizard
+msgid "Google reCAPTCHA Admin"
+msgstr "Administrador de reCAPTCHA de Google"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_captcha_field_config_wizard__secret_key
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__captcha_secret_key
+msgid "Google reCAPTCHA Secret Key"
+msgstr "Clave secreta de Google reCAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_captcha_field_config_wizard__site_key
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__captcha_site_key
+msgid "Google reCAPTCHA Site Key"
+msgstr "Clave del sitio Google reCAPTCHA"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Group By"
+msgstr "Agrupar por"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "HTTP or HTTPS protocol is required."
+msgstr "Se requiere el protocolo HTTP o HTTPS."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__url_required_protocol__http_https
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__url_field_config_wizard__required_protocol__http_https
+msgid "HTTP/HTTPS Only"
+msgstr "SÃ³lo HTTP/HTTPS"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__url_required_protocol__https
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__url_field_config_wizard__required_protocol__https
+msgid "HTTPS Only"
+msgstr "Solo HTTPS"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "HTTPS protocol is required."
+msgstr "Se requiere el protocolo HTTPS."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__has_message
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__has_message
+msgid "Has Message"
+msgstr "Tiene mensaje"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Has Submissions"
+msgstr "Tiene presentaciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__rating_style__hearts
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__rating_field_config_wizard__style__hearts
+msgid "Hearts"
+msgstr "Copas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__help_text
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__help_text
+msgid "Help Text"
+msgstr "Texto de ayuda"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__checkbox_field_config_wizard__layout__horizontal
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__checkbox_layout__horizontal
+msgid "Horizontal"
+msgstr "Horizontal"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__layout_type__horizontal
+msgid "Horizontal Layout"
+msgstr "Diseño horizontal"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__hover_text
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__hover_text
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__hover_text
+msgid "Hover Text"
+msgstr "Texto flotante"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_select_field_config_wizard
+msgid "Hover text for this field"
+msgstr "Coloca el cursor sobre el texto de este campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__id
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__id
+msgid "ID"
+msgstr "IDENTIFICACIÃ“N"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__ip_address
+msgid "IP Address"
+msgstr "DirecciÃ³n IP"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_exception_icon
+msgid "Icon"
+msgstr "Icono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__activity_exception_icon
+msgid "Icon to indicate an exception activity."
+msgstr "Icono para indicar una actividad de excepciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__message_needaction
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__message_needaction
+msgid "If checked, new messages require your attention."
+msgstr "Si estÃ¡ marcado, los mensajes nuevos requieren su atenciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__message_has_error
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__message_has_error
+msgid "If checked, some messages have a delivery error."
+msgstr "Si estÃ¡ marcado, algunos mensajes tienen un error de entrega."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__checkbox_layout__inline
+msgid "Inline"
+msgstr "En lÃ­nea"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Invalid file"
+msgstr "Archivo no vÃ¡lido"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Invalid password format"
+msgstr "Formato de contraseÃ±a no vÃ¡lido"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_is_follower
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_is_follower
+msgid "Is Follower"
+msgstr "es seguidor"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__is_shared
+msgid "Is Shared"
+msgstr "es compartido"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__01
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__01
+msgid "January"
+msgstr "Enero"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__07
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__07
+msgid "July"
+msgstr "Julio"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__06
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__06
+msgid "June"
+msgstr "Junio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__label
+msgid "Label"
+msgstr "Etiqueta"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_rating_field_config_wizard
+msgid "Labels and Tooltips"
+msgstr "Etiquetas e informaciÃ³n sobre herramientas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__rating_labels
+#: model:ir.model.fields,help:zehntech_form_builder.field_rating_field_config_wizard__labels
+msgid "Labels for ratings (e.g., Poor|Fair|Good|Great|Excellent)"
+msgstr "Etiquetas para calificaciones (p. ej., deficiente|regular|buena|excelente|excelente)"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Last 12 Months"
+msgstr "Ãšltimos 12 meses"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Last 30 Days"
+msgstr "Ãšltimos 30 dÃ­as"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__write_uid
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__write_uid
+msgid "Last Updated by"
+msgstr "Actualizado por Ãºltima vez por"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_time_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__write_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__write_date
+msgid "Last Updated on"
+msgstr "Ãšltima actualizaciÃ³n el"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_max_date
+msgid "Latest date that can be selected"
+msgstr "Ãšltima fecha que se puede seleccionar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__year_max
+msgid "Latest selectable year."
+msgstr "Ãšltimo aÃ±o seleccionable."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__layout
+msgid "Layout"
+msgstr "DisposiciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Length Requirements"
+msgstr "Requisitos de longitud"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__theme__light
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_theme__light
+msgid "Light"
+msgstr "Luz"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__submitted_on_local
+msgid "Local Submitted Time"
+msgstr "Hora local de envÃ­o"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "MB"
+msgstr "MEGABYTE"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_format__mm/dd/yyyy
+msgid "MM/DD/YYYY"
+msgstr "DD/MM/AAAA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_format__mm/yyyy
+msgid "MM/YYYY"
+msgstr "MM/AAAA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_captcha_field_config_wizard__captcha_version
+msgid "Make sure your keys match this version!"
+msgstr "Â¡AsegÃºrate de que tus claves coincidan con esta versiÃ³n!"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__03
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__03
+msgid "March"
+msgstr "Marzo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__max_chars
+msgid "Max Characters"
+msgstr "Personajes mÃ¡ximos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__max_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_max_date
+msgid "Max Date"
+msgstr "Fecha mÃ¡xima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__max_size
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__file_max_size
+msgid "Max File Size (MB)"
+msgstr "TamaÃ±o mÃ¡ximo de archivo (MB)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_max_hour
+msgid "Max Hour"
+msgstr "Hora mÃ¡xima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__max_length
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__max_length
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__max_length
+msgid "Max Length"
+msgstr "Longitud mÃ¡xima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_max_minute
+msgid "Max Minute"
+msgstr "Minuto mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_max_month
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__max_month_month
+msgid "Max Month"
+msgstr "Mes mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_max_year
+msgid "Max Month Year"
+msgstr "MÃ¡ximo Mes AÃ±o"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_max_length
+msgid "Max Password Length"
+msgstr "Longitud mÃ¡xima de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_max_stars
+msgid "Max Stars"
+msgstr "estrellas mÃ¡ximas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__max_stars
+msgid "Max Stars/Points"
+msgstr "MÃ¡ximo de estrellas/puntos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__max_value
+msgid "Max Value"
+msgstr "Valor mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__year_max
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__max_month_year
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__max_year
+msgid "Max Year"
+msgstr "AÃ±o mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Max size:"
+msgstr "TamaÃ±o mÃ¡ximo:"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Maximum"
+msgstr "MÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__textarea_max_chars
+msgid "Maximum characters allowed in textarea"
+msgstr "MÃ¡ximo de caracteres permitidos en el Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__phone_max_length
+msgid "Maximum digits allowed in phone number"
+msgstr "DÃ­gitos mÃ¡ximos permitidos en el nÃºmero de telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__file_max_size
+msgid "Maximum file size in megabytes"
+msgstr "TamaÃ±o mÃ¡ximo de archivo en megabytes"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__text_max_length
+msgid "Maximum number of characters allowed"
+msgstr "NÃºmero mÃ¡ximo de caracteres permitidos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__rating_max_stars
+msgid "Maximum number of stars/rating points"
+msgstr "NÃºmero mÃ¡ximo de estrellas/puntos de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__textarea_word_limit
+msgid "Maximum number of words allowed"
+msgstr "NÃºmero mÃ¡ximo de palabras permitidas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__number_max_value
+msgid "Maximum numeric value allowed"
+msgstr "Valor numÃ©rico mÃ¡ximo permitido"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__05
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__05
+msgid "May"
+msgstr "Puede"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_has_error
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_has_error
+msgid "Message Delivery error"
+msgstr "Error de entrega de mensaje"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__availability_message
+msgid "Message displayed when form is not available"
+msgstr "Mensaje mostrado cuando el formulario no estÃ¡ disponible"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__message_on_unpublish
+msgid "Message shown to users when trying to access an unpublished form"
+msgstr "Mensaje mostrado a los usuarios al intentar acceder a un formulario no publicado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_on_unpublish
+msgid "Message to display when form is Unpublished"
+msgstr "Mensaje que se mostrarÃ¡ cuando el formulario no estÃ© publicado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_ids
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_ids
+msgid "Messages"
+msgstr "Mensajes"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_date_field_config_wizard__min_date
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__date_min_date
+msgid "Min Date"
+msgstr "Fecha mÃ­nima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_min_hour
+msgid "Min Hour"
+msgstr "Hora mÃ­nima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__min_length
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__min_length
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__min_length
+msgid "Min Length"
+msgstr "Longitud mÃ­nima"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_min_minute
+msgid "Min Minute"
+msgstr "Minuto mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_min_month
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__min_month_month
+msgid "Min Month"
+msgstr "Mes mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_min_year
+msgid "Min Month Year"
+msgstr "Min Mes AÃ±o"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_min_length
+msgid "Min Password Length"
+msgstr "Longitud mÃ­nima de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__min_value
+msgid "Min Value"
+msgstr "Valor mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__year_min
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__min_month_year
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_year_field_config_wizard__min_year
+msgid "Min Year"
+msgstr "AÃ±o mÃ­nimo"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Minimum"
+msgstr "MÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__phone_min_length
+msgid "Minimum digits required in phone number"
+msgstr "DÃ­gitos mÃ­nimos requeridos en el nÃºmero de telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__text_min_length
+msgid "Minimum number of characters required"
+msgstr "NÃºmero mÃ­nimo de caracteres requeridos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__number_min_value
+msgid "Minimum numeric value allowed"
+msgstr "Valor numÃ©rico mÃ­nimo permitido"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__month
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Month"
+msgstr "Mes"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+msgid "Month Field Configuration"
+msgstr "ConfiguraciÃ³n del campo mes"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_month_field_config_wizard
+msgid "Month Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo mes"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_format
+msgid "Month Format"
+msgstr "Formato de mes"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__relative_months
+msgid "Months from Current"
+msgstr "Meses desde la actualidad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__response_limit__unlimited
+msgid "Multiple responses allowed"
+msgstr "Se permiten mÃºltiples respuestas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__my_activity_date_deadline
+msgid "My Activity Deadline"
+msgstr "Fecha lÃ­mite de mi actividad"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "My Forms"
+msgstr "Mis formularios"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Next <i class=\"fas fa-chevron-right\"/>"
+msgstr "Siguiente <i class=\"\\fas\" fa-chevron-right=\"\"/>"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_date_deadline
+msgid "Next Activity Deadline"
+msgstr "Fecha lÃ­mite para la prÃ³xima actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_summary
+msgid "Next Activity Summary"
+msgstr "Resumen de la prÃ³xima actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_type_id
+msgid "Next Activity Type"
+msgstr "Siguiente tipo de actividad"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_default_value__none
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_default_value__none
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__time_default_value__none
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__default_value__none
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__time_field_config_wizard__default_time__none
+msgid "No Default"
+msgstr "Sin valor predeterminado"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "No Submissions"
+msgstr "Sin envÃ­os"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "No submissions yet"
+msgstr "AÃºn no hay presentaciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__size__normal
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_size__normal
+msgid "Normal"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__send_to_owner
+msgid "Notify the form owner on each submission."
+msgstr "Notifique al propietario del formulario en cada envÃ­o."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__11
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__11
+msgid "November"
+msgstr "Noviembre"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__number
+msgid "Number"
+msgstr "NÃºmero"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_number_field_config_wizard
+msgid "Number Field Configuration"
+msgstr "ConfiguraciÃ³n del campo numÃ©rico"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_number_field_config_wizard
+msgid "Number Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campos numÃ©ricos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__number_max_value
+msgid "Number Max Value"
+msgstr "NÃºmero Valor mÃ¡ximo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__number_min_value
+msgid "Number Min Value"
+msgstr "NÃºmero Valor mÃ­nimo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__number_step
+msgid "Number Step"
+msgstr "Paso numÃ©rico"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_needaction_counter
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_needaction_counter
+msgid "Number of Actions"
+msgstr "NÃºmero de acciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_textarea_field_config_wizard__rows
+msgid "Number of Rows"
+msgstr "NÃºmero de filas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__message_has_error_counter
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__message_has_error_counter
+msgid "Number of errors"
+msgstr "NÃºmero de errores"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__message_needaction_counter
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__message_needaction_counter
+msgid "Number of messages requiring action"
+msgstr "NÃºmero de mensajes que requieren acciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__message_has_error_counter
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__message_has_error_counter
+msgid "Number of messages with delivery error"
+msgstr "NÃºmero de mensajes con error de entrega"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__total_views
+msgid "Number of times the form has been viewed"
+msgstr "NÃºmero de veces que se ha visto el formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__textarea_rows
+msgid "Number of visible text rows"
+msgstr "NÃºmero de filas de texto visibles"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__rating_style__numbers
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__rating_field_config_wizard__style__numbers
+msgid "Numbers"
+msgstr "NÃºmeros"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__10
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__10
+msgid "October"
+msgstr "Octubre"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_email_field_config_wizard__allowed_domains
+msgid "One domain per line (e.g., gmail.com, outlook.com)"
+msgstr "Un dominio por lÃ­nea (por ejemplo, gmail.com, outlook.com)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_rating_field_config_wizard__tooltips
+msgid "One per line for each rating level"
+msgstr "Uno por lÃ­nea para cada nivel de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__response_limit__one_only
+msgid "One response only (requires sign-in)"
+msgstr "Una sola respuesta (requiere iniciar sesiÃ³n)"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_rating_field_config_wizard
+msgid "One tooltip per line for each rating"
+msgstr "Una informaciÃ³n sobre herramientas por lÃ­nea para cada calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Only"
+msgstr "Solo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__url_open_new_tab
+msgid "Open URLs in a new browser tab."
+msgstr "Abra las URL en una nueva pestaÃ±a del navegador."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__url_open_new_tab
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__open_new_tab
+msgid "Open in New Tab"
+msgstr "Abrir en nueva pestaÃ±a"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_checkbox_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_select_field_config_wizard
+msgid ""
+"Option 1\n"
+"Option 2\n"
+"Option 3"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_checkbox_field_config_wizard__checkbox_options
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_select_field_config_wizard__option_values
+msgid "Options"
+msgstr "Opciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__option_values
+msgid "Options (one per line)"
+msgstr "Opciones (una por lÃ­nea)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__sequence
+msgid "Order in which fields appear on the form"
+msgstr "Orden en que aparecen los campos en el formulario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__owner_email_subject
+msgid "Owner Email Subject"
+msgstr "Asunto del correo electrÃ³nico del propietario"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__owner_email_template
+msgid "Owner Email Template"
+msgstr "Plantilla de correo electrÃ³nico del propietario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Owner Notification"
+msgstr "NotificaciÃ³n del propietario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Page"
+msgstr "PÃ¡gina"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__password
+msgid "Password"
+msgstr "ContraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Password Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_password_field_config_wizard
+msgid "Password Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Password Strength:"
+msgstr "Fuerza de la contraseÃ±a:"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Password must be at least"
+msgstr "La contraseÃ±a debe ser al menos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Password must contain:"
+msgstr "La contraseÃ±a debe contener:"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Password must not exceed"
+msgstr "La contraseÃ±a no debe exceder"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Past months are not allowed."
+msgstr "No se permiten meses pasados."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_text_field_config_wizard__pattern
+msgid "Pattern (Regex)"
+msgstr "PatrÃ³n (Regex)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__conversion_rate
+msgid "Percentage of form views that resulted in submissions"
+msgstr "Porcentaje de vistas de formularios que resultaron en envÃ­os"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__error_score
+msgid "Percentage of incomplete form submissions"
+msgstr "Porcentaje de envÃ­os de formularios incompletos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__url_allow_external
+msgid "Permit links to external websites."
+msgstr "Permitir enlaces a sitios web externos."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__phone
+msgid "Phone"
+msgstr "TelÃ©fono"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_phone_field_config_wizard
+msgid "Phone Field Configuration"
+msgstr "ConfiguraciÃ³n del campo del telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_phone_field_config_wizard
+msgid "Phone Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campo del telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__phone_hover_text
+msgid "Phone Hover Text"
+msgstr "Texto al pasar el cursor sobre el telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__phone_max_length
+msgid "Phone Max Length"
+msgstr "Longitud mÃ¡xima del telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__phone_min_length
+msgid "Phone Min Length"
+msgstr "Longitud mÃ­nima del telÃ©fono"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Phone number must be at least"
+msgstr "El nÃºmero de telÃ©fono debe ser al menos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Phone number must not exceed"
+msgstr "El nÃºmero de telÃ©fono no debe exceder"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__placeholder
+msgid "Placeholder"
+msgstr "Marcador de posiciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__placeholder
+msgid "Placeholder text shown inside the input field"
+msgstr "Texto de marcador de posiciÃ³n que se muestra dentro del campo de entrada"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Please complete the CAPTCHA verification"
+msgstr "Por favor complete la verificaciÃ³n CAPTCHA"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please complete the CAPTCHA."
+msgstr "Por favor complete el CAPTCHA."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please enter a valid URL."
+msgstr "Por favor ingrese una URL vÃ¡lida."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please enter a valid email address."
+msgstr "Por favor, introduce una direcciÃ³n de correo electrÃ³nico vÃ¡lida."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please enter a valid format."
+msgstr "Por favor ingrese un formato vÃ¡lido."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please enter a valid number."
+msgstr "Por favor ingrese un nÃºmero vÃ¡lido."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please enter a valid phone number."
+msgstr "Por favor ingrese un nÃºmero de telÃ©fono vÃ¡lido."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please limit your response to"
+msgstr "Por favor limite su respuesta a"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please make a selection."
+msgstr "Por favor haga una selecciÃ³n."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please select"
+msgstr "Por favor seleccione"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please select a valid year."
+msgstr "Seleccione un aÃ±o vÃ¡lido."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Please select a year."
+msgstr "Por favor seleccione un aÃ±o."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_calculation_days
+#: model:ir.model.fields,help:zehntech_form_builder.field_month_field_config_wizard__relative_months
+msgid "Positive for future, negative for past"
+msgstr "Positivo para el futuro, negativo para el pasado."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Preview Form"
+msgstr "Formulario de vista previa"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+msgid "Preview:"
+msgstr "Avance:"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__share_token
+msgid "Public Token"
+msgstr "Ficha pÃºblica"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Publish"
+msgstr "Publicar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__status__published
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Published"
+msgstr "Publicado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__qr_code_image
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "QR Code"
+msgstr "CÃ³digo QR"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "QR Code & Sharing"
+msgstr "CÃ³digo QR y uso compartido"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__qr_code_filename
+msgid "QR Code Filename"
+msgstr "Nombre de archivo del cÃ³digo QR"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__qr_code_image
+msgid "QR code for easy form access via mobile devices"
+msgstr "CÃ³digo QR para acceder fÃ¡cilmente al formulario a travÃ©s de dispositivos mÃ³viles"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__radio
+msgid "Radio Button"
+msgstr "BotÃ³n de opciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__radio_hover_text
+msgid "Radio Hover Text"
+msgstr "Texto al pasar por radio"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+msgid "Range Restrictions"
+msgstr "Restricciones de rango"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__rating
+msgid "Rating"
+msgstr "ClasificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_rating_field_config_wizard
+msgid "Rating Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_rating_field_config_wizard
+msgid "Rating Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_labels
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__labels
+msgid "Rating Labels"
+msgstr "Etiquetas de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_style
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__style
+msgid "Rating Style"
+msgstr "Estilo de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__rating_tooltips
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_rating_field_config_wizard__tooltips
+msgid "Rating Tooltips"
+msgstr "InformaciÃ³n sobre herramientas de calificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Recipients"
+msgstr "Destinatarios"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_regional_analytics_graph
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_regional_analytics_list
+msgid "Regional Analytics"
+msgstr "AnÃ¡lisis regionales"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Regional Data"
+msgstr "Datos regionales"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__text_pattern
+msgid "Regular expression pattern for input validation"
+msgstr "PatrÃ³n de expresiÃ³n regular para validaciÃ³n de entrada."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_relative_months
+msgid "Relative Months"
+msgstr "Meses relativos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_default_value__relative
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__default_value__relative
+msgid "Relative to Current Month"
+msgstr "Relativo al mes actual"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__require_lowercase
+msgid "Require Lowercase"
+msgstr "Requerir minÃºsculas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_require_lowercase
+msgid "Require Lowercase Letter"
+msgstr "Requerir letra minÃºscula"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_require_number
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__require_number
+msgid "Require Number"
+msgstr "Requerir nÃºmero"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_require_special
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__require_special
+msgid "Require Special Character"
+msgstr "Requerir carÃ¡cter especial"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__require_uppercase
+msgid "Require Uppercase"
+msgstr "Requerir mayÃºsculas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_require_uppercase
+msgid "Require Uppercase Letter"
+msgstr "Requerir letra mayÃºscula"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__required
+msgid "Required"
+msgstr "Requerido"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_address_field_config_wizard__required_fields
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__address_required_fields
+msgid "Required Address Fields"
+msgstr "Campos de direcciÃ³n obligatorios"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__url_required_protocol
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_url_field_config_wizard__required_protocol
+msgid "Required Protocol"
+msgstr "Protocolo requerido"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__response_limit
+msgid "Response Limit"
+msgstr "LÃ­mite de respuesta"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Response Settings"
+msgstr "ConfiguraciÃ³n de respuesta"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Responses"
+msgstr "Respuestas"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__activity_user_id
+msgid "Responsible User"
+msgstr "Usuario responsable"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_restrict_business
+msgid "Restrict Business Hours"
+msgstr "Restringir el horario comercial"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_restrict_future
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__restrict_future
+msgid "Restrict Future Months"
+msgstr "Restringir meses futuros"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_restrict_past
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__restrict_past
+msgid "Restrict Past Months"
+msgstr "Restringir meses pasados"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__url_required_protocol
+msgid "Restrict allowed URL protocols."
+msgstr "Restringir los protocolos de URL permitidos."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_email_field_config_wizard__domain_restriction_type
+msgid "Restriction Type"
+msgstr "Tipo de restricciÃ³n"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_captcha_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_checkbox_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_date_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_email_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_file_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_month_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_number_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_phone_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_rating_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_select_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_text_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_textarea_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_time_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_url_field_config_wizard
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_year_field_config_wizard
+msgid "Save"
+msgstr "Ahorrar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__secret_key
+msgid "Secret Key"
+msgstr "clave secreta"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_select_field_config_wizard
+msgid "Select Field Configuration"
+msgstr "Seleccionar configuraciÃ³n de campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_select_field_config_wizard
+msgid "Select Field Configuration Wizard"
+msgstr "Seleccionar asistente de configuraciÃ³n de campo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__select_hover_text
+msgid "Select Hover Text"
+msgstr "Seleccionar texto flotante"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Select or enter year"
+msgstr "Seleccione o ingrese el aÃ±o"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_format
+msgid "Select the date display format."
+msgstr "Seleccione el formato de visualizaciÃ³n de la fecha."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__month_format
+msgid "Select the month display format."
+msgstr "Seleccione el formato de visualizaciÃ³n del mes."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__rating_style
+msgid "Select the style for rating display."
+msgstr "Seleccione el estilo para mostrar la calificaciÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__send_to_customer
+msgid "Send a confirmation email to the customer."
+msgstr "Enviar un correo electrÃ³nico de confirmaciÃ³n al cliente."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__send_to_customer
+msgid "Send to Customer"
+msgstr "Enviar al cliente"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__send_to_owner
+msgid "Send to Form Owner"
+msgstr "Enviar al propietario del formulario"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_default__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_custom_month__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_max_month__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_min_month__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__custom_month__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__max_month_month__09
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__month_field_config_wizard__min_month_month__09
+msgid "September"
+msgstr "Septiembre"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__sequence
+msgid "Sequence"
+msgstr "Secuencia"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__availability_type
+msgid "Set when this form is available for submissions"
+msgstr "Establecer cuÃ¡ndo este formulario estarÃ¡ disponible para envÃ­os"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Share Form"
+msgstr "Compartir formulario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Share:"
+msgstr "Compartir:"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Show / hide password"
+msgstr "Mostrar/ocultar contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__textarea_show_counter
+msgid "Show Character/Word Counter"
+msgstr "Mostrar contador de caracteres/palabras"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__phone_show_country_selector
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_phone_field_config_wizard__show_country_selector
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_phone_field_config_wizard
+msgid "Show Country Code Selector"
+msgstr "Mostrar selector de cÃ³digo de paÃ­s"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__file_show_preview
+msgid "Show File Preview"
+msgstr "Mostrar vista previa del archivo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_show_toggle
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__show_toggle
+msgid "Show Hide/Show Toggle"
+msgstr "Mostrar Ocultar/Mostrar Alternar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__month_show_names
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_month_field_config_wizard__show_month_names
+msgid "Show Month Names"
+msgstr "Mostrar nombres de meses"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__password_show_strength
+msgid "Show Password Strength Indicator"
+msgstr "Mostrar indicador de seguridad de contraseÃ±a"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_file_field_config_wizard__show_preview
+msgid "Show Preview"
+msgstr "Mostrar vista previa"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_password_field_config_wizard__show_strength
+msgid "Show Strength Indicator"
+msgstr "Mostrar indicador de fuerza"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_enable_zip
+msgid "Show ZIP/postal code field."
+msgstr "Mostrar campo de cÃ³digo postal."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__phone_show_country_selector
+msgid "Show a dropdown for country codes in phone field."
+msgstr "Muestra un menÃº desplegable para cÃ³digos de paÃ­s en el campo del telÃ©fono."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_enable_city
+msgid "Show city field."
+msgstr "Mostrar campo de ciudad."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_enable_country
+msgid "Show country field."
+msgstr "Mostrar campo de paÃ­s."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_enable_state
+msgid "Show state/province field."
+msgstr "Mostrar campo de estado/provincia."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__address_enable_street
+msgid "Show street address field."
+msgstr "Mostrar el campo de direcciÃ³n postal."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__site_key
+msgid "Site Key"
+msgstr "Clave del sitio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__size
+msgid "Size"
+msgstr "TamaÃ±o"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__captcha_size
+msgid "Size for reCAPTCHA widget"
+msgstr "TamaÃ±o del widget reCAPTCHA"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__rating_style__stars
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__rating_field_config_wizard__style__stars
+msgid "Stars"
+msgstr "estrellas"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "State/Province"
+msgstr "Estado/Provincia"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__status
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Status"
+msgstr "Estado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__activity_state
+msgid ""
+"Status based on activities\n"
+"Overdue: Due date is already passed\n"
+"Today: Activity date is today\n"
+"Planned: Future activities."
+msgstr ""
+"Estado según actividades\n"
+"Vencido: La fecha de vencimiento ya pasó\n"
+"Hoy: La fecha de la actividad es hoy\n"
+"Planificado: Actividades futuras"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_number_field_config_wizard__step
+msgid "Step"
+msgstr "Paso"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__number_step
+msgid "Step increment for numeric input"
+msgstr "Incremento de paso para entrada numÃ©rica"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__form_styles
+msgid "Stores customization settings"
+msgstr "Configuraciones de personalizaciÃ³n de tiendas"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "Street Address"
+msgstr "DirecciÃ³n"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Strong"
+msgstr "Fuerte"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__customer_email_subject
+msgid "Subject line for confirmation emails sent to customers"
+msgstr "LÃ­nea de asunto para correos electrÃ³nicos de confirmaciÃ³n enviados a los clientes"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__owner_email_subject
+msgid "Subject line for notification emails sent to form owner"
+msgstr "LÃ­nea de asunto para correos electrÃ³nicos de notificaciÃ³n enviados al propietario del formulario"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/controllers/main.py:0
+msgid "Submission ID"
+msgstr "ID de envío"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__submissions
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__submission_ids
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "Submissions"
+msgstr "EnvÃ­os"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Submissions pagination"
+msgstr "PaginaciÃ³n de envÃ­os"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__submission_count
+msgid "Submissions/Entries"
+msgstr "EnvÃ­os/Inscripciones"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__submitted_data
+msgid "Submitted Data"
+msgstr "Datos enviados"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/controllers/main.py:0
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_submission__submitted_on
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "Submitted On"
+msgstr "Enviado el"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__text
+msgid "Text"
+msgstr "Texto"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_text_field_config_wizard
+msgid "Text Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_text_field_config_wizard
+msgid "Text Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campos de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__text_max_length
+msgid "Text Max Length"
+msgstr "Longitud mÃ¡xima del texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__text_min_length
+msgid "Text Min Length"
+msgstr "Longitud mÃ­nima del texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__text_pattern
+msgid "Text Pattern (Regex)"
+msgstr "PatrÃ³n de texto (Regex)"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__button_label
+msgid "Text displayed on the button"
+msgstr "Texto mostrado en el botÃ³n."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__textarea
+msgid "Textarea"
+msgstr "Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_textarea_field_config_wizard
+msgid "Textarea Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_textarea_field_config_wizard
+msgid "Textarea Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campos de Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__textarea_max_chars
+msgid "Textarea Max Characters"
+msgstr "Caracteres mÃ¡ximos del Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__textarea_rows
+msgid "Textarea Rows"
+msgstr "Filas de Ã¡rea de texto"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__thank_you_message
+msgid "Thank You Message"
+msgstr "Mensaje de agradecimiento"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_thank_you_template
+msgid "Thank You!"
+msgstr "Â¡Gracias!"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__theme
+msgid "Theme"
+msgstr "Tema"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__captcha_theme
+msgid "Theme for reCAPTCHA widget"
+msgstr "Tema para el widget reCAPTCHA"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "This field is required."
+msgstr "Este campo es obligatorio."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__rating_style__thumbs
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__rating_field_config_wizard__style__thumbs
+msgid "Thumbs"
+msgstr "pulgares"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__time
+msgid "Time"
+msgstr "Tiempo"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_time_field_config_wizard
+msgid "Time Field Configuration"
+msgstr "ConfiguraciÃ³n del campo de hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_time_field_config_wizard
+msgid "Time Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo de hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_format
+msgid "Time Format"
+msgstr "Formato de hora"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__time_step
+msgid "Time Step"
+msgstr "Paso de tiempo"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_default_value__today
+msgid "Today"
+msgstr "Hoy"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_select_field_config_wizard__hover_text
+msgid "Tooltip text displayed on hover"
+msgstr "Texto de informaciÃ³n sobre herramientas que se muestra al pasar el mouse"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__rating_tooltips
+msgid "Tooltip text for each rating level, one per line"
+msgstr "Texto de informaciÃ³n sobre herramientas para cada nivel de calificaciÃ³n, uno por lÃ­nea"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__email_hover_text
+msgid "Tooltip text for email field"
+msgstr "Texto de informaciÃ³n sobre herramientas para el campo de correo electrÃ³nico"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__phone_hover_text
+msgid "Tooltip text for phone field"
+msgstr "Texto de informaciÃ³n sobre herramientas para el campo de telÃ©fono"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__radio_hover_text
+msgid "Tooltip text for radio field"
+msgstr "Texto de informaciÃ³n sobre herramientas para el campo de radio"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__select_hover_text
+msgid "Tooltip text for select field"
+msgstr "Texto de informaciÃ³n sobre herramientas para el campo seleccionado"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__total_submissions
+msgid "Total Submissions"
+msgstr "EnvÃ­os totales"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__total_views
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_regional_analytics__total_views
+msgid "Total Views"
+msgstr "Vistas totales"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__submission_count
+msgid "Total number of form submissions received"
+msgstr "NÃºmero total de envÃ­os de formularios recibidos"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__activity_exception_decoration
+msgid "Type of the exception activity on record."
+msgstr "Tipo de actividad de excepciÃ³n registrada."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_url_field_config_wizard
+msgid "URL Field Configuration"
+msgstr "ConfiguraciÃ³n del campo URL"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_url_field_config_wizard
+msgid "URL Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n de campos URL"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__url_validation_message
+msgid "URL Validation Message"
+msgstr "Mensaje de validaciÃ³n de URL"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__url
+msgid "URL/Link"
+msgstr "URL/Enlace"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder__availability_message
+msgid "Unavailable Message"
+msgstr "Mensaje no disponible"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder__share_token
+msgid "Unique token used for public form access"
+msgstr "Token Ãºnico utilizado para el acceso al formulario pÃºblico"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Unpublish"
+msgstr "Despublicar"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__status__unpublished
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_search
+msgid "Unpublished"
+msgstr "InÃ©dito"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__user_agent
+msgid "User Agent"
+msgstr "Agente de usuario"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_password_field_config_wizard
+msgid "Validation"
+msgstr "ValidaciÃ³n"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Value must be at least"
+msgstr "El valor debe ser al menos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Value must not exceed"
+msgstr "El valor no debe exceder"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_captcha_field_config_wizard__captcha_version
+msgid "Version"
+msgstr "VersiÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__checkbox_field_config_wizard__layout__vertical
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__checkbox_layout__vertical
+msgid "Vertical"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder__layout_type__vertical
+msgid "Vertical Layout (Default)"
+msgstr "Disposición vertical (predeterminada)"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Very Strong"
+msgstr "AcÃ©rrimo"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Very Weak"
+msgstr "muy débil"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_view_tracker__view_date
+msgid "View Date"
+msgstr "Ver fecha"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_analytics__views
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_kanban
+msgid "Views"
+msgstr "Vistas"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Weak"
+msgstr "DÃ©bil"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_analytics_search
+msgid "Week"
+msgstr "Semana"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "When people submit your form, their responses will appear here."
+msgstr "Cuando las personas envÃ­en su formulario, sus respuestas aparecerÃ¡n aquÃ­."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,field_description:zehntech_form_builder.field_form_builder_field__textarea_word_limit
+msgid "Word Limit"
+msgstr "LÃ­mite de palabras"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Write Form expired message here..."
+msgstr "Escriba aquÃ­ el mensaje del formulario caducado..."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "Write thank you message here..."
+msgstr "Escribe aquÃ­ un mensaje de agradecimiento..."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__month_format__yyyy-mm
+msgid "YYYY-MM"
+msgstr "AAAA-MM"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__date_format__yyyy-mm-dd
+msgid "YYYY-MM-DD"
+msgstr "AAAA-MM-DD"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__field_type__year
+msgid "Year"
+msgstr "AÃ±o"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_year_field_config_wizard
+msgid "Year Field Configuration"
+msgstr "ConfiguraciÃ³n del campo aÃ±o"
+
+#. module: zehntech_form_builder
+#: model:ir.model,name:zehntech_form_builder.model_year_field_config_wizard
+msgid "Year Field Configuration Wizard"
+msgstr "Asistente de configuraciÃ³n del campo AÃ±o"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "Year must be"
+msgstr "El aÃ±o debe ser"
+
+#. module: zehntech_form_builder
+#. odoo-python
+#: code:addons/zehntech_form_builder/models/form_builder.py:0
+msgid ""
+"Your form does not have any Email field yet.\n"
+"\n"
+"Please add an Email field to collect customer email addresses before enabling this option."
+msgstr ""
+"Su formulario aún no tiene un campo de correo electrónico.\n"
+"\n"
+"Agregue un campo de correo electrónico para recopilar las direcciones de correo electrónico de los clientes antes de habilitar esta opción."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "ZIP/Postal Code"
+msgstr "CÃ³digo Postal/CÃ³digo Postal"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "characters allowed."
+msgstr "caracteres permitidos."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "characters long"
+msgstr "caracteres largos"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "characters required."
+msgstr "caracteres requeridos."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "digits."
+msgstr "dÃ­gitos."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__time_custom_default
+msgid "e.g., 9.5 for 9:30 AM"
+msgstr "por ejemplo, 9,5 para las 9:30 a.m."
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_form_builder_field__date_domain_restriction
+msgid "e.g., @company.com"
+msgstr "por ejemplo, @empresa.com"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_text_field_config_wizard__pattern
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_text_field_config_wizard
+msgid "e.g., [A-Za-z]+ for letters only"
+msgstr "por ejemplo, [A-Za-z]+ solo para letras"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_form_builder_form
+msgid "email1@example.com, email2@example.com"
+msgstr "correo electrÃ³nico1@ejemplo.com, correo electrÃ³nico2@ejemplo.com"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "file actions"
+msgstr "acciones de archivo"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "files are allowed"
+msgstr "se permiten archivos"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_email_field_config_wizard
+msgid ""
+"gmail.com\n"
+"outlook.com\n"
+"company.com"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "of"
+msgstr "de"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "one lowercase letter"
+msgstr "una letra minÃºscula"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "one number"
+msgstr "un numero"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "one special character"
+msgstr "un personaje especial"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "one uppercase letter"
+msgstr "una letra mayÃºscula"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "or earlier."
+msgstr "o antes."
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "or later."
+msgstr "o mÃ¡s tarde."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_file_field_config_wizard
+msgid "pdf,doc,docx,jpg,png,xlsx"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields,help:zehntech_form_builder.field_file_field_config_wizard__allowed_extensions
+msgid "pdf,doc,docx,jpg,png,xlsx,csv"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__captcha_version__v2_checkbox
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_version__v2_checkbox
+msgid "reCAPTCHA v2 - Checkbox"
+msgstr "reCAPTCHA v2 - Casilla de verificaciÃ³n"
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__captcha_version__v2_invisible
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_version__v2_invisible
+msgid "reCAPTCHA v2 - Invisible"
+msgstr ""
+
+#. module: zehntech_form_builder
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__captcha_field_config_wizard__captcha_version__v3
+#: model:ir.model.fields.selection,name:zehntech_form_builder.selection__form_builder_field__captcha_version__v3
+msgid "reCAPTCHA v3"
+msgstr "prescripciÃ³n vz"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.view_address_field_config_wizard
+msgid "street,city,state,zip,country"
+msgstr "calle, ciudad, estado, cÃ³digo postal, paÃ­s"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "submissions"
+msgstr "presentaciones"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_response_table_template
+msgid "to"
+msgstr "a"
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "words"
+msgstr "palabras"
+
+#. module: zehntech_form_builder
+#. odoo-javascript
+#: code:addons/zehntech_form_builder/static/src/js/form_validation.js:0
+msgid "words."
+msgstr "palabras."
+
+#. module: zehntech_form_builder
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.form_preview_template
+#: model_terms:ir.ui.view,arch_db:zehntech_form_builder.public_form_template
+msgid "| Allowed:"
+msgstr "| Permitido:"
