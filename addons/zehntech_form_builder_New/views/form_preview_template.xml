@@ -1,0 +1,787 @@
+<odoo>
+    <template id="form_preview_template" name="Form Preview">
+        <t t-call="web.layout">
+            <t t-set="title">Preview: <t t-esc="form.name" /></t>
+
+            <div
+                t-att-class="'form-preview-wrapper form-id-%s d-flex justify-content-center align-items-center min-vh-100 bg-gradient' % form.id">
+
+                <div id="preview-form-class-margin"
+                    class="form-preview-card shadow-lg rounded-4 bg-white p-4">
+                    <!-- Header Section -->
+                    <div class="form-header text-center border-bottom pb-3 mb-4">
+                        <h2 class="fw-bold text-primary mb-0">
+                            <t t-esc="form.name" />
+                        </h2>
+                    </div>
+
+                    <form>
+                        <div id="form-builder-preview"
+                            t-att-class="'d-grid gap-3 layout-' + form.layout_type">
+                            <t t-foreach="fields" t-as="field">
+
+                                <div class="form-field" draggable="true" t-att-data-id="field.id">
+
+                                    <div class="drag-handle" title="Drag to reorder field">
+                                        <div class="drag-handle-icon">
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Button Field -->
+                                    <t t-if="field.field_type == 'button'">
+                                        <div class="text-center mt-4">
+                                            <button type="button"
+                                                class="btn btn-primary px-4 py-2 rounded-pill w-100 form-submit-button"
+                                                id="form-submit-button"
+                                                t-att-data-id="field.id">
+                                                <t
+                                                    t-esc="field.button_label or field.label or 'Submits'" />
+                                            </button>
+                                        </div>
+                                    </t>
+
+                                    <!-- Phone Field with validation -->
+                                    <t t-elif="field.field_type == 'phone'">
+                                        <label class="form-label fw-semibold"
+                                            t-att-title="field.phone_hover_text">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+
+                                        <t t-if="field.phone_show_country_selector">
+                                            <div class="d-flex align-items-center"
+                                                style="width: 100%; gap: 1%; display:flex;">
+                                                <select class="form-control"
+                                                    style="flex: 0 0 22%; width: 22%; padding-left:1px; padding-right:1px;"
+                                                    t-att-name="'country_code_' + str(field.id)">
+                                                    <t
+                                                        t-foreach="request.env['res.country'].search([('phone_code', '!=', False)])"
+                                                        t-as="country">
+                                                        <option t-att-value="country.phone_code"
+                                                            t-att-selected="country.phone_code == '91' and 'selected' or None">
+                                                            +<t t-esc="country.phone_code" />
+                                                        </option>
+                                                    </t>
+                                                </select>
+                                                <input class="form-control validation-field"
+                                                    type="tel"
+                                                    style="flex: 0 0 77%; width: 77%;"
+                                                    t-att-name="'phone_' + str(field.id)"
+                                                    t-att-placeholder="field.placeholder"
+                                                    t-att-required="field.required and 'required' or None"
+                                                    t-att-minlength="field.phone_min_length"
+                                                    t-att-maxlength="field.phone_max_length"
+                                                    t-att-data-min-length="field.phone_min_length"
+                                                    t-att-data-max-length="field.phone_max_length" />
+                                            </div>
+                                        </t>
+                                        <t t-else="">
+                                            <input class="form-control validation-field"
+                                                type="tel"
+                                                t-att-id="'phone' + str(field.id)"
+                                                t-att-name="'phone_' + str(field.id)"
+                                                t-att-placeholder="field.placeholder"
+                                                t-att-required="field.required and 'required' or None"
+                                                t-att-minlength="field.phone_min_length"
+                                                t-att-maxlength="field.phone_max_length"
+                                                t-att-data-min-length="field.phone_min_length"
+                                                t-att-data-max-length="field.phone_max_length"
+                                                t-att-title="field.phone_hover_text" />
+                                        </t>
+                                        <div class="invalid-feedback"
+                                            t-att-id="'phoneerror' + str(field.id)"></div>
+                                    </t>
+
+                                    <!-- Text Field with validation attributes -->
+                                    <t t-elif="field.field_type == 'text'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control validation-field"
+                                            type="text"
+                                            t-att-id="'text_' + str(field.id)"
+                                            t-att-name="'text_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-minlength="field.text_min_length"
+                                            t-att-maxlength="field.text_max_length"
+                                            t-att-pattern="field.text_pattern"
+                                            t-att-data-min-length="field.text_min_length"
+                                            t-att-data-max-length="field.text_max_length"
+                                            t-att-data-pattern="field.text_pattern" />
+                                        <div class="invalid-feedback"
+                                            t-att-id="'text_error_' + str(field.id)"></div>
+                                    </t>
+
+                                    <!-- Number Field with validation attributes -->
+                                    <t t-elif="field.field_type == 'number'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control validation-field"
+                                            type="number"
+                                            t-att-id="'number_' + str(field.id)"
+                                            t-att-name="'number_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-min="field.number_min_value"
+                                            t-att-max="field.number_max_value"
+                                            t-att-step="field.number_step"
+                                            t-att-data-min="field.number_min_value"
+                                            t-att-data-max="field.number_max_value" />
+                                        <div class="invalid-feedback"
+                                            t-att-id="'number_error_' + str(field.id)"></div>
+                                    </t>
+
+
+                                    <!-- Select/Dropdown Field -->
+                                    <t t-elif="field.field_type == 'select'">
+                                        <label class="form-label fw-semibold"
+                                            t-att-title="field.select_hover_text">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-control"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-title="field.select_hover_text"
+                                        >
+                                            <option value="">-- Select --</option>
+                                            <t t-if="field.option_values">
+                                                <t t-foreach="field.option_values.split('\n')"
+                                                    t-as="option">
+                                                    <t t-if="option.strip()">
+                                                        <option t-att-value="opt.get('value')">
+                                                            <t t-esc="opt.get('label')" />
+                                                        </option>
+                                                    </t>
+                                                </t>
+                                            </t>
+                                        </select>
+                                    </t>
+
+                                    <!-- Radio Button Field -->
+                                    <t t-elif="field.field_type == 'radio'">
+                                        <label class="form-label fw-semibold"
+                                            t-att-title="field.select_hover_text">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <div t-att-title="field.select_hover_text">
+                                            <t t-if="field.option_values">
+                                                <t t-foreach="field.option_values.split('\n')"
+                                                    t-as="option">
+                                                    <t t-if="option.strip()">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input"
+                                                                type="radio"
+                                                                t-att-name="'field_' + str(field.id)"
+                                                                t-att-id="'radio_' + str(field.id) + '_' + str(opt_index)"
+                                                                t-att-value="opt.get('value')"
+                                                                t-att-required="field.required and 'required' or None" />
+                                                            <label class="form-check-label"
+                                                                t-att-for="'radio_' + str(field.id) + '_' + str(opt_index)"
+                                                                t-att-title="field.select_hover_text">
+                                                                <t t-esc="opt.get('label')" />
+                                                            </label>
+                                                        </div>
+                                                    </t>
+                                                </t>
+                                            </t>
+                                        </div>
+                                    </t>
+
+                                    <t t-elif="field.field_type == 'email'">
+                                        <label class="form-label fw-semibold"
+                                            t-att-title="field.email_hover_text">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control validation-field" type="email"
+                                            t-att-id="'email_' + str(field.id)"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-title="field.email_hover_text"
+                                            t-att-data-domain-restriction="field.email_enable_domain_restriction and 'true' or 'false'"
+                                            t-att-data-restriction-type="field.email_domain_restriction_type"
+                                            t-att-data-allowed-domains="field.email_allowed_domains"
+                                            t-att-data-domain-message="field.email_domain_validation_message" />
+                                        <div class="invalid-feedback"
+                                            t-att-id="'email_error_' + str(field.id)"></div>
+                                        <t t-if="field.email_validation_message">
+                                            <div class="form-text" style="font-size:14px;">
+                                                <t t-esc="field.email_validation_message" />
+                                            </div>
+                                        </t>
+                                    </t>
+
+
+                                    <!-- Multiple Checkbox Field -->
+                                    <t
+                                        t-elif="field.field_type == 'checkbox' and field.checkbox_options">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <div
+                                            t-att-class="'d-flex flex-wrap gap-2' if field.checkbox_layout == 'horizontal' else ('d-flex flex-wrap gap-3' if field.checkbox_layout == 'inline' else 'd-block')"
+                                            t-att-style="'display: flex; flex-wrap: wrap; gap: 8px;' if field.checkbox_layout == 'horizontal' else ('display: flex; flex-wrap: wrap; gap: 12px;' if field.checkbox_layout == 'inline' else 'display: block;')">
+                                            <t t-foreach="field.checkbox_options.split('\n')"
+                                                t-as="option">
+                                                <t t-if="option.strip()">
+                                                    <div
+                                                        style="display:flex; gap:2px; align-items:center"
+                                                        class="form-check"
+                                                        t-att-class="'me-3' if field.checkbox_layout in ['horizontal', 'inline'] else 'mb-2'">
+                                                        <input class="form-check-input"
+                                                            style="padding:0; margin:0px; height:15px; width:15px"
+                                                            type="checkbox"
+                                                            t-att-id="'checkbox_' + str(field.id) + '_' + str(opt_index)"
+                                                            t-att-name="'field_' + str(field.id) + '[]'"
+                                                            t-att-value="opt.get('value')"
+                                                            t-att-required="field.required and opt_index == 0" />
+                                                        <label class="form-check-label"
+                                                            style="padding-right: 5px;"
+                                                            t-att-for="'checkbox_' + str(field.id) + '_' + str(opt_index)">
+                                                            <t t-esc="opt.get('label')" />
+                                                        </label>
+                                                    </div>
+                                                </t>
+                                            </t>
+                                        </div>
+                                    </t>
+
+                                    <!-- Date Field with configurations -->
+                                    <t t-elif="field.field_type == 'date'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                        </label>
+                                        <input class="form-control" type="date"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-min="field.date_min_date"
+                                            t-att-max="field.date_max_date" />
+                                    </t>
+
+                                    <t t-elif="field.field_type == 'captcha'">
+                                        <div class="g-recaptcha"
+                                            style="display:flex; align-items:center; justify-content:start; margin-top:10px; margin-bottom:10px;"
+                                            t-att-data-sitekey="field.captcha_site_key"
+                                            t-att-data-theme="field.captcha_theme"
+                                            t-att-data-size="field.captcha_size"></div>
+                                        <div class="invalid-feedback"
+                                            t-att-id="'captchaerror' + str(field.id)"></div>
+                                        <script src="https://www.google.com/recaptcha/api.js"
+                                            async="async" defer="defer" />
+                                    </t>
+
+
+                                    <!-- Time Field -->
+                                    <t t-elif="field.field_type == 'time'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control time-field" type="time"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-data-default-value="field.time_default_value"
+                                            t-att-data-custom-hour="field.time_custom_hour"
+                                            t-att-data-custom-minute="field.time_custom_minute" />
+                                        <t t-if="field.help_text">
+                                            <div class="form-text">
+                                                <t t-esc="field.help_text" />
+                                            </div>
+                                        </t>
+                                    </t>
+                                    <!-- Month Field -->
+                                    <t t-elif="field.field_type == 'month'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control month-field" type="month"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-data-default-value="field.month_default_value"
+                                            t-att-data-custom-month="field.month_custom_month"
+                                            t-att-data-custom-year="field.month_custom_year"
+                                            t-att-data-relative-months="field.month_relative_months"
+                                            t-att-data-enable-min="field.month_enable_min and 'true' or 'false'"
+                                            t-att-data-min-year="field.month_min_year"
+                                            t-att-data-min-month="field.month_min_month"
+                                            t-att-data-enable-max="field.month_enable_max and 'true' or 'false'"
+                                            t-att-data-max-year="field.month_max_year"
+                                            t-att-data-max-month="field.month_max_month"
+                                            t-att-data-restrict-future="field.month_restrict_future and 'true' or 'false'"
+                                            t-att-data-restrict-past="field.month_restrict_past and 'true' or 'false'" />
+                                        <t t-if="field.help_text">
+                                            <div class="form-text" style="font-size:14px;">
+                                                <t t-esc="field.help_text" />
+                                            </div>
+                                        </t>
+                                    </t>
+                                    <!-- Year Field with Datalist -->
+                                    <t t-elif="field.field_type == 'year'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control validation-field"
+                                            type="number"
+                                            t-att-id="'year_' + str(field.id)"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-data-min="field.year_min"
+                                            t-att-data-max="field.year_max"
+                                            t-att-min="field.year_min or 1900"
+                                            t-att-max="field.year_max or 2050"
+                                            placeholder="Select or enter year"
+                                            t-att-list="'years_' + str(field.id)" />
+                                        <datalist t-att-id="'years_' + str(field.id)">
+                                            <t t-set="min_year" t-value="field.year_min or 1900" />
+                                            <t t-set="max_year" t-value="field.year_max or 2050" />
+                                            <t
+                                                t-foreach="range(int(max_year), int(min_year) - 1, -1)"
+                                                t-as="year">
+                                                <option t-att-value="year" />
+                                            </t>
+                                        </datalist>
+                                        <div class="invalid-feedback"
+                                            t-att-id="'year_error_' + str(field.id)"></div>
+                                    </t>
+
+                                    <t t-elif="field.field_type == 'rating'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <div
+                                            class="rating-container d-flex align-items-center gap-1"
+                                            t-att-data-field-id="field.id"
+                                            t-att-data-allow-clear="field.rating_allow_clear and 'true' or 'false'"
+                                            t-att-data-tooltips="field.rating_tooltips"
+                                            t-att-data-labels="field.rating_labels">
+                                            <t
+                                                t-foreach="range(1, (field.rating_max_stars or 5) + 1)"
+                                                t-as="star">
+                                                <t t-if="field.rating_style == 'stars'">
+                                                    <span class="rating-item"
+                                                        t-att-data-rating="star"
+                                                        t-att-data-field-id="field.id"
+                                                        style="cursor: pointer; font-size: 1.8rem; color: #ddd; user-select: none; margin-right:10px;">
+                                                        ★
+                                                    </span>
+                                                </t>
+                                                <t t-elif="field.rating_style == 'hearts'">
+                                                    <span class="rating-item"
+                                                        t-att-data-rating="star"
+                                                        t-att-data-field-id="field.id"
+                                                        style="cursor: pointer; font-size: 1.8rem; color: #ddd; user-select: none; margin-right:10px;">
+                                                        ♥
+                                                    </span>
+                                                </t>
+                                                <t t-elif="field.rating_style == 'numbers'">
+                                                    <span
+                                                        class="rating-item btn btn-outline-primary"
+                                                        t-att-data-rating="star"
+                                                        t-att-data-field-id="field.id"
+                                                        style="cursor: pointer; min-width: 40px; padding: 5px 10px; margin-right:10px;">
+                                                        <t t-esc="star" />
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="rating-item"
+                                                        t-att-data-rating="star"
+                                                        t-att-data-field-id="field.id"
+                                                        style="cursor: pointer; font-size: 1.8rem; color: #ddd; user-select: none; font-weight: bold; margin-right:10px;">
+                                                        👍︎
+                                                    </span>
+                                                </t>
+                                            </t>
+                                            <input type="hidden"
+                                                t-att-name="'field_' + str(field.id)"
+                                                t-att-id="'rating_input_' + str(field.id)" value="0" />
+                                        </div>
+                                    </t>
+
+                                    <t t-elif="field.field_type == 'textarea'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <textarea class="form-control validation-field"
+                                            t-att-rows="field.textarea_rows or 3"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-maxlength="field.textarea_max_chars"
+                                            t-att-data-word-limit="field.textarea_word_limit"
+                                            t-att-data-show-counter="field.textarea_show_counter and 'true' or 'false'"></textarea>
+                                        <t
+                                            t-if="field.textarea_word_limit and field.textarea_show_counter">
+                                            <div class="word-counter text-muted">0/<t
+                                                    t-esc="field.textarea_word_limit" /> words</div>
+                                        </t>
+                                    </t>
+
+                                    <!-- URL Field -->
+                                    <t t-elif="field.field_type == 'url'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control validation-field"
+                                            type="url"
+                                            t-att-id="'url_' + str(field.id)"
+                                            t-att-name="'field_' + str(field.id)"
+                                            t-att-placeholder="field.placeholder or 'https://example.com'"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-data-protocol="field.url_required_protocol"
+                                            t-att-data-external="field.url_allow_external and 'true' or 'false'" />
+                                        <div class="invalid-feedback"
+                                            t-att-id="'url_error_' + str(field.id)"></div>
+                                        <t t-if="field.url_validation_message">
+                                            <div class="form-text " style="font-size:14px;">
+                                                <t t-esc="field.url_validation_message" />
+                                            </div>
+                                        </t>
+                                    </t>
+
+
+                                    <t t-elif="field.field_type == 'address'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <div class="address-field-container"
+                                            style="display:flex; flex-direction:column; gap: 4px;">
+                                            <!-- Row 1: Street Address (full width) -->
+
+                                            <t t-if="field.address_enable_street">
+                                                <div class="mb-3" style="width:100%">
+                                                    <input class="form-control" style="width:100%"
+                                                        type="text"
+                                                        t-att-name="'field_' + str(field.id) + '_street'"
+                                                        placeholder="Street Address"
+                                                        t-att-required="'street' in (field.address_required_fields or '') and 'required' or None" />
+                                                </div>
+                                            </t>
+
+                                            <!-- Row 2: City (full width) -->
+                                            <t t-if="field.address_enable_city">
+                                                <div class="mb-3" style="width:100%">
+                                                    <input class="form-control" style="width:100%"
+                                                        type="text"
+                                                        t-att-name="'field_' + str(field.id) + '_city'"
+                                                        placeholder="City"
+                                                        t-att-required="'city' in (field.address_required_fields or '') and 'required' or None" />
+                                                </div>
+                                            </t>
+
+
+                                            <!-- Row 3: State and ZIP (side by side) -->
+
+                                            <t t-if="field.address_enable_state">
+                                                <div style="width:100%"
+                                                    t-att-class="'col-md-6' if field.address_enable_zip else 'col-12'">
+                                                    <input class="form-control" style="width:100%"
+                                                        type="text"
+                                                        t-att-name="'field_' + str(field.id) + '_state'"
+                                                        placeholder="State/Province"
+                                                        t-att-required="'state' in (field.address_required_fields or '') and 'required' or None" />
+                                                </div>
+                                            </t>
+
+                                            <t t-if="field.address_enable_zip">
+                                                <div style="width:100%"
+                                                    t-att-class="'col-md-6' if field.address_enable_state else 'col-12'">
+                                                    <input class="form-control" style="width:100%"
+                                                        type="text"
+                                                        t-att-name="'field_' + str(field.id) + '_zip'"
+                                                        placeholder="ZIP/Postal Code"
+                                                        t-att-required="'zip' in (field.address_required_fields or '') and 'required' or None" />
+                                                </div>
+                                            </t>
+
+
+                                            <!-- Row 4: Country (full width) -->
+                                            <t t-if="field.address_enable_country">
+                                                <div class="mb-2">
+                                                    <select class="form-control" style="width:100%"
+                                                        t-att-name="'field_' + str(field.id) + '_country'"
+                                                        t-att-required="'country' in (field.address_required_fields or '') and 'required' or None">
+                                                        <option value="">-- Select Country --</option>
+                                                        <t
+                                                            t-foreach="request.env['res.country'].search([])"
+                                                            t-as="country">
+                                                            <option t-att-value="country.name"
+                                                                t-att-selected="field.address_default_country and field.address_default_country.id == country.id and 'selected' or None">
+                                                                <t t-esc="country.name" />
+                                                            </option>
+                                                        </t>
+                                                    </select>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+
+
+                                    <t t-elif="field.field_type == 'password'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <div class="password-input-wrapper"
+                                            style="position:relative !important; width:100% !important;">
+                                            <input
+                                                class="form-control validation-field password-field"
+                                                type="password"
+                                                t-att-id="'password_' + str(field.id)"
+                                                t-att-name="'field_' + str(field.id)"
+                                                t-att-placeholder="field.placeholder"
+                                                t-att-required="field.required and 'required' or None"
+                                                t-att-minlength="field.password_min_length"
+                                                t-att-maxlength="field.password_max_length"
+                                                t-att-data-require-uppercase="field.password_require_uppercase and 'true' or 'false'"
+                                                t-att-data-require-lowercase="field.password_require_lowercase and 'true' or 'false'"
+                                                t-att-data-require-number="field.password_require_number and 'true' or 'false'"
+                                                t-att-data-require-special="field.password_require_special and 'true' or 'false'"
+                                                t-att-data-show-strength="field.password_show_strength and 'true' or 'false'"
+                                                t-att-data-validation-message="field.password_validation_message"
+                                                style="width:100%; padding-right:44px !important; box-sizing:border-box;" />
+
+                                            <!-- Toggle Button (inside input) -->
+                                            <button t-if="field.password_show_toggle"
+                                                type="button"
+                                                class="password-toggle"
+                                                t-att-data-target="'password_' + str(field.id)"
+                                                style="position:absolute !important; right:12px !important; top:50% !important; transform:translateY(-50%) !important; border:none !important; background:transparent !important; z-index:9999 !important; padding:0 !important;">
+                                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+
+                                        <div t-if="field.password_show_strength"
+                                            class="password-strength-indicator mt-2"
+                                            t-att-id="'strength_' + str(field.id)"
+                                            style="display: none;"></div>
+                                        <div class="invalid-feedback"
+                                            t-att-id="'password_error_' + str(field.id)"
+                                            style="display: none;"></div>
+                                        <small t-if="field.help_text" class="form-text text-muted">
+                                            <t t-esc="field.help_text" />
+                                        </small>
+                                    </t>
+
+                                    <t t-elif="field.field_type == 'file'">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                            <span t-if="field.required" class="text-danger">*</span>
+                                        </label>
+                                        <input
+                                            class="form-control validation-field file-field"
+                                            type="file"
+                                            t-attf-id="file_{{field.id}}"
+                                            t-attf-name="field_{{field.id}}"
+                                            t-att-required="field.required and 'required' or None"
+                                            t-att-multiple="field.file_multiple and 'multiple' or None"
+                                            t-att-accept="field.file_allowed_extensions and ('.' + field.file_allowed_extensions.replace(',', ',.')) or None"
+                                            t-att-data-max-size="field.file_max_size * 1024 * 1024"
+                                            t-att-data-allowed-extensions="field.file_allowed_extensions"
+                                            t-att-data-show-preview="field.file_show_preview and 'true' or 'false'"
+                                            t-att-data-validation-message="field.file_validation_message"
+                                            t-att-data-multiple="field.file_multiple and 'true' or 'false'"
+                                            onchange="handleFileUpload(this)" />
+
+                                        <div t-if="field.file_show_preview"
+                                            class="file-preview-container mt-3"
+                                            t-attf-id="preview_{{field.id}}"></div>
+                                        <div class="invalid-feedback"
+                                            t-attf-id="file_error_{{field.id}}"></div>
+                                        <small t-if="field.help_text"
+                                            class="form-text text-muted d-block">
+                                            <t t-esc="field.help_text" />
+                                        </small>
+                                        <button type="button"
+                                            class="btn btn-sm btn-primary mt-2 add-more-files-btn"
+                                            t-attf-id="add_more_{{field.id}}"
+                                            style="display: none; width: 150px;font-size: 0.875rem;"
+                                            t-attf-onclick="triggerFileInput('file_{{field.id}}')">
+                                            <i class="fa fa-plus"></i> Add More Files </button>
+                                        <small class="form-text text-muted" style="font-size:14px;">
+                                            Max size: <t t-esc="field.file_max_size" />MB <t
+                                                t-if="field.file_allowed_extensions"> | Allowed: <t
+                                                    t-esc="field.file_allowed_extensions" />
+                                            </t>
+                                        </small>
+                                        <t t-if="field.file_validation_message">
+                                            <div class="form-text " style="font-size:14px;">
+                                                <t t-esc="field.file_validation_message" />
+                                            </div>
+                                        </t>
+                                    </t>
+                                    
+                                    <t t-elif="field.field_type == 'checkbox'">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input"
+                                                t-att-id="'checkbox_single_' + str(field.id)"
+                                                t-att-name="'checkbox_single_' + str(field.id)" />
+                                            <label class="form-check-label fw-semibold"
+                                                t-att-for="'checkbox_single_' + str(field.id)">
+                                                <t t-esc="field.label" />
+                                            </label>
+                                        </div>
+                                        <t t-if="field.placeholder">
+                                            <div class="form-text mt-1">
+                                                <t t-esc="field.placeholder" />
+                                            </div>
+                                        </t>
+                                    </t>
+
+                                    <t t-else="">
+                                        <label class="form-label fw-semibold">
+                                            <t t-esc="field.label" />
+                                        </label>
+                                        <input class="form-control"
+                                            t-att-type="field.field_type"
+                                            t-att-placeholder="field.placeholder"
+                                            t-att-required="field.required and 'required' or None" />
+                                    </t>
+                                </div>
+                            </t>
+                        </div>
+                        <t
+                            t-if="form.send_to_customer and form.email_notifications_enabled and not form.require_email_consent">
+                            <div class="form-field email-consent-section"
+                                style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 20px;">
+                                <div class="form-check">
+                                    <input type="checkbox"
+                                        class="form-check-input"
+                                        id="email_consent"
+                                        name="email_consent"
+                                        value="true" />
+                                    <label class="form-check-label fw-semibold"
+                                        for="email_consent">
+                                        <t
+                                            t-esc="form.consent_text or 'Send me a confirmation email'" />
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Check this box if you want to receive a confirmation email.
+                                </div>
+                            </div>
+                        </t>
+
+                    </form>
+                </div>
+            </div>
+            <script src="/zehntech_form_builder/static/src/js/translations.js"></script>
+            <script src="/zehntech_form_builder/static/src/js/public_translations.js"></script>
+
+            <link rel="stylesheet"
+                href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+            <link rel="stylesheet" type="text/css"
+                href="/zehntech_form_builder/static/src/css/responsive.css" />
+            <link rel="stylesheet" type="text/css"
+                href="/zehntech_form_builder/static/src/css/form_customizer.css" />
+
+            <script type="module" src="/zehntech_form_builder/static/src/js/form_preview_drag.js"></script>
+            <script type="text/javascript"
+                src="/zehntech_form_builder/static/src/js/form_validation.js"></script>
+            <script type="module" src="/zehntech_form_builder/static/src/js/form_customizer.js"></script>
+
+            <script type="text/javascript"> window.CURRENT_FORM_ID = <t t-esc="form.id" />; </script>
+            <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer" />
+
+            <style>
+                /* Drag Handle Styles */
+                .form-field {
+                position: relative;
+                padding-right: 40px; /* Make space for the drag handle on right */
+                transition: background-color 0.2s ease;
+                }
+
+                .drag-handle {
+                position: absolute;
+                right: 5px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: move; /* Shows four-direction arrow cursor */
+                cursor: grab;
+                opacity: 0.4;
+                transition: opacity 0.2s ease;
+                z-index: 10;
+                }
+
+                .drag-handle:hover {
+                opacity: 1;
+                }
+
+                .drag-handle:active {
+                cursor: grabbing;
+                }
+
+                /* Drag handle icon (6 dots in 2 columns) */
+                .drag-handle-icon {
+                width: 16px;
+                height: 24px;
+                display: grid;
+                grid-template-columns: repeat(2, 4px);
+                grid-template-rows: repeat(3, 4px);
+                gap: 4px;
+                justify-content: center;
+                align-items: center;
+                }
+
+                .drag-handle-icon span {
+                width: 4px;
+                height: 4px;
+                background-color: #6c757d;
+                border-radius: 50%;
+                display: block;
+                }
+
+                /* Highlight when dragging */
+                .form-field.dragging {
+                opacity: 0.5;
+                background-color: #f8f9fa;
+                }
+
+                .form-field.drag-over {
+                border-top: 3px solid #007bff;
+                }
+
+                /* Mobile responsiveness */
+                @media (max-width: 768px) {
+                .form-field {
+                padding-right: 35px;
+                }
+
+                .drag-handle {
+                width: 25px;
+                height: 25px;
+                }
+                }
+            </style>
+            <link rel="stylesheet" type="text/css"
+                href="/zehntech_form_builder/static/src/css/layouts.css" />
+
+        </t>
+    </template>
+</odoo>
