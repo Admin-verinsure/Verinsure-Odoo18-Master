@@ -1,9 +1,0 @@
-<odoo>
-    <!--
-      This addon works without changing any views.
-      If you want to show `code` in your form-builder UI, inherit your base module's views
-      and insert <field name="code"/> where needed.
-
-      Because your base view XML IDs are unknown here, we provide no-op safe views.
-    -->
-</odoo>

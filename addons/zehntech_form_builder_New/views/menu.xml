@@ -1,5 +1,0 @@
-<!-- views/menu.xml -->
-<odoo>
-    <menuitem id="menu_form_builder_root" name="Form Builder"/>
-    <menuitem id="menu_form_builder_forms" name="Forms" parent="menu_form_builder_root" action="action_form_builder"/>
-</odoo>
