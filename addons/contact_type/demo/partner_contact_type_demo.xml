@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Default Contact Types -->
+        <record id="contact_type_customer" model="partner.contact.type">
+            <field name="name">Customer</field>
+            <field name="description">Business customers who purchase products or services</field>
+            <field name="sequence">10</field>
+            <field name="color">3</field>
+        </record>
+        
+        <record id="contact_type_vendor" model="partner.contact.type">
+            <field name="name">Vendor</field>
+            <field name="description">Suppliers who provide products or services</field>
+            <field name="sequence">20</field>
+            <field name="color">5</field>
+        </record>
+        
+        <record id="contact_type_employee" model="partner.contact.type">
+            <field name="name">Employee</field>
+            <field name="description">Company employees</field>
+            <field name="sequence">40</field>
+            <field name="color">8</field>
+        </record>
+        
+        <record id="contact_type_partner" model="partner.contact.type">
+            <field name="name">Business Partner</field>
+            <field name="description">Strategic business partners</field>
+            <field name="sequence">50</field>
+            <field name="color">6</field>
+        </record>
+
+         <!-- Additional Contact Types -->
+        <record id="contact_type_insurance" model="partner.contact.type">
+            <field name="name">Insurance Provider</field>
+            <field name="description">Insurance companies providing various insurance services</field>
+            <field name="sequence">60</field>
+            <field name="color">2</field>
+        </record>
+        
+        <record id="contact_type_retailer" model="partner.contact.type">
+            <field name="name">Retailer</field>
+            <field name="description">Retail businesses selling directly to end consumers</field>
+            <field name="sequence">70</field>
+            <field name="color">4</field>
+        </record>
+        
+        <record id="contact_type_distributor" model="partner.contact.type">
+            <field name="name">Distributor</field>
+            <field name="description">Distribution companies handling product logistics and supply chain</field>
+            <field name="sequence">80</field>
+            <field name="color">7</field>
+        </record>
+        
+        <record id="contact_type_super_stockist" model="partner.contact.type">
+            <field name="name">Super Stockist</field>
+            <field name="description">Large-scale stockists managing inventory for multiple regions</field>
+            <field name="sequence">90</field>
+            <field name="color">9</field>
+        </record>
+        
+        <record id="contact_type_builder" model="partner.contact.type">
+            <field name="name">Builder</field>
+            <field name="description">Construction companies and real estate builders</field>
+            <field name="sequence">100</field>
+            <field name="color">10</field>
+        </record>
+        
+        <record id="contact_type_contractor" model="partner.contact.type">
+            <field name="name">Contractor</field>
+            <field name="description">Independent contractors providing specialized services</field>
+            <field name="sequence">110</field>
+            <field name="color">11</field>
+        </record>
+        
+        <record id="contact_type_wholesaler" model="partner.contact.type">
+            <field name="name">Wholesaler</field>
+            <field name="description">Wholesale businesses selling in bulk quantities</field>
+            <field name="sequence">120</field>
+            <field name="color">1</field>
+        </record>
+        
+        <record id="contact_type_manufacturer" model="partner.contact.type">
+            <field name="name">Manufacturer</field>
+            <field name="description">Manufacturing companies producing goods and products</field>
+            <field name="sequence">130</field>
+            <field name="color">3</field>
+        </record>
+        
+        <record id="contact_type_consultant" model="partner.contact.type">
+            <field name="name">Consultant</field>
+            <field name="description">Professional consultants providing expert advice and services</field>
+            <field name="sequence">140</field>
+            <field name="color">5</field>
+        </record>
+        
+        <record id="contact_type_government" model="partner.contact.type">
+            <field name="name">Government</field>
+            <field name="description">Government agencies and public sector organizations</field>
+            <field name="sequence">150</field>
+            <field name="color">8</field>
+        </record>
+        
+        <record id="contact_type_ngo" model="partner.contact.type">
+            <field name="name">NGO</field>
+            <field name="description">Non-governmental organizations and non-profit entities</field>
+            <field name="sequence">160</field>
+            <field name="color">6</field>
+        </record>
+        
+        <record id="contact_type_bank" model="partner.contact.type">
+            <field name="name">Bank</field>
+            <field name="description">Banking institutions and financial service providers</field>
+            <field name="sequence">170</field>
+            <field name="color">2</field>
+        </record>
+        
+        <record id="contact_type_logistics" model="partner.contact.type">
+            <field name="name">Logistics Provider</field>
+            <field name="description">Companies providing transportation, shipping, and logistics services</field>
+            <field name="sequence">180</field>
+            <field name="color">4</field>
+        </record>
+        
+        <record id="contact_type_tech_vendor" model="partner.contact.type">
+            <field name="name">Technology Vendor</field>
+            <field name="description">Software, hardware, and IT service providers</field>
+            <field name="sequence">190</field>
+            <field name="color">7</field>
+        </record>
+        
+        <record id="contact_type_media" model="partner.contact.type">
+            <field name="name">Media Partner</field>
+            <field name="description">Media companies, advertising agencies, and marketing partners</field>
+            <field name="sequence">200</field>
+            <field name="color">9</field>
+        </record>
+        
+        <record id="contact_type_educational" model="partner.contact.type">
+            <field name="name">Educational Institution</field>
+            <field name="description">Schools, colleges, universities, and training institutes</field>
+            <field name="sequence">210</field>
+            <field name="color">10</field>
+        </record>
+        
+        <record id="contact_type_healthcare" model="partner.contact.type">
+            <field name="name">Healthcare Provider</field>
+            <field name="description">Hospitals, clinics, medical practitioners, and healthcare organizations</field>
+            <field name="sequence">220</field>
+            <field name="color">11</field>
+        </record>
+        
+        <record id="contact_type_landlord" model="partner.contact.type">
+            <field name="name">Landlord</field>
+            <field name="description">Property owners and real estate rental providers</field>
+            <field name="sequence">230</field>
+            <field name="color">1</field>
+        </record>
+        
+        <record id="contact_type_competitor" model="partner.contact.type">
+            <field name="name">Competitor</field>
+            <field name="description">Competitive businesses in the same industry</field>
+            <field name="sequence">240</field>
+            <field name="color">3</field>
+        </record>
+        
+        <record id="contact_type_investor" model="partner.contact.type">
+            <field name="name">Investor</field>
+            <field name="description">Investment firms, venture capitalists, and financial investors</field>
+            <field name="sequence">250</field>
+            <field name="color">5</field>
+        </record>
+
+    </data>
+</odoo>
