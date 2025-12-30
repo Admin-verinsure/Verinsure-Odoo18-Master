@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <record id="res_partner_kanban_show_only_person_name" model="ir.ui.view">
+    <field name="name">res.partner.kanban.show.only.person.name</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.res_partner_kanban_view"/>
+    <field name="arch" type="xml">
+
+      <!-- Title: swap display_name for name -->
+      <xpath expr="//div[contains(@class,'o_kanban_record_title')]//span[@t-esc='record.display_name.value']"
+             position="replace">
+        <span t-esc="record.name.value or ''"/>
+      </xpath>
+
+      <!-- Hide the redundant parent company line under the title -->
+      <xpath expr="//t[@t-if='record.parent_id.raw_value']" position="replace">
+        <!-- hidden intentionally -->
+      </xpath>
+
+    </field>
+  </record>
+</odoo>
