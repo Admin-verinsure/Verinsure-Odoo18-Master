@@ -1,20 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-  <record id="res_partner_kanban_show_only_person_name" model="ir.ui.view">
-    <field name="name">res.partner.kanban.show.only.person.name</field>
-    <field name="model">res.partner</field>
-    <field name="inherit_id" ref="base.res_partner_kanban_view"/>
-    <field name="arch" type="xml">
-
-      <!-- Replace the whole title container safely -->
-      <xpath expr="//div[contains(@class,'o_kanban_record_title')]" position="replace">
-        <div class="o_kanban_record_title">
-          <strong><t t-esc="record.name.value or ''"/></strong>
-        </div>
-      </xpath>
-
-    </field>
-  </record>
+  
 
 </odoo>
