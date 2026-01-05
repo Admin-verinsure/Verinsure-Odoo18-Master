@@ -7,9 +7,9 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
-            <field name="category_id" position="after">
+            <xpath expr="//field[@name='category_id']" position="after">
                 <field name="contact_type_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
-            </field>
+            </xpath>
         </field>
     </record>
 
@@ -19,9 +19,9 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_tree"/>
         <field name="arch" type="xml">
-            <field name="country_id" position="after">
+            <xpath expr="//field[@name='name']" position="after">
                 <field name="contact_type_ids" widget="many2many_tags" optional="show" options="{'color_field': 'color'}"/>
-            </field>
+            </xpath>
         </field>
     </record>
 
@@ -44,18 +44,20 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_res_partner_filter"/>
         <field name="arch" type="xml">
-            <field name="category_id" position="after">
+            <xpath expr="//search" position="inside">
                 <field name="contact_type_ids" string="Contact Type"/>
-            </field>
-            <filter name="type_company" position="after">
                 <separator/>
-                <filter name="filter_customer_type" string="Customers" domain="[('contact_type_ids.name', 'ilike', 'customer')]"/>
-                <filter name="filter_vendor_type" string="Vendors" domain="[('contact_type_ids.name', 'ilike', 'vendor')]"/>
-                <filter name="filter_employee_type" string="Employee" domain="[('contact_type_ids.name', 'ilike', 'Employee')]"/>
+                <filter name="filter_customer_type" string="Customers"
+                        domain="[('contact_type_ids.name', 'ilike', 'customer')]"/>
+                <filter name="filter_vendor_type" string="Vendors"
+                        domain="[('contact_type_ids.name', 'ilike', 'vendor')]"/>
+                <filter name="filter_employee_type" string="Employees"
+                        domain="[('contact_type_ids.name', 'ilike', 'employee')]"/>
                 <separator/>
-                <filter string="Contact Type" name="group_contact_type" context="{'group_by': 'contact_type_ids'}"/>
-            </filter>
-        </field>
+                <filter string="Contact Type" name="group_contact_type"
+                        context="{'group_by': 'contact_type_ids'}"/>
+            </xpath>
+</field>
     </record>
 
 </odoo>
