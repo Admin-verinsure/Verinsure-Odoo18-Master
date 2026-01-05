@@ -1,0 +1,11 @@
+Odoo Proprietary License v1.0
+
+This software and associated files (the "Software") may only be used (executed, modified, executed after modifications) if you have purchased a valid license from Yantradhigam Labs Private Limited.
+
+The above permissions are granted for a single database per purchased license. For additional databases, you must purchase additional licenses.
+
+You may not publish, distribute, sublicense, or sell copies of the Software or modified versions of it.
+
+Yantradhigam Labs Private Limited reserves the right to modify the terms of this license from time to time.
+
+Contact: odoo@yalabs.com | https://www.yantradhigam.com
