@@ -21,7 +21,7 @@ on:
 
 env:
   # --- Custom Addon Paths ---
-  STG_CUSTOM: /opt/odoo18/custom-addons
+  STG_CUSTOM: /opt/odoo/current/addons
   SEC_ADDONS: /opt/odoo/current/addons
   VER_CUSTOM: /opt/odoo18/odoo18-addons
   MORRIS_CUSTOM: /opt/odoo/custom/addons # <--- Morris Path
