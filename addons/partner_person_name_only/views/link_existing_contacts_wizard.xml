@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <record id="view_link_existing_contacts_wizard_form" model="ir.ui.view">
+    <field name="name">link.existing.contacts.wizard.form</field>
+    <field name="model">link.existing.contacts.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Link Existing Contacts">
+        <group>
+          <field name="company_id"/>
+          <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"/>
+        </group>
+        <footer>
+          <button name="action_link" type="object" class="btn-primary" string="Link"/>
+          <button special="cancel" class="btn-secondary" string="Cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_link_existing_contacts_wizard" model="ir.actions.act_window">
+    <field name="name">Link Existing Contacts</field>
+    <field name="res_model">link.existing.contacts.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+    <field name="context">{'default_company_id': active_id}</field>
+  </record>
+</odoo>
