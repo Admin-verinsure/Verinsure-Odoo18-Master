@@ -4,9 +4,9 @@
     <field name="name">link.existing.contacts.wizard.form</field>
     <field name="model">link.existing.contacts.wizard</field>
     <field name="arch" type="xml">
-      <form string="Link Existing Contacts">
+      <form string="Link Existing Contact(s)">
         <group>
-          <field name="company_id"/>
+          <field name="company_id" readonly="1"/>
           <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"/>
         </group>
         <footer>
@@ -18,7 +18,7 @@
   </record>
 
   <record id="action_link_existing_contacts_wizard" model="ir.actions.act_window">
-    <field name="name">Link Existing Contacts</field>
+    <field name="name">Link Existing Contact(s)</field>
     <field name="res_model">link.existing.contacts.wizard</field>
     <field name="view_mode">form</field>
     <field name="target">new</field>

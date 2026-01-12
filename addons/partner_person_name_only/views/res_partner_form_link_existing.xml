@@ -12,8 +12,7 @@
         <button name="%(action_link_existing_contacts_wizard)d"
                 type="action"
                 string="Link Existing Contact(s)"
-                class="btn-secondary"
-                invisible="not is_company"/>
+                class="btn-secondary"/>
       </xpath>
     </field>
   </record>
