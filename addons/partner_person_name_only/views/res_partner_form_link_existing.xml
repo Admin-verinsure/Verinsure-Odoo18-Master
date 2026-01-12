@@ -13,7 +13,7 @@
                 type="action"
                 string="Link Existing Contact(s)"
                 class="btn-secondary"
-                attrs="{'invisible': [('is_company','=',False)]}"/>
+                invisible="not is_company"/>
       </xpath>
     </field>
   </record>
