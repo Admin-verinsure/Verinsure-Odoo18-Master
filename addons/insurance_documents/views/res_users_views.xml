@@ -1,4 +1,5 @@
 <odoo>
+  <!-- Add Clubs field on Users form -->
   <record id="view_res_users_form_inherit_insurance_clubs" model="ir.ui.view">
     <field name="name">res.users.form.insurance.clubs</field>
     <field name="model">res.users</field>

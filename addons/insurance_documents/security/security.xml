@@ -1,21 +1,22 @@
 <odoo>
+  <!-- Remove old unsafe/global attachment rule from earlier versions -->
+  <delete id="rule_insurance_attachments" model="ir.rule"/>
+
   <record id="group_insurance_documents_user" model="res.groups">
     <field name="name">Insurance Documents User</field>
     <field name="category_id" ref="base.module_category_hidden"/>
   </record>
 
-  <!-- Do NOT restrict non-insurance attachments (web assets, etc.). -->
-  <record id="rule_insurance_docs_club_or_owner" model="ir.rule">
-    <field name="name">Insurance docs visibility (club or owner)</field>
-    <field name="model_id" ref="base.model_ir_attachment"/>
+  <!-- Record rule on insurance.document ONLY (safe: does not affect web assets) -->
+  <record id="rule_insurance_document_visibility" model="ir.rule">
+    <field name="name">Insurance Documents visibility by club or owner</field>
+    <field name="model_id" ref="model_insurance_document"/>
     <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_documents_user'))]"/>
     <field name="domain_force">
       [
-        '|', ('x_insurance_doc', '=', False),
-        '&amp;', ('x_insurance_doc', '=', True),
         '|',
-          '&amp;', ('x_club_id', 'in', user.x_club_ids.ids), ('x_club_id', '!=', False),
-          '&amp;', ('x_owner_user_id', '=', user.id), ('x_club_id', '=', False)
+          '&amp;', ('club_id', 'in', user.x_club_ids.ids), ('club_id', '!=', False),
+          '&amp;', ('owner_user_id', '=', user.id), ('club_id', '=', False)
       ]
     </field>
     <field name="perm_read" eval="1"/>

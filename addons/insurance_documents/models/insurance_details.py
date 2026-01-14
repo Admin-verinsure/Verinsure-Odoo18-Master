@@ -3,34 +3,26 @@ from odoo import fields, models
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
+    # Club field on the policy record (generic res.partner)
     x_club_id = fields.Many2one("res.partner", string="Club", index=True)
 
-    attachment_count = fields.Integer(string="Documents", compute="_compute_attachment_count")
+    document_count = fields.Integer(string="Documents", compute="_compute_document_count")
 
-    def _compute_attachment_count(self):
-        Attachment = self.env["ir.attachment"]
+    def _compute_document_count(self):
+        Doc = self.env["insurance.document"]
         for rec in self:
-            rec.attachment_count = Attachment.search_count([
-                ("res_model", "=", rec._name),
-                ("res_id", "=", rec.id),
-                ("x_insurance_doc", "=", True),
-            ])
+            rec.document_count = Doc.search_count([("policy_id", "=", rec.id)])
 
-    def action_open_documents(self):
+    def action_open_policy_documents(self):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
             "name": "Documents",
-            "res_model": "ir.attachment",
+            "res_model": "insurance.document",
             "view_mode": "kanban,list,form",
-            "domain": [
-                ("res_model", "=", self._name),
-                ("res_id", "=", self.id),
-                ("x_insurance_doc", "=", True),
-            ],
+            "domain": [("policy_id", "=", self.id)],
             "context": {
-                "default_res_model": self._name,
-                "default_res_id": self.id,
-                "default_x_insurance_doc": True,
+                "default_policy_id": self.id,
+                "default_club_id": self.x_club_id.id or False,
             },
         }
