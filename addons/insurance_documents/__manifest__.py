@@ -1,16 +1,17 @@
+# -*- coding: utf-8 -*-
 {
-  "name": "Insurance Documents",
-  "version": "18.0.1.1.0",
-  "category": "Insurance",
-  "summary": "Safe club/user document visibility without touching global attachments",
-  "depends": ["base", "mail", "insurance_management_cybro"],
-  "data": [
-    "security/security.xml",
-    "security/ir.model.access.csv",
-    "views/insurance_document_views.xml",
-    "views/insurance_details_views.xml",
-    "views/res_users_views.xml"
-  ],
-  "installable": true,
-  "application": false
+    "name": "Insurance Documents & Policy Access",
+    "version": "18.0.2.0.0",
+    "category": "Insurance",
+    "summary": "Insurance documents with club/owner visibility + policy visibility rules",
+    "depends": ["base", "mail", "insurance_management_cybro"],
+    "data": [
+        "security/ir.model.access.csv",
+        "security/security.xml",
+        "views/insurance_document_views.xml",
+        "views/insurance_details_views.xml",
+        "views/res_users_views.xml",
+    ],
+    "installable": True,
+    "application": False,
 }
