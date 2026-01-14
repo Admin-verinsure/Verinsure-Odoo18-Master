@@ -1,8 +1,7 @@
 from odoo import fields, models
 
 class InsuranceDetails(models.Model):
-    # Add chatter + activities to the existing model so users can attach files directly on the policy record
-    _inherit = ["insurance.details", "mail.thread", "mail.activity.mixin"]
+    _inherit = "insurance.details"  # IMPORTANT: only inherit, do NOT redefine _name
 
     attachment_count = fields.Integer(string="Documents", compute="_compute_attachment_count")
 
@@ -15,17 +14,18 @@ class InsuranceDetails(models.Model):
             ])
 
     def action_open_documents(self):
-        """Open only documents linked to THIS policy record."""
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
             "name": "Documents",
             "res_model": "ir.attachment",
             "view_mode": "kanban,list,form",
-            "domain": [("res_model", "=", self._name), ("res_id", "=", self.id)],
+            "domain": [
+                ("res_model", "=", self._name),
+                ("res_id", "=", self.id)
+            ],
             "context": {
                 "default_res_model": self._name,
                 "default_res_id": self.id,
             },
-            "target": "current",
         }
