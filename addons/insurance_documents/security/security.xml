@@ -1,0 +1,17 @@
+<odoo>
+    <record id="group_insurance_documents_user" model="res.groups">
+        <field name="name">Insurance Documents User</field>
+        <field name="category_id" ref="base.module_category_hidden"/>
+    </record>
+
+    <record id="rule_insurance_details_attachments" model="ir.rule">
+        <field name="name">Insurance Details attachments access</field>
+        <field name="model_id" ref="base.model_ir_attachment"/>
+        <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_documents_user'))]"/>
+        <field name="domain_force">[('res_model', '=', 'insurance.details')]</field>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+</odoo>
