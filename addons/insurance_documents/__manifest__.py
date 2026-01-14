@@ -1,8 +1,8 @@
 {
     "name": "Insurance Documents",
-    "version": "18.0.1.0.5",
+    "version": "18.0.1.0.6",
     "category": "Insurance",
-    "summary": "Upload and manage documents in Insurance module (global + per policy)",
+    "summary": "Insurance-only documents (global + per policy)",
     "depends": ["base", "mail", "insurance_management_cybro"],
     "data": [
         "security/security.xml",

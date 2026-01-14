@@ -4,11 +4,11 @@
         <field name="category_id" ref="base.module_category_hidden"/>
     </record>
 
-    <record id="rule_insurance_details_attachments" model="ir.rule">
-        <field name="name">Insurance Details attachments access</field>
+    <record id="rule_insurance_attachments" model="ir.rule">
+        <field name="name">Insurance attachments access</field>
         <field name="model_id" ref="base.model_ir_attachment"/>
         <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_documents_user'))]"/>
-        <field name="domain_force">[('res_model', '=', 'insurance.details')]</field>
+        <field name="domain_force">['|', ('res_model', '=', 'insurance.details'), ('x_insurance_doc', '=', True)]</field>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>

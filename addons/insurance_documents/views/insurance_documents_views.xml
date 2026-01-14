@@ -17,13 +17,17 @@
         </field>
     </record>
 
-    <!-- Global Insurance Documents -->
+    <!-- Global Insurance Documents (ONLY Insurance tagged docs) -->
     <record id="action_insurance_details_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">ir.attachment</field>
         <field name="view_mode">kanban,list,form</field>
-        <field name="domain">['|', ('res_model', '=', 'insurance.details'), ('res_model', '=', False)]</field>
-        <field name="context">{'default_res_model': 'insurance.details'}</field>
+
+        <!-- Show ONLY docs created/managed via this module -->
+        <field name="domain">[('x_insurance_doc', '=', True)]</field>
+
+        <!-- Ensure uploads from this screen are tagged as Insurance docs -->
+        <field name="context">{'default_x_insurance_doc': True, 'default_res_model': 'insurance.details'}</field>
     </record>
 
     <menuitem id="menu_insurance_documents"
