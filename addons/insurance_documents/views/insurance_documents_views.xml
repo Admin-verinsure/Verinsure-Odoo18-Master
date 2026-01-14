@@ -1,39 +1,28 @@
 <odoo>
+  <record id="view_insurance_details_form_inherit_documents" model="ir.ui.view">
+    <field name="name">insurance.details.form.documents.button</field>
+    <field name="model">insurance.details</field>
+    <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//header" position="inside">
+        <button name="action_open_documents" type="object" class="oe_stat_button" icon="fa-paperclip">
+          <field name="attachment_count" widget="statinfo" string="Documents"/>
+        </button>
+      </xpath>
+    </field>
+  </record>
 
-    <!-- Smart Button on Insurance Details Form -->
-    <record id="view_insurance_details_form_inherit_documents" model="ir.ui.view">
-        <field name="name">insurance.details.form.documents.button</field>
-        <field name="model">insurance.details</field>
-        <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
-                <button name="action_open_documents"
-                        type="object"
-                        class="oe_stat_button"
-                        icon="fa-paperclip">
-                    <field name="attachment_count" widget="statinfo" string="Documents"/>
-                </button>
-            </xpath>
-        </field>
-    </record>
+  <record id="action_insurance_details_documents" model="ir.actions.act_window">
+    <field name="name">Documents</field>
+    <field name="res_model">ir.attachment</field>
+    <field name="view_mode">kanban,list,form</field>
+    <field name="domain">[('x_insurance_doc', '=', True)]</field>
+    <field name="context">{'default_x_insurance_doc': True}</field>
+  </record>
 
-    <!-- Global Insurance Documents (ONLY Insurance tagged docs) -->
-    <record id="action_insurance_details_documents" model="ir.actions.act_window">
-        <field name="name">Documents</field>
-        <field name="res_model">ir.attachment</field>
-        <field name="view_mode">kanban,list,form</field>
-
-        <!-- Show ONLY docs created/managed via this module -->
-        <field name="domain">[('x_insurance_doc', '=', True)]</field>
-
-        <!-- Ensure uploads from this screen are tagged as Insurance docs -->
-        <field name="context">{'default_x_insurance_doc': True, 'default_res_model': 'insurance.details'}</field>
-    </record>
-
-    <menuitem id="menu_insurance_documents"
-              name="Documents"
-              parent="insurance_management_cybro.insurance_management_menu_root"
-              action="action_insurance_details_documents"
-              sequence="40"/>
-
+  <menuitem id="menu_insurance_documents"
+            name="Documents"
+            parent="insurance_management_cybro.insurance_management_menu_root"
+            action="action_insurance_details_documents"
+            sequence="40"/>
 </odoo>
