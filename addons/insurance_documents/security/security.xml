@@ -4,6 +4,7 @@
         <field name="category_id" ref="base.module_category_hidden"/>
     </record>
 
+    <!-- Allow users in this group to read/create/write insurance attachments; disallow delete for safety -->
     <record id="rule_insurance_details_attachments" model="ir.rule">
         <field name="name">Insurance Details attachments access</field>
         <field name="model_id" ref="base.model_ir_attachment"/>

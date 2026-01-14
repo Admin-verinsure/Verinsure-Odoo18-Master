@@ -1,30 +1,56 @@
 <odoo>
 
+    <!-- ===============================
+         1) RECORD LEVEL: Smart button
+         =============================== -->
     <record id="view_insurance_details_form_inherit_documents" model="ir.ui.view">
         <field name="name">insurance.details.form.documents.button</field>
         <field name="model">insurance.details</field>
-        <field name="inherit_id"
-               ref="insurance_management_cybro.insurance_details_view_form"/>
+        <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
                 <button name="action_open_documents"
                         type="object"
                         class="oe_stat_button"
                         icon="fa-paperclip">
-                    <field name="attachment_count"
-                           widget="statinfo"
-                           string="Documents"/>
+                    <field name="attachment_count" widget="statinfo" string="Documents"/>
                 </button>
             </xpath>
         </field>
     </record>
 
+    <!-- ===============================
+         2) RECORD LEVEL: Chatter attachments (upload directly on policy)
+         =============================== -->
+    <record id="view_insurance_details_form_inherit_chatter" model="ir.ui.view">
+        <field name="name">insurance.details.form.chatter</field>
+        <field name="model">insurance.details</field>
+        <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Insert chatter at the end of the form -->
+            <xpath expr="//form" position="inside">
+                <chatter>
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </chatter>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ===============================
+         3) GLOBAL: Insurance -> Documents menu
+         =============================== -->
     <record id="action_insurance_details_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">ir.attachment</field>
-        <!-- Odoo 18 uses 'list' instead of 'tree' -->
         <field name="view_mode">kanban,list,form</field>
-        <field name="domain">[('res_model', '=', 'insurance.details')]</field>
+
+        <!-- Show insurance-linked docs + any unlinked docs uploaded from this screen -->
+        <field name="domain">['|', ('res_model', '=', 'insurance.details'), ('res_model', '=', False)]</field>
+
+        <!-- Ensure new uploads from this screen default to insurance.details -->
+        <field name="context">{'default_res_model': 'insurance.details'}</field>
     </record>
 
     <menuitem id="menu_insurance_documents"
