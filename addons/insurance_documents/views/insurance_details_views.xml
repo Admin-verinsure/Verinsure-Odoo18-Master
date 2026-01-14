@@ -1,4 +1,5 @@
 <odoo>
+  <!-- Add Club field to Insurance Details form -->
   <record id="view_insurance_details_form_inherit_club" model="ir.ui.view">
     <field name="name">insurance.details.form.club</field>
     <field name="model">insurance.details</field>
@@ -6,6 +7,20 @@
     <field name="arch" type="xml">
       <xpath expr="//sheet//group" position="inside">
         <field name="x_club_id"/>
+      </xpath>
+    </field>
+  </record>
+
+  <!-- Smart button to open documents for this policy -->
+  <record id="view_insurance_details_form_inherit_docs_btn" model="ir.ui.view">
+    <field name="name">insurance.details.form.documents.button</field>
+    <field name="model">insurance.details</field>
+    <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//header" position="inside">
+        <button name="action_open_policy_documents" type="object" class="oe_stat_button" icon="fa-paperclip">
+          <field name="document_count" widget="statinfo" string="Documents"/>
+        </button>
       </xpath>
     </field>
   </record>
