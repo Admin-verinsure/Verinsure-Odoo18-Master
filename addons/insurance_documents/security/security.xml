@@ -1,0 +1,23 @@
+<odoo>
+  <record id="group_insurance_documents_user" model="res.groups">
+    <field name="name">Insurance Documents User</field>
+    <field name="category_id" ref="base.module_category_hidden"/>
+  </record>
+
+  <record id="rule_insurance_document_visibility" model="ir.rule">
+    <field name="name">Insurance Documents visibility by club or owner</field>
+    <field name="model_id" ref="model_insurance_document"/>
+    <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_documents_user'))]"/>
+    <field name="domain_force">
+      [
+        '|',
+          '&amp;', ('club_id', 'in', user.x_club_ids.ids), ('club_id', '!=', False),
+          '&amp;', ('owner_user_id', '=', user.id), ('club_id', '=', False)
+      ]
+    </field>
+    <field name="perm_read" eval="1"/>
+    <field name="perm_write" eval="1"/>
+    <field name="perm_create" eval="1"/>
+    <field name="perm_unlink" eval="0"/>
+  </record>
+</odoo>
