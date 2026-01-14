@@ -22,7 +22,8 @@
     <record id="action_insurance_details_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">ir.attachment</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <!-- Odoo 18 uses 'list' instead of 'tree' -->
+        <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('res_model', '=', 'insurance.details')]</field>
     </record>
 

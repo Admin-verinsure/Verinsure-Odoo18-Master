@@ -22,7 +22,8 @@ class InsuranceDetails(models.Model):
             "type": "ir.actions.act_window",
             "name": "Documents",
             "res_model": "ir.attachment",
-            "view_mode": "kanban,tree,form",
+            # Odoo 18 uses 'list' (not 'tree') for list views
+            "view_mode": "kanban,list,form",
             "domain": [
                 ("res_model", "=", self._name),
                 ("res_id", "=", self.id)
