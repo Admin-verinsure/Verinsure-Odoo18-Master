@@ -1,2 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_insurance_document_user,insurance.document user,model_insurance_document,insurance_documents.group_insurance_documents_user,1,1,1,0
+access_insurance_document_user,insurance.document user,model_insurance_document,base.group_user,1,1,1,0

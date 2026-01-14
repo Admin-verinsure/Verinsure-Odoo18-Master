@@ -3,7 +3,6 @@ from odoo import fields, models
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
-    # Club on policy (generic res.partner)
     x_club_id = fields.Many2one("res.partner", string="Club", index=True)
 
     document_count = fields.Integer(string="Documents", compute="_compute_document_count")
