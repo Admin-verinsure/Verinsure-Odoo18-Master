@@ -1,8 +1,6 @@
 <odoo>
 
-    <!-- ===============================
-         1) RECORD LEVEL: Smart button
-         =============================== -->
+    <!-- Smart Button on Insurance Details Form -->
     <record id="view_insurance_details_form_inherit_documents" model="ir.ui.view">
         <field name="name">insurance.details.form.documents.button</field>
         <field name="model">insurance.details</field>
@@ -19,37 +17,12 @@
         </field>
     </record>
 
-    <!-- ===============================
-         2) RECORD LEVEL: Chatter attachments (upload directly on policy)
-         =============================== -->
-    <record id="view_insurance_details_form_inherit_chatter" model="ir.ui.view">
-        <field name="name">insurance.details.form.chatter</field>
-        <field name="model">insurance.details</field>
-        <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
-        <field name="arch" type="xml">
-            <!-- Insert chatter at the end of the form -->
-            <xpath expr="//form" position="inside">
-                <chatter>
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </chatter>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- ===============================
-         3) GLOBAL: Insurance -> Documents menu
-         =============================== -->
+    <!-- Global Insurance Documents -->
     <record id="action_insurance_details_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">ir.attachment</field>
         <field name="view_mode">kanban,list,form</field>
-
-        <!-- Show insurance-linked docs + any unlinked docs uploaded from this screen -->
         <field name="domain">['|', ('res_model', '=', 'insurance.details'), ('res_model', '=', False)]</field>
-
-        <!-- Ensure new uploads from this screen default to insurance.details -->
         <field name="context">{'default_res_model': 'insurance.details'}</field>
     </record>
 
