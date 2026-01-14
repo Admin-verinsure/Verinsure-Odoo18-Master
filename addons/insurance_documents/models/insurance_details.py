@@ -1,12 +1,10 @@
 from odoo import fields, models
 
 class InsuranceDetails(models.Model):
-    _inherit = "insurance.details"
+    # Add chatter + activities to the existing model so users can attach files directly on the policy record
+    _inherit = ["insurance.details", "mail.thread", "mail.activity.mixin"]
 
-    attachment_count = fields.Integer(
-        string="Documents",
-        compute="_compute_attachment_count"
-    )
+    attachment_count = fields.Integer(string="Documents", compute="_compute_attachment_count")
 
     def _compute_attachment_count(self):
         Attachment = self.env["ir.attachment"]
@@ -17,19 +15,17 @@ class InsuranceDetails(models.Model):
             ])
 
     def action_open_documents(self):
+        """Open only documents linked to THIS policy record."""
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
             "name": "Documents",
             "res_model": "ir.attachment",
-            # Odoo 18 uses 'list' (not 'tree') for list views
             "view_mode": "kanban,list,form",
-            "domain": [
-                ("res_model", "=", self._name),
-                ("res_id", "=", self.id)
-            ],
+            "domain": [("res_model", "=", self._name), ("res_id", "=", self.id)],
             "context": {
                 "default_res_model": self._name,
                 "default_res_id": self.id,
-            }
+            },
+            "target": "current",
         }
