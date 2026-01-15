@@ -1,5 +1,4 @@
 <odoo>
-    <!-- Insurance -> Documents menu (DMS) -->
     <record id="action_insurance_dms_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">dms.file</field>
@@ -15,9 +14,8 @@
               sequence="10"
               groups="base.group_user"/>
 
-    <!-- Policy form smart button -->
-    <record id="view_insurance_details_form_inherit_dms_btn" model="ir.ui.view">
-        <field name="name">insurance.details.form.dms.documents.button</field>
+    <record id="view_insurance_details_form_inherit_dms_secure" model="ir.ui.view">
+        <field name="name">insurance.details.form.dms.secure</field>
         <field name="model">insurance.details</field>
         <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
         <field name="arch" type="xml">
@@ -28,6 +26,10 @@
                         icon="fa-folder-open">
                     <field name="document_count" widget="statinfo" string="Documents"/>
                 </button>
+            </xpath>
+
+            <xpath expr="//sheet//group" position="inside">
+                <field name="x_club_group_id" options="{'no_create': True}"/>
             </xpath>
         </field>
     </record>
