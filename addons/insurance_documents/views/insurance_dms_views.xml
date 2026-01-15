@@ -33,4 +33,15 @@
             </xpath>
         </field>
     </record>
+
+    <record id="view_dms_file_form_inherit_ins_policy" model="ir.ui.view">
+        <field name="name">dms.file.form.insurance.policy.link</field>
+        <field name="model">dms.file</field>
+        <field name="inherit_id" ref="dms.view_dms_file_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet//group" position="inside">
+                <field name="x_policy_id"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>

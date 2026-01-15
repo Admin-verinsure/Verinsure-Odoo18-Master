@@ -4,10 +4,6 @@
         <field name="category_id" ref="base.module_category_hidden"/>
     </record>
 
-    <!-- Policy visibility for normal users:
-         - If x_club_group_id set: only members of that group can see the policy
-         - If not set: only creator can see it
-    -->
     <record id="rule_insurance_policy_visibility" model="ir.rule">
         <field name="name">Insurance policy visibility (club group or creator)</field>
         <field name="model_id" ref="insurance_management_cybro.model_insurance_details"/>
@@ -25,7 +21,6 @@
         <field name="perm_unlink" eval="0"/>
     </record>
 
-    <!-- Technical bypass: can see all policies -->
     <record id="rule_insurance_policy_full_access" model="ir.rule">
         <field name="name">Insurance policy full access (technical)</field>
         <field name="model_id" ref="insurance_management_cybro.model_insurance_details"/>
@@ -35,5 +30,47 @@
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
         <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_dms_file_insurance_read" model="ir.rule">
+        <field name="name">DMS insurance files read (linked policy or creator)</field>
+        <field name="model_id" ref="dms.model_dms_file"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">
+            [
+              '&amp;', ('directory_id', 'child_of', 51),
+              '|',
+                '&amp;', ('x_policy_id', '!=', False), '|',
+                    '&amp;', ('x_policy_id.x_club_group_id', '!=', False), ('x_policy_id.x_club_group_id', 'in', user.groups_id.ids),
+                    '&amp;', ('x_policy_id.x_club_group_id', '=', False), ('x_policy_id.create_uid', '=', user.id),
+                ('create_uid', '=', user.id)
+            ]
+        </field>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_dms_file_insurance_write_creator" model="ir.rule">
+        <field name="name">DMS insurance files write (creator only)</field>
+        <field name="model_id" ref="dms.model_dms_file"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('directory_id', 'child_of', 51), ('create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="0"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_dms_file_insurance_full_access" model="ir.rule">
+        <field name="name">DMS insurance files full access (technical)</field>
+        <field name="model_id" ref="dms.model_dms_file"/>
+        <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_dms_full_access'))]"/>
+        <field name="domain_force">[('directory_id', 'child_of', 51)]</field>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
     </record>
 </odoo>
