@@ -1,13 +1,22 @@
 <odoo>
-    <record id="rule_insurance_document_visibility" model="ir.rule">
-        <field name="name">Insurance Documents visibility by club or owner</field>
-        <field name="model_id" ref="model_insurance_document"/>
+    <record id="group_insurance_dms_full_access" model="res.groups">
+        <field name="name">Insurance DMS Full Access</field>
+        <field name="category_id" ref="base.module_category_hidden"/>
+    </record>
+
+    <!-- Policy visibility for normal users:
+         - If x_club_group_id set: only members of that group can see the policy
+         - If not set: only creator can see it
+    -->
+    <record id="rule_insurance_policy_visibility" model="ir.rule">
+        <field name="name">Insurance policy visibility (club group or creator)</field>
+        <field name="model_id" ref="insurance_management_cybro.model_insurance_details"/>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         <field name="domain_force">
             [
               '|',
-                '&amp;', ('club_id', '!=', False), ('club_id', 'in', user.x_club_ids.ids),
-                '&amp;', ('club_id', '=', False), ('owner_user_id', '=', user.id)
+                '&amp;', ('x_club_group_id', '!=', False), ('x_club_group_id', 'in', user.groups_id.ids),
+                '&amp;', ('x_club_group_id', '=', False), ('create_uid', '=', user.id)
             ]
         </field>
         <field name="perm_read" eval="1"/>
@@ -16,17 +25,12 @@
         <field name="perm_unlink" eval="0"/>
     </record>
 
-    <record id="rule_insurance_policy_visibility" model="ir.rule">
-        <field name="name">Insurance Policies visibility by club or creator</field>
+    <!-- Technical bypass: can see all policies -->
+    <record id="rule_insurance_policy_full_access" model="ir.rule">
+        <field name="name">Insurance policy full access (technical)</field>
         <field name="model_id" ref="insurance_management_cybro.model_insurance_details"/>
-        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
-        <field name="domain_force">
-            [
-              '|',
-                '&amp;', ('x_club_id', '!=', False), ('x_club_id', 'in', user.x_club_ids.ids),
-                '&amp;', ('x_club_id', '=', False), ('create_uid', '=', user.id)
-            ]
-        </field>
+        <field name="groups" eval="[(4, ref('insurance_documents.group_insurance_dms_full_access'))]"/>
+        <field name="domain_force">[(1,'=',1)]</field>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
