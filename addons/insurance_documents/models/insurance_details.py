@@ -3,7 +3,7 @@ from odoo import fields, models
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
-    # Compatibility: some views may use document_count
+    # Compatibility fields: use document_count in views (common name)
     document_count = fields.Integer(string="Documents", compute="_compute_dms_doc_count")
     dms_doc_count = fields.Integer(string="Documents (DMS)", compute="_compute_dms_doc_count")
 
