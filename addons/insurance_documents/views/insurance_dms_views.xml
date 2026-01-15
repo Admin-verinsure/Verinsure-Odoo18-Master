@@ -1,4 +1,5 @@
 <odoo>
+    <!-- Insurance -> Documents menu (DMS) -->
     <record id="action_insurance_dms_documents" model="ir.actions.act_window">
         <field name="name">Documents</field>
         <field name="res_model">dms.file</field>
@@ -14,6 +15,7 @@
               sequence="10"
               groups="base.group_user"/>
 
+    <!-- Policy form smart button -->
     <record id="view_insurance_details_form_inherit_dms_btn" model="ir.ui.view">
         <field name="name">insurance.details.form.dms.documents.button</field>
         <field name="model">insurance.details</field>
