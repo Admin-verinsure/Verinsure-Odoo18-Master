@@ -1,0 +1,32 @@
+<odoo>
+    <record id="action_insurance_dms_documents" model="ir.actions.act_window">
+        <field name="name">Documents</field>
+        <field name="res_model">dms.file</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('directory_id', 'child_of', 51)]</field>
+        <field name="context">{'default_directory_id': 51}</field>
+    </record>
+
+    <menuitem id="menu_insurance_dms_documents"
+              name="Documents"
+              parent="insurance_management_cybro.insurance_management_menu_root"
+              action="action_insurance_dms_documents"
+              sequence="10"
+              groups="base.group_user"/>
+
+    <record id="view_insurance_details_form_inherit_dms_btn" model="ir.ui.view">
+        <field name="name">insurance.details.form.dms.documents.button</field>
+        <field name="model">insurance.details</field>
+        <field name="inherit_id" ref="insurance_management_cybro.insurance_details_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_dms_documents"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-folder-open">
+                    <field name="dms_doc_count" widget="statinfo" string="Documents"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>
