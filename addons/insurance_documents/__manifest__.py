@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Insurance Documents & Policy Access",
-    "version": "18.0.2.0.0",
+    "name": "Insurance DMS Integration",
+    "version": "18.0.1.0.0",
     "category": "Insurance",
-    "summary": "Insurance documents with club/owner visibility + policy visibility rules",
-    "depends": ["base", "mail", "insurance_management_cybro"],
+    "summary": "Open and manage Insurance documents from DMS (dms.file) with policy linking",
+    "depends": ["base", "mail", "insurance_management_cybro", "dms"],
     "data": [
-        "security/ir.model.access.csv",
-        "security/security.xml",
-        "views/insurance_document_views.xml",
-        "views/insurance_details_views.xml",
-        "views/res_users_views.xml",
+        "views/insurance_dms_views.xml",
     ],
     "installable": True,
     "application": False,
