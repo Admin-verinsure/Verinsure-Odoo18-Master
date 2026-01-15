@@ -3,15 +3,19 @@ from odoo import fields, models
 class InsuranceDetails(models.Model):
     _inherit = "insurance.details"
 
-    dms_doc_count = fields.Integer(string="Documents", compute="_compute_dms_doc_count")
+    # Compatibility: some views may use document_count
+    document_count = fields.Integer(string="Documents", compute="_compute_dms_doc_count")
+    dms_doc_count = fields.Integer(string="Documents (DMS)", compute="_compute_dms_doc_count")
 
     def _compute_dms_doc_count(self):
         DmsFile = self.env["dms.file"]
         for rec in self:
-            rec.dms_doc_count = DmsFile.search_count([
+            cnt = DmsFile.search_count([
                 ("res_model", "=", rec._name),
                 ("res_id", "=", rec.id),
             ])
+            rec.document_count = cnt
+            rec.dms_doc_count = cnt
 
     def action_open_dms_documents(self):
         self.ensure_one()

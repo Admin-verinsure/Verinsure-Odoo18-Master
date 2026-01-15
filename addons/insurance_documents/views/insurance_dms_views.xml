@@ -24,7 +24,7 @@
                         type="object"
                         class="oe_stat_button"
                         icon="fa-folder-open">
-                    <field name="dms_doc_count" widget="statinfo" string="Documents"/>
+                    <field name="document_count" widget="statinfo" string="Documents"/>
                 </button>
             </xpath>
         </field>
