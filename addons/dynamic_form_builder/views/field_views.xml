@@ -8,12 +8,18 @@
           <group>
             <field name="label"/>
             <field name="field_type"/>
-            <field name="option_source" attrs="{'invisible':[('field_type','!=','select')]}"/>
-            <field name="option_model_id" attrs="{'invisible':[('option_source','!=','model')]}"/>
-            <field name="option_domain" attrs="{'invisible':[('option_source','!=','model')]}"/>
-            <field name="option_label_field" attrs="{'invisible':[('option_source','!=','model')]}"/>
-            <field name="option_value_field" attrs="{'invisible':[('option_source','!=','model')]}"/>
-            <field name="option_values" attrs="{'invisible':[('option_source','!=','manual')]}"/>
+            <field name="option_source"
+                   modifiers='{"invisible":[["field_type","!=","select"]]}'/>
+            <field name="option_model_id"
+                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+            <field name="option_domain"
+                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+            <field name="option_label_field"
+                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+            <field name="option_value_field"
+                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+            <field name="option_values"
+                   modifiers='{"invisible":[["option_source","!=","manual"]]}'/>
           </group>
         </sheet>
       </form>

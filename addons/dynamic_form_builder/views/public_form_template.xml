@@ -4,9 +4,11 @@
       <t t-foreach="form.field_ids" t-as="field">
         <div>
           <label><t t-esc="field.label"/></label>
+
           <t t-if="field.field_type == 'char'">
             <input type="text" t-att-name="field.id"/>
           </t>
+
           <t t-if="field.field_type == 'select'">
             <select t-att-name="field.id">
               <option value="">-- Select --</option>

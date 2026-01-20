@@ -5,8 +5,10 @@
     <field name="arch" type="xml">
       <form>
         <sheet>
-          <field name="name"/>
-          <field name="field_ids"/>
+          <group>
+            <field name="name"/>
+            <field name="field_ids"/>
+          </group>
         </sheet>
       </form>
     </field>
