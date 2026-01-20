@@ -1,0 +1,24 @@
+<odoo>
+  <template id="public_form_template">
+    <form>
+      <t t-foreach="form.field_ids" t-as="field">
+        <div>
+          <label><t t-esc="field.label"/></label>
+          <t t-if="field.field_type == 'char'">
+            <input type="text" t-att-name="field.id"/>
+          </t>
+          <t t-if="field.field_type == 'select'">
+            <select t-att-name="field.id">
+              <option value="">-- Select --</option>
+              <t t-foreach="field.get_select_options()" t-as="opt">
+                <option t-att-value="opt['value']">
+                  <t t-esc="opt['label']"/>
+                </option>
+              </t>
+            </select>
+          </t>
+        </div>
+      </t>
+    </form>
+  </template>
+</odoo>

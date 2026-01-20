@@ -1,0 +1,14 @@
+<odoo>
+  <record id="dynamic_form_view_form" model="ir.ui.view">
+    <field name="name">dynamic.form.form</field>
+    <field name="model">dynamic.form</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <field name="name"/>
+          <field name="field_ids"/>
+        </sheet>
+      </form>
+    </field>
+  </record>
+</odoo>
