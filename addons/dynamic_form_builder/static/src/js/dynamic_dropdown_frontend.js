@@ -1,5 +1,5 @@
 /** Dynamic dropdown loader for public forms (zehntech_form_builder extension) */
-odoo.define('dynamic_form_builder.dynamic_dropdown_frontend', function (require) {
+odoo.define('dynamic_form_builder.dynamic_dropdown_frontend', [], function (require) {
     "use strict";
 
     async function loadOptionsForSelect(selectEl) {

@@ -1,5 +1,5 @@
 /** Branching: when answers change, ask server for next form token and show a link/button */
-odoo.define('dynamic_form_builder.branching_frontend', function (require) {
+odoo.define('dynamic_form_builder.branching_frontend', [], function (require) {
     "use strict";
 
     function collectAnswers(formEl) {
