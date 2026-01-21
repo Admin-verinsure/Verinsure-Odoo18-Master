@@ -7,12 +7,23 @@
       <xpath expr="//form/group" position="after">
         <group string="Dynamic Options (DB)" name="dynamic_options_group">
           <field name="is_dynamic_options"/>
-          <field name="dynamic_model_id" invisible="is_dynamic_options != True" required="is_dynamic_options == True"/>
-          <field name="dynamic_domain" placeholder="[('active','=',True)]" invisible="is_dynamic_options != True"/>
-          <field name="dynamic_label_field_id" invisible="is_dynamic_options != True"/>
-          <field name="dynamic_value_field_id" invisible="is_dynamic_options != True"/>
-          <field name="dynamic_limit" invisible="is_dynamic_options != True"/>
-          <label string="Tip: If Dynamic Options is enabled, manual Options can be left empty."/>
+          <field name="dynamic_model_id"
+                 invisible="is_dynamic_options != True"
+                 required="is_dynamic_options == True"/>
+          <field name="dynamic_domain"
+                 placeholder="[('active','=',True)]"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_label_field_id"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_value_field_id"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_limit"
+                 invisible="is_dynamic_options != True"/>
+
+          <!-- Odoo 18: label without 'for' is not allowed -->
+          <div class="o_form_label">
+            Tip: If Dynamic Options is enabled, manual Options can be left empty.
+          </div>
         </group>
       </xpath>
     </field>
