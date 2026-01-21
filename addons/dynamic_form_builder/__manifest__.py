@@ -13,11 +13,11 @@
     ],
     'assets': {
         'web.assets_backend': [
-            'zt_form_builder_dynamic/static/src/js/field_dynamic_source_backend.js',
+            'dynamic_form_builder/static/src/js/field_dynamic_source_backend.js',
         ],
         'web.assets_frontend': [
-            'zt_form_builder_dynamic/static/src/js/dynamic_dropdown_frontend.js',
-            'zt_form_builder_dynamic/static/src/js/branching_frontend.js',
+            'dynamic_form_builder/static/src/js/dynamic_dropdown_frontend.js',
+            'dynamic_form_builder/static/src/js/branching_frontend.js',
         ],
     },
     'license': 'LGPL-3',
