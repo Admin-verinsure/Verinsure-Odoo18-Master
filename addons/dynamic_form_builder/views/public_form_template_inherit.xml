@@ -2,6 +2,12 @@
   <template id="public_form_template_inherit_dynamic"
             inherit_id="zehntech_form_builder.public_form_template">
 
+    <!-- Load our JS on Zehntech public/shared form page (they don't use web.assets_frontend) -->
+    <xpath expr="//script[contains(@src, '/zehntech_form_builder/static/src/js/translations.js')]" position="after">
+      <script type="text/javascript" src="/dynamic_form_builder/static/src/js/dynamic_dropdown_frontend.js"/>
+      <script type="text/javascript" src="/dynamic_form_builder/static/src/js/branching_frontend.js"/>
+    </xpath>
+
     <!-- Add data attributes for JS (dynamic dropdowns + branching) -->
     <xpath expr="//t[@t-elif=&quot;field.field_type == 'select'&quot;]//select"
            position="attributes">
