@@ -1,12 +1,9 @@
-/** Branching: when a trigger field changes, ask server for next form token and dynamically show a link/button */
-odoo.define('zt_form_builder_dynamic.branching_frontend', function (require) {
+/** Branching: when answers change, ask server for next form token and show a link/button */
+odoo.define('dynamic_form_builder.branching_frontend', function (require) {
     "use strict";
-
-    const ajax = require('web.ajax');
 
     function collectAnswers(formEl) {
         const answers = {};
-        // assumes each input includes data-field-id set by template or name=field_<id>
         formEl.querySelectorAll('[data-field-id]').forEach((el) => {
             const fid = el.dataset.fieldId;
             if (!fid) return;
@@ -14,53 +11,64 @@ odoo.define('zt_form_builder_dynamic.branching_frontend', function (require) {
             if (el.type === 'checkbox') {
                 answers[fid] = el.checked ? (el.value || 'true') : '';
             } else if (el.type === 'radio') {
-                if (el.checked) answers[fid] = el.value;
+                if (el.checked) {
+                    answers[fid] = el.value;
+                }
+            } else if (el.tagName === 'SELECT') {
+                answers[fid] = el.value || '';
             } else {
-                answers[fid] = el.value;
+                answers[fid] = el.value || '';
             }
         });
         return answers;
     }
 
-    function ensureBranchCta(formEl) {
-        let cta = formEl.querySelector('#branch_next_form_cta');
+    function ensureCta(formEl) {
+        let cta = formEl.querySelector('#dfb-branching-cta');
         if (!cta) {
             cta = document.createElement('div');
-            cta.id = 'branch_next_form_cta';
-            cta.className = 'alert alert-info mt-3 d-none';
-            cta.innerHTML = '<div class="d-flex align-items-center justify-content-between">' +
-                '<div><strong>Next step:</strong> a different form is required based on your selection.</div>' +
-                '<a class="btn btn-primary" target="_blank" rel="noopener">Open next form</a>' +
-                '</div>';
+            cta.id = 'dfb-branching-cta';
+            cta.style.marginTop = '12px';
+            cta.style.textAlign = 'center';
             formEl.appendChild(cta);
         }
         return cta;
     }
 
-    function wireBranching(formEl) {
+    async function evaluateBranching(formEl) {
         const tokenInput = formEl.querySelector('input[name="token"]');
         const token = tokenInput ? tokenInput.value : null;
         if (!token) return;
 
-        // Trigger check on any change
-        formEl.addEventListener('change', () => {
-            const answers = collectAnswers(formEl);
-            ajax.jsonRpc(`/form_builder/branching/${token}`, 'call', { answers: answers })
-                .then((res) => {
-                    if (!res || !res.success) return;
-                    const cta = ensureBranchCta(formEl);
-                    if (res.next_token) {
-                        const link = cta.querySelector('a');
-                        link.href = `/form_builder/shared/${res.next_token}`;
-                        cta.classList.remove('d-none');
-                    } else {
-                        cta.classList.add('d-none');
-                    }
-                });
-        });
+        const answers = collectAnswers(formEl);
+        try {
+            const res = await fetch(`/form_builder/branching/${encodeURIComponent(token)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answers }),
+                credentials: 'same-origin',
+            });
+            const data = await res.json();
+            const cta = ensureCta(formEl);
+
+            if (!data || !data.success || !data.next_token) {
+                cta.innerHTML = '';
+                return;
+            }
+
+            const url = `/form_builder/shared/${data.next_token}`;
+            cta.innerHTML = `<a class="btn btn-primary" href="${url}">Continue</a>`;
+        } catch (e) {
+            // console.error('branching eval failed', e);
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('form[action="/form_builder/submit"]').forEach(wireBranching);
+        const formEl = document.querySelector('form[action="/form_builder/submit"]') || document.querySelector('form');
+        if (!formEl) return;
+
+        // Evaluate once and on any change
+        evaluateBranching(formEl);
+        formEl.addEventListener('change', () => evaluateBranching(formEl));
     });
 });
