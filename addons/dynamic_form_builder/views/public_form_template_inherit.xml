@@ -1,0 +1,18 @@
+<odoo>
+  <template id="public_form_template_inherit_dynamic" inherit_id="zehntech_form_builder.public_form_template">
+    <!-- Add data attributes for JS (dynamic dropdowns + branching) -->
+    <xpath expr="//t[@t-elif=\"field.field_type == 'select'\"]//select" position="attributes">
+      <attribute name="t-att-data-field-id">field.id</attribute>
+      <attribute name="t-att-data-form-token">form.share_token</attribute>
+      <attribute name="t-att-data-dynamic-options">field.is_dynamic_options and '1' or None</attribute>
+    </xpath>
+
+    <xpath expr="//input[@t-att-name=\"'field_' + str(field.id)\" ]" position="attributes">
+      <attribute name="t-att-data-field-id">field.id</attribute>
+    </xpath>
+
+    <xpath expr="//textarea[@t-att-name=\"'field_' + str(field.id)\" ]" position="attributes">
+      <attribute name="t-att-data-field-id">field.id</attribute>
+    </xpath>
+  </template>
+</odoo>
