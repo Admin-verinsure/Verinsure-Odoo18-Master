@@ -1,19 +1,28 @@
 <odoo>
-  <record id="view_form_builder_field_dynamic_inherit" model="ir.ui.view">
-    <field name="name">form.builder.field.dynamic.inherit</field>
-    <field name="model">form.builder.field</field>
-    <field name="inherit_id" ref="zehntech_form_builder.view_form_builder_field_form"/>
+  <record id="view_select_field_config_wizard_dynamic_inherit" model="ir.ui.view">
+    <field name="name">select.field.config.wizard.dynamic.inherit</field>
+    <field name="model">select.field.config.wizard</field>
+    <field name="inherit_id" ref="zehntech_form_builder.view_select_field_config_wizard"/>
     <field name="arch" type="xml">
-      <!-- Insert a "Dynamic Options" group under advanced settings if exists -->
-      <xpath expr="//group" position="inside">
-        <group string="Dynamic Options" name="dynamic_options_group">
+      <xpath expr="//form/group" position="after">
+        <group string="Dynamic Options (DB)" name="dynamic_options_group">
           <field name="is_dynamic_options"/>
-          <field name="dynamic_model_id" attrs="{'invisible':[('is_dynamic_options','=',False)], 'required':[('is_dynamic_options','=',True)]}"/>
-          <field name="dynamic_domain" placeholder="[('active','=',True)]" attrs="{'invisible':[('is_dynamic_options','=',False)]}"/>
-          <field name="dynamic_label_field_id" attrs="{'invisible':[('is_dynamic_options','=',False)]}"/>
-          <field name="dynamic_value_field_id" attrs="{'invisible':[('is_dynamic_options','=',False)]}"/>
-          <field name="dynamic_limit" attrs="{'invisible':[('is_dynamic_options','=',False)]}"/>
-          <label string="Note: For public forms, keep domains simple and avoid sensitive models."/>
+          <field name="dynamic_model_id"
+                 invisible="is_dynamic_options != True"
+                 required="is_dynamic_options == True"/>
+          <field name="dynamic_domain"
+                 placeholder="[('active','=',True)]"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_label_field_id"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_value_field_id"
+                 invisible="is_dynamic_options != True"/>
+          <field name="dynamic_limit"
+                 invisible="is_dynamic_options != True"/>
+
+          <div class="o_form_label">
+            Note: For public forms, keep domains simple and avoid sensitive models.
+          </div>
         </group>
       </xpath>
     </field>
