@@ -8,18 +8,24 @@
           <group>
             <field name="label"/>
             <field name="field_type"/>
+
             <field name="option_source"
-                   modifiers='{"invisible":[["field_type","!=","select"]]}'/>
+                   invisible="field_type != 'select'"/>
+
             <field name="option_model_id"
-                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+                   invisible="option_source != 'model'"/>
+
             <field name="option_domain"
-                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+                   invisible="option_source != 'model'"/>
+
             <field name="option_label_field"
-                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+                   invisible="option_source != 'model'"/>
+
             <field name="option_value_field"
-                   modifiers='{"invisible":[["option_source","!=","model"]]}'/>
+                   invisible="option_source != 'model'"/>
+
             <field name="option_values"
-                   modifiers='{"invisible":[["option_source","!=","manual"]]}'/>
+                   invisible="option_source != 'manual'"/>
           </group>
         </sheet>
       </form>
