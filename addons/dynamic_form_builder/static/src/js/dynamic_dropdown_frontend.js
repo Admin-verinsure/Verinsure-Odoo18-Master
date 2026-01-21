@@ -1,51 +1,65 @@
 /** Dynamic dropdown loader for public forms (zehntech_form_builder extension) */
-odoo.define('dynamic_form_builder.dynamic_dropdown_frontend', [], function (require) {
-    "use strict";
+(function () {
+  "use strict";
 
-    async function loadOptionsForSelect(selectEl) {
-        const fieldId = selectEl.dataset.fieldId;
-        const token = selectEl.dataset.formToken;
-        if (!fieldId) { return; }
+  async function loadOptionsForSelect(selectEl) {
+    try {
+      const fieldId = selectEl.dataset.fieldId;
+      const token = selectEl.dataset.formToken;
 
-        const url = token
-            ? `/form_builder/dynamic_options/${fieldId}?token=${encodeURIComponent(token)}`
-            : `/form_builder/dynamic_options/${fieldId}`;
+      if (!fieldId) return;
 
-        try {
-            const res = await fetch(url, { method: 'GET', credentials: 'same-origin' });
-            const data = await res.json();
-            if (!data || !data.success) { return; }
+      const url = token
+        ? `/form_builder/dynamic_options/${encodeURIComponent(fieldId)}?token=${encodeURIComponent(token)}`
+        : `/form_builder/dynamic_options/${encodeURIComponent(fieldId)}`;
 
-            // Keep first placeholder option if any
-            const firstOpt = selectEl.querySelector('option[value=""]') || selectEl.options[0] || null;
-            const placeholder = firstOpt ? { value: firstOpt.value, label: firstOpt.textContent } : null;
+      const res = await fetch(url, {
+        method: "GET",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        // console.error("dynamic_options http error", res.status);
+        return;
+      }
 
-            // Clear existing
-            selectEl.innerHTML = '';
+      const data = await res.json();
+      if (!data || !data.success) return;
 
-            // Restore placeholder
-            if (placeholder) {
-                const opt = document.createElement('option');
-                opt.value = placeholder.value;
-                opt.textContent = placeholder.label;
-                selectEl.appendChild(opt);
-            }
+      // Keep first option as placeholder (usually "-- Select --")
+      const firstOpt = selectEl.querySelector("option") || null;
+      const placeholder = firstOpt
+        ? { value: firstOpt.value, label: firstOpt.textContent }
+        : null;
 
-            (data.options || []).forEach((o) => {
-                const option = document.createElement('option');
-                option.value = o.value;
-                option.textContent = o.label;
-                selectEl.appendChild(option);
-            });
-        } catch (e) {
-            // fail silently on public pages
-            // console.error('dynamic options load failed', e);
-        }
+      // Clear existing options
+      selectEl.innerHTML = "";
+
+      // Restore placeholder
+      if (placeholder) {
+        const opt = document.createElement("option");
+        opt.value = placeholder.value;
+        opt.textContent = placeholder.label;
+        selectEl.appendChild(opt);
+      }
+
+      // Append fetched options
+      (data.options || []).forEach((o) => {
+        const option = document.createElement("option");
+        option.value = o.value;
+        option.textContent = o.label;
+        selectEl.appendChild(option);
+      });
+    } catch (e) {
+      // fail silently on public pages
+      // console.error("dynamic options load failed", e);
     }
+  }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('select[data-dynamic-options="1"]').forEach((el) => {
-            loadOptionsForSelect(el);
-        });
-    });
-});
+  document.addEventListener("DOMContentLoaded", () => {
+    document
+      .querySelectorAll('select[data-dynamic-options="1"]')
+      .forEach((el) => {
+        loadOptionsForSelect(el);
+      });
+  });
+})();
