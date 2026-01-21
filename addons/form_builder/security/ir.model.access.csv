@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_smooth_form,access_smooth_form,model_smooth_form,base.group_system,1,1,1,1
+access_smooth_form_field,access_smooth_form_field,model_smooth_form_field,base.group_system,1,1,1,1
+access_smooth_form_submission,access_smooth_form_submission,model_smooth_form_submission,base.group_system,1,1,1,1
+access_smooth_form_branch_rule,access_smooth_form_branch_rule,model_smooth_form_branch_rule,base.group_system,1,1,1,1
