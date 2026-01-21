@@ -8,7 +8,7 @@
         <group string="Dynamic Options (DB)" name="dynamic_options_group">
           <field name="is_dynamic_options"/>
           <field name="dynamic_model_id" invisible="is_dynamic_options != True" required="is_dynamic_options == True"/>
-          <field name="dynamic_domain" placeholder="[(\"active\",\"=\",True)]" invisible="is_dynamic_options != True"/>
+          <field name="dynamic_domain" placeholder="[('active','=',True)]" invisible="is_dynamic_options != True"/>
           <field name="dynamic_label_field_id" invisible="is_dynamic_options != True"/>
           <field name="dynamic_value_field_id" invisible="is_dynamic_options != True"/>
           <field name="dynamic_limit" invisible="is_dynamic_options != True"/>
