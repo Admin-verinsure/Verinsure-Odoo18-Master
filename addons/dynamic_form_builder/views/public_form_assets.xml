@@ -1,0 +1,4 @@
+<odoo>
+  <!-- No template override required; frontend JS will detect dynamic fields by data attributes.
+       But we ensure assets are loaded (defined in manifest). -->
+</odoo>
