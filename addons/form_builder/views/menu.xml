@@ -1,0 +1,6 @@
+<odoo>
+  <menuitem id="smooth_form_root" name="Smooth Forms" sequence="20"/>
+  <menuitem id="smooth_form_menu_forms" name="Forms" parent="smooth_form_root" action="smooth_form_action" sequence="10"/>
+  <menuitem id="smooth_form_menu_branch" name="Branch Rules" parent="smooth_form_root" action="smooth_branch_action" sequence="20"/>
+  <menuitem id="smooth_form_menu_submissions" name="Submissions" parent="smooth_form_root" action="smooth_submission_action" sequence="30"/>
+</odoo>

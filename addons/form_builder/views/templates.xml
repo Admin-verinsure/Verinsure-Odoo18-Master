@@ -1,0 +1,84 @@
+<odoo>
+  <template id="smooth_form_page" name="Smooth Form Page">
+    <t t-call="website.layout">
+      <div class="container my-5">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="mb-4" t-esc="form.name"/>
+            <form t-att-action="'/smooth_form/submit/%s' % form.token" method="post">
+              <input type="hidden" name="token" t-att-value="form.token"/>
+              <t t-foreach="form.field_ids" t-as="field">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold" t-esc="field.label"/>
+                  <t t-if="field.field_type == 'text'">
+                    <input class="form-control" type="text" t-att-name="'field_%s' % field.id" t-att-required="field.required or None" t-att-data-field-id="field.id"/>
+                  </t>
+                  <t t-elif="field.field_type == 'number'">
+                    <input class="form-control" type="number" t-att-name="'field_%s' % field.id" t-att-required="field.required or None" t-att-data-field-id="field.id"/>
+                  </t>
+                  <t t-elif="field.field_type == 'date'">
+                    <input class="form-control" type="date" t-att-name="'field_%s' % field.id" t-att-required="field.required or None" t-att-data-field-id="field.id"/>
+                  </t>
+                  <t t-elif="field.field_type == 'textarea'">
+                    <textarea class="form-control" rows="3" t-att-name="'field_%s' % field.id" t-att-required="field.required or None" t-att-data-field-id="field.id"></textarea>
+                  </t>
+                  <t t-elif="field.field_type == 'select'">
+                    <select class="form-select"
+                            t-att-name="'field_%s' % field.id"
+                            t-att-required="field.required or None"
+                            t-att-data-field-id="field.id"
+                            t-att-data-form-token="form.token"
+                            t-att-data-dynamic-options="'1' if field.option_source == 'model' else None">
+                      <option value="">-- Select --</option>
+                      <t t-if="field.option_source == 'manual'">
+                        <t t-foreach="field.get_options()" t-as="o">
+                          <option t-att-value="o['value']" t-esc="o['label']"/>
+                        </t>
+                      </t>
+                    </select>
+                  </t>
+                  <t t-elif="field.field_type == 'checkbox'">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox"
+                             t-att-name="'field_%s' % field.id"
+                             t-att-value="'true'"
+                             t-att-data-field-id="field.id"/>
+                      <label class="form-check-label">Yes</label>
+                    </div>
+                  </t>
+                  <t t-elif="field.field_type == 'radio'">
+                    <t t-foreach="field.get_options()" t-as="o">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               t-att-name="'field_%s' % field.id"
+                               t-att-value="o['value']"
+                               t-att-data-field-id="field.id"/>
+                        <label class="form-check-label" t-esc="o['label']"/>
+                      </div>
+                    </t>
+                  </t>
+                </div>
+              </t>
+              <div id="sfb-branching-cta" class="text-center mt-3"></div>
+              <div class="text-center mt-4">
+                <button type="submit" class="btn btn-primary">Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </t>
+  </template>
+
+  <template id="smooth_form_thanks" name="Smooth Form Thanks">
+    <t t-call="website.layout">
+      <div class="container my-5">
+        <div class="alert alert-success">
+          <h4 class="alert-heading">Thanks!</h4>
+          <p>Your response has been recorded.</p>
+          <a t-att-href="'/smooth_form/%s' % form.token" class="btn btn-link">Back</a>
+        </div>
+      </div>
+    </t>
+  </template>
+</odoo>

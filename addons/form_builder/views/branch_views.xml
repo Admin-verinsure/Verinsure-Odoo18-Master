@@ -1,0 +1,43 @@
+<odoo>
+  <record id="smooth_branch_view_list" model="ir.ui.view">
+    <field name="name">smooth.form.branch.rule.list</field>
+    <field name="model">smooth.form.branch.rule</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="sequence"/>
+        <field name="form_id"/>
+        <field name="trigger_field_id"/>
+        <field name="operator"/>
+        <field name="value_text"/>
+        <field name="target_form_id"/>
+        <field name="fallback_form_id"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="smooth_branch_action" model="ir.actions.act_window">
+    <field name="name">Branch Rules</field>
+    <field name="res_model">smooth.form.branch.rule</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+  <record id="smooth_submission_view_list" model="ir.ui.view">
+    <field name="name">smooth.form.submission.list</field>
+    <field name="model">smooth.form.submission</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="create_date"/>
+        <field name="form_id"/>
+        <field name="ip"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="smooth_submission_action" model="ir.actions.act_window">
+    <field name="name">Submissions</field>
+    <field name="res_model">smooth.form.submission</field>
+    <field name="view_mode">list,form</field>
+  </record>
+</odoo>

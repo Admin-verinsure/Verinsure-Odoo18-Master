@@ -1,0 +1,91 @@
+<odoo>
+  <record id="smooth_form_view_list" model="ir.ui.view">
+    <field name="name">smooth.form.list</field>
+    <field name="model">smooth.form</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="name"/>
+        <field name="token"/>
+        <field name="active"/>
+        <field name="submission_count"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="smooth_form_view_form" model="ir.ui.view">
+    <field name="name">smooth.form.form</field>
+    <field name="model">smooth.form</field>
+    <field name="arch" type="xml">
+      <form>
+        <header>
+          <button name="action_open_public" type="object" string="Open Public Form" class="btn-primary"/>
+          <button name="action_open_preview" type="object" string="Preview" class="btn-secondary"/>
+          <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
+        </header>
+        <sheet>
+          <group>
+            <field name="name"/>
+            <field name="token" readonly="1"/>
+            <field name="active"/>
+          </group>
+
+          <notebook>
+            <page string="Fields">
+              <field name="field_ids" context="{'default_form_id': active_id}">
+                <list editable="bottom">
+                  <field name="sequence"/>
+                  <field name="label"/>
+                  <field name="field_type"/>
+                  <field name="required"/>
+                  <field name="option_source" optional="show" invisible="field_type not in ('select','radio','checkbox')"/>
+                  <field name="option_model_id" optional="show" invisible="field_type not in ('select','radio','checkbox')"/>
+                  <field name="option_limit" optional="show" invisible="field_type not in ('select','radio','checkbox')"/>
+                </list>
+                <form>
+                  <sheet>
+                    <group>
+                      <field name="sequence"/>
+                      <field name="label"/>
+                      <field name="field_type"/>
+                      <field name="required"/>
+                    </group>
+                    <group string="Options" invisible="field_type not in ('select','radio','checkbox')">
+                      <field name="option_source"/>
+                      <field name="option_values" invisible="option_source != 'manual'"/>
+                      <field name="option_model_id" invisible="option_source != 'model'"/>
+                      <field name="option_domain" invisible="option_source != 'model'" placeholder="[('active','=',True)]"/>
+                      <field name="option_label_field" invisible="option_source != 'model'"/>
+                      <field name="option_value_field" invisible="option_source != 'model'"/>
+                      <field name="option_limit" invisible="option_source != 'model'"/>
+                    </group>
+                  </sheet>
+                </form>
+              </field>
+            </page>
+
+            <page string="Branching">
+              <field name="branch_rule_ids" context="{'default_form_id': active_id}">
+                <list editable="bottom">
+                  <field name="sequence"/>
+                  <field name="trigger_field_id"/>
+                  <field name="operator"/>
+                  <field name="value_text"/>
+                  <field name="target_form_id"/>
+                  <field name="fallback_form_id"/>
+                </list>
+              </field>
+              <div class="o_form_label">Rules are evaluated in order. First match wins.</div>
+            </page>
+          </notebook>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="smooth_form_action" model="ir.actions.act_window">
+    <field name="name">Forms</field>
+    <field name="res_model">smooth.form</field>
+    <field name="view_mode">list,form</field>
+  </record>
+</odoo>
