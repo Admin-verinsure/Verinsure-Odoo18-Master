@@ -14,8 +14,7 @@
           <group>
             <field name="is_dynamic"/>
             <field name="option_model_id" invisible="is_dynamic != True" required="is_dynamic == True"/>
-            <field name="model_name" invisible="1"/>
-            <field name="option_domain" widget="domain" options="{'model_field': 'model_name'}" invisible="is_dynamic != True"/>
+            <field name="option_domain" placeholder="[('active','=',True)]" invisible="is_dynamic != True"/>
             <field name="option_label_field" invisible="is_dynamic != True"/>
             <field name="option_value_field" invisible="is_dynamic != True"/>
             <field name="option_limit" invisible="is_dynamic != True"/>
