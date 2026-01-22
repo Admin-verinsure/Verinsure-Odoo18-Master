@@ -14,6 +14,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
 
     is_dynamic = fields.Boolean(string="Dynamic Options (DB)")
     option_model_id = fields.Many2one("ir.model", string="Source Model")
+    model_name = fields.Char(compute="_compute_model_name", readonly=True)
     option_domain = fields.Char(string="Domain", default="[('active','=',True)]")
     option_label_field = fields.Many2one(
         "ir.model.fields",
