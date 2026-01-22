@@ -1,0 +1,43 @@
+<odoo>
+  <record id="view_smart_branch_rule_list" model="ir.ui.view">
+    <field name="name">smart.form.branch.rule.list</field>
+    <field name="model">smart.form.branch.rule</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="sequence"/>
+        <field name="form_id"/>
+        <field name="trigger_field_id"/>
+        <field name="operator"/>
+        <field name="value_text"/>
+        <field name="target_form_id"/>
+        <field name="fallback_form_id"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_smart_branch_rule_form" model="ir.ui.view">
+    <field name="name">smart.form.branch.rule.form</field>
+    <field name="model">smart.form.branch.rule</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <group>
+            <field name="sequence"/>
+            <field name="form_id"/>
+            <field name="trigger_field_id"/>
+          </group>
+          <group>
+            <field name="operator"/>
+            <field name="value_text"/>
+          </group>
+          <group>
+            <field name="target_form_id"/>
+            <field name="fallback_form_id"/>
+          </group>
+          <p class="text-muted">Branching evaluates rules in order. First match wins.</p>
+        </sheet>
+      </form>
+    </field>
+  </record>
+</odoo>

@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_smart_form,access.smart.form,model_smart_form,base.group_user,1,1,1,1
+access_smart_form_field,access.smart.form.field,model_smart_form_field,base.group_user,1,1,1,1
+access_smart_form_branch_rule,access.smart.form.branch.rule,model_smart_form_branch_rule,base.group_user,1,1,1,1
+access_smart_form_submission,access.smart.form.submission,model_smart_form_submission,base.group_user,1,0,0,0

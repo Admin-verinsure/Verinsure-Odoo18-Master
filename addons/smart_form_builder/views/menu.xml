@@ -1,0 +1,6 @@
+<odoo>
+  <menuitem id="menu_smart_form_root" name="Smart Form Builder" sequence="10"/>
+  <menuitem id="menu_smart_forms" name="Forms" parent="menu_smart_form_root" action="action_smart_forms" sequence="10"/>
+  <menuitem id="menu_smart_branch_rules" name="Branch Rules" parent="menu_smart_form_root" action="action_smart_branch_rules" sequence="20"/>
+  <menuitem id="menu_smart_submissions" name="Submissions" parent="menu_smart_form_root" action="action_smart_submissions" sequence="30"/>
+</odoo>
