@@ -1,39 +1,48 @@
 (function () {
   "use strict";
 
-  async function populateDynamicSelect(sel) {
-    try {
-      const source = sel.dataset.optionSource;
-      if (source !== "model") return;
+  function normalize(s) {
+    return (s || "").toString().toLowerCase().trim();
+  }
 
-      const fieldId = sel.dataset.fieldId;
-      const token = sel.dataset.formToken;
-      if (!fieldId || !token) return;
+  function attachSearch(inputEl) {
+    const targetSel = inputEl.getAttribute("data-target");
+    if (!targetSel) return;
+    const selectEl = document.querySelector(targetSel);
+    if (!selectEl) return;
 
-      const url = `/smart_form/options/${encodeURIComponent(fieldId)}?token=${encodeURIComponent(token)}`;
-      const res = await fetch(url, { method: "GET", credentials: "same-origin" });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data || !data.success) return;
+    const original = Array.from(selectEl.options).map((opt) => ({
+      value: opt.value,
+      label: opt.textContent || "",
+    }));
 
-      // Preserve placeholder
-      const placeholder = sel.querySelector("option") ? sel.querySelector("option").cloneNode(true) : null;
-      sel.innerHTML = "";
-      if (placeholder) sel.appendChild(placeholder);
+    inputEl.addEventListener("input", () => {
+      const q = normalize(inputEl.value);
 
-      (data.options || []).forEach((o) => {
+      selectEl.innerHTML = "";
+
+      // placeholder first
+      const ph = original.find((o) => o.value === "");
+      if (ph) {
         const opt = document.createElement("option");
-        opt.value = o.value;
-        opt.textContent = o.label;
-        sel.appendChild(opt);
+        opt.value = "";
+        opt.textContent = ph.label;
+        selectEl.appendChild(opt);
+      }
+
+      original.forEach((o) => {
+        if (o.value === "") return;
+        if (!q || normalize(o.label).includes(q)) {
+          const opt = document.createElement("option");
+          opt.value = o.value;
+          opt.textContent = o.label;
+          selectEl.appendChild(opt);
+        }
       });
-    } catch (e) {
-      // silent
-      // console.error(e);
-    }
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("select[data-option-source='model']").forEach(populateDynamicSelect);
+    document.querySelectorAll(".sfb-select-search").forEach(attachSearch);
   });
 })();

@@ -23,22 +23,27 @@
                           t-att-name="f.name or ('field_%s' % f.id)"
                           t-att-required="'required' if f.required else None"></textarea>
               </t>
-              <t t-elif="f.field_type == 'select'">
-                <select class="form-select"
+                            <t t-elif="f.field_type == 'select'">
+                <!-- Search box for large dropdowns -->
+                <input type="text"
+                       class="form-control mb-2 sfb-select-search"
+                       t-att-placeholder="'Search ' + (f.label or '')"
+                       t-att-data-target="'#sfb_select_' + str(f.id)"/>
+
+                <select class="form-select sfb-select"
+                        t-att-id="'sfb_select_' + str(f.id)"
                         t-att-name="f.name or ('field_%s' % f.id)"
-                        t-att-data-field-id="f.id"
-                        t-att-data-form-token="form.token"
-                        t-att-data-option-source="f.option_source"
                         t-att-required="'required' if f.required else None">
                   <option value="">-- Select --</option>
-                  <t t-if="f.option_source == 'manual'">
-                    <t t-foreach="f.get_options()" t-as="o">
-                      <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
-                    </t>
+
+                  <!-- Always render options server-side (manual OR DB) -->
+                  <t t-foreach="f.get_options()" t-as="o">
+                    <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
                   </t>
                 </select>
               </t>
-              <t t-elif="f.field_type == 'radio'">
+
+<t t-elif="f.field_type == 'radio'">
                 <t t-foreach="f.get_options()" t-as="o">
                   <div class="form-check">
                     <input class="form-check-input" type="radio"
