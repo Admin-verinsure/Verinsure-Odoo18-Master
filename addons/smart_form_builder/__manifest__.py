@@ -12,6 +12,7 @@
         "views/field_views.xml",
         "views/submission_views.xml",
         "views/branch_rule_views.xml",
+        "views/select_field_wizard_views.xml",
         "views/templates.xml",
     ],
     "assets": {
