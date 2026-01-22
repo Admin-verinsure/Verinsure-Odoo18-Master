@@ -18,13 +18,11 @@
                        t-att-name="f.name or ('field_%s' % f.id)"
                        t-att-required="'required' if f.required else None"/>
               </t>
-
               <t t-elif="f.field_type == 'textarea'">
                 <textarea class="form-control"
                           t-att-name="f.name or ('field_%s' % f.id)"
                           t-att-required="'required' if f.required else None"></textarea>
               </t>
-
               <t t-elif="f.field_type == 'select'">
                 <select class="form-select"
                         t-att-name="f.name or ('field_%s' % f.id)"
@@ -40,7 +38,6 @@
                   </t>
                 </select>
               </t>
-
               <t t-elif="f.field_type == 'radio'">
                 <t t-foreach="f.get_options()" t-as="o">
                   <div class="form-check">
@@ -51,7 +48,6 @@
                   </div>
                 </t>
               </t>
-
               <t t-elif="f.field_type == 'checkbox'">
                 <t t-foreach="f.get_options()" t-as="o">
                   <div class="form-check">
@@ -61,11 +57,10 @@
                     <label class="form-check-label"><t t-esc="o['label']"/></label>
                   </div>
                 </t>
-<t t-elif="f.field_type == 'file'">
-  <input class="form-control" type="file"
-         t-att-name="f.name or ('field_%s' % f.id)"/>
-</t>
-
+              </t>
+              <t t-elif="f.field_type == 'file'">
+                <input class="form-control" type="file"
+                       t-att-name="f.name or ('field_%s' % f.id)"/>
               </t>
             </div>
           </t>
