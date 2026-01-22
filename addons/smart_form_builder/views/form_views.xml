@@ -1,0 +1,64 @@
+<odoo>
+  <record id="view_smart_form_list" model="ir.ui.view">
+    <field name="name">smart.form.list</field>
+    <field name="model">smart.form</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="name"/>
+        <field name="share_token"/>
+        <field name="active"/>
+        <field name="submission_count" string="Submissions"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_smart_form_form" model="ir.ui.view">
+    <field name="name">smart.form.form</field>
+    <field name="model">smart.form</field>
+    <field name="arch" type="xml">
+      <form>
+        <header>
+          <button name="action_open_preview" type="object" string="Preview" class="btn-primary"/>
+          <button name="action_open_public" type="object" string="Public Link" class="btn-secondary"/>
+          <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
+        </header>
+        <sheet>
+          <group>
+            <field name="name"/>
+            <field name="active"/>
+            <field name="share_token" readonly="1"/>
+          </group>
+
+          <notebook>
+            <page string="Fields">
+              <field name="field_ids" context="{'default_form_id': active_id}">
+                <list editable="bottom">
+                  <field name="sequence"/>
+                  <field name="label"/>
+                  <field name="field_type"/>
+                  <field name="required"/>
+                </list>
+              </field>
+            </page>
+            <page string="Branching">
+              <field name="branch_rule_ids" context="{'default_form_id': active_id}">
+                <list editable="bottom">
+                  <field name="sequence"/>
+                  <field name="trigger_field_id"/>
+                  <field name="operator"/>
+                  <field name="value_text"/>
+                  <field name="target_form_id"/>
+                  <field name="fallback_form_id"/>
+                </list>
+              </field>
+              <div class="text-muted">
+                Branch rules are evaluated in order. First match wins.
+              </div>
+            </page>
+          </notebook>
+        </sheet>
+      </form>
+    </field>
+  </record>
+</odoo>

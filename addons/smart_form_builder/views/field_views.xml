@@ -1,0 +1,30 @@
+<odoo>
+  <record id="view_smart_form_field_form" model="ir.ui.view">
+    <field name="name">smart.form.field.form</field>
+    <field name="model">smart.form.field</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <group>
+            <field name="form_id"/>
+            <field name="sequence"/>
+            <field name="label"/>
+            <field name="help"/>
+            <field name="required"/>
+            <field name="field_type"/>
+          </group>
+
+          <group string="Options" invisible="field_type not in ('select','radio','checkbox')">
+            <field name="option_source"/>
+            <field name="option_values" invisible="option_source != 'manual'"/>
+            <field name="option_model_id" invisible="option_source != 'model'"/>
+            <field name="option_domain" placeholder="[('active','=',True)]" invisible="option_source != 'model'"/>
+            <field name="option_label_field" invisible="option_source != 'model'"/>
+            <field name="option_value_field" invisible="option_source != 'model'"/>
+            <field name="option_limit" invisible="option_source != 'model'"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+</odoo>

@@ -1,0 +1,109 @@
+<odoo>
+  <template id="smart_form_public" name="Smart Form Public">
+    <t t-call="website.layout">
+      <div class="container my-5">
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <h2 t-esc="form.name"/>
+            <t t-if="is_preview">
+              <div class="alert alert-info mt-2">Preview Mode</div>
+            </t>
+
+            <form action="/smart_form/submit" method="post" class="mt-4">
+              <input type="hidden" name="token" t-att-value="form.share_token"/>
+
+              <t t-foreach="form.field_ids" t-as="field">
+                <div class="mb-3">
+                  <label class="form-label">
+                    <t t-esc="field.label"/>
+                    <t t-if="field.required"><span class="text-danger">*</span></t>
+                  </label>
+
+                  <t t-if="field.field_type == 'char'">
+                    <input class="form-control"
+                           t-att-name="'field_%s' % field.id"
+                           t-att-required="field.required and 'required' or None"
+                           t-att-data-field-id="field.id"/>
+                  </t>
+
+                  <t t-elif="field.field_type == 'text'">
+                    <textarea class="form-control"
+                              rows="4"
+                              t-att-name="'field_%s' % field.id"
+                              t-att-required="field.required and 'required' or None"
+                              t-att-data-field-id="field.id"></textarea>
+                  </t>
+
+                  <t t-elif="field.field_type == 'select'">
+                    <select class="form-select"
+                            t-att-name="'field_%s' % field.id"
+                            t-att-required="field.required and 'required' or None"
+                            t-att-data-field-id="field.id"
+                            t-att-data-form-token="form.share_token"
+                            t-att-data-dynamic-options="field.option_source == 'model' and '1' or None">
+                      <option value="">-- Select --</option>
+                      <t t-if="field.option_source == 'manual'">
+                        <t t-foreach="field.get_manual_options()" t-as="opt">
+                          <option t-att-value="opt['value']"><t t-esc="opt['label']"/></option>
+                        </t>
+                      </t>
+                    </select>
+                  </t>
+
+                  <t t-elif="field.field_type == 'radio'">
+                    <t t-set="opts" t-value="field.get_options()"/>
+                    <t t-foreach="opts" t-as="opt">
+                      <div class="form-check">
+                        <input class="form-check-input"
+                               type="radio"
+                               t-att-name="'field_%s' % field.id"
+                               t-att-value="opt['value']"
+                               t-att-required="field.required and 'required' or None"
+                               t-att-data-field-id="field.id"/>
+                        <label class="form-check-label"><t t-esc="opt['label']"/></label>
+                      </div>
+                    </t>
+                  </t>
+
+                  <t t-elif="field.field_type == 'checkbox'">
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             type="checkbox"
+                             t-att-name="'field_%s' % field.id"
+                             value="true"
+                             t-att-data-field-id="field.id"/>
+                      <label class="form-check-label"><t t-esc="field.help or 'Yes'"/></label>
+                    </div>
+                  </t>
+
+                  <t t-if="field.help and field.field_type not in ('checkbox',)">
+                    <div class="form-text" t-esc="field.help"/>
+                  </t>
+                </div>
+              </t>
+
+              <div id="sfb-branching-cta" class="my-3 text-center"></div>
+
+              <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </t>
+  </template>
+
+  <template id="smart_form_thanks" name="Smart Form Thanks">
+    <t t-call="website.layout">
+      <div class="container my-5">
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <div class="alert alert-success">
+              Thank you! Your response has been submitted.
+            </div>
+            <a class="btn btn-secondary" t-att-href="'/smart_form/%s' % form.share_token">Back</a>
+          </div>
+        </div>
+      </div>
+    </t>
+  </template>
+</odoo>
