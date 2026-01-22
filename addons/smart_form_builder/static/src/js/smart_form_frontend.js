@@ -154,7 +154,13 @@
         if (el.checked) answers[fid].push(el.value || "true");
         return;
       }
-      answers[fid] = el.value || "";
+      if (el.tagName === "SELECT") {
+        const idx = el.selectedIndex;
+        const label = idx >= 0 && el.options[idx] ? (el.options[idx].textContent || "") : "";
+        answers[fid] = { value: el.value || "", label: label.trim() };
+      } else {
+        answers[fid] = el.value || "";
+      }
     });
     return answers;
   }

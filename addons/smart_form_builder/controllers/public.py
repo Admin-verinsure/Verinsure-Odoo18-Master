@@ -43,7 +43,12 @@ class SmartFormPublic(http.Controller):
         rules = request.env["smart.form.branch.rule"].sudo().search([("form_id","=",form.id)], order="sequence,id")
 
         def _match(rule, val):
-            if isinstance(val, list):
+            # val can be: scalar, list (checkbox), or dict {value,label}
+            if isinstance(val, dict):
+                # allow matching on either 'value' or 'label'
+                candidates = [val.get('value'), val.get('label')]
+                v_list = [str(x).strip() for x in candidates if x is not None]
+            elif isinstance(val, list):
                 v_list = [str(x).strip() for x in val]
             else:
                 v_list = [str(val).strip()]
@@ -72,7 +77,7 @@ class SmartFormPublic(http.Controller):
         return request.make_response(json.dumps({"success": True, "next_token": next_form.token if next_form else None}),
                                     [("Content-Type","application/json")])
 
-@http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
+    @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
         token = post.get("token")
         form = request.env["smart.form"].sudo().search([("token","=",token),("active","=",True)], limit=1)
