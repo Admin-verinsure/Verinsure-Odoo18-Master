@@ -1,5 +1,5 @@
 {
-    "name": "Smart Form Builder (Standalone)",
+    "name": "Forms (Standalone)",
     "version": "18.0.1.0.0",
     "category": "Tools",
     "summary": "Standalone form builder with dynamic DB dropdown options",
