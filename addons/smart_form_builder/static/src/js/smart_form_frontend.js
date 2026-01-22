@@ -1,48 +1,113 @@
 (function () {
   "use strict";
 
-  function normalize(s) {
-    return (s || "").toString().toLowerCase().trim();
+  function createEl(tag, attrs, text) {
+    const el = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach((k) => {
+        if (k === "class") el.className = attrs[k];
+        else el.setAttribute(k, attrs[k]);
+      });
+    }
+    if (text !== undefined && text !== null) el.textContent = text;
+    return el;
   }
 
-  function attachSearch(inputEl) {
-    const targetSel = inputEl.getAttribute("data-target");
-    if (!targetSel) return;
-    const selectEl = document.querySelector(targetSel);
-    if (!selectEl) return;
+  function enhanceSelect(selectEl) {
+    if (selectEl.dataset.sfbEnhanced === "1") return;
+    selectEl.dataset.sfbEnhanced = "1";
 
-    const original = Array.from(selectEl.options).map((opt) => ({
-      value: opt.value,
-      label: opt.textContent || "",
+    const options = Array.from(selectEl.options).map((o) => ({
+      value: o.value,
+      label: o.textContent || "",
+      disabled: o.disabled,
     }));
 
-    inputEl.addEventListener("input", () => {
-      const q = normalize(inputEl.value);
+    selectEl.style.display = "none";
 
-      selectEl.innerHTML = "";
-
-      // placeholder first
-      const ph = original.find((o) => o.value === "");
-      if (ph) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = ph.label;
-        selectEl.appendChild(opt);
-      }
-
-      original.forEach((o) => {
-        if (o.value === "") return;
-        if (!q || normalize(o.label).includes(q)) {
-          const opt = document.createElement("option");
-          opt.value = o.value;
-          opt.textContent = o.label;
-          selectEl.appendChild(opt);
-        }
-      });
+    const wrap = createEl("div", { class: "sfb-dd" });
+    const btn = createEl("button", { type: "button", class: "form-select sfb-dd-btn" });
+    const panel = createEl("div", { class: "sfb-dd-panel d-none" });
+    const search = createEl("input", {
+      type: "text",
+      class: "form-control sfb-dd-search",
+      placeholder: "Search...",
     });
+    const list = createEl("div", { class: "sfb-dd-list" });
+
+    function syncBtnLabel() {
+      const cur = selectEl.value;
+      const found = options.find((x) => x.value === cur);
+      btn.textContent = found ? found.label : (options[0] ? options[0].label : "-- Select --");
+    }
+
+    function renderList(filter) {
+      const q = (filter || "").toLowerCase().trim();
+      list.innerHTML = "";
+
+      options.forEach((opt, idx) => {
+        // placeholder always at top
+        if (idx === 0) {
+          const item = createEl("div", { class: "sfb-dd-item sfb-dd-placeholder" }, opt.label);
+          item.addEventListener("click", () => {
+            selectEl.value = opt.value;
+            selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+            syncBtnLabel();
+            close();
+          });
+          list.appendChild(item);
+          return;
+        }
+
+        if (q && !opt.label.toLowerCase().includes(q)) return;
+
+        const item = createEl("div", { class: "sfb-dd-item" }, opt.label);
+        if (opt.value === selectEl.value) item.classList.add("active");
+        item.addEventListener("click", () => {
+          selectEl.value = opt.value;
+          selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+          syncBtnLabel();
+          close();
+        });
+        list.appendChild(item);
+      });
+
+      if (!list.childElementCount) {
+        list.appendChild(createEl("div", { class: "sfb-dd-empty" }, "No results"));
+      }
+    }
+
+    function open() {
+      panel.classList.remove("d-none");
+      renderList(search.value);
+      setTimeout(() => search.focus(), 0);
+    }
+    function close() {
+      panel.classList.add("d-none");
+    }
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (panel.classList.contains("d-none")) open();
+      else close();
+    });
+
+    search.addEventListener("input", () => renderList(search.value));
+
+    document.addEventListener("click", (e) => {
+      if (!wrap.contains(e.target)) close();
+    });
+
+    panel.appendChild(search);
+    panel.appendChild(list);
+    wrap.appendChild(btn);
+    wrap.appendChild(panel);
+
+    selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+    syncBtnLabel();
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".sfb-select-search").forEach(attachSearch);
+    document.querySelectorAll("select.sfb-enhanced-select").forEach(enhanceSelect);
   });
 })();

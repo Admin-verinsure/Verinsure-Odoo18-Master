@@ -42,7 +42,7 @@ class SmartFormField(models.Model):
         string="Value Field",
         domain="[('model_id','=',option_model_id)]",
     )
-    option_limit = fields.Integer(default=200)
+    option_limit = fields.Integer(default=10000)
 
     def _parse_manual_options(self):
         self.ensure_one()
@@ -80,7 +80,8 @@ class SmartFormField(models.Model):
             label_field = self.option_label_field.name if self.option_label_field else "name"
             value_field = self.option_value_field.name if self.option_value_field else "id"
 
-            recs = self.env[model].sudo().search(domain, limit=self.option_limit or 200)
+            limit = min(self.option_limit or 10000, 10000)
+            recs = self.env[model].sudo().search(domain, limit=limit)
             res = []
             for r in recs:
                 label = getattr(r, label_field, False) or r.display_name
