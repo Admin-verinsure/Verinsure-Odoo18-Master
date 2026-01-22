@@ -13,6 +13,7 @@
     return el;
   }
 
+  // ---------- Searchable dropdown ----------
   function enhanceSelect(selectEl) {
     if (selectEl.dataset.sfbEnhanced === "1") return;
     selectEl.dataset.sfbEnhanced = "1";
@@ -20,10 +21,8 @@
     const options = Array.from(selectEl.options).map((o) => ({
       value: o.value,
       label: o.textContent || "",
-      disabled: o.disabled,
     }));
 
-    // Hide native select but keep it for form submission
     selectEl.style.display = "none";
 
     const wrap = createEl("div", { class: "sfb-dd" });
@@ -51,22 +50,21 @@
       const q = (filter || "").toLowerCase().trim();
       list.innerHTML = "";
 
-      options.forEach((opt, idx) => {
-        // placeholder always at top (idx 0)
-        if (idx === 0) {
-          const item = createEl("div", { class: "sfb-dd-item sfb-dd-placeholder" }, opt.label);
-          item.addEventListener("click", (e) => {
-            e.preventDefault();
-            selectEl.value = opt.value;
-            selectEl.dispatchEvent(new Event("change", { bubbles: true }));
-            syncBtnLabel();
-            close();
-          });
-          list.appendChild(item);
-          return;
-        }
+      const placeholder = options.find((o) => o.value === "") || { value: "", label: "-- Select --" };
+      const phItem = createEl("div", { class: "sfb-dd-item sfb-dd-placeholder" }, placeholder.label);
+      phItem.addEventListener("click", (e) => {
+        e.preventDefault();
+        selectEl.value = "";
+        selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+        syncBtnLabel();
+        close();
+      });
+      list.appendChild(phItem);
 
-        if (q && !opt.label.toLowerCase().includes(q)) return;
+      let count = 0;
+      for (const opt of options) {
+        if (opt.value === "") continue;
+        if (q && !opt.label.toLowerCase().includes(q)) continue;
 
         const item = createEl("div", { class: "sfb-dd-item" }, opt.label);
         if (opt.value === selectEl.value) item.classList.add("active");
@@ -78,19 +76,24 @@
           syncBtnLabel();
           close();
         });
-        list.appendChild(item);
-      });
 
-      if (!list.childElementCount) {
+        list.appendChild(item);
+        count++;
+      }
+
+      if (count === 0) {
         list.appendChild(createEl("div", { class: "sfb-dd-empty" }, "No results"));
       }
     }
 
     function open() {
       panel.classList.remove("d-none");
-      search.value = "";
-      renderList("");
-      setTimeout(() => search.focus(), 0);
+      renderList(search.value);
+      setTimeout(() => {
+        search.focus();
+        const v = search.value;
+        search.setSelectionRange(v.length, v.length);
+      }, 0);
     }
 
     function close() {
@@ -104,12 +107,21 @@
       else close();
     });
 
-    search.addEventListener("click", (e) => e.stopPropagation());
-    search.addEventListener("input", () => renderList(search.value));
+    // prevent outside-close while typing
+    ["click","mousedown","mouseup","keydown","keyup","keypress"].forEach((evt) => {
+      search.addEventListener(evt, (e) => e.stopPropagation());
+      panel.addEventListener(evt, (e) => e.stopPropagation());
+      wrap.addEventListener(evt, (e) => e.stopPropagation());
+    });
 
-    // Prevent outside close when clicking inside panel
-    panel.addEventListener("click", (e) => e.stopPropagation());
-    wrap.addEventListener("click", (e) => e.stopPropagation());
+    search.addEventListener("input", () => {
+      const cur = search.value;
+      renderList(cur);
+      setTimeout(() => {
+        search.focus();
+        search.setSelectionRange(cur.length, cur.length);
+      }, 0);
+    });
 
     document.addEventListener("click", () => close());
 
@@ -122,13 +134,60 @@
     syncBtnLabel();
   }
 
-  function init() {
+  function initDropdowns() {
     document.querySelectorAll("select.sfb-enhanced-select").forEach(enhanceSelect);
   }
 
+  // ---------- Branching ----------
+  function collectAnswers(formEl) {
+    const answers = {};
+    formEl.querySelectorAll("[data-field-id]").forEach((el) => {
+      const fid = el.getAttribute("data-field-id");
+      if (!fid) return;
+
+      if (el.type === "radio") {
+        if (el.checked) answers[fid] = el.value || "";
+        return;
+      }
+      if (el.type === "checkbox") {
+        if (!answers[fid]) answers[fid] = [];
+        if (el.checked) answers[fid].push(el.value || "true");
+        return;
+      }
+      answers[fid] = el.value || "";
+    });
+    return answers;
+  }
+
+  async function evaluateBranching(formEl) {
+    const tokenInput = formEl.querySelector('input[name="token"]');
+    const token = tokenInput ? tokenInput.value : null;
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/smart_form/branching/${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: collectAnswers(formEl) }),
+        credentials: "same-origin",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.success && data.next_token) {
+        window.location.href = `/smart_form/${data.next_token}`;
+      }
+    } catch (e) {}
+  }
+
+  function initBranching() {
+    const formEl = document.querySelector("form#smart-form") || document.querySelector("form[action='/smart_form/submit']");
+    if (!formEl) return;
+    formEl.addEventListener("change", () => evaluateBranching(formEl));
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    init();
-    // In case the page is partially re-rendered by website editor, try again shortly
-    setTimeout(init, 500);
+    initDropdowns();
+    initBranching();
+    setTimeout(initDropdowns, 500);
   });
 })();
