@@ -39,6 +39,7 @@
                   <field name="field_type"/>
                   <field name="required"/>
                   <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
+                  <button type="action" name="%(action_smart_form_select_config_wizard)d" string="Configure" class="btn-link" context="{'default_field_id': id}" invisible="field_type != 'select'"/>
                 </list>
               </field>
             </page>
