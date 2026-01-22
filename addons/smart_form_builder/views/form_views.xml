@@ -6,9 +6,9 @@
     <field name="arch" type="xml">
       <list>
         <field name="name"/>
-        <field name="share_token"/>
-        <field name="active"/>
+        <field name="token"/>
         <field name="submission_count" string="Submissions"/>
+        <field name="active"/>
       </list>
     </field>
   </record>
@@ -20,29 +20,31 @@
       <form>
         <header>
           <button name="action_open_preview" type="object" string="Preview" class="btn-primary"/>
-          <button name="action_open_public" type="object" string="Public Link" class="btn-secondary"/>
+          <button name="action_open_public" type="object" string="Open Public" class="btn-secondary"/>
           <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
         </header>
         <sheet>
           <group>
             <field name="name"/>
             <field name="active"/>
-            <field name="share_token" readonly="1"/>
+            <field name="token" readonly="1"/>
           </group>
 
           <notebook>
             <page string="Fields">
-              <field name="field_ids" context="{'default_form_id': active_id}">
+              <field name="field_ids">
                 <list editable="bottom">
                   <field name="sequence"/>
                   <field name="label"/>
                   <field name="field_type"/>
                   <field name="required"/>
+                  <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
                 </list>
               </field>
             </page>
+
             <page string="Branching">
-              <field name="branch_rule_ids" context="{'default_form_id': active_id}">
+              <field name="branch_rule_ids">
                 <list editable="bottom">
                   <field name="sequence"/>
                   <field name="trigger_field_id"/>
@@ -52,9 +54,17 @@
                   <field name="fallback_form_id"/>
                 </list>
               </field>
-              <div class="text-muted">
-                Branch rules are evaluated in order. First match wins.
-              </div>
+              <p class="text-muted">Branching evaluates rules in order. First match wins.</p>
+            </page>
+
+            <page string="Submissions">
+              <field name="submission_ids" readonly="1">
+                <list>
+                  <field name="create_date"/>
+                  <field name="ip"/>
+                  <field name="user_agent"/>
+                </list>
+              </field>
             </page>
           </notebook>
         </sheet>

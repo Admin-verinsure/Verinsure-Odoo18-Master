@@ -1,8 +1,8 @@
 {
-    "name": "Smart Form Builder",
+    "name": "Smart Form Builder (Standalone)",
     "version": "18.0.1.0.0",
     "category": "Tools",
-    "summary": "Standalone form builder with dynamic DB dropdowns and branching",
+    "summary": "Standalone form builder with dynamic DB dropdown options",
     "depends": ["base", "website"],
     "data": [
         "security/ir.model.access.csv",
@@ -10,16 +10,16 @@
         "views/menu.xml",
         "views/form_views.xml",
         "views/field_views.xml",
-        "views/branch_rule_views.xml",
         "views/submission_views.xml",
-        "views/templates.xml"
+        "views/branch_rule_views.xml",
+        "views/templates.xml",
     ],
     "assets": {
         "web.assets_frontend": [
-            "smart_form_builder/static/src/js/dynamic_options.js",
-            "smart_form_builder/static/src/js/branching.js"
-        ]
+            "smart_form_builder/static/src/js/smart_form_frontend.js",
+        ],
     },
     "application": True,
-    "installable": True
+    "installable": True,
+    "license": "LGPL-3",
 }

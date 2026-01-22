@@ -7,15 +7,15 @@ class SmartFormBranchRule(models.Model):
 
     sequence = fields.Integer(default=10)
     form_id = fields.Many2one("smart.form", required=True, ondelete="cascade")
-    trigger_field_id = fields.Many2one("smart.form.field", required=True, ondelete="cascade",
-                                       domain="[('form_id','=',form_id)]")
+    trigger_field_id = fields.Many2one("smart.form.field", required=True, domain="[('form_id','=',form_id)]")
     operator = fields.Selection([
         ("=", "="),
         ("!=", "!="),
         ("contains", "contains"),
-        ("in", "in (comma-separated)"),
-        ("not in", "not in (comma-separated)"),
-    ], default="=")
-    value_text = fields.Char(string="Match Value", help="For 'in', use comma-separated values.")
-    target_form_id = fields.Many2one("smart.form", string="Target Form", required=True)
+        ("in", "in"),
+        ("not in", "not in"),
+    ], default="=", required=True)
+    value_text = fields.Char(string="Value")
+    target_form_id = fields.Many2one("smart.form", string="Target Form")
     fallback_form_id = fields.Many2one("smart.form", string="Fallback Form")
+
