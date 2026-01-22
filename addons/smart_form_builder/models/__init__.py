@@ -1,4 +1,1 @@
-from . import form
-from . import field
-from . import submission
-from . import branch_rule
+from . import form, field, submission, branch_rule

@@ -1,5 +1,5 @@
 <odoo>
-  <record id="view_smart_submission_list" model="ir.ui.view">
+  <record id="view_smart_form_submission_list" model="ir.ui.view">
     <field name="name">smart.form.submission.list</field>
     <field name="model">smart.form.submission</field>
     <field name="type">list</field>
@@ -7,11 +7,13 @@
       <list>
         <field name="create_date"/>
         <field name="form_id"/>
+        <field name="ip"/>
+        <field name="user_agent"/>
       </list>
     </field>
   </record>
 
-  <record id="view_smart_submission_form" model="ir.ui.view">
+  <record id="view_smart_form_submission_form" model="ir.ui.view">
     <field name="name">smart.form.submission.form</field>
     <field name="model">smart.form.submission</field>
     <field name="arch" type="xml">
@@ -20,9 +22,11 @@
           <group>
             <field name="form_id" readonly="1"/>
             <field name="create_date" readonly="1"/>
+            <field name="ip" readonly="1"/>
+            <field name="user_agent" readonly="1"/>
           </group>
           <group>
-            <field name="data_json" readonly="1" widget="text"/>
+            <field name="data_json" widget="text" readonly="1"/>
           </group>
         </sheet>
       </form>

@@ -8,17 +8,17 @@ class SmartFormField(models.Model):
 
     form_id = fields.Many2one("smart.form", required=True, ondelete="cascade")
     sequence = fields.Integer(default=10)
+    name = fields.Char(string="Technical Name", help="Optional. Used as HTML name; if empty, field_<id> is used.")
     label = fields.Char(required=True)
-    help = fields.Char()
     required = fields.Boolean(default=False)
 
     field_type = fields.Selection([
-        ("char", "Text"),
-        ("text", "Long Text"),
-        ("select", "Dropdown"),
+        ("text", "Text"),
+        ("textarea", "Textarea"),
+        ("select", "Select"),
         ("radio", "Radio"),
         ("checkbox", "Checkbox"),
-    ], required=True, default="char")
+    ], default="text", required=True)
 
     # Options
     option_source = fields.Selection([
@@ -26,66 +26,53 @@ class SmartFormField(models.Model):
         ("model", "From Database (Model)"),
     ], default="manual")
 
-    option_values = fields.Text(help="One option per line. For value|label use value|label.")
+    option_values = fields.Text(string="Manual Options", help="One option per line. Use 'value|label' or just 'label'.")
 
     option_model_id = fields.Many2one("ir.model", string="Source Model")
-    option_domain = fields.Char(string="Domain", help="Example: [('active','=',True)]")
-    option_label_field = fields.Char(string="Label Field", default="name")
-    option_value_field = fields.Char(string="Value Field", default="id")
+    option_domain = fields.Char(string="Domain", help="Python domain, e.g. [('active','=',True)]")
+    option_label_field = fields.Many2one("ir.model.fields", string="Label Field", domain="[('model_id','=',option_model_id),('ttype','in',('char','text','html'))]")
+    option_value_field = fields.Many2one("ir.model.fields", string="Value Field", domain="[('model_id','=',option_model_id)]")
     option_limit = fields.Integer(default=200)
 
-    def _parse_domain(self):
+    def _parse_manual_options(self):
         self.ensure_one()
-        if not self.option_domain:
-            return []
-        try:
-            return safe_eval(self.option_domain, {"uid": self.env.uid})
-        except Exception:
-            return []
-
-    def get_dynamic_options(self):
-        self.ensure_one()
-        if self.option_source != "model" or not self.option_model_id:
-            return []
-        model_name = self.option_model_id.model
-        domain = self._parse_domain()
-        limit = self.option_limit or 200
-
-        label_field = (self.option_label_field or "name").strip()
-        value_field = (self.option_value_field or "id").strip()
-
-        Model = self.env[model_name].sudo()
-        recs = Model.search(domain, limit=limit)
-
-        opts = []
-        for r in recs:
-            label = getattr(r, label_field, False)
-            if label is False:
-                label = r.display_name
-            value = getattr(r, value_field, False)
-            if value_field == "id":
-                value = r.id
-            opts.append({"value": value, "label": str(label)})
-        return opts
-
-    def get_manual_options(self):
-        self.ensure_one()
+        out = []
         if not self.option_values:
-            return []
-        opts = []
-        for line in (self.option_values or "").splitlines():
+            return out
+        for line in self.option_values.splitlines():
             line = (line or "").strip()
             if not line:
                 continue
             if "|" in line:
-                value, label = line.split("|", 1)
-                opts.append({"value": value.strip(), "label": label.strip()})
+                v, l = line.split("|", 1)
+                out.append({"value": v.strip(), "label": l.strip()})
             else:
-                opts.append({"value": line, "label": line})
-        return opts
+                out.append({"value": line, "label": line})
+        return out
 
     def get_options(self):
+        """Return a list of {value,label} for this field."""
         self.ensure_one()
-        if self.option_source == "model":
-            return self.get_dynamic_options()
-        return self.get_manual_options()
+        if self.field_type not in ("select", "radio", "checkbox"):
+            return []
+        if self.option_source == "model" and self.option_model_id:
+            model = self.option_model_id.model
+            domain = []
+            if self.option_domain:
+                try:
+                    domain = safe_eval(self.option_domain, {"uid": self.env.uid})
+                except Exception:
+                    domain = []
+            label_field = (self.option_label_field.name if self.option_label_field else "name")
+            value_field = (self.option_value_field.name if self.option_value_field else "id")
+            recs = self.env[model].sudo().search(domain, limit=self.option_limit or 200)
+            res = []
+            for r in recs:
+                label = getattr(r, label_field, False) or r.display_name
+                value = getattr(r, value_field, False)
+                if value_field == "id":
+                    value = r.id
+                res.append({"value": value, "label": str(label)})
+            return res
+        # manual
+        return self._parse_manual_options()
