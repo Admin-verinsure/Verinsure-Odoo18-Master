@@ -23,16 +23,22 @@
       disabled: o.disabled,
     }));
 
+    // Hide native select but keep it for form submission
     selectEl.style.display = "none";
 
     const wrap = createEl("div", { class: "sfb-dd" });
     const btn = createEl("button", { type: "button", class: "form-select sfb-dd-btn" });
     const panel = createEl("div", { class: "sfb-dd-panel d-none" });
+
+    const header = createEl("div", { class: "sfb-dd-header" });
     const search = createEl("input", {
       type: "text",
       class: "form-control sfb-dd-search",
       placeholder: "Search...",
+      autocomplete: "off",
     });
+    header.appendChild(search);
+
     const list = createEl("div", { class: "sfb-dd-list" });
 
     function syncBtnLabel() {
@@ -46,10 +52,11 @@
       list.innerHTML = "";
 
       options.forEach((opt, idx) => {
-        // placeholder always at top
+        // placeholder always at top (idx 0)
         if (idx === 0) {
           const item = createEl("div", { class: "sfb-dd-item sfb-dd-placeholder" }, opt.label);
-          item.addEventListener("click", () => {
+          item.addEventListener("click", (e) => {
+            e.preventDefault();
             selectEl.value = opt.value;
             selectEl.dispatchEvent(new Event("change", { bubbles: true }));
             syncBtnLabel();
@@ -63,7 +70,9 @@
 
         const item = createEl("div", { class: "sfb-dd-item" }, opt.label);
         if (opt.value === selectEl.value) item.classList.add("active");
-        item.addEventListener("click", () => {
+
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
           selectEl.value = opt.value;
           selectEl.dispatchEvent(new Event("change", { bubbles: true }));
           syncBtnLabel();
@@ -79,35 +88,47 @@
 
     function open() {
       panel.classList.remove("d-none");
-      renderList(search.value);
+      search.value = "";
+      renderList("");
       setTimeout(() => search.focus(), 0);
     }
+
     function close() {
       panel.classList.add("d-none");
     }
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (panel.classList.contains("d-none")) open();
       else close();
     });
 
+    search.addEventListener("click", (e) => e.stopPropagation());
     search.addEventListener("input", () => renderList(search.value));
 
-    document.addEventListener("click", (e) => {
-      if (!wrap.contains(e.target)) close();
-    });
+    // Prevent outside close when clicking inside panel
+    panel.addEventListener("click", (e) => e.stopPropagation());
+    wrap.addEventListener("click", (e) => e.stopPropagation());
 
-    panel.appendChild(search);
+    document.addEventListener("click", () => close());
+
+    panel.appendChild(header);
     panel.appendChild(list);
     wrap.appendChild(btn);
     wrap.appendChild(panel);
-
     selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+
     syncBtnLabel();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  function init() {
     document.querySelectorAll("select.sfb-enhanced-select").forEach(enhanceSelect);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    init();
+    // In case the page is partially re-rendered by website editor, try again shortly
+    setTimeout(init, 500);
   });
 })();
