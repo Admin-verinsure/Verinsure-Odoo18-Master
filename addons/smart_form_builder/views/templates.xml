@@ -3,7 +3,7 @@
     <t t-call="website.layout">
       <div class="container my-4">
         <h2 t-esc="form.name"/>
-        <form action="/smart_form/submit" method="post" class="mt-3" id="smart-form">
+        <form action="/smart_form/submit" method="post" enctype="multipart/form-data" class="mt-3" id="smart-form">
           <input type="hidden" name="token" t-att-value="form.token"/>
 
           <t t-foreach="form.field_ids" t-as="f">
@@ -62,6 +62,11 @@
                   </div>
                 </t>
               </t>
+<t t-elif="f.field_type == 'file'">
+  <input class="form-control" type="file"
+         t-att-name="f.name or ('field_%s' % f.id)"/>
+</t>
+
             </div>
           </t>
 

@@ -39,6 +39,7 @@
                   <field name="field_type"/>
                   <field name="required"/>
                   <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
+                  <button name="action_open_select_config" type="object" string="Configure" class="btn-link" invisible="field_type != 'select'"/>
                 </list>
               </field>
             </page>

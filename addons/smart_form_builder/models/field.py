@@ -18,6 +18,7 @@ class SmartFormField(models.Model):
         ("select", "Select"),
         ("radio", "Radio"),
         ("checkbox", "Checkbox"),
+        ("file", "File Upload"),
     ], default="text", required=True)
 
     # Options
@@ -76,3 +77,14 @@ class SmartFormField(models.Model):
             return res
         # manual
         return self._parse_manual_options()
+
+def action_open_select_config(self):
+    self.ensure_one()
+    return {
+        "type": "ir.actions.act_window",
+        "name": "Configure Select Field",
+        "res_model": "smart.form.field.select.wizard",
+        "view_mode": "form",
+        "target": "new",
+        "context": {"default_field_id": self.id},
+    }
