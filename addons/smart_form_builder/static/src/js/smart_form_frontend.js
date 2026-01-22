@@ -1,199 +1,107 @@
 (function () {
   "use strict";
 
-  function createEl(tag, attrs, text) {
-    const el = document.createElement(tag);
-    if (attrs) {
-      Object.keys(attrs).forEach((k) => {
-        if (k === "class") el.className = attrs[k];
-        else el.setAttribute(k, attrs[k]);
-      });
-    }
-    if (text !== undefined && text !== null) el.textContent = text;
-    return el;
+  function el(tag, cls, attrs) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (attrs) Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k, v));
+    return e;
   }
 
-  // ---------- Searchable dropdown ----------
-  function enhanceSelect(selectEl) {
+  function enhance(selectEl) {
     if (selectEl.dataset.sfbEnhanced === "1") return;
     selectEl.dataset.sfbEnhanced = "1";
 
-    const options = Array.from(selectEl.options).map((o) => ({
-      value: o.value,
-      label: o.textContent || "",
-    }));
+    const opts = Array.from(selectEl.options).map(o => ({value:o.value, label:o.textContent || ""}));
 
+    // Hide native select (still used for submission)
     selectEl.style.display = "none";
 
-    const wrap = createEl("div", { class: "sfb-dd" });
-    const btn = createEl("button", { type: "button", class: "form-select sfb-dd-btn" });
-    const panel = createEl("div", { class: "sfb-dd-panel d-none" });
+    const wrap = el("div", "sfb-dd");
+    const btn = el("button", "form-select sfb-dd-btn", {type:"button"});
+    const panel = el("div", "sfb-dd-panel d-none");
+    const header = el("div", "sfb-dd-header");
+    const search = el("input", "form-control sfb-dd-search", {type:"text", placeholder:"Search...", autocomplete:"off"});
+    const list = el("div", "sfb-dd-list");
 
-    const header = createEl("div", { class: "sfb-dd-header" });
-    const search = createEl("input", {
-      type: "text",
-      class: "form-control sfb-dd-search",
-      placeholder: "Search...",
-      autocomplete: "off",
-    });
     header.appendChild(search);
-
-    const list = createEl("div", { class: "sfb-dd-list" });
-
-    function syncBtnLabel() {
-      const cur = selectEl.value;
-      const found = options.find((x) => x.value === cur);
-      btn.textContent = found ? found.label : (options[0] ? options[0].label : "-- Select --");
-    }
-
-    function renderList(filter) {
-      const q = (filter || "").toLowerCase().trim();
-      list.innerHTML = "";
-
-      const placeholder = options.find((o) => o.value === "") || { value: "", label: "-- Select --" };
-      const phItem = createEl("div", { class: "sfb-dd-item sfb-dd-placeholder" }, placeholder.label);
-      phItem.addEventListener("click", (e) => {
-        e.preventDefault();
-        selectEl.value = "";
-        selectEl.dispatchEvent(new Event("change", { bubbles: true }));
-        syncBtnLabel();
-        close();
-      });
-      list.appendChild(phItem);
-
-      let count = 0;
-      for (const opt of options) {
-        if (opt.value === "") continue;
-        if (q && !opt.label.toLowerCase().includes(q)) continue;
-
-        const item = createEl("div", { class: "sfb-dd-item" }, opt.label);
-        if (opt.value === selectEl.value) item.classList.add("active");
-
-        item.addEventListener("click", (e) => {
-          e.preventDefault();
-          selectEl.value = opt.value;
-          selectEl.dispatchEvent(new Event("change", { bubbles: true }));
-          syncBtnLabel();
-          close();
-        });
-
-        list.appendChild(item);
-        count++;
-      }
-
-      if (count === 0) {
-        list.appendChild(createEl("div", { class: "sfb-dd-empty" }, "No results"));
-      }
-    }
-
-    function open() {
-      panel.classList.remove("d-none");
-      renderList(search.value);
-      setTimeout(() => {
-        search.focus();
-        const v = search.value;
-        search.setSelectionRange(v.length, v.length);
-      }, 0);
-    }
-
-    function close() {
-      panel.classList.add("d-none");
-    }
-
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (panel.classList.contains("d-none")) open();
-      else close();
-    });
-
-    // prevent outside-close while typing
-    ["click","mousedown","mouseup","keydown","keyup","keypress"].forEach((evt) => {
-      search.addEventListener(evt, (e) => e.stopPropagation());
-      panel.addEventListener(evt, (e) => e.stopPropagation());
-      wrap.addEventListener(evt, (e) => e.stopPropagation());
-    });
-
-    search.addEventListener("input", () => {
-      const cur = search.value;
-      renderList(cur);
-      setTimeout(() => {
-        search.focus();
-        search.setSelectionRange(cur.length, cur.length);
-      }, 0);
-    });
-
-    document.addEventListener("click", () => close());
-
     panel.appendChild(header);
     panel.appendChild(list);
     wrap.appendChild(btn);
     wrap.appendChild(panel);
     selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
 
-    syncBtnLabel();
-  }
+    function syncBtn() {
+      const cur = selectEl.value;
+      const found = opts.find(x => x.value === cur);
+      btn.textContent = found ? found.label : (opts[0]?.label || "-- Select --");
+    }
 
-  function initDropdowns() {
-    document.querySelectorAll("select.sfb-enhanced-select").forEach(enhanceSelect);
-  }
+    function render(q) {
+      const query = (q || "").toLowerCase().trim();
+      list.innerHTML = "";
 
-  // ---------- Branching ----------
-  function collectAnswers(formEl) {
-    const answers = {};
-    formEl.querySelectorAll("[data-field-id]").forEach((el) => {
-      const fid = el.getAttribute("data-field-id");
-      if (!fid) return;
+      // placeholder always first
+      const ph = opts.find(o => o.value === "") || {value:"", label:"-- Select --"};
+      const phItem = el("div", "sfb-dd-item sfb-dd-placeholder");
+      phItem.textContent = ph.label;
+      phItem.onclick = (e) => { e.preventDefault(); selectEl.value=""; selectEl.dispatchEvent(new Event("change",{bubbles:true})); syncBtn(); close(); };
+      list.appendChild(phItem);
 
-      if (el.type === "radio") {
-        if (el.checked) answers[fid] = el.value || "";
-        return;
+      let shown = 0;
+      for (const o of opts) {
+        if (o.value === "") continue;
+        if (query && !o.label.toLowerCase().includes(query)) continue;
+        const item = el("div", "sfb-dd-item" + (o.value===selectEl.value ? " active": ""));
+        item.textContent = o.label;
+        item.onclick = (e) => { e.preventDefault(); selectEl.value=o.value; selectEl.dispatchEvent(new Event("change",{bubbles:true})); syncBtn(); close(); };
+        list.appendChild(item);
+        shown++;
       }
-      if (el.type === "checkbox") {
-        if (!answers[fid]) answers[fid] = [];
-        if (el.checked) answers[fid].push(el.value || "true");
-        return;
+      if (shown === 0) {
+        const empty = el("div","sfb-dd-empty");
+        empty.textContent = "No results";
+        list.appendChild(empty);
       }
-      if (el.tagName === "SELECT") {
-        const idx = el.selectedIndex;
-        const label = idx >= 0 && el.options[idx] ? (el.options[idx].textContent || "") : "";
-        answers[fid] = { value: el.value || "", label: label.trim() };
-      } else {
-        answers[fid] = el.value || "";
-      }
+    }
+
+    function open() {
+      panel.classList.remove("d-none");
+      render(search.value);
+      setTimeout(() => { search.focus(); const v=search.value; search.setSelectionRange(v.length,v.length); }, 0);
+    }
+    function close() { panel.classList.add("d-none"); }
+
+    btn.addEventListener("click",(e)=>{
+      e.preventDefault(); e.stopPropagation();
+      panel.classList.contains("d-none") ? open() : close();
     });
-    return answers;
+
+    // Keep dropdown open while typing/clicking inside
+    ["click","mousedown","mouseup","keydown","keyup","keypress"].forEach(evt=>{
+      panel.addEventListener(evt, e=>e.stopPropagation());
+      search.addEventListener(evt, e=>e.stopPropagation());
+      wrap.addEventListener(evt, e=>e.stopPropagation());
+    });
+
+    search.addEventListener("input", ()=>{
+      const v = search.value;
+      render(v);
+      // preserve focus so user can type full name
+      setTimeout(()=>{ search.focus(); search.setSelectionRange(v.length,v.length); },0);
+    });
+
+    document.addEventListener("click", close);
+
+    syncBtn();
   }
 
-  async function evaluateBranching(formEl) {
-    const tokenInput = formEl.querySelector('input[name="token"]');
-    const token = tokenInput ? tokenInput.value : null;
-    if (!token) return;
-
-    try {
-      const res = await fetch(`/smart_form/branching/${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: collectAnswers(formEl) }),
-        credentials: "same-origin",
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data && data.success && data.next_token) {
-        window.location.href = `/smart_form/${data.next_token}`;
-      }
-    } catch (e) {}
-  }
-
-  function initBranching() {
-    const formEl = document.querySelector("form#smart-form") || document.querySelector("form[action='/smart_form/submit']");
-    if (!formEl) return;
-    formEl.addEventListener("change", () => evaluateBranching(formEl));
+  function init() {
+    document.querySelectorAll("select.sfb-enhanced-select").forEach(enhance);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    initDropdowns();
-    initBranching();
-    setTimeout(initDropdowns, 500);
+    init();
+    setTimeout(init, 500);
   });
 })();

@@ -26,57 +26,6 @@ class SmartFormPublic(http.Controller):
         return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
                                     [("Content-Type","application/json")])
 
-    
-
-    @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
-    def smart_form_branching(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token","=",token),("active","=",True)], limit=1)
-        if not form:
-            return request.make_response(json.dumps({"success": False, "next_token": None}), [("Content-Type","application/json")])
-
-        try:
-            payload = request.get_json_data(silent=True) or {}
-        except Exception:
-            payload = {}
-        answers = payload.get("answers") or {}
-
-        rules = request.env["smart.form.branch.rule"].sudo().search([("form_id","=",form.id)], order="sequence,id")
-
-        def _match(rule, val):
-            # val can be: scalar, list (checkbox), or dict {value,label}
-            if isinstance(val, dict):
-                # allow matching on either 'value' or 'label'
-                candidates = [val.get('value'), val.get('label')]
-                v_list = [str(x).strip() for x in candidates if x is not None]
-            elif isinstance(val, list):
-                v_list = [str(x).strip() for x in val]
-            else:
-                v_list = [str(val).strip()]
-            want = (rule.value_text or "").strip()
-
-            if rule.operator in ("in", "not in"):
-                wanted = [x.strip() for x in want.split(",") if x.strip()]
-                ok = any(x in wanted for x in v_list)
-                return ok if rule.operator == "in" else (not ok)
-            if rule.operator == "contains":
-                return any(want in x for x in v_list)
-            if rule.operator == "!=":
-                return all(x != want for x in v_list)
-            return any(x == want for x in v_list)
-
-        next_form = None
-        for r in rules:
-            key = str(r.trigger_field_id.id)
-            if key in answers and _match(r, answers.get(key)):
-                next_form = r.target_form_id
-                break
-
-        if not next_form and rules and rules[0].fallback_form_id:
-            next_form = rules[0].fallback_form_id
-
-        return request.make_response(json.dumps({"success": True, "next_token": next_form.token if next_form else None}),
-                                    [("Content-Type","application/json")])
-
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
         token = post.get("token")
