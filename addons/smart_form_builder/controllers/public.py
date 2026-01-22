@@ -3,12 +3,11 @@ import base64
 from odoo import http
 from odoo.http import request
 
-
 class SmartFormPublic(http.Controller):
 
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+        form = request.env["smart.form"].sudo().search([("token","=",token),("active","=",True)], limit=1)
         if not form:
             return request.not_found()
         return request.render("smart_form_builder.smart_form_page", {"form": form})
@@ -17,43 +16,33 @@ class SmartFormPublic(http.Controller):
     def smart_form_options(self, field_id, token=None, **kw):
         field = request.env["smart.form.field"].sudo().browse(field_id)
         if not field.exists():
-            return request.make_response(
-                json.dumps({"success": False, "options": []}),
-                [("Content-Type", "application/json")],
-            )
+            return request.make_response(json.dumps({"success": False, "options": []}), [("Content-Type","application/json")])
 
-        # Optional: ensure field belongs to provided form token
         if token:
-            form = request.env["smart.form"].sudo().search([("token", "=", token)], limit=1)
+            form = request.env["smart.form"].sudo().search([("token","=",token)], limit=1)
             if not form or field.form_id.id != form.id:
-                return request.make_response(
-                    json.dumps({"success": False, "options": []}),
-                    [("Content-Type", "application/json")],
-                )
+                return request.make_response(json.dumps({"success": False, "options": []}), [("Content-Type","application/json")])
 
-        opts = field.get_options()
-        return request.make_response(
-            json.dumps({"success": True, "options": opts}),
-            [("Content-Type", "application/json")],
-        )
+        return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
+                                    [("Content-Type","application/json")])
 
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
         token = post.get("token")
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+        form = request.env["smart.form"].sudo().search([("token","=",token),("active","=",True)], limit=1)
         if not form:
             return request.not_found()
 
-        # Create submission first (so file uploads can be attached)
+        data = {}
+        files = request.httprequest.files
+
+        # create submission first so attachments can link
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
             "data_json": "{}",
             "ip": request.httprequest.remote_addr,
             "user_agent": request.httprequest.headers.get("User-Agent"),
         })
-
-        data = {}
-        files = request.httprequest.files
 
         for f in form.field_ids.sudo():
             key = f.name or f"field_{f.id}"
@@ -75,11 +64,10 @@ class SmartFormPublic(http.Controller):
                 continue
 
             if f.field_type == "checkbox":
-                # checkbox uses name="key[]" in template
                 data[key] = request.httprequest.form.getlist(f"{key}[]")
                 continue
 
-            data[key] = post.get(key) or ""
+            data[key] = post.get(key)
 
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),

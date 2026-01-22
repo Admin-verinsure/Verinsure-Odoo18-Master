@@ -47,7 +47,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
 
     def action_save(self):
         self.ensure_one()
-        vals = {
+        self.field_id.write({
             "option_values": self.option_values or False,
             "option_source": "model" if self.is_dynamic else "manual",
             "option_model_id": self.option_model_id.id if self.is_dynamic and self.option_model_id else False,
@@ -55,6 +55,5 @@ class SmartFormSelectFieldWizard(models.TransientModel):
             "option_label_field": self.option_label_field.id if self.is_dynamic and self.option_label_field else False,
             "option_value_field": self.option_value_field.id if self.is_dynamic and self.option_value_field else False,
             "option_limit": self.option_limit if self.is_dynamic else 200,
-        }
-        self.field_id.write(vals)
+        })
         return {"type": "ir.actions.act_window_close"}
