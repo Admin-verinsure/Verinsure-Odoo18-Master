@@ -20,6 +20,9 @@
     <field name="model">smart.form.field</field>
     <field name="arch" type="xml">
       <form>
+        <header>
+          <button name="action_open_select_config" type="object" string="Configure Options" class="btn-primary" invisible="field_type != 'select'"/>
+        </header>
         <sheet>
           <group>
             <field name="form_id"/>

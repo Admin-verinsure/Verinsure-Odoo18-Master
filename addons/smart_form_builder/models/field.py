@@ -78,16 +78,6 @@ class SmartFormField(models.Model):
         # manual
         return self._parse_manual_options()
 
-    self.ensure_one()
-    return {
-        "type": "ir.actions.act_window",
-        "name": "Configure Select Field",
-        "res_model": "smart.form.field.select.wizard",
-        "view_mode": "form",
-        "target": "new",
-        "context": {"default_field_id": self.id},
-    }
-
 def action_open_select_config(self):
     """Open the select field configuration wizard."""
     self.ensure_one()
