@@ -25,7 +25,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
         string="Value Field",
         domain="[('model_id','=',option_model_id)]",
     )
-    option_limit = fields.Integer(default=200)
+    option_limit = fields.Integer(default=10000)
 
     @api.model
     def default_get(self, fields_list):
@@ -41,7 +41,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
                 "option_domain": f.option_domain or "[('active','=',True)]",
                 "option_label_field": f.option_label_field.id if f.option_label_field else False,
                 "option_value_field": f.option_value_field.id if f.option_value_field else False,
-                "option_limit": f.option_limit or 200,
+                "option_limit": f.option_limit or 10000,
             })
         return res
 
@@ -54,6 +54,6 @@ class SmartFormSelectFieldWizard(models.TransientModel):
             "option_domain": self.option_domain if self.is_dynamic else False,
             "option_label_field": self.option_label_field.id if self.is_dynamic and self.option_label_field else False,
             "option_value_field": self.option_value_field.id if self.is_dynamic and self.option_value_field else False,
-            "option_limit": self.option_limit if self.is_dynamic else 200,
+            "option_limit": self.option_limit if self.is_dynamic else 10000,
         })
         return {"type": "ir.actions.act_window_close"}
