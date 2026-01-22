@@ -14,8 +14,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
 
     is_dynamic = fields.Boolean(string="Dynamic Options (DB)")
     option_model_id = fields.Many2one("ir.model", string="Source Model")
-    model_name = fields.Char(string="Model Name", compute="_compute_model_name", readonly=True)
-    option_domain = fields.Char(string="Domain", default="[]")
+    option_domain = fields.Char(string="Domain", default="[('active','=',True)]")
     option_label_field = fields.Many2one(
         "ir.model.fields",
         string="Label Field",
@@ -39,7 +38,7 @@ class SmartFormSelectFieldWizard(models.TransientModel):
                 "option_values": f.option_values or False,
                 "is_dynamic": (f.option_source == "model"),
                 "option_model_id": f.option_model_id.id if f.option_model_id else False,
-                "option_domain": f.option_domain or "[]",
+                "option_domain": f.option_domain or "[('active','=',True)]",
                 "option_label_field": f.option_label_field.id if f.option_label_field else False,
                 "option_value_field": f.option_value_field.id if f.option_value_field else False,
                 "option_limit": f.option_limit or 10000,
@@ -58,8 +57,3 @@ class SmartFormSelectFieldWizard(models.TransientModel):
             "option_limit": self.option_limit if self.is_dynamic else 10000,
         })
         return {"type": "ir.actions.act_window_close"}
-
-@api.depends("option_model_id")
-def _compute_model_name(self):
-    for rec in self:
-        rec.model_name = rec.option_model_id.model or ""
