@@ -58,6 +58,20 @@
               <p class="text-muted">Branching evaluates rules in order. First match wins.</p>
             </page>
 
+            <page string="Logic">
+              <field name="logic_rule_ids">
+                <list editable="bottom">
+                  <field name="sequence"/>
+                  <field name="trigger_field_id"/>
+                  <field name="operator"/>
+                  <field name="value_text"/>
+                  <field name="action"/>
+                  <field name="target_field_id"/>
+                </list>
+              </field>
+              <p class="text-muted">Use rules to show/hide/require fields based on answers.</p>
+            </page>
+
             <page string="Submissions">
               <field name="submission_ids" readonly="1">
                 <list>

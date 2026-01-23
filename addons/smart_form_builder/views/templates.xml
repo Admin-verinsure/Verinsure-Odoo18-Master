@@ -1,79 +1,135 @@
 <odoo>
-  <template id="smart_form_page" name="Smart Form Page">
+  <template id="smart_form_page" name="Forms Page">
     <t t-call="website.layout">
-      <div class="container my-4">
-        <h2 t-esc="form.name"/>
-        <form action="/smart_form/submit" method="post" enctype="multipart/form-data" class="mt-3" id="smart-form">
-          <input type="hidden" name="token" t-att-value="form.token"/>
+      <div class="container my-5">
+        <div class="row justify-content-center">
+          <div class="col-12 col-lg-8">
+            <div class="card shadow-sm border-0">
+              <div class="card-body p-4 p-md-5">
+                <h2 class="mb-1" t-esc="form.name"/>
+                <p class="text-muted mb-4">Please fill the form below.</p>
 
-          <t t-foreach="form.field_ids" t-as="f">
-            <div class="mb-3">
-              <label class="form-label">
-                <span t-esc="f.label"/>
-                <t t-if="f.required"><span class="text-danger">*</span></t>
-              </label>
+                <script type="application/json" id="sfb-rules-json"><t t-esc="rules_json or '[]'"/></script>
 
-              <t t-if="f.field_type == 'text'">
-                <input class="form-control" type="text"
-                       t-att-name="f.name or ('field_%s' % f.id)"
-                       t-att-required="'required' if f.required else None"/>
-              </t>
-              <t t-elif="f.field_type == 'textarea'">
-                <textarea class="form-control"
-                          t-att-name="f.name or ('field_%s' % f.id)"
-                          t-att-required="'required' if f.required else None"></textarea>
-              </t>
-                            <t t-elif="f.field_type == 'select'">
-                <div class="sfb-select-wrap" t-att-data-field-id="f.id">
-                  <select class="form-select sfb-enhanced-select"
-                          t-att-name="f.name or ('field_%s' % f.id)"
-                          t-att-required="'required' if f.required else None">
-                    <option value="">-- Select --</option>
-                    <t t-foreach="f.get_options()" t-as="o">
-                      <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
+                <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
+                  <input type="hidden" name="token" t-att-value="form.token"/>
+
+                  <t t-foreach="form.field_ids" t-as="f">
+                    <t t-if="f.field_type == 'subheading'">
+                      <div class="mt-4 mb-2">
+                        <h5 class="mb-0" t-esc="f.label"/>
+                      </div>
                     </t>
-                  </select>
-                </div>
-              </t>
+                    <t t-else="">
+                      <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
+                        <label class="form-label">
+                          <span t-esc="f.label"/>
+                          <t t-if="f.required"><span class="text-danger">*</span></t>
+                        </label>
 
-<t t-elif="f.field_type == 'radio'">
-                <t t-foreach="f.get_options()" t-as="o">
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio"
-                           t-att-name="f.name or ('field_%s' % f.id)"
-                           t-att-value="o['value']"/>
-                    <label class="form-check-label"><t t-esc="o['label']"/></label>
+                        <t t-if="f.field_type == 'text'">
+                          <input class="form-control" type="text"
+                                 t-att-name="f.name or ('field_%s' % f.id)"
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
+                        </t>
+                        <t t-elif="f.field_type == 'email'">
+                          <input class="form-control" type="email"
+                                 placeholder="name@example.com"
+                                 t-att-name="f.name or ('field_%s' % f.id)"
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
+                        </t>
+                        <t t-elif="f.field_type == 'phone'">
+                          <input class="form-control" type="tel"
+                                 placeholder="+91 XXXXX XXXXX"
+                                 t-att-name="f.name or ('field_%s' % f.id)"
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
+                        </t>
+                        <t t-elif="f.field_type == 'number'">
+                          <input class="form-control" type="number"
+                                 t-att-name="f.name or ('field_%s' % f.id)"
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
+                        </t>
+                        <t t-elif="f.field_type == 'textarea'">
+                          <textarea class="form-control" rows="4"
+                                    t-att-name="f.name or ('field_%s' % f.id)"
+                                    t-att-data-field-id="f.id"
+                                    t-att-required="'required' if f.required else None"></textarea>
+                        </t>
+                        <t t-elif="f.field_type == 'select'">
+                          <div class="sfb-select-wrap">
+                            <select class="form-select sfb-enhanced-select"
+                                    t-att-name="f.name or ('field_%s' % f.id)"
+                                    t-att-data-field-id="f.id"
+                                    t-att-required="'required' if f.required else None">
+                              <option value="">-- Select --</option>
+                              <t t-foreach="f.get_options()" t-as="o">
+                                <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
+                              </t>
+                            </select>
+                          </div>
+                        </t>
+                        <t t-elif="f.field_type == 'radio'">
+                          <t t-foreach="f.get_options()" t-as="o">
+                            <div class="form-check">
+                              <input class="form-check-input" type="radio"
+                                     t-att-name="f.name or ('field_%s' % f.id)"
+                                     t-att-data-field-id="f.id"
+                                     t-att-value="o['value']"/>
+                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                            </div>
+                          </t>
+                        </t>
+                        <t t-elif="f.field_type == 'checkbox'">
+                          <t t-foreach="f.get_options()" t-as="o">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox"
+                                     t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
+                                     t-att-data-field-id="f.id"
+                                     t-att-value="o['value']"/>
+                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                            </div>
+                          </t>
+                        </t>
+                        <t t-elif="f.field_type == 'file'">
+                          <input class="form-control" type="file"
+                                 t-att-name="f.name or ('field_%s' % f.id)"
+                                 t-att-data-field-id="f.id"/>
+                          <div class="form-text">Upload a file if applicable.</div>
+                        </t>
+                      </div>
+                    </t>
+                  </t>
+
+                  <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">Submit</button>
                   </div>
-                </t>
-              </t>
-              <t t-elif="f.field_type == 'checkbox'">
-                <t t-foreach="f.get_options()" t-as="o">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox"
-                           t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
-                           t-att-value="o['value']"/>
-                    <label class="form-check-label"><t t-esc="o['label']"/></label>
-                  </div>
-                </t>
-              </t>
-              <t t-elif="f.field_type == 'file'">
-                <input class="form-control" type="file"
-                       t-att-name="f.name or ('field_%s' % f.id)"/>
-              </t>
+                </form>
+              </div>
             </div>
-          </t>
-
-          <button type="submit" class="btn btn-primary">Submit</button>
-        </form>
+            <p class="text-center text-muted small mt-3 mb-0">Powered by Forms</p>
+          </div>
+        </div>
       </div>
     </t>
   </template>
 
-  <template id="smart_form_thanks" name="Smart Form Thanks">
+  <template id="smart_form_thanks" name="Forms Thanks">
     <t t-call="website.layout">
       <div class="container my-5">
-        <h3>Thank you!</h3>
-        <p>Your response has been submitted for <strong t-esc="form.name"/>.</p>
+        <div class="row justify-content-center">
+          <div class="col-12 col-lg-6">
+            <div class="card shadow-sm border-0">
+              <div class="card-body p-4 p-md-5 text-center">
+                <h3 class="mb-2">Thank you!</h3>
+                <p class="text-muted mb-0">Your response has been submitted.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </t>
   </template>

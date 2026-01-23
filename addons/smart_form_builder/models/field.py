@@ -20,6 +20,10 @@ class SmartFormField(models.Model):
         ("radio", "Radio"),
         ("checkbox", "Checkbox"),
         ("file", "File Upload"),
+        ("email", "Email"),
+        ("phone", "Phone"),
+        ("number", "Numeric"),
+        ("subheading", "Sub Heading"),
     ], default="text", required=True)
 
     # Options

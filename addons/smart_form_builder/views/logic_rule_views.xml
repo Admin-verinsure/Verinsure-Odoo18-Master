@@ -1,0 +1,17 @@
+<odoo>
+  <record id="view_smart_form_logic_rule_list" model="ir.ui.view">
+    <field name="name">smart.form.logic.rule.list</field>
+    <field name="model">smart.form.logic.rule</field>
+    <field name="type">list</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="sequence"/>
+        <field name="trigger_field_id"/>
+        <field name="operator"/>
+        <field name="value_text"/>
+        <field name="action"/>
+        <field name="target_field_id"/>
+      </list>
+    </field>
+  </record>
+</odoo>

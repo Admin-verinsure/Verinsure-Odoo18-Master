@@ -1,6 +1,75 @@
 (function () {
   "use strict";
 
+  // ---------- Conditional Logic (show/hide/require) ----------
+  function parseRules() {
+    const el = document.getElementById("sfb-rules-json");
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || "[]") || []; } catch (e) { return []; }
+  }
+
+  function getFieldValue(formEl, fieldId) {
+    const nodes = formEl.querySelectorAll('[data-field-id="' + fieldId + '"]');
+    if (!nodes.length) return "";
+    const first = nodes[0];
+    if (first.type === "radio") {
+      for (const n of nodes) if (n.checked) return n.value || "";
+      return "";
+    }
+    if (first.type === "checkbox") {
+      const vals = [];
+      for (const n of nodes) if (n.checked) vals.push(n.value || "true");
+      return vals;
+    }
+    return first.value || "";
+  }
+
+  function compare(op, left, right) {
+    const r = (right ?? "").toString();
+    const ln = Array.isArray(left) ? NaN : Number(left);
+    const rn = Number(r);
+    const numeric = !Number.isNaN(ln) && !Number.isNaN(rn);
+
+    if (op === "contains") return (left ?? "").toString().includes(r);
+    if (op === "=") return Array.isArray(left) ? left.map(String).includes(r) : (left ?? "").toString() === r;
+    if (op === "!=") return Array.isArray(left) ? !left.map(String).includes(r) : (left ?? "").toString() !== r;
+    if (op === "in" || op === "not in") {
+      const wanted = r.split(",").map(s => s.trim()).filter(Boolean);
+      const ok = Array.isArray(left) ? left.map(String).some(v => wanted.includes(v)) : wanted.includes((left ?? "").toString());
+      return op === "in" ? ok : !ok;
+    }
+    if (numeric) {
+      if (op === ">") return ln > rn;
+      if (op === ">=") return ln >= rn;
+      if (op === "<") return ln < rn;
+      if (op === "<=") return ln <= rn;
+    }
+    return false;
+  }
+
+  function applyRules(formEl) {
+    const rules = parseRules();
+    for (const r of rules) {
+      const v = getFieldValue(formEl, r.trigger);
+      const ok = compare(r.op, v, r.value);
+      const targetWrap = formEl.querySelector('.sfb-field[data-field-id="' + r.target + '"]');
+      if (!targetWrap) continue;
+
+      if (r.action === "show") targetWrap.style.display = ok ? "" : "none";
+      else if (r.action === "hide") targetWrap.style.display = ok ? "none" : "";
+      else if (r.action === "require") targetWrap.querySelectorAll("input,select,textarea").forEach(i => i.required = ok);
+      else if (r.action === "unrequire") targetWrap.querySelectorAll("input,select,textarea").forEach(i => i.required = !ok);
+
+      if (targetWrap.style.display === "none") {
+        targetWrap.querySelectorAll("input,select,textarea").forEach((i) => {
+          if (i.type === "checkbox" || i.type === "radio") i.checked = false;
+          else i.value = "";
+        });
+      }
+    }
+  }
+
+
   function el(tag, cls, attrs) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -101,6 +170,13 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    const formEl = document.getElementById('smart-form');
+    if (formEl) {
+      applyRules(formEl);
+      formEl.addEventListener('change', () => applyRules(formEl));
+      formEl.addEventListener('input', () => applyRules(formEl));
+    }
+
     init();
     setTimeout(init, 500);
   });
