@@ -2,10 +2,10 @@
   "use strict";
 
   // Conditional Logic
-  function parseRules(){const el=document.getElementById("sfb-rules-json");if(!el)return[];try{return JSON.parse(el.textContent||"[]")||[]}catch(e){return[]}}
+  function parseRules(){const el=document.getElementById('sfb-rules-json');if(!el)return[];try{const txt=(el.textContent||'[]').trim();return JSON.parse(txt||'[]')||[]}catch(e){return[]}}catch(e){return[]}}
   function getFieldValue(formEl,fieldId){const nodes=formEl.querySelectorAll('[data-field-id="'+fieldId+'"]');if(!nodes.length)return"";const first=nodes[0];if(first.type==="radio"){for(const n of nodes)if(n.checked)return n.value||"";return""}if(first.type==="checkbox"){const vals=[];for(const n of nodes)if(n.checked)vals.push(n.value||"true");return vals}return first.value||""}
   function compare(op,left,right){const r=(right??"").toString();const ln=Array.isArray(left)?NaN:Number(left);const rn=Number(r);const numeric=!Number.isNaN(ln)&&!Number.isNaN(rn);if(op==="contains")return (left??"").toString().includes(r);if(op==="=")return Array.isArray(left)?left.map(String).includes(r):(left??"").toString()===r;if(op==="!=")return Array.isArray(left)?!left.map(String).includes(r):(left??"").toString()!==r;if(op==="in"||op==="not in"){const wanted=r.split(",").map(s=>s.trim()).filter(Boolean);const ok=Array.isArray(left)?left.map(String).some(v=>wanted.includes(v)):wanted.includes((left??"").toString());return op==="in"?ok:!ok}if(numeric){if(op===">")return ln>rn;if(op===">=")return ln>=rn;if(op==="<")return ln<rn;if(op==="<=")return ln<=rn}return false}
-  function sfbApplyRules(formEl){const rules=parseRules();for(const rule of rules){const v=getFieldValue(formEl,rule.trigger);const ok=compare(rule.op,v,rule.value);const target=formEl.querySelector('.sfb-field[data-field-id="'+rule.target+'"]');if(!target)continue;if(rule.action==="show")target.style.display=ok?"":"none";else if(rule.action==="hide")target.style.display=ok?"none":"";else if(rule.action==="require")target.querySelectorAll("input,select,textarea").forEach(i=>i.required=ok);else if(rule.action==="unrequire")target.querySelectorAll("input,select,textarea").forEach(i=>i.required=!ok);if(target.style.display==="none"){target.querySelectorAll("input,select,textarea").forEach(i=>{if(i.type==="checkbox"||i.type==="radio")i.checked=false;else i.value=""})}}}
+  function applyRules(formEl){const rules=parseRules();for(const rule of rules){const v=getFieldValue(formEl,rule.trigger);const ok=compare(rule.op,v,rule.value);const target=formEl.querySelector('.sfb-field[data-field-id="'+rule.target+'"]');if(!target)continue;if(rule.action==="show")target.style.display=ok?"":"none";else if(rule.action==="hide")target.style.display=ok?"none":"";else if(rule.action==="require")target.querySelectorAll("input,select,textarea").forEach(i=>i.required=ok);else if(rule.action==="unrequire")target.querySelectorAll("input,select,textarea").forEach(i=>i.required=!ok);if(target.style.display==="none"){target.querySelectorAll("input,select,textarea").forEach(i=>{if(i.type==="checkbox"||i.type==="radio")i.checked=false;else i.value=""})}}}
 
 
   function createEl(tag, attrs, text) {
@@ -135,61 +135,11 @@
 
     function hideShowTargets(formEl){const rules=parseRules();const targets=new Set();for(const r of rules){if(r.action==='show'){targets.add(String(r.target));}}targets.forEach(tid=>{const wrap=formEl.querySelector('.sfb-field[data-field-id="'+tid+'"]');if(wrap){wrap.style.display='none';}});}
 
+function hideTargetsByDefault(formEl){const rules=parseRules();const targets=new Set();for(const r of rules){if(r.action==='show'&&r.target!=null)targets.add(String(r.target));}targets.forEach(tid=>{const wrap=formEl.querySelector('.sfb-field[data-field-id="'+tid+'"]');if(wrap){wrap.style.display='none';}});}
 
-
-  // ---- Logic v2: hide targets by default + show only when rule matches ----
-  function sfbHideTargetsByDefault(formEl){
-    const rules=parseRules();
-    const targets=new Set();
-    for(const r of rules){
-      if(r.action==="show" && r.target!=null){
-        targets.add(String(r.target));
-      }
-    }
-    targets.forEach((tid)=>{
-      const wrap=formEl.querySelector('.sfb-field[data-field-id="'+tid+'"]');
-      if(wrap){ wrap.style.display="none"; }
-    });
-  }
-
-  function sfbApplyRules(formEl){
-    const rules=parseRules();
-    for(const r of rules){
-      const triggerVal=getFieldValue(formEl, r.trigger);
-      const ok=compare(r.op, triggerVal, r.value);
-      const triggerWrap=formEl.querySelector('.sfb-field[data-field-id="'+r.trigger+'"]');
-      const targetWrap=formEl.querySelector('.sfb-field[data-field-id="'+r.target+'"]');
-      if(!targetWrap) continue;
-
-      if(r.action==="show"){
-        targetWrap.style.display = ok ? "" : "none";
-        if(ok && triggerWrap && triggerWrap.nextSibling !== targetWrap){
-          triggerWrap.parentNode.insertBefore(targetWrap, triggerWrap.nextSibling);
-        }
-        if(!ok){
-          targetWrap.querySelectorAll("input,select,textarea").forEach((i)=>{
-            if(i.type==="checkbox"||i.type==="radio") i.checked=false;
-            else i.value="";
-          });
-        }
-      } else if(r.action==="hide"){
-        targetWrap.style.display = ok ? "none" : "";
-        if(ok){
-          targetWrap.querySelectorAll("input,select,textarea").forEach((i)=>{
-            if(i.type==="checkbox"||i.type==="radio") i.checked=false;
-            else i.value="";
-          });
-        }
-      } else if(r.action==="require"){
-        targetWrap.querySelectorAll("input,select,textarea").forEach((i)=> i.required = !!ok);
-      } else if(r.action==="unrequire"){
-        targetWrap.querySelectorAll("input,select,textarea").forEach((i)=> i.required = !ok);
-      }
-    }
-  }
 document.addEventListener("DOMContentLoaded", () => {
     const formEl=document.getElementById('smart-form');
-    if(formEl){hideShowTargets(formEl);sfbApplyRules(formEl);formEl.addEventListener('change',()=>sfbApplyRules(formEl));formEl.addEventListener('input',()=>sfbApplyRules(formEl));}
+    if(formEl){hideShowTargets(formEl);applyRules(formEl);formEl.addEventListener('change',()=>applyRules(formEl));formEl.addEventListener('input',()=>applyRules(formEl));}
 
     init();
     // In case the page is partially re-rendered by website editor, try again shortly
