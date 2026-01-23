@@ -48,7 +48,7 @@
               <field name="branch_rule_ids">
                 <list editable="bottom">
                   <field name="sequence"/>
-                  <field name="trigger_field_id"/>
+                  <field name="trigger_field_id" context="{'default_form_id': id}"/>
                   <field name="operator"/>
                   <field name="value_text"/>
                   <field name="target_form_id"/>
@@ -62,11 +62,11 @@
               <field name="logic_rule_ids">
                 <list editable="bottom">
                   <field name="sequence"/>
-                  <field name="trigger_field_id"/>
+                  <field name="trigger_field_id" context="{'default_form_id': id}"/>
                   <field name="operator"/>
                   <field name="value_text"/>
                   <field name="action"/>
-                  <field name="target_field_id"/>
+                  <field name="target_field_id" context="{'default_form_id': id}"/>
                 </list>
               </field>
               <p class="text-muted">Use rules to show/hide/require fields based on answers.</p>

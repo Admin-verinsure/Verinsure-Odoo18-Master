@@ -133,9 +133,11 @@
     document.querySelectorAll("select.sfb-enhanced-select").forEach(enhanceSelect);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+    function hideShowTargets(formEl){const rules=parseRules();const targets=new Set();for(const r of rules){if(r.action==='show'){targets.add(String(r.target));}}targets.forEach(tid=>{const wrap=formEl.querySelector('.sfb-field[data-field-id="'+tid+'"]');if(wrap){wrap.style.display='none';}});}
+
+document.addEventListener("DOMContentLoaded", () => {
     const formEl=document.getElementById('smart-form');
-    if(formEl){applyRules(formEl);formEl.addEventListener('change',()=>applyRules(formEl));formEl.addEventListener('input',()=>applyRules(formEl));}
+    if(formEl){hideShowTargets(formEl);applyRules(formEl);formEl.addEventListener('change',()=>applyRules(formEl));formEl.addEventListener('input',()=>applyRules(formEl));}
 
     init();
     // In case the page is partially re-rendered by website editor, try again shortly
