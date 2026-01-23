@@ -3,6 +3,7 @@ from odoo.tools.safe_eval import safe_eval
 
 
 class SmartFormField(models.Model):
+    _rec_name = "label"
     _name = "smart.form.field"
     _description = "Smart Form Field"
     _order = "sequence, id"
