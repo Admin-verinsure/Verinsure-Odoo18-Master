@@ -72,43 +72,8 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key)
 
-        # LDAP enrichment (optional)
-ldap_payload = {}
-try:
-    enabled = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.enabled") in ("True", "1", True)
-except Exception:
-    enabled = False
-
-if enabled:
-    first_name = (data.get("first_name") or data.get("First Name") or data.get("first") or "").strip()
-    last_name = (data.get("last_name") or data.get("Last Name") or data.get("last") or "").strip()
-    email = (data.get("email") or data.get("Email") or "").strip()
-    if first_name and last_name and email:
-        try:
-            server_uri = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.server_uri") or ""
-            bind_dn = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.bind_dn") or ""
-            bind_pw = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.bind_password") or ""
-            base_dn = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.base_dn") or ""
-            filt_tpl = request.env["ir.config_parameter"].sudo().get_param("sfb.ldap.filter") or ""
-            if server_uri and base_dn and filt_tpl:
-                try:
-                    from ldap3 import Server, Connection
-                    server = Server(server_uri)
-                    conn = Connection(server, user=bind_dn or None, password=bind_pw or None, auto_bind=True)
-                    ldap_filter = filt_tpl.format(first_name=first_name, last_name=last_name, email=email)
-                    conn.search(search_base=base_dn, search_filter=ldap_filter, attributes=["*"])
-                    if conn.entries:
-                        e = conn.entries[0]
-                        ldap_payload = json.loads(e.entry_to_json()).get("attributes", {})
-                    conn.unbind()
-                except Exception:
-                    ldap_payload = {}
-        except Exception:
-            ldap_payload = {}
-
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),
-            "ldap_json": json.dumps(ldap_payload, ensure_ascii=False) if ldap_payload else False,
         })
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})

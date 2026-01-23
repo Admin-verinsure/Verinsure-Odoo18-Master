@@ -98,7 +98,6 @@
                           <input class="form-control" type="file"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"/>
-                          <div class="form-text">Upload a file if applicable.</div>
                         </t>
                       </div>
                     </t>

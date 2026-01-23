@@ -10,7 +10,6 @@ class SmartFormSubmission(models.Model):
     data_json = fields.Text(string="Data (JSON)", readonly=True)
     ip = fields.Char(readonly=True)
     user_agent = fields.Char(readonly=True)
-    ldap_json = fields.Text(string="LDAP Data (JSON)", readonly=True)
 
     def data(self):
         for rec in self:

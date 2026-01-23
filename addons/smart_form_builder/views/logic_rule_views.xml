@@ -6,6 +6,7 @@
     <field name="arch" type="xml">
       <list>
         <field name="sequence"/>
+        <field name="form_id"/>
         <field name="trigger_field_id"/>
         <field name="operator"/>
         <field name="value_text"/>
