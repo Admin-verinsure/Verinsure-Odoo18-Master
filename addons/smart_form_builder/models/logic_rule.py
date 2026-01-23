@@ -7,7 +7,7 @@ class SmartFormLogicRule(models.Model):
 
     sequence = fields.Integer(default=10)
     form_id = fields.Many2one("smart.form", required=True, ondelete="cascade")
-    trigger_field_id = fields.Many2one("smart.form.field", required=True, domain="[('form_id','=',form_id)]")
+    trigger_field_id = fields.Many2one("smart.form.field", required=True, ondelete="cascade", domain="[('form_id','=',form_id)]")
     operator = fields.Selection([
         ("=", "="),
         ("!=", "!="),
@@ -26,4 +26,4 @@ class SmartFormLogicRule(models.Model):
         ("require", "Make Required"),
         ("unrequire", "Make Optional"),
     ], default="show", required=True)
-    target_field_id = fields.Many2one("smart.form.field", required=True, domain="[('form_id','=',form_id)]")
+    target_field_id = fields.Many2one("smart.form.field", required=True, ondelete="cascade", domain="[('form_id','=',form_id)]")
