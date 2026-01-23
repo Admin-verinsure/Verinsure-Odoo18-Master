@@ -9,7 +9,7 @@
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <script type="application/json" id="sfb-rules-json"><t t-esc="rules_json or '[]'"/></script>
+                <script type="application/json" id="sfb-rules-json"><t t-raw="rules_json or '[]'"/></script>
 
                 <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
                   <input type="hidden" name="token" t-att-value="form.token"/>
