@@ -4,3 +4,4 @@ access_smart_form_field_user,access.smart.form.field.user,model_smart_form_field
 access_smart_form_submission_user,access.smart.form.submission.user,model_smart_form_submission,base.group_user,1,0,0,0
 access_smart_form_branch_rule_user,access.smart.form.branch.rule.user,model_smart_form_branch_rule,base.group_user,1,1,1,1
 access_smart_form_select_wizard_user,access.smart.form.select.wizard.user,model_smart_form_field_select_wizard,base.group_user,1,1,1,1
+access_smart_form_logic_rule_user,access.smart.form.logic.rule.user,model_smart_form_logic_rule,base.group_user,1,1,1,1

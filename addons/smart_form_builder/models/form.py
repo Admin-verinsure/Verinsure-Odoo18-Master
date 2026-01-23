@@ -13,6 +13,7 @@ class SmartForm(models.Model):
     field_ids = fields.One2many("smart.form.field", "form_id", string="Fields", copy=True)
     submission_ids = fields.One2many("smart.form.submission", "form_id", string="Submissions", readonly=True)
     branch_rule_ids = fields.One2many("smart.form.branch.rule", "form_id", string="Branch Rules", copy=True)
+    logic_rule_ids = fields.One2many("smart.form.logic.rule", "form_id", string="Logic Rules", copy=True)
 
     submission_count = fields.Integer(compute="_compute_submission_count")
 
