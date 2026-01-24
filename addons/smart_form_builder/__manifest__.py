@@ -1,6 +1,6 @@
 {
     "name": "Forms (Standalone)",
-    "version": "18.0.1.1.6",
+    "version": "18.0.1.1.7",
     "category": "Tools",
     "summary": "Standalone form builder with dynamic DB dropdown options",
     "depends": ["base", "website"],
