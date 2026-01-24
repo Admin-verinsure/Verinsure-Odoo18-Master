@@ -200,7 +200,69 @@
                       }
                     })();
 ]]></script>
-                </form>
+                <script type="text/javascript"><![CDATA[
+  (function(){
+    function collectAnswers(){
+      var out={};
+      var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
+      nodes.forEach(function(el){
+        var fid=el.getAttribute('data-field-id');
+        if(!fid) return;
+        if(el.type==="radio"){
+          if(el.checked) out[fid]=el.value||"";
+          return;
+        }
+        if(el.type==="checkbox"){
+          if(!out[fid]) out[fid]=[];
+          if(el.checked) out[fid].push(el.value||"true");
+          return;
+        }
+        out[fid]=el.value||"";
+      });
+      return out;
+    }
+    function post(url, payload, cb){
+      try{
+        var xhr=new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Content-Type","application/json");
+        xhr.onreadystatechange=function(){
+          if(xhr.readyState===4){
+            try{
+              var data=JSON.parse(xhr.responseText||"{}");
+              cb(null,data);
+            }catch(e){ cb(e,null); }
+          }
+        };
+        xhr.send(JSON.stringify(payload||{}));
+      }catch(e){ cb(e,null); }
+    }
+    function evalBranch(){
+      var tokenEl=document.querySelector('input[name="token"]');
+      if(!tokenEl) return;
+      var token=tokenEl.value;
+      if(!token) return;
+      post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()}, function(err,data){
+        if(err) return;
+        if(data && data.success && data.next_token){
+          window.location.href="/smart_form/"+data.next_token;
+        }
+      });
+    }
+    var form=document.getElementById("smart-form");
+    if(form){
+      var t=null;
+      var handler=function(){ if(t) clearTimeout(t); t=setTimeout(evalBranch, 50); };
+      form.addEventListener("change", handler, true);
+      // optional: trigger on input for selects/text
+      form.addEventListener("input", handler, true);
+    }
+    // mark for debug
+    // window.sfb_branching=true;
+  })();
+]]></script>
+
+              </form>
               </div>
             </div>
           </div>
