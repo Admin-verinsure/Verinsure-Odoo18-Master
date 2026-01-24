@@ -13,7 +13,6 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # Send logic rules to template (if you use logic feature)
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -44,9 +43,8 @@ class SmartFormPublic(http.Controller):
                                              [("Content-Type", "application/json")])
 
         return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
-                                    [("Content-Type", "application/json")])
+                                     [("Content-Type", "application/json")])
 
-    # ✅ Branching endpoint (safe)
     @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_branching(self, token, **kw):
         form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
@@ -73,14 +71,10 @@ class SmartFormPublic(http.Controller):
                 wanted = [x.strip() for x in want.split(",") if x.strip()]
                 ok = any(v in wanted for v in vals)
                 return ok if rule.operator == "in" else (not ok)
-
             if rule.operator == "contains":
                 return any(want in v for v in vals)
-
             if rule.operator == "!=":
                 return all(v != want for v in vals)
-
-            # default '='
             return any(v == want for v in vals)
 
         next_form = None
