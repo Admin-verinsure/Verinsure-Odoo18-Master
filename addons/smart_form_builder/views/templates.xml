@@ -221,33 +221,36 @@
       });
       return out;
     }
+
     function post(url, payload){
       return fetch(url, {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload||{}),
         credentials: "same-origin"
-      }).then(r=>r.json()).catch(()=>null);
+      }).then(function(r){ return r.ok ? r.json() : null; })
+        .catch(function(){ return null; });
     }
+
     var form=document.getElementById("smart-form");
     if(!form) return;
-    var tokenEl=document.querySelector('input[name="token"]');
-    if(!tokenEl) return;
-    var token=tokenEl.value;
-    if(!token) return;
 
-    var timer=null;
-    function handler(){
-      if(timer) clearTimeout(timer);
-      timer=setTimeout(async function(){
-        var data = await post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()});
-        if(data && data.success && data.next_token){
-          window.location.href="/smart_form/"+data.next_token;
-        }
-      }, 80);
-    }
-    form.addEventListener("change", handler, true);
-    form.addEventListener("input", handler, true);
+    form.addEventListener("submit", function(e){
+      var tokenEl=document.querySelector('input[name="token"]');
+      var token=tokenEl ? tokenEl.value : "";
+      if(!token) return;
+
+      e.preventDefault();
+
+      post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
+        .then(function(data){
+          if(data && data.success && data.next_token){
+            window.location.href="/smart_form/"+data.next_token;
+          } else {
+            form.submit();
+          }
+        });
+    }, true);
   })();
 ]]></script>
 
