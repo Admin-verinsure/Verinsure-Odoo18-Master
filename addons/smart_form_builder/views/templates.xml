@@ -120,7 +120,7 @@
                         return document.querySelector('.sfb-field[data-field-id="'+fieldId+'"]');
                       }
                       function getValue(fieldId){
-                        var nodes=document.querySelectorAll('[data-field-id="'+fieldId+'"]');
+                        var nodes=document.querySelectorAll('input[data-field-id="'+fieldId+'"],select[data-field-id="'+fieldId+'"],textarea[data-field-id="'+fieldId+'"]');
                         if(!nodes.length) return "";
                         var first=nodes[0];
                         if(first.type==="radio"){
