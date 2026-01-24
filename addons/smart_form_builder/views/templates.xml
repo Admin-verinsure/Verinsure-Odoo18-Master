@@ -168,8 +168,8 @@
                           if(!targ) return;
                           if(r.action==="show"){
                             targ.style.display = ok ? "" : "none";
-                            if(ok && trig && trig.nextSibling!==targ){
-                              trig.parentNode.insertBefore(targ, trig.nextSibling);
+                            if(ok && trig && trig.nextElementSibling !== targ){
+                              trig.parentNode.insertBefore(targ, trig.nextElementSibling);
                             }
                             if(!ok){
                               targ.querySelectorAll("input,select,textarea").forEach(function(i){
@@ -181,19 +181,25 @@
                           }
                         });
                       }
-                      document.addEventListener("DOMContentLoaded", function(){
-                        var rules=safeJson("sfb-rules-json");
-                        if(!rules || !rules.length) return;
-                        hideTargets(rules);
-                        apply(rules);
-                        var form=document.getElementById("smart-form");
-                        if(form){
-                          form.addEventListener("change", function(){ apply(rules); });
-                          form.addEventListener("input", function(){ apply(rules); });
-                        }
-                      });
+
+                      var rules = safeJson("sfb-rules-json");
+                      if(!rules || !rules.length) return;
+
+                      hideTargets(rules);
+                      apply(rules);
+
+                      var form=document.getElementById("smart-form");
+                      if(form){
+                        var timer=null;
+                        var onChange=function(){
+                          if(timer) clearTimeout(timer);
+                          timer=setTimeout(function(){ apply(rules); }, 30);
+                        };
+                        form.addEventListener("input", onChange, true);
+                        form.addEventListener("change", onChange, true);
+                      }
                     })();
-                  ]]></script>
+]]></script>
                 </form>
               </div>
             </div>
