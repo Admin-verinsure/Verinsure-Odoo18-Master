@@ -32,7 +32,6 @@ class SmartFormPublic(http.Controller):
     
 @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
 def smart_form_branching(self, token, **kw):
-    """Evaluate branching rules and return next form token."""
     form = request.env["smart.form"].sudo().search([("token","=",token),("active","=",True)], limit=1)
     if not form:
         return request.make_response(json.dumps({"success": False, "next_token": None}), [("Content-Type","application/json")])
@@ -46,7 +45,6 @@ def smart_form_branching(self, token, **kw):
     rules = request.env["smart.form.branch.rule"].sudo().search([("form_id","=",form.id)], order="sequence,id")
 
     def _match(rule, val):
-        # val may be list for checkbox
         if isinstance(val, list):
             vals = [str(x).strip() for x in val]
         else:
@@ -61,7 +59,6 @@ def smart_form_branching(self, token, **kw):
             return any(want in v for v in vals)
         if rule.operator == "!=":
             return all(v != want for v in vals)
-        # default '='
         return any(v == want for v in vals)
 
     next_form = None
