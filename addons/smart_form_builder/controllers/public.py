@@ -83,8 +83,6 @@ class SmartFormPublic(http.Controller):
             if key in answers and _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
-
-        if not next_form and rules and rules[0].fallback_form_id:
             next_form = rules[0].fallback_form_id
 
         return request.make_response(json.dumps({
