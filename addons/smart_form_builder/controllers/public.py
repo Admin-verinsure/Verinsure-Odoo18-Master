@@ -46,11 +46,50 @@ class SmartFormPublic(http.Controller):
                                      [("Content-Type", "application/json")])
 
     @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
-    def smart_form_branching(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
-        if not form:
-            return request.make_response(json.dumps({"success": False, "next_token": None}),
-                                         [("Content-Type", "application/json")])
+def smart_form_branching(self, token, **kw):
+    """Evaluate branch rules and return next form token only if a rule matches."""
+    form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+    if not form:
+        return request.make_response(json.dumps({"success": False, "next_token": None}),
+                                     [("Content-Type", "application/json")])
+
+    try:
+        payload = request.get_json_data(silent=True) or {}
+    except Exception:
+        payload = {}
+    answers = payload.get("answers") or {}
+
+    rules = request.env["smart.form.branch.rule"].sudo().search([("form_id", "=", form.id)], order="sequence,id")
+
+    def _match(rule, val):
+        if isinstance(val, list):
+            vals = [str(x).strip() for x in val]
+        else:
+            vals = [str(val).strip()]
+        want = (rule.value_text or "").strip()
+
+        if rule.operator in ("in", "not in"):
+            wanted = [x.strip() for x in want.split(",") if x.strip()]
+            ok = any(v in wanted for v in vals)
+            return ok if rule.operator == "in" else (not ok)
+        if rule.operator == "contains":
+            return any(want in v for v in vals)
+        if rule.operator == "!=":
+            return all(v != want for v in vals)
+        return any(v == want for v in vals)
+
+    next_form = None
+    for r in rules:
+        key = str(r.trigger_field_id.id)
+        if key in answers and _match(r, answers.get(key)):
+            next_form = r.target_form_id
+            break
+
+    # IMPORTANT: do NOT auto-fallback; only redirect when a rule matches.
+    return request.make_response(json.dumps({
+        "success": True,
+        "next_token": next_form.token if next_form else None
+    }), [("Content-Type", "application/json")])
 
         try:
             payload = request.get_json_data(silent=True) or {}
