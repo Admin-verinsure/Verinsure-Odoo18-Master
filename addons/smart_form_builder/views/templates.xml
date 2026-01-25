@@ -109,150 +109,71 @@
                   </div>
 
                   <!-- Inline Logic (runs even if assets are cached) -->
-                  <script type="text/javascript"><![CDATA[
-                    (function(){
-                      function safeJson(id){
-                        var el=document.getElementById(id);
-                        if(!el) return [];
-                        try { return JSON.parse((el.textContent||'[]').trim()||'[]') || []; } catch(e){ return []; }
-                      }
-                      function getWrap(fieldId){
-                        return document.querySelector('.sfb-field[data-field-id="'+fieldId+'"]');
-                      }
-                      function getValue(fieldId){
-                        var nodes=document.querySelectorAll('input[data-field-id="'+fieldId+'"],select[data-field-id="'+fieldId+'"],textarea[data-field-id="'+fieldId+'"]');
-                        if(!nodes.length) return "";
-                        var first=nodes[0];
-                        if(first.type==="radio"){
-                          for(var i=0;i<nodes.length;i++){ if(nodes[i].checked) return nodes[i].value||""; }
-                          return "";
-                        }
-                        if(first.type==="checkbox"){
-                          var vals=[];
-                          for(var j=0;j<nodes.length;j++){ if(nodes[j].checked) vals.push(nodes[j].value||"true"); }
-                          return vals;
-                        }
-                        return first.value||"";
-                      }
-                      function compare(op,left,right){
-                        var r=(right==null?"":String(right)).trim();
-                        var ln = Array.isArray(left) ? NaN : Number(left);
-                        var rn = Number(r);
-                        var numeric = !Number.isNaN(ln) && !Number.isNaN(rn);
-                        if(op==="contains") return String(left||"").indexOf(r)!==-1;
-                        if(op==="=") return Array.isArray(left)? left.map(String).indexOf(r)!==-1 : String(left||"")===r;
-                        if(op==="!=") return Array.isArray(left)? left.map(String).indexOf(r)===-1 : String(left||"")!==r;
-                        if(op==="in"||op==="not in"){
-                          var wanted=r.split(",").map(function(s){return s.trim();}).filter(Boolean);
-                          var ok = Array.isArray(left)? left.map(String).some(function(v){return wanted.indexOf(v)!==-1;}) : wanted.indexOf(String(left||""))!==-1;
-                          return op==="in"? ok : !ok;
-                        }
-                        if(numeric){
-                          if(op===">") return ln>rn;
-                          if(op===">=") return ln>=rn;
-                          if(op==="<") return ln<rn;
-                          if(op==="<=") return ln<=rn;
-                        }
-                        return false;
-                      }
-                      function hideTargets(rules){
-                        var targets={};
-                        rules.forEach(function(r){ if(r.action==="show") targets[String(r.target)]=true; });
-                        Object.keys(targets).forEach(function(tid){ var w=getWrap(tid); if(w) w.style.display="none"; });
-                      }
-                      function apply(rules){
-                        rules.forEach(function(r){
-                          var ok=compare(r.op, getValue(String(r.trigger)), r.value);
-                          var trig=getWrap(String(r.trigger));
-                          var targ=getWrap(String(r.target));
-                          if(!targ) return;
-                          if(r.action==="show"){
-                            targ.style.display = ok ? "" : "none";
-                            if(ok && trig && trig.nextElementSibling !== targ){
-                              trig.parentNode.insertBefore(targ, trig.nextElementSibling);
-                            }
-                            if(!ok){
-                              targ.querySelectorAll("input,select,textarea").forEach(function(i){
-                                if(i.type==="checkbox"||i.type==="radio") i.checked=false; else i.value="";
-                              });
-                            }
-                          } else if(r.action==="hide"){
-                            targ.style.display = ok ? "none" : "";
-                          }
-                        });
-                      }
+                  
 
-                      var rules = safeJson("sfb-rules-json");
-                      if(!rules || !rules.length) return;
+              
 
-                      hideTargets(rules);
-                      apply(rules);
+                <script type="text/javascript"><![CDATA[
+  (function(){
+    function collectAnswers(){
+      var out={};
+      var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
+      nodes.forEach(function(el){
+        var fid=el.getAttribute('data-field-id');
+        if(!fid) return;
 
-                      var form=document.getElementById("smart-form");
-                      if(form){
-                        var timer=null;
-                        var onChange=function(){
-                          if(timer) clearTimeout(timer);
-                          timer=setTimeout(function(){ apply(rules); }, 30);
-                        };
-                        form.addEventListener("input", onChange, true);
-                        form.addEventListener("change", onChange, true);
-                      }
-                    })();
+        if(el.tagName==="SELECT"){
+          var label="";
+          try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
+          out[fid] = {value:(el.value||""), label:(label||"")};
+          return;
+        }
+
+        if(el.type==="radio"){
+          if(el.checked) out[fid]=el.value||"";
+          return;
+        }
+        if(el.type==="checkbox"){
+          if(!out[fid]) out[fid]=[];
+          if(el.checked) out[fid].push(el.value||"true");
+          return;
+        }
+        out[fid]=el.value||"";
+      });
+      return out;
+    }
+
+    function post(url, payload){
+      return fetch(url, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload||{}),
+        credentials: "same-origin"
+      }).then(function(r){ return r.ok ? r.json() : null; })
+        .catch(function(){ return null; });
+    }
+
+    var form=document.getElementById("smart-form");
+    if(!form) return;
+
+    form.addEventListener("submit", function(e){
+      var tokenEl=document.querySelector('input[name="token"]');
+      var token=tokenEl ? tokenEl.value : "";
+      if(!token) return;
+
+      e.preventDefault();
+
+      post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
+        .then(function(data){
+          if(data && data.success && data.next_token){
+            window.location.href="/smart_form/"+data.next_token;
+          } else {
+            form.submit();
+          }
+        });
+    }, true);
+  })();
 ]]></script>
-                                  <script type="text/javascript"><![CDATA[
-                    (function(){
-                      function collectAnswers(){
-                        var out={};
-                        var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
-                        nodes.forEach(function(el){
-                          var fid=el.getAttribute('data-field-id');
-                          if(!fid) return;
-                          if(el.tagName==="SELECT"){
-                            var label="";
-                            try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
-                            out[fid] = {value: (el.value||""), label: (label||"")};
-                            return;
-                          }
-                          if(el.type==="radio"){
-                            if(el.checked) out[fid]=el.value||"";
-                            return;
-                          }
-                          if(el.type==="checkbox"){
-                            if(!out[fid]) out[fid]=[];
-                            if(el.checked) out[fid].push(el.value||"true");
-                            return;
-                          }
-                          out[fid]=el.value||"";
-                        });
-                        return out;
-                      }
-                      function post(url, payload){
-                        return fetch(url, {
-                          method: "POST",
-                          headers: {"Content-Type":"application/json"},
-                          body: JSON.stringify(payload||{}),
-                          credentials: "same-origin"
-                        }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
-                      }
-                      var form=document.getElementById("smart-form");
-                      if(!form) return;
-                      form.addEventListener("submit", function(e){
-                        var tokenEl=document.querySelector('input[name="token"]');
-                        var token=tokenEl ? tokenEl.value : "";
-                        if(!token) return;
-                        e.preventDefault();
-                        post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
-                          .then(function(data){
-                            if(data && data.success && data.next_token){
-                              window.location.href="/smart_form/"+data.next_token;
-                            } else {
-                              form.submit();
-                            }
-                          });
-                      }, true);
-                    })();
-                  ]]></script>
 
               </form>
               </div>
