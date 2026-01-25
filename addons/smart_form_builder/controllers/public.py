@@ -48,7 +48,6 @@ class SmartFormPublic(http.Controller):
 
     @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_branching(self, token, **kw):
-        """Evaluate branch rules and return next form token only if a rule matches."""
         form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
         if not form:
             return request.make_response(json.dumps({"success": False, "next_token": None}),
@@ -86,7 +85,10 @@ class SmartFormPublic(http.Controller):
                 next_form = r.target_form_id
                 break
 
-        # IMPORTANT: do not auto-fallback. Return None when no match.
+        # Fallback only when nothing matches
+        if not next_form and rules and rules[0].fallback_form_id:
+            next_form = rules[0].fallback_form_id
+
         return request.make_response(json.dumps({
             "success": True,
             "next_token": next_form.token if next_form else None
