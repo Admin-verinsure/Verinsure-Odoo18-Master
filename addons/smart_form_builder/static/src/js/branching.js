@@ -21,14 +21,14 @@
     return answers;
   }
 
-  async function callBranching(formEl) {
+  async function evaluateBranching(formEl) {
     const token =
       formEl.dataset.formToken ||
       (formEl.querySelector('input[name="token"]') || {}).value ||
       null;
 
     if (!token) {
-      console.error("❌ Branching token not found");
+      console.error("❌ Branching token missing");
       return null;
     }
 
@@ -51,19 +51,25 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const formEl =
-      document.querySelector("form[action='/smart_form/submit']") ||
-      document.querySelector("form");
+  // 🔥 GLOBAL SUBMIT INTERCEPT (CAPTURE PHASE — CRITICAL)
+  document.addEventListener(
+    "submit",
+    async function (ev) {
+      const formEl = ev.target;
+      if (!(formEl instanceof HTMLFormElement)) return;
 
-    if (!formEl) return;
+      // Only intercept smart forms
+      if (
+        !formEl.dataset.formToken &&
+        !formEl.querySelector('input[name="token"]')
+      ) {
+        return;
+      }
 
-    // 🔴 INTERCEPT SUBMIT — NON-NEGOTIABLE
-    formEl.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      ev.stopPropagation();
+      ev.stopImmediatePropagation();
 
-      const data = await callBranching(formEl);
+      const data = await evaluateBranching(formEl);
 
       if (data && data.success) {
         if (data.next_token) {
@@ -76,8 +82,12 @@
         }
       }
 
-      // No branching → normal submit
+      // 🔁 No branching → allow real submit
+      formEl.removeAttribute("data-branching-lock");
       formEl.submit();
-    });
-  });
+    },
+    true, // 🔥 CAPTURE PHASE (THIS IS WHY IT WORKS)
+  );
+
+  console.log("✅ Smart Form Branching ACTIVE");
 })();
