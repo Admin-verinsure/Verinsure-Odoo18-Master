@@ -1,6 +1,5 @@
 import json
 import base64
-
 from odoo import http
 from odoo.http import request
 
@@ -19,7 +18,6 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # Field logic rules
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -146,7 +144,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # --------------------------------------------------
-    # FORM SUBMIT (SAFE, TERMINAL-ONLY)
+    # FORM SUBMIT (FINAL, CORRECT)
     # --------------------------------------------------
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
@@ -159,34 +157,9 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # 🚨 BACKEND GUARD:
-        # If this form has ANY branch path (target OR fallback),
-        # it is NOT terminal → NEVER submit here
-        rules = request.env["smart.form.branch.rule"].sudo().search(
-            [("form_id", "=", form.id)]
-        )
-
-        has_path = any(
-            r.target_form_id or r.fallback_form_id
-            for r in rules
-        )
-
-        if has_path:
-            # Safety fallback — should normally never hit
-            return request.render(
-                "smart_form_builder.smart_form_page",
-                {"form": form},
-            )
-
         # ------------------------------------------------
-        # CREATE SUBMISSION (TERMINAL FORM ONLY)
+        # COLLECT FORM DATA
         # ------------------------------------------------
-        submission = request.env["smart.form.submission"].sudo().create({
-            "form_id": form.id,
-            "ip": request.httprequest.remote_addr,
-            "user_agent": request.httprequest.headers.get("User-Agent"),
-        })
-
         data = {}
         files = request.httprequest.files
 
@@ -195,14 +168,14 @@ class SmartFormPublic(http.Controller):
 
             if f.field_type == "file":
                 fs = files.get(key)
-                if fs and getattr(fs, "filename", ""):
+                if fs and fs.filename:
                     content = fs.read()
                     request.env["ir.attachment"].sudo().create({
                         "name": fs.filename,
                         "datas": base64.b64encode(content),
                         "res_model": "smart.form.submission",
-                        "res_id": submission.id,
-                        "mimetype": getattr(fs, "mimetype", None) or "application/octet-stream",
+                        "res_id": 0,
+                        "mimetype": getattr(fs, "mimetype", None),
                     })
                     data[key] = fs.filename
                 else:
@@ -215,7 +188,9 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
-        # OPTIONAL PARTNER LOGIC
+        # ------------------------------------------------
+        # OPTIONAL PARTNER LOGIC (FIXED)
+        # ------------------------------------------------
         first_name = (data.get("field_24") or "").strip()
         last_name = (data.get("field_25") or "").strip()
         email = (data.get("field_13") or "").strip().lower()
@@ -227,15 +202,22 @@ class SmartFormPublic(http.Controller):
         if email:
             Partner = request.env["res.partner"].sudo()
             partner = Partner.search([("email", "=ilike", email)], limit=1)
-            if not partner:
+
+            if partner:
+                data_source = "partner"
+            else:
                 partner = Partner.create({
                     "name": f"{first_name} {last_name}".strip() or email,
                     "email": email,
                     "phone": phone,
                 })
-            data_source = "partner"
+                data_source = "form"
 
-        submission.sudo().write({
+        # ------------------------------------------------
+        # CREATE SUBMISSION (ONCE, CLEAN)
+        # ------------------------------------------------
+        submission = request.env["smart.form.submission"].sudo().create({
+            "form_id": form.id,
             "partner_id": partner.id if partner else False,
             "first_name": first_name,
             "last_name": last_name,
@@ -243,9 +225,15 @@ class SmartFormPublic(http.Controller):
             "phone": phone,
             "data_source": data_source,
             "data_json": json.dumps(data, ensure_ascii=False),
+            "ip": request.httprequest.remote_addr,
+            "user_agent": request.httprequest.headers.get("User-Agent"),
         })
 
         return request.render(
             "smart_form_builder.smart_form_thanks",
-            {"form": form},
+            {
+                "form": form,
+                "submission": submission,
+                "partner": partner,
+            },
         )
