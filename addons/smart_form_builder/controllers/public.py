@@ -58,9 +58,13 @@ class SmartFormPublic(http.Controller):
             payload = {}
         answers = payload.get("answers") or {}
 
-        rules = request.env["smart.form.branch.rule"].sudo().search([("form_id", "=", form.id)], order="sequence,id")
+        rules = request.env["smart.form.branch.rule"].sudo().search(
+            [("form_id", "=", form.id)],
+            order="sequence,id"
+        )
 
         def _vals(v):
+            """Accept dict {value,label}, list, or scalar -> list[str]."""
             if isinstance(v, dict):
                 out = []
                 if v.get("value") not in (None, ""):
@@ -77,24 +81,41 @@ class SmartFormPublic(http.Controller):
             vals = _vals(val)
             want = (rule.value_text or "").strip()
 
+            # Case-insensitive compare for strings
+            vals_l = [v.lower() for v in vals]
+            want_l = want.lower()
+
             if rule.operator in ("in", "not in"):
-                wanted = [x.strip() for x in want.split(",") if x.strip()]
-                ok = any(v in wanted for v in vals)
+                wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
+                ok = any(v in wanted for v in vals_l)
                 return ok if rule.operator == "in" else (not ok)
+
             if rule.operator == "contains":
-                return any(want in v for v in vals)
+                return any(want_l in v for v in vals_l)
+
             if rule.operator == "!=":
-                return all(v != want for v in vals)
-            return any(v == want for v in vals)
+                return all(v != want_l for v in vals_l)
+
+            # default '='
+            return any(v == want_l for v in vals_l)
 
         next_form = None
+        evaluated_any = False  # ✅ critical: only fallback if we actually evaluated a rule
+
         for r in rules:
             key = str(r.trigger_field_id.id)
-            if key in answers and _match(r, answers.get(key)):
+
+            # ✅ If trigger key isn't present in submitted answers, don't evaluate this rule
+            if key not in answers:
+                continue
+
+            evaluated_any = True
+            if _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
 
-        if not next_form and rules and rules[0].fallback_form_id:
+        # ✅ fallback ONLY when at least one rule was evaluated (prevents "always fallback")
+        if not next_form and evaluated_any and rules and rules[0].fallback_form_id:
             next_form = rules[0].fallback_form_id
 
         return request.make_response(json.dumps({

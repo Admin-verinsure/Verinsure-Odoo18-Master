@@ -108,74 +108,187 @@
                     <button type="submit" class="btn btn-primary btn-lg">Submit</button>
                   </div>
 
-                  <!-- Inline Logic (runs even if assets are cached) -->
-                  
+                  <!-- ✅ Inline Conditional Logic -->
+                  <script type="text/javascript"><![CDATA[
+                    (function(){
+                      function safeRules(){
+                        var el = document.getElementById("sfb-rules-json");
+                        if(!el) return [];
+                        try { return JSON.parse((el.textContent||"[]").trim()||"[]") || []; }
+                        catch(e){ return []; }
+                      }
+                      function inputNodes(fid){
+                        return document.querySelectorAll(
+                          'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
+                        );
+                      }
+                      function wrap(fid){
+                        return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
+                      }
+                      function valueOf(fid){
+                        var nodes = inputNodes(fid);
+                        if(!nodes.length) return "";
+                        var first = nodes[0];
+                        if(first.type==="radio"){
+                          for(var i=0;i<nodes.length;i++){ if(nodes[i].checked) return nodes[i].value||""; }
+                          return "";
+                        }
+                        if(first.type==="checkbox"){
+                          var vals=[];
+                          for(var j=0;j<nodes.length;j++){ if(nodes[j].checked) vals.push(nodes[j].value||"true"); }
+                          return vals;
+                        }
+                        return first.value||"";
+                      }
+                      function num(x){
+                        try { return parseFloat(x); } catch(e){ return NaN; }
+                      }
+                      function compare(op,left,right){
+                        var r = (right==null?"":String(right)).trim();
+                        // numeric ops
+                        if(op===">"||op===">="||op==="<"||op==="<="){
+                          var ln = Array.isArray(left) ? NaN : num(left);
+                          var rn = num(r);
+                          if(isNaN(ln)||isNaN(rn)) return false;
+                          if(op===">") return ln>rn;
+                          if(op===">=") return ln>=rn;
+                          if(op==="<") return ln<rn;
+                          if(op==="<=") return ln<=rn;
+                        }
+                        // string ops
+                        var want = r.toLowerCase();
+                        var vals = Array.isArray(left) ? left.map(String) : [String(left||"")];
+                        vals = vals.map(function(v){return v.toLowerCase();});
 
-              
+                        if(op==="contains") return vals.some(function(v){return v.indexOf(want)!==-1;});
+                        if(op==="!=") return vals.every(function(v){return v!==want;});
+                        if(op==="in"||op==="not in"){
+                          var wanted = want.split(",").map(function(s){return s.trim();}).filter(Boolean);
+                          var ok = vals.some(function(v){return wanted.indexOf(v)!==-1;});
+                          return op==="in"? ok : !ok;
+                        }
+                        // default '='
+                        return vals.some(function(v){return v===want;});
+                      }
 
-                <script type="text/javascript"><![CDATA[
-  (function(){
-    function collectAnswers(){
-      var out={};
-      var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
-      nodes.forEach(function(el){
-        var fid=el.getAttribute('data-field-id');
-        if(!fid) return;
+                      var rules = safeRules();
+                      if(!rules.length) return;
 
-        if(el.tagName==="SELECT"){
-          var label="";
-          try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
-          out[fid] = {value:(el.value||""), label:(label||"")};
-          return;
-        }
+                      // hide targets of "show" rules by default
+                      var targets = {};
+                      rules.forEach(function(r){ if(r.action==="show") targets[String(r.target)] = true; });
+                      Object.keys(targets).forEach(function(tid){
+                        var w = wrap(tid);
+                        if(w) w.style.display="none";
+                      });
 
-        if(el.type==="radio"){
-          if(el.checked) out[fid]=el.value||"";
-          return;
-        }
-        if(el.type==="checkbox"){
-          if(!out[fid]) out[fid]=[];
-          if(el.checked) out[fid].push(el.value||"true");
-          return;
-        }
-        out[fid]=el.value||"";
-      });
-      return out;
-    }
+                      function apply(){
+                        rules.forEach(function(r){
+                          var trig = String(r.trigger);
+                          var targ = String(r.target);
+                          var ok = compare(r.op, valueOf(trig), r.value);
 
-    function post(url, payload){
-      return fetch(url, {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(payload||{}),
-        credentials: "same-origin"
-      }).then(function(r){ return r.ok ? r.json() : null; })
-        .catch(function(){ return null; });
-    }
+                          var tw = wrap(targ);
+                          if(!tw) return;
 
-    var form=document.getElementById("smart-form");
-    if(!form) return;
+                          if(r.action==="show"){
+                            tw.style.display = ok ? "" : "none";
+                            if(ok){
+                              var trw = wrap(trig);
+                              if(trw && trw.nextElementSibling !== tw){
+                                trw.parentNode.insertBefore(tw, trw.nextElementSibling);
+                              }
+                            } else {
+                              // clear when hidden
+                              tw.querySelectorAll("input,select,textarea").forEach(function(i){
+                                if(i.type==="checkbox"||i.type==="radio") i.checked=false;
+                                else i.value="";
+                              });
+                            }
+                          } else if(r.action==="hide"){
+                            tw.style.display = ok ? "none" : "";
+                          }
+                        });
+                      }
 
-    form.addEventListener("submit", function(e){
-      var tokenEl=document.querySelector('input[name="token"]');
-      var token=tokenEl ? tokenEl.value : "";
-      if(!token) return;
+                      var form = document.getElementById("smart-form");
+                      if(!form) return;
+                      apply();
 
-      e.preventDefault();
+                      var t=null;
+                      function onChange(){
+                        if(t) clearTimeout(t);
+                        t=setTimeout(apply, 30);
+                      }
+                      form.addEventListener("input", onChange, true);
+                      form.addEventListener("change", onChange, true);
+                    })();
+                  ]]></script>
 
-      post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
-        .then(function(data){
-          if(data && data.success && data.next_token){
-            window.location.href="/smart_form/"+data.next_token;
-          } else {
-            form.submit();
-          }
-        });
-    }, true);
-  })();
-]]></script>
+                  <!-- ✅ Branching on submit -->
+                  <script type="text/javascript"><![CDATA[
+                    (function(){
+                      function collectAnswers(){
+                        var out={};
+                        var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
+                        nodes.forEach(function(el){
+                          var fid=el.getAttribute('data-field-id');
+                          if(!fid) return;
 
-              </form>
+                          if(el.tagName==="SELECT"){
+                            var label="";
+                            try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
+                            out[fid] = {value:(el.value||""), label:(label||"")};
+                            return;
+                          }
+
+                          if(el.type==="radio"){
+                            if(el.checked) out[fid]=el.value||"";
+                            return;
+                          }
+                          if(el.type==="checkbox"){
+                            if(!out[fid]) out[fid]=[];
+                            if(el.checked) out[fid].push(el.value||"true");
+                            return;
+                          }
+                          out[fid]=el.value||"";
+                        });
+                        return out;
+                      }
+
+                      function post(url, payload){
+                        return fetch(url, {
+                          method: "POST",
+                          headers: {"Content-Type":"application/json"},
+                          body: JSON.stringify(payload||{}),
+                          credentials: "same-origin"
+                        }).then(function(r){ return r.ok ? r.json() : null; })
+                          .catch(function(){ return null; });
+                      }
+
+                      var form=document.getElementById("smart-form");
+                      if(!form) return;
+
+                      form.addEventListener("submit", function(e){
+                        var tokenEl=document.querySelector('input[name="token"]');
+                        var token=tokenEl ? tokenEl.value : "";
+                        if(!token) return;
+
+                        e.preventDefault();
+
+                        post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
+                          .then(function(data){
+                            if(data && data.success && data.next_token){
+                              window.location.href="/smart_form/"+data.next_token;
+                            } else {
+                              form.submit();
+                            }
+                          });
+                      }, true);
+                    })();
+                  ]]></script>
+
+                </form>
               </div>
             </div>
           </div>
