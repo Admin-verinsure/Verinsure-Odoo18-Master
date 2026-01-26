@@ -1,7 +1,7 @@
 <odoo>
 
     <!-- ==================================================
-         LIST VIEW : SUBMISSIONS
+         LIST VIEW
     =================================================== -->
     <record id="view_smart_form_submission_list" model="ir.ui.view">
         <field name="name">smart.form.submission.list</field>
@@ -20,7 +20,7 @@
     </record>
 
     <!-- ==================================================
-         FORM VIEW : READABLE DATA
+         FORM VIEW
     =================================================== -->
     <record id="view_smart_form_submission_form" model="ir.ui.view">
         <field name="name">smart.form.submission.form</field>
@@ -45,25 +45,10 @@
 
                     <separator string="Readable Data"/>
 
-                    <!-- DYNAMIC READABLE DATA -->
-                    <div>
-                        <table class="table table-sm table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Field</th>
-                                    <th>Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="record.readable_data.items()" t-as="item">
-                                    <tr>
-                                        <td><t t-esc="item[0]"/></td>
-                                        <td><t t-esc="item[1]"/></td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </div>
+                    <!-- ✅ SUPPORTED WAY -->
+                    <group>
+                        <field name="readable_data" widget="json" readonly="1" nolabel="1"/>
+                    </group>
 
                     <separator string="Raw Data (JSON)"/>
 
