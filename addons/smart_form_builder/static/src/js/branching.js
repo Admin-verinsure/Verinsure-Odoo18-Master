@@ -8,11 +8,14 @@
       if (!fid) return;
 
       if (el.type === "checkbox") {
-        answers[fid] = el.checked ? (el.value || "true") : "";
+        if (!answers[fid]) answers[fid] = [];
+        if (el.checked) answers[fid].push(el.value || "true");
       } else if (el.type === "radio") {
         if (el.checked) answers[fid] = el.value;
       } else {
-        answers[fid] = el.value || "";
+        if (el.value !== "" && el.value !== null) {
+        answers[fid] = el.value;
+      }
       }
     });
     return answers;
@@ -25,7 +28,7 @@
 
     const answers = collectAnswers(formEl);
     try {
-      const res = await fetch(`/smart_form/branch/${encodeURIComponent(token)}`, {
+      const res = await fetch(`/smart_form/branching/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),

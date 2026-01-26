@@ -4,39 +4,56 @@ from odoo.http import request
 
 class SmartFormController(http.Controller):
 
-    @http.route("/smart_form/<string:token>", type="http", auth="public", website=True)
-    def public_form(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("share_token", "=", token), ("active", "=", True)], limit=1)
-        if not form:
-            return request.not_found()
-        return request.render("smart_form_builder.smart_form_public", {"form": form, "is_preview": False})
+    
+@http.route(
+    "/smart_form/submit",
+    type="http",
+    auth="public",
+    website=True,
+    csrf=False,
+    methods=["POST"],
+)
+def smart_form_submit(self, **post):
 
-    @http.route("/smart_form/preview/<int:form_id>", type="http", auth="user", website=True)
-    def preview_form(self, form_id, **kw):
-        form = request.env["smart.form"].sudo().browse(form_id)
-        if not form.exists():
-            return request.not_found()
-        return request.render("smart_form_builder.smart_form_public", {"form": form, "is_preview": True})
+    token = post.get("token")
+    form = request.env["smart.form"].sudo().search(
+        [("token", "=", token), ("active", "=", True)],
+        limit=1,
+    )
+    if not form:
+        return request.not_found()
 
-    @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
-    def submit(self, **post):
-        token = post.get("token")
-        form = request.env["smart.form"].sudo().search([("share_token", "=", token), ("active", "=", True)], limit=1)
-        if not form:
-            return request.not_found()
+    first_name = (post.get("first_name") or "").strip()
+    last_name = (post.get("last_name") or "").strip()
+    email = (post.get("email") or "").strip().lower()
+    phone = (post.get("phone") or "").strip()
 
-        data = {}
-        for f in form.field_ids:
-            key = f"field_{f.id}"
-            if f.field_type == "checkbox":
-                data[str(f.id)] = "true" if post.get(key) else ""
-            else:
-                data[str(f.id)] = post.get(key, "")
-        request.env["smart.form.submission"].sudo().create({
-            "form_id": form.id,
-            "data_json": json.dumps(data, ensure_ascii=False),
+    Partner = request.env["res.partner"].sudo()
+    partner = Partner.search([("email", "=ilike", email)], limit=1) if email else None
+
+    if not partner:
+        partner = Partner.create({
+            "name": f"{first_name} {last_name}".strip(),
+            "email": email,
+            "phone": phone,
         })
-        return request.render("smart_form_builder.smart_form_thanks", {"form": form})
+
+    request.env["smart.form.submission"].sudo().create({
+        "form_id": form.id,
+        "partner_id": partner.id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone": phone,
+        "data_json": json.dumps(post, ensure_ascii=False),
+        "ip": request.httprequest.remote_addr,
+        "user_agent": request.httprequest.headers.get("User-Agent"),
+    })
+
+    return request.render(
+        "smart_form_builder.smart_form_thanks",
+        {"form": form, "partner": partner},
+    )
 
     @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
     def options(self, field_id, token=None, **kw):
