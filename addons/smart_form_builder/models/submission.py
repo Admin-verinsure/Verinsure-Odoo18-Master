@@ -13,17 +13,16 @@ class SmartFormSubmission(models.Model):
     form_id = fields.Many2one("smart.form", required=True)
     partner_id = fields.Many2one("res.partner", string="Partner")
 
-    first_name = fields.Char(string="First Name")
-    last_name = fields.Char(string="Last Name")
-    email = fields.Char(string="Email")
-    phone = fields.Char(string="Phone")
+    first_name = fields.Char()
+    last_name = fields.Char()
+    email = fields.Char()
+    phone = fields.Char()
 
     data_source = fields.Selection(
         [
             ("partner", "Fetched from Partner"),
             ("form", "Submitted via Form"),
-        ],
-        string="Data Source",
+        ]
     )
 
     data_json = fields.Text(string="Raw Data")
@@ -31,16 +30,16 @@ class SmartFormSubmission(models.Model):
     user_agent = fields.Char()
 
     # --------------------------------------------------
-    # READABLE DATA (AUTO-GENERATED FROM FORM FIELDS)
+    # READABLE DATA (FIXED)
     # --------------------------------------------------
     readable_data = fields.Json(
         string="Readable Data",
         compute="_compute_readable_data",
-        store=False,
+        readonly=True,
     )
 
     # --------------------------------------------------
-    # COMPUTE METHODS
+    # COMPUTE
     # --------------------------------------------------
     @api.depends("data_json", "form_id")
     def _compute_readable_data(self):
@@ -48,28 +47,29 @@ class SmartFormSubmission(models.Model):
             readable = {}
 
             if not rec.data_json or not rec.form_id:
-                rec.readable_data = readable
+                rec.readable_data = {}
                 continue
 
+            # Load submitted data
             try:
-                submitted_data = json.loads(rec.data_json)
+                submitted = json.loads(rec.data_json)
             except Exception:
-                submitted_data = {}
+                submitted = {}
 
-            # Build mapping: field_key -> field label
-            field_label_map = {}
-            for field in rec.form_id.field_ids:
+            # Map field technical key -> label
+            label_map = {}
+            for field in rec.form_id.sudo().field_ids:
                 key = field.name or f"field_{field.id}"
-                field_label_map[key] = field.label or field.name or key
+                label_map[key] = field.label or field.name or key
 
-            # Replace technical keys with labels
-            for key, value in submitted_data.items():
-                label = field_label_map.get(key, key)
+            # Build readable dict
+            for key, value in submitted.items():
+                label = label_map.get(key, key)
 
-                # Normalize values
                 if isinstance(value, list):
-                    value = ", ".join([str(v) for v in value if v])
+                    value = ", ".join(str(v) for v in value if v)
 
                 readable[label] = value
 
+            # ✅ ASSIGN ALWAYS
             rec.readable_data = readable
