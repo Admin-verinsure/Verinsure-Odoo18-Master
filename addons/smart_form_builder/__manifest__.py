@@ -10,7 +10,7 @@
         "views/menu.xml",
         "views/form_views.xml",
         "views/field_views.xml",
-        "views/submission_views.xml",
+        "views/smart_form_submission_tree.xml",
         "views/branch_rule_views.xml",
         "views/select_field_wizard_views.xml",
         "views/logic_rule_views.xml",
