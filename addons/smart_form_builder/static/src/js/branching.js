@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const BRANCHING_LOCK = "__sfb_branching_done__";
+
   function collectAnswers(formEl) {
     const answers = {};
 
@@ -51,14 +53,17 @@
     }
   }
 
-  // 🔥 GLOBAL SUBMIT INTERCEPT (CAPTURE PHASE — CRITICAL)
+  // 🔥 GLOBAL SUBMIT INTERCEPT (CAPTURE PHASE)
   document.addEventListener(
     "submit",
     async function (ev) {
       const formEl = ev.target;
       if (!(formEl instanceof HTMLFormElement)) return;
 
-      // Only intercept smart forms
+      // Already processed → allow normal submit
+      if (formEl[BRANCHING_LOCK]) return;
+
+      // Only smart forms
       if (
         !formEl.dataset.formToken &&
         !formEl.querySelector('input[name="token"]')
@@ -71,6 +76,7 @@
 
       const data = await evaluateBranching(formEl);
 
+      // 🔀 Redirect if branching matched
       if (data && data.success) {
         if (data.next_token) {
           window.location.href = `/smart_form/${data.next_token}`;
@@ -82,11 +88,11 @@
         }
       }
 
-      // 🔁 No branching → allow real submit
-      formEl.removeAttribute("data-branching-lock");
-      formEl.submit();
+      // 🔓 No branching → allow natural submit ONCE
+      formEl[BRANCHING_LOCK] = true;
+      formEl.dispatchEvent(new Event("submit", { bubbles: true }));
     },
-    true, // 🔥 CAPTURE PHASE (THIS IS WHY IT WORKS)
+    true, // capture phase
   );
 
   console.log("✅ Smart Form Branching ACTIVE");
