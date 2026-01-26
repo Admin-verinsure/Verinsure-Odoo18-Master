@@ -6,6 +6,7 @@ class SmartFormController(http.Controller):
 
     
 
+
 @http.route(
     "/smart_form/submit",
     type="http",
@@ -24,21 +25,23 @@ def smart_form_submit(self, **post):
     if not form:
         return request.not_found()
 
-    # 🔹 Map dynamic fields
     first_name = (post.get("field_24") or "").strip()
     last_name = (post.get("field_25") or "").strip()
     email = (post.get("field_13") or "").strip().lower()
     phone = (post.get("field_11") or "").strip()
 
     Partner = request.env["res.partner"].sudo()
-    partner = Partner.search([("email", "=ilike", email)], limit=1) if email else None
+    partner = False
+    data_source = "form"
+
+    if email:
+        partner = Partner.search([("email", "=ilike", email)], limit=1)
 
     if partner:
         data_source = "partner"
     else:
-        data_source = "form"
         partner = Partner.create({
-            "name": f"{first_name} {last_name}".strip(),
+            "name": f"{first_name} {last_name}".strip() or email,
             "email": email,
             "phone": phone,
         })
