@@ -45,9 +45,9 @@
 
                     <separator string="Readable Data"/>
 
-                    <!-- ✅ SUPPORTED WAY -->
+                    <!-- ✅ FINAL & STABLE -->
                     <group>
-                        <field name="readable_data" widget="json" readonly="1" nolabel="1"/>
+                        <field name="readable_text" readonly="1" nolabel="1"/>
                     </group>
 
                     <separator string="Raw Data (JSON)"/>
