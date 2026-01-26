@@ -1,0 +1,29 @@
+
+<odoo>
+    <!-- Tree view for submissions (readable table) -->
+    <record id="view_smart_form_submission_tree" model="ir.ui.view">
+        <field name="name">smart.form.submission.tree</field>
+        <field name="model">smart.form.submission</field>
+        <field name="arch" type="xml">
+            <tree string="Form Submissions">
+                <field name="create_date" string="Submitted On"/>
+                <field name="first_name"/>
+                <field name="last_name"/>
+                <field name="email"/>
+                <field name="phone"/>
+                <field name="partner_id"/>
+                <field name="data_source"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Action: submissions for a single form -->
+    <record id="action_smart_form_submissions_per_form" model="ir.actions.act_window">
+        <field name="name">Submissions</field>
+        <field name="res_model">smart.form.submission</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_smart_form_submission_tree"/>
+        <field name="domain">[('form_id', '=', active_id)]</field>
+        <field name="context">{}</field>
+    </record>
+</odoo>
