@@ -1,6 +1,8 @@
-
 <odoo>
-    <!-- Tree view for submissions (readable table) -->
+
+    <!-- ==================================================
+         TREE VIEW : SUBMISSIONS LIST
+    =================================================== -->
     <record id="view_smart_form_submission_tree" model="ir.ui.view">
         <field name="name">smart.form.submission.tree</field>
         <field name="model">smart.form.submission</field>
@@ -17,7 +19,70 @@
         </field>
     </record>
 
-    <!-- Action: submissions for a single form -->
+    <!-- ==================================================
+         FORM VIEW : READABLE DATA
+    =================================================== -->
+    <record id="view_smart_form_submission_form" model="ir.ui.view">
+        <field name="name">smart.form.submission.form</field>
+        <field name="model">smart.form.submission</field>
+        <field name="arch" type="xml">
+            <form string="Form Submission">
+                <sheet>
+
+                    <!-- Basic Info -->
+                    <group>
+                        <group>
+                            <field name="form_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="data_source" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="create_date" readonly="1"/>
+                            <field name="ip" readonly="1"/>
+                            <field name="user_agent" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <separator string="Readable Data"/>
+
+                    <!-- READABLE DATA TABLE -->
+                    <div>
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="record.readable_data.items()" t-as="item">
+                                    <tr>
+                                        <td>
+                                            <t t-esc="item[0]"/>
+                                        </td>
+                                        <td>
+                                            <t t-esc="item[1]"/>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <separator string="Raw Data (JSON)"/>
+
+                    <group>
+                        <field name="data_json" readonly="1" nolabel="1"/>
+                    </group>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ==================================================
+         ACTION : SUBMISSIONS PER FORM
+    =================================================== -->
     <record id="action_smart_form_submissions_per_form" model="ir.actions.act_window">
         <field name="name">Submissions</field>
         <field name="res_model">smart.form.submission</field>
@@ -26,4 +91,5 @@
         <field name="domain">[('form_id', '=', active_id)]</field>
         <field name="context">{}</field>
     </record>
+
 </odoo>
