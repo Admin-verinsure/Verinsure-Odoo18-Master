@@ -7,132 +7,68 @@ from odoo.http import request
 
 class SmartFormPublic(http.Controller):
 
+    # --------------------------------------------------
+    # FORM PAGE
+    # --------------------------------------------------
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+        form = request.env["smart.form"].sudo().search(
+            [("token", "=", token), ("active", "=", True)],
+            limit=1,
+        )
         if not form:
             return request.not_found()
 
-        rules = []
-        if hasattr(form, "logic_rule_ids"):
-            for r in form.logic_rule_ids.sudo():
-                rules.append({
-                    "trigger": r.trigger_field_id.id,
-                    "op": r.operator,
-                    "value": r.value_text or "",
-                    "action": r.action,
-                    "target": r.target_field_id.id,
-                })
+        return request.render(
+            "smart_form_builder.smart_form_page",
+            {"form": form},
+        )
 
-        return request.render("smart_form_builder.smart_form_page", {
-            "form": form,
-            "rules_json": json.dumps(rules),
-        })
-
+    # --------------------------------------------------
+    # FIELD OPTIONS
+    # --------------------------------------------------
     @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
     def smart_form_options(self, field_id, token=None, **kw):
         field = request.env["smart.form.field"].sudo().browse(field_id)
         if not field.exists():
-            return request.make_response(json.dumps({"success": False, "options": []}),
-                                         [("Content-Type", "application/json")])
+            return request.make_response(
+                json.dumps({"success": False, "options": []}),
+                [("Content-Type", "application/json")],
+            )
 
         if token:
-            form = request.env["smart.form"].sudo().search([("token", "=", token)], limit=1)
+            form = request.env["smart.form"].sudo().search(
+                [("token", "=", token)],
+                limit=1,
+            )
             if not form or field.form_id.id != form.id:
-                return request.make_response(json.dumps({"success": False, "options": []}),
-                                             [("Content-Type", "application/json")])
+                return request.make_response(
+                    json.dumps({"success": False, "options": []}),
+                    [("Content-Type", "application/json")],
+                )
 
-        return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
-                                     [("Content-Type", "application/json")])
-
-    @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
-    def smart_form_branching(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
-        if not form:
-            return request.make_response(json.dumps({"success": False, "next_token": None}),
-                                         [("Content-Type", "application/json")])
-
-        try:
-            payload = request.get_json_data(silent=True) or {}
-        except Exception:
-            payload = {}
-        answers = payload.get("answers") or {}
-
-        rules = request.env["smart.form.branch.rule"].sudo().search(
-            [("form_id", "=", form.id)],
-            order="sequence,id"
+        return request.make_response(
+            json.dumps({"success": True, "options": field.get_options()}),
+            [("Content-Type", "application/json")],
         )
 
-        def _vals(v):
-            """Accept dict {value,label}, list, or scalar -> list[str]."""
-            if isinstance(v, dict):
-                out = []
-                if v.get("value") not in (None, ""):
-                    out.append(str(v.get("value")).strip())
-                if v.get("label") not in (None, ""):
-                    out.append(str(v.get("label")).strip())
-                return out
-            if isinstance(v, list):
-                return [str(x).strip() for x in v if str(x).strip()]
-            s = str(v).strip()
-            return [s] if s else []
-
-        def _match(rule, val):
-            vals = _vals(val)
-            want = (rule.value_text or "").strip()
-
-            # Case-insensitive compare for strings
-            vals_l = [v.lower() for v in vals]
-            want_l = want.lower()
-
-            if rule.operator in ("in", "not in"):
-                wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
-                ok = any(v in wanted for v in vals_l)
-                return ok if rule.operator == "in" else (not ok)
-
-            if rule.operator == "contains":
-                return any(want_l in v for v in vals_l)
-
-            if rule.operator == "!=":
-                return all(v != want_l for v in vals_l)
-
-            # default '='
-            return any(v == want_l for v in vals_l)
-
-        next_form = None
-        evaluated_any = False  # ✅ critical: only fallback if we actually evaluated a rule
-
-        for r in rules:
-            key = str(r.trigger_field_id.id)
-
-            # ✅ If trigger key isn't present in submitted answers, don't evaluate this rule
-            if key not in answers:
-                continue
-
-            evaluated_any = True
-            if _match(r, answers.get(key)):
-                next_form = r.target_form_id
-                break
-
-        # ✅ fallback ONLY when at least one rule was evaluated (prevents "always fallback")
-        if not next_form and evaluated_any and rules and rules[0].fallback_form_id:
-            next_form = rules[0].fallback_form_id
-
-        return request.make_response(json.dumps({
-            "success": True,
-            "next_token": next_form.token if next_form else None
-        }), [("Content-Type", "application/json")])
-
+    # --------------------------------------------------
+    # FORM SUBMIT (MERGED LOGIC – THIS IS THE FIX)
+    # --------------------------------------------------
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
+
         token = post.get("token")
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+        form = request.env["smart.form"].sudo().search(
+            [("token", "=", token), ("active", "=", True)],
+            limit=1,
+        )
         if not form:
             return request.not_found()
 
+        # 1️⃣ Create submission first
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
-            "data_json": "{}",
             "ip": request.httprequest.remote_addr,
             "user_agent": request.httprequest.headers.get("User-Agent"),
         })
@@ -140,6 +76,7 @@ class SmartFormPublic(http.Controller):
         data = {}
         files = request.httprequest.files
 
+        # 2️⃣ Collect form data (original logic preserved)
         for f in form.field_ids.sudo():
             key = f.name or f"field_{f.id}"
 
@@ -165,8 +102,41 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
+        # 3️⃣ Map readable fields (adjust IDs if needed)
+        first_name = (data.get("field_24") or "").strip()
+        last_name = (data.get("field_25") or "").strip()
+        email = (data.get("field_13") or "").strip().lower()
+        phone = (data.get("field_11") or "").strip()
+
+        # 4️⃣ Partner lookup / create
+        Partner = request.env["res.partner"].sudo()
+        partner = False
+        data_source = "form"
+
+        if email:
+            partner = Partner.search([("email", "=ilike", email)], limit=1)
+
+        if partner:
+            data_source = "partner"
+        else:
+            partner = Partner.create({
+                "name": f"{first_name} {last_name}".strip() or email,
+                "email": email,
+                "phone": phone,
+            })
+
+        # 5️⃣ Final write (THIS WAS MISSING BEFORE)
         submission.sudo().write({
+            "partner_id": partner.id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "phone": phone,
+            "data_source": data_source,
             "data_json": json.dumps(data, ensure_ascii=False),
         })
 
-        return request.render("smart_form_builder.smart_form_thanks", {"form": form})
+        return request.render(
+            "smart_form_builder.smart_form_thanks",
+            {"form": form},
+        )
