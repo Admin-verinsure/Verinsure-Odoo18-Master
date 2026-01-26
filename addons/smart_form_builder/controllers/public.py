@@ -103,20 +103,38 @@ class SmartFormPublic(http.Controller):
         evaluated_any = False  # ✅ critical: only fallback if we actually evaluated a rule
 
         for r in rules:
-            key = str(r.trigger_field_id.id)
+            # Accept both "field id" keys (preferred) and "field technical name" keys (legacy)
+            key_id = str(r.trigger_field_id.id)
+            key_name = (r.trigger_field_id.name or "").strip()
 
-            # ✅ If trigger key isn't present in submitted answers, don't evaluate this rule
-            if key not in answers:
+            val = None
+            if key_id in answers:
+                val = answers.get(key_id)
+            elif key_name and key_name in answers:
+                val = answers.get(key_name)
+            else:
+                # If trigger key isn't present in submitted answers, don't evaluate this rule
                 continue
 
             evaluated_any = True
-            if _match(r, answers.get(key)):
-                next_form = r.target_form_id
-                break
+
+            # If the rule matches but no target is configured, keep evaluating next rules
+            if _match(r, val):
+                if r.target_form_id:
+                    next_form = r.target_form_id
+                    break
+                continue
 
         # ✅ fallback ONLY when at least one rule was evaluated (prevents "always fallback")
-        if not next_form and evaluated_any and rules and rules[0].fallback_form_id:
-            next_form = rules[0].fallback_form_id
+        if not next_form and evaluated_any:
+            # Take the first configured fallback (not necessarily the first rule)
+            fallback = False
+            for rr in rules:
+                if rr.fallback_form_id:
+                    fallback = rr.fallback_form_id
+                    break
+            if fallback:
+                next_form = fallback
 
         return request.make_response(json.dumps({
             "success": True,
