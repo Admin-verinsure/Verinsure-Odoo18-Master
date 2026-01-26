@@ -30,19 +30,31 @@ class SmartFormSubmission(models.Model):
     user_agent = fields.Char()
 
     # --------------------------------------------------
-    # READABLE DATA (FINAL FIX)
+    # READABLE DATA (FINAL)
     # --------------------------------------------------
     readable_data = fields.Json(
         string="Readable Data",
-        compute="_compute_readable_data",
-        store=True,          # ✅ REQUIRED IN ODOO 18
         readonly=True,
     )
 
     # --------------------------------------------------
-    # COMPUTE
+    # CREATE / WRITE (FORCE COMPUTE)
     # --------------------------------------------------
-    @api.depends("data_json", "form_id")
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._compute_readable_data()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "data_json" in vals or "form_id" in vals:
+            self._compute_readable_data()
+        return res
+
+    # --------------------------------------------------
+    # COMPUTE METHOD
+    # --------------------------------------------------
     def _compute_readable_data(self):
         for rec in self:
             readable = {}
@@ -51,19 +63,17 @@ class SmartFormSubmission(models.Model):
                 rec.readable_data = {}
                 continue
 
-            # Load submitted data
             try:
                 submitted = json.loads(rec.data_json)
             except Exception:
                 submitted = {}
 
-            # Map field technical key -> label
+            # Map technical keys → labels
             label_map = {}
             for field in rec.form_id.sudo().field_ids:
                 key = field.name or f"field_{field.id}"
                 label_map[key] = field.label or field.name or key
 
-            # Build readable dict
             for key, value in submitted.items():
                 label = label_map.get(key, key)
 
