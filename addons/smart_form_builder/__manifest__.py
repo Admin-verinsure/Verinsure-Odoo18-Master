@@ -10,7 +10,7 @@
         "views/menu.xml",
         "views/form_views.xml",
         "views/field_views.xml",
-        "views/submission_views.xml",
+        "views/smart_form_submission_tree.xml",
         "views/branch_rule_views.xml",
         "views/select_field_wizard_views.xml",
         "views/logic_rule_views.xml",
@@ -20,7 +20,7 @@
         "web.assets_frontend": [
             "smart_form_builder/static/src/css/sfb_dropdown.css",
             "smart_form_builder/static/src/js/smart_form_frontend.js",
-            "smart_form_builder/static/src/js/branching.js",
+            
         ],
     },
     "application": True,
