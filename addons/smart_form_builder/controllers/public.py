@@ -8,7 +8,7 @@ from odoo.http import request
 class SmartFormPublic(http.Controller):
 
     # --------------------------------------------------
-    # FORM PAGE (WITH FIELD LOGIC RESTORED)
+    # FORM PAGE (FIELD LOGIC INCLUDED)
     # --------------------------------------------------
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
@@ -19,7 +19,7 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # 🔥 FIELD LOGIC (RESTORED)
+        # Field logic rules
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -40,7 +40,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # --------------------------------------------------
-    # FIELD OPTIONS (UNCHANGED)
+    # FIELD OPTIONS
     # --------------------------------------------------
     @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
     def smart_form_options(self, field_id, token=None, **kw):
@@ -68,7 +68,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # --------------------------------------------------
-    # BRANCHING (UNCHANGED)
+    # BRANCHING (NAVIGATION ONLY)
     # --------------------------------------------------
     @http.route(
         "/smart_form/branching/<string:token>",
@@ -99,14 +99,9 @@ class SmartFormPublic(http.Controller):
 
         def _vals(v):
             if isinstance(v, dict):
-                out = []
-                if v.get("value"):
-                    out.append(str(v.get("value")).strip())
-                if v.get("label"):
-                    out.append(str(v.get("label")).strip())
-                return out
+                return [str(x).strip() for x in v.values() if x]
             if isinstance(v, list):
-                return [str(x).strip() for x in v if str(x).strip()]
+                return [str(x).strip() for x in v if x]
             s = str(v).strip()
             return [s] if s else []
 
@@ -128,18 +123,18 @@ class SmartFormPublic(http.Controller):
             return any(v == want for v in vals)
 
         next_form = None
-        evaluated_any = False
+        evaluated = False
 
         for r in rules:
             key = str(r.trigger_field_id.id)
             if key not in answers:
                 continue
-            evaluated_any = True
+            evaluated = True
             if _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
 
-        if not next_form and evaluated_any and rules and rules[0].fallback_form_id:
+        if not next_form and evaluated and rules and rules[0].fallback_form_id:
             next_form = rules[0].fallback_form_id
 
         return request.make_response(
@@ -151,7 +146,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # --------------------------------------------------
-    # FORM SUBMIT (FINAL MERGED & FIXED)
+    # FORM SUBMIT (SAFE, TERMINAL-ONLY)
     # --------------------------------------------------
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
@@ -164,7 +159,28 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # 1️⃣ Create submission
+        # 🚨 BACKEND GUARD:
+        # If this form has ANY branch path (target OR fallback),
+        # it is NOT terminal → NEVER submit here
+        rules = request.env["smart.form.branch.rule"].sudo().search(
+            [("form_id", "=", form.id)]
+        )
+
+        has_path = any(
+            r.target_form_id or r.fallback_form_id
+            for r in rules
+        )
+
+        if has_path:
+            # Safety fallback — should normally never hit
+            return request.render(
+                "smart_form_builder.smart_form_page",
+                {"form": form},
+            )
+
+        # ------------------------------------------------
+        # CREATE SUBMISSION (TERMINAL FORM ONLY)
+        # ------------------------------------------------
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
             "ip": request.httprequest.remote_addr,
@@ -174,7 +190,6 @@ class SmartFormPublic(http.Controller):
         data = {}
         files = request.httprequest.files
 
-        # 2️⃣ Collect form data (ORIGINAL LOGIC PRESERVED)
         for f in form.field_ids.sudo():
             key = f.name or f"field_{f.id}"
 
@@ -200,32 +215,28 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
-        # 3️⃣ Readable field mapping (ADJUST IDs IF NEEDED)
+        # OPTIONAL PARTNER LOGIC
         first_name = (data.get("field_24") or "").strip()
         last_name = (data.get("field_25") or "").strip()
         email = (data.get("field_13") or "").strip().lower()
         phone = (data.get("field_11") or "").strip()
 
-        # 4️⃣ Partner logic
-        Partner = request.env["res.partner"].sudo()
         partner = False
         data_source = "form"
 
         if email:
+            Partner = request.env["res.partner"].sudo()
             partner = Partner.search([("email", "=ilike", email)], limit=1)
-
-        if partner:
+            if not partner:
+                partner = Partner.create({
+                    "name": f"{first_name} {last_name}".strip() or email,
+                    "email": email,
+                    "phone": phone,
+                })
             data_source = "partner"
-        else:
-            partner = Partner.create({
-                "name": f"{first_name} {last_name}".strip() or email,
-                "email": email,
-                "phone": phone,
-            })
 
-        # 5️⃣ Final write (CRITICAL)
         submission.sudo().write({
-            "partner_id": partner.id,
+            "partner_id": partner.id if partner else False,
             "first_name": first_name,
             "last_name": last_name,
             "email": email,
