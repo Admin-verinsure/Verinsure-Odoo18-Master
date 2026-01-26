@@ -30,11 +30,12 @@ class SmartFormSubmission(models.Model):
     user_agent = fields.Char()
 
     # --------------------------------------------------
-    # READABLE DATA (FIXED)
+    # READABLE DATA (FINAL FIX)
     # --------------------------------------------------
     readable_data = fields.Json(
         string="Readable Data",
         compute="_compute_readable_data",
+        store=True,          # ✅ REQUIRED IN ODOO 18
         readonly=True,
     )
 
@@ -71,5 +72,4 @@ class SmartFormSubmission(models.Model):
 
                 readable[label] = value
 
-            # ✅ ASSIGN ALWAYS
             rec.readable_data = readable
