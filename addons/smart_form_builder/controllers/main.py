@@ -5,6 +5,7 @@ from odoo.http import request
 class SmartFormController(http.Controller):
 
     
+
 @http.route(
     "/smart_form/submit",
     type="http",
@@ -23,15 +24,19 @@ def smart_form_submit(self, **post):
     if not form:
         return request.not_found()
 
-    first_name = (post.get("first_name") or "").strip()
-    last_name = (post.get("last_name") or "").strip()
-    email = (post.get("email") or "").strip().lower()
-    phone = (post.get("phone") or "").strip()
+    # 🔹 Map dynamic fields
+    first_name = (post.get("field_24") or "").strip()
+    last_name = (post.get("field_25") or "").strip()
+    email = (post.get("field_13") or "").strip().lower()
+    phone = (post.get("field_11") or "").strip()
 
     Partner = request.env["res.partner"].sudo()
     partner = Partner.search([("email", "=ilike", email)], limit=1) if email else None
 
-    if not partner:
+    if partner:
+        data_source = "partner"
+    else:
+        data_source = "form"
         partner = Partner.create({
             "name": f"{first_name} {last_name}".strip(),
             "email": email,
@@ -45,6 +50,7 @@ def smart_form_submit(self, **post):
         "last_name": last_name,
         "email": email,
         "phone": phone,
+        "data_source": data_source,
         "data_json": json.dumps(post, ensure_ascii=False),
         "ip": request.httprequest.remote_addr,
         "user_agent": request.httprequest.headers.get("User-Agent"),
