@@ -4,6 +4,7 @@ from odoo import models, fields
 class SmartFormSubmission(models.Model):
     _name = "smart.form.submission"
     _description = "Smart Form Submission"
+    _order = "create_date asc"
 
     form_id = fields.Many2one("smart.form", required=True)
     partner_id = fields.Many2one("res.partner", string="Partner")
