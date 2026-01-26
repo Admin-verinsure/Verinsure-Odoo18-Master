@@ -1,6 +1,6 @@
 {
     "name": "Forms (Standalone)",
-    "version": "18.0.1.3.0",
+    "version": "18.0.1.3.1",
     "category": "Tools",
     "summary": "Standalone form builder with dynamic DB dropdown options",
     "depends": ["base", "website"],
@@ -20,8 +20,6 @@
         "web.assets_frontend": [
             "smart_form_builder/static/src/css/sfb_dropdown.css",
             "smart_form_builder/static/src/js/smart_form_frontend.js",
-            "smart_form_builder/static/src/js/branching.js",
-            "smart_form_builder/static/src/js/dynamic_options.js",
         ],
     },
     "application": True,
