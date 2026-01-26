@@ -11,7 +11,7 @@ class SmartFormSubmission(models.Model):
     # CORE FIELDS
     # --------------------------------------------------
     form_id = fields.Many2one("smart.form", required=True)
-    partner_id = fields.Many2one("res.partner", string="Partner")
+    partner_id = fields.Many2one("res.partner")
 
     first_name = fields.Char()
     last_name = fields.Char()
@@ -26,41 +26,33 @@ class SmartFormSubmission(models.Model):
     )
 
     data_json = fields.Text(string="Raw Data")
+    readable_text = fields.Text(string="Readable Data")  # ✅ FINAL FIX
+
     ip = fields.Char()
     user_agent = fields.Char()
 
     # --------------------------------------------------
-    # READABLE DATA (FINAL)
-    # --------------------------------------------------
-    readable_data = fields.Json(
-        string="Readable Data",
-        readonly=True,
-    )
-
-    # --------------------------------------------------
-    # CREATE / WRITE (FORCE COMPUTE)
+    # CREATE / WRITE
     # --------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        records._compute_readable_data()
+        records._build_readable_text()
         return records
 
     def write(self, vals):
         res = super().write(vals)
         if "data_json" in vals or "form_id" in vals:
-            self._compute_readable_data()
+            self._build_readable_text()
         return res
 
     # --------------------------------------------------
-    # COMPUTE METHOD
+    # BUILD READABLE DATA
     # --------------------------------------------------
-    def _compute_readable_data(self):
+    def _build_readable_text(self):
         for rec in self:
-            readable = {}
-
             if not rec.data_json or not rec.form_id:
-                rec.readable_data = {}
+                rec.readable_text = ""
                 continue
 
             try:
@@ -68,7 +60,8 @@ class SmartFormSubmission(models.Model):
             except Exception:
                 submitted = {}
 
-            # Map technical keys → labels
+            lines = []
+
             label_map = {}
             for field in rec.form_id.sudo().field_ids:
                 key = field.name or f"field_{field.id}"
@@ -80,6 +73,6 @@ class SmartFormSubmission(models.Model):
                 if isinstance(value, list):
                     value = ", ".join(str(v) for v in value if v)
 
-                readable[label] = value
+                lines.append(f"{label}: {value}")
 
-            rec.readable_data = readable
+            rec.readable_text = "\n".join(lines)
