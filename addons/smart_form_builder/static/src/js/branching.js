@@ -22,11 +22,15 @@
   }
 
   async function callBranching(formEl) {
-    const tokenInput = formEl.querySelector('input[name="token"]');
-    const token = tokenInput ? tokenInput.value : null;
-    if (!token) return null;
+    const token =
+      formEl.dataset.formToken ||
+      (formEl.querySelector('input[name="token"]') || {}).value ||
+      null;
 
-    const answers = collectAnswers(formEl);
+    if (!token) {
+      console.error("❌ Branching token not found");
+      return null;
+    }
 
     try {
       const res = await fetch(
@@ -34,7 +38,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers }),
+          body: JSON.stringify({ answers: collectAnswers(formEl) }),
           credentials: "same-origin",
         },
       );
@@ -42,6 +46,7 @@
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
+      console.error("❌ Branching fetch failed", e);
       return null;
     }
   }
@@ -53,24 +58,7 @@
 
     if (!formEl) return;
 
-    const cta = document.getElementById("sfb-branching-cta");
-
-    // 🔁 Evaluate on change (preview button)
-    formEl.addEventListener("change", async () => {
-      const data = await callBranching(formEl);
-      if (!cta) return;
-
-      if (data && data.success && data.next_token) {
-        cta.innerHTML = `
-          <a class="btn btn-outline-primary" href="/smart_form/${data.next_token}">
-            Continue
-          </a>`;
-      } else {
-        cta.innerHTML = "";
-      }
-    });
-
-    // 🚨 INTERCEPT SUBMIT (THIS IS THE KEY FIX)
+    // 🔴 INTERCEPT SUBMIT — NON-NEGOTIABLE
     formEl.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
