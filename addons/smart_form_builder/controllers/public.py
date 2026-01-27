@@ -194,10 +194,23 @@ class SmartFormPublic(http.Controller):
                 answers_by_id[str(f.id)] = {"value": val, "label": label or val}
             else:
                 answers_by_id[str(f.id)] = val
-
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),
         })
+
+        # Optional: create a record in the configured target model
+        if form.store_in_model and form.target_model_id:
+            vals = form._build_target_record_vals(answers_by_id)
+            if vals:
+                try:
+                    rec = request.env[form.target_model_id.model].sudo().create(vals)
+                    submission.sudo().write({
+                        "target_model": form.target_model_id.model,
+                        "target_res_id": rec.id,
+                    })
+                except Exception:
+                    # As requested: if something doesn't map cleanly, just skip model storage
+                    pass
 
         # ✅ Server-side branching: always works even if JS fails
         next_form, reason = self._eval_next_form(form, answers_by_id)

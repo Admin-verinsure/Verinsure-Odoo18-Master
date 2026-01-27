@@ -11,6 +11,9 @@ class SmartFormSubmission(models.Model):
     ip = fields.Char(readonly=True)
     user_agent = fields.Char(readonly=True)
 
+    target_model = fields.Char(string="Target Model", readonly=True)
+    target_res_id = fields.Integer(string="Target Record ID", readonly=True)
+
     def data(self):
         for rec in self:
             try:
