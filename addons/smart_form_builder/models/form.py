@@ -10,11 +10,6 @@ class SmartForm(models.Model):
     token = fields.Char(index=True, readonly=True, copy=False, default=lambda self: secrets.token_urlsafe(16))
     active = fields.Boolean(default=True)
 
-    # Optional: store submissions into an Odoo model record
-    store_in_model = fields.Boolean(string="Store in Database Model", default=False)
-    target_model_id = fields.Many2one("ir.model", string="Target Model", ondelete="restrict")
-    field_mapping_ids = fields.One2many("smart.form.model.map", "form_id", string="Field Mapping", copy=True)
-
     field_ids = fields.One2many("smart.form.field", "form_id", string="Fields", copy=True)
     submission_ids = fields.One2many("smart.form.submission", "form_id", string="Submissions", readonly=True)
     branch_rule_ids = fields.One2many("smart.form.branch.rule", "form_id", string="Branch Rules", copy=True)
@@ -56,27 +51,26 @@ class SmartForm(models.Model):
 
 
     def _build_target_record_vals(self, answers_by_id):
-        """Build create() vals for the configured target model from answers_by_id.
+        """Build vals for the configured target model based on mapping.
 
-        answers_by_id keys are string(field_id). Values are either:
-          - scalar (text/number/etc)
-          - list (checkbox values)
-          - dict {"value": ..., "label": ...} for select/radio
-        Only mapped fields are written; anything unmapped is skipped.
+        - Unmapped fields are ignored (as requested).
+        - If store_in_model/target_model_id not configured, returns {}.
         """
         self.ensure_one()
+        if not self.store_in_model or not self.target_model_id:
+            return {}
+
         vals = {}
-        for m in self.field_mapping_ids.sorted(lambda r: (r.sequence, r.id)):
+        for m in self.model_field_mapping_ids.sorted(lambda r: (r.sequence, r.id)):
             ff = m.form_field_id
             mf = m.model_field_id
             if not ff or not mf:
                 continue
 
             raw = answers_by_id.get(str(ff.id))
-            if raw in (None, "", [], {}):
+            if raw is None:
                 continue
 
-            # unwrap dict answers for select/radio
             if isinstance(raw, dict):
                 value = raw.get("value")
                 label = raw.get("label")
@@ -84,20 +78,14 @@ class SmartForm(models.Model):
                 value = raw
                 label = None
 
-            if value in (None, "", [], {}):
+            if value in (None, "", [], {}, False):
                 continue
 
-            t = mf.ttype
-
             try:
+                t = mf.ttype
                 if t in ("char", "text", "html"):
-                    vals[mf.name] = str(label or value)
-
-                elif t == "boolean":
-                    if isinstance(value, str):
-                        vals[mf.name] = value.strip().lower() in ("1", "true", "yes", "y", "on")
-                    else:
-                        vals[mf.name] = bool(value)
+                    # Prefer human label when available
+                    vals[mf.name] = str(label if label not in (None, "") else value)
 
                 elif t == "integer":
                     vals[mf.name] = int(value)
@@ -105,38 +93,40 @@ class SmartForm(models.Model):
                 elif t in ("float", "monetary"):
                     vals[mf.name] = float(value)
 
+                elif t == "boolean":
+                    if isinstance(value, str):
+                        vals[mf.name] = value.strip().lower() in ("1", "true", "yes", "y", "on")
+                    else:
+                        vals[mf.name] = bool(value)
+
                 elif t in ("date", "datetime"):
-                    # Expect ISO string from frontend; if invalid, let create() raise
+                    # Expect ISO strings from the website form; store as-is
                     vals[mf.name] = value
 
                 elif t == "selection":
-                    # Prefer value (selection key). If user mapped label by mistake,
-                    # keep it as-is; create() will raise if invalid.
+                    # Selection expects the key; assume your option value stores the key
                     vals[mf.name] = str(value)
 
                 elif t == "many2one":
-                    # Prefer numeric id; else try name search (best-effort)
-                    if isinstance(value, int):
-                        vals[mf.name] = value
-                    elif isinstance(value, str) and value.isdigit():
+                    if isinstance(value, (int,)) or (isinstance(value, str) and value.isdigit()):
                         vals[mf.name] = int(value)
                     else:
-                        # Best-effort by name (can be ambiguous)
-                        rec = self.env[mf.relation].sudo().search([("name", "=", str(label or value))], limit=1)
+                        # Best-effort: search by display name
+                        rel = self.env[mf.relation]
+                        rec = rel.search([("name", "=", str(value))], limit=1)
                         if rec:
                             vals[mf.name] = rec.id
 
                 elif t in ("many2many", "one2many"):
-                    # Expect list of ids
                     ids = value if isinstance(value, list) else []
                     ids = [int(x) for x in ids if str(x).isdigit()]
-                    vals[mf.name] = [(6, 0, ids)]
+                    if ids:
+                        vals[mf.name] = [(6, 0, ids)]
 
-                else:
-                    # Fallback: try plain assignment
-                    vals[mf.name] = value
+                # unsupported types are silently ignored
             except Exception:
-                # Skip any unmappable value silently as requested
+                # Skip any mapping that can't be converted
                 continue
 
         return vals
+
