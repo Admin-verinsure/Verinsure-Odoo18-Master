@@ -1,11 +1,126 @@
 import json
 import base64
+import logging
 
 from odoo import http
 from odoo.http import request
 
 
 class SmartFormPublic(http.Controller):
+
+    _logger = logging.getLogger(__name__)
+
+    def _create_target_record(self, form, data):
+        """Create a record in the selected target model (if configured).
+        Mapping rule: SmartFormField.technical_name -> target model field name.
+        Unmapped/unknown fields are ignored.
+        """
+        if not form.target_model_id:
+            return None
+        model_name = form.target_model_id.model
+        # Hard safety deny-list for sensitive technical models
+        deny = {
+            "ir.model", "ir.model.fields", "ir.config_parameter", "res.users",
+            "res.groups", "ir.rule", "ir.ui.view", "ir.ui.menu", "ir.actions.act_window",
+            "ir.attachment",
+        }
+        if model_name in deny:
+            self._logger.warning("Smart Form target model denied: %s (form %s)", model_name, form.id)
+            return None
+
+        Model = request.env[model_name].sudo()
+        fields_map = Model._fields
+
+        vals = {}
+        for f in form.field_ids.sudo():
+            key = f.name or f"field_{f.id}"
+            if key not in data:
+                continue
+            if key not in fields_map:
+                continue
+
+            field = fields_map[key]
+            if getattr(field, "readonly", False) or not getattr(field, "store", True):
+                continue
+
+            v = data.get(key)
+
+            try:
+                ftype = field.type
+                if ftype in ("char", "text", "html"):
+                    if isinstance(v, list):
+                        vals[key] = ", ".join([str(x) for x in v if x not in (None, "")])
+                    else:
+                        vals[key] = str(v) if v is not None else False
+
+                elif ftype == "boolean":
+                    if isinstance(v, str):
+                        vals[key] = v.lower() in ("1", "true", "yes", "on")
+                    else:
+                        vals[key] = bool(v)
+
+                elif ftype == "integer":
+                    if isinstance(v, list):
+                        v = v[0] if v else False
+                    vals[key] = int(v) if v not in (None, "", False) else False
+
+                elif ftype == "float":
+                    if isinstance(v, list):
+                        v = v[0] if v else False
+                    vals[key] = float(v) if v not in (None, "", False) else False
+
+                elif ftype == "date":
+                    if v:
+                        vals[key] = v  # Odoo accepts YYYY-MM-DD string
+                elif ftype == "datetime":
+                    if v:
+                        vals[key] = v  # Odoo accepts ISO datetime string
+
+                elif ftype == "selection":
+                    if isinstance(v, list):
+                        vals[key] = v[0] if v else False
+                    else:
+                        vals[key] = v
+
+                elif ftype == "many2one":
+                    if isinstance(v, list):
+                        v = v[0] if v else False
+                    if v in (None, "", False):
+                        continue
+                    if isinstance(v, int):
+                        vals[key] = v
+                    elif isinstance(v, str) and v.isdigit():
+                        vals[key] = int(v)
+                    else:
+                        # If not an ID, skip (safe behavior)
+                        continue
+
+                elif ftype in ("many2many", "one2many"):
+                    # Accept list of ids (strings or ints)
+                    if not v:
+                        continue
+                    if not isinstance(v, list):
+                        v = [v]
+                    ids = []
+                    for item in v:
+                        if isinstance(item, int):
+                            ids.append(item)
+                        elif isinstance(item, str) and item.isdigit():
+                            ids.append(int(item))
+                    if ids:
+                        vals[key] = [(6, 0, ids)]
+
+                else:
+                    # Unknown / unsupported field types: ignore safely
+                    continue
+            except Exception:
+                # Ignore conversion errors per-field
+                continue
+
+        if not vals:
+            return None
+
+        return Model.create(vals)
 
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
@@ -199,20 +314,13 @@ class SmartFormPublic(http.Controller):
             "data_json": json.dumps(data, ensure_ascii=False),
         })
 
-        # Optional: also create a record in configured Odoo model (e.g., Contacts) using field mappings
+        # Optional: create a record in a selected Odoo model (unmapped fields are ignored)
         try:
-            if getattr(form, 'store_in_model', False) and getattr(form, 'target_model_id', False):
-                vals = form.sudo()._build_target_vals_from_answers(answers_by_id)
-                if vals:
-                    model_name = form.target_model_id.model
-                    rec = request.env[model_name].sudo().create(vals)
-                    submission.sudo().write({
-                        'target_model': model_name,
-                        'target_res_id': rec.id,
-                    })
-        except Exception:
-            # Never break public submission/branching due to model-storage issues
-            pass
+            rec = self._create_target_record(form, data)
+            if rec:
+                submission.sudo().write({"target_model": rec._name, "target_res_id": rec.id})
+        except Exception as e:
+            self._logger.exception("Smart Form: target model create failed for form %s: %s", form.id, e)
 
 
         # ✅ Server-side branching: always works even if JS fails
