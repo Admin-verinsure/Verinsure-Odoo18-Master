@@ -10,8 +10,9 @@ class SmartFormSubmission(models.Model):
     data_json = fields.Text(string="Data (JSON)", readonly=True)
     ip = fields.Char(readonly=True)
     user_agent = fields.Char(readonly=True)
-    target_model = fields.Char(string='Target Model', readonly=True)
-    target_res_id = fields.Integer(string='Target Record ID', readonly=True)
+
+    target_model = fields.Char(readonly=True)
+    target_res_id = fields.Integer(readonly=True)
 
     def data(self):
         for rec in self:
