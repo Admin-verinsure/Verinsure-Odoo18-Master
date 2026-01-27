@@ -29,17 +29,7 @@
             <field name="data_json" widget="text" readonly="1"/>
           </group>
         </sheet>
-      
-        <group string="Readable Data">
-            <field name="partner_id"/>
-            <field name="data_source"/>
-            <field name="first_name"/>
-            <field name="last_name"/>
-            <field name="email"/>
-            <field name="phone"/>
-        </group>
-        </form>
-        
+      </form>
     </field>
   </record>
 </odoo>

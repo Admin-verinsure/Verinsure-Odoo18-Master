@@ -6,28 +6,15 @@
           <div class="col-12 col-lg-8">
             <div class="card shadow-sm border-0">
               <div class="card-body p-4 p-md-5">
-
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <!-- ==================================================
-                     FIELD LOGIC RULES JSON (VALID JSON ONLY)
-                ================================================== -->
-                <script type="application/json" id="sfb-rules-json">
-<t t-raw="rules_json or '[]'"/>
-                </script>
+                <!-- Rules JSON (must not be escaped) -->
+                <script type="application/json" id="sfb-rules-json"><t t-raw="rules_json or '[]'"/></script>
 
-                <!-- ==================================================
-                     FORM
-                ================================================== -->
-                <form action="/smart_form/submit"
-                      method="post"
-                      enctype="multipart/form-data"
-                      id="smart-form">
-
+                <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
                   <input type="hidden" name="token" t-att-value="form.token"/>
 
-                  <!-- ================= FIELDS ================= -->
                   <t t-foreach="form.field_ids" t-as="f">
                     <t t-if="f.field_type == 'subheading'">
                       <div class="mt-4 mb-2">
@@ -38,54 +25,54 @@
                       <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
                         <label class="form-label">
                           <span t-esc="f.label"/>
-                          <t t-if="f.required">
-                            <span class="text-danger">*</span>
-                          </t>
+                          <t t-if="f.required"><span class="text-danger">*</span></t>
                         </label>
 
                         <t t-if="f.field_type == 'text'">
                           <input class="form-control" type="text"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
                         </t>
-
                         <t t-elif="f.field_type == 'email'">
                           <input class="form-control" type="email"
+                                 placeholder="name@example.com"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
                         </t>
-
                         <t t-elif="f.field_type == 'phone'">
                           <input class="form-control" type="tel"
+                                 placeholder="+91 XXXXX XXXXX"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
                         </t>
-
                         <t t-elif="f.field_type == 'number'">
                           <input class="form-control" type="number"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                                 t-att-data-field-id="f.id"
+                                 t-att-required="'required' if f.required else None"/>
                         </t>
-
                         <t t-elif="f.field_type == 'textarea'">
                           <textarea class="form-control" rows="4"
                                     t-att-name="f.name or ('field_%s' % f.id)"
-                                    t-att-data-field-id="f.id"/>
+                                    t-att-data-field-id="f.id"
+                                    t-att-required="'required' if f.required else None"></textarea>
                         </t>
-
                         <t t-elif="f.field_type == 'select'">
-                          <select class="form-select"
-                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                  t-att-data-field-id="f.id">
-                            <option value="">-- Select --</option>
-                            <t t-foreach="f.get_options()" t-as="o">
-                              <option t-att-value="o['value']">
-                                <t t-esc="o['label']"/>
-                              </option>
-                            </t>
-                          </select>
+                          <div class="sfb-select-wrap">
+                            <select class="form-select sfb-enhanced-select"
+                                    t-att-name="f.name or ('field_%s' % f.id)"
+                                    t-att-data-field-id="f.id"
+                                    t-att-required="'required' if f.required else None">
+                              <option value="">-- Select --</option>
+                              <t t-foreach="f.get_options()" t-as="o">
+                                <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
+                              </t>
+                            </select>
+                          </div>
                         </t>
-
                         <t t-elif="f.field_type == 'radio'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
@@ -93,13 +80,10 @@
                                      t-att-name="f.name or ('field_%s' % f.id)"
                                      t-att-data-field-id="f.id"
                                      t-att-value="o['value']"/>
-                              <label class="form-check-label">
-                                <t t-esc="o['label']"/>
-                              </label>
+                              <label class="form-check-label"><t t-esc="o['label']"/></label>
                             </div>
                           </t>
                         </t>
-
                         <t t-elif="f.field_type == 'checkbox'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
@@ -107,13 +91,10 @@
                                      t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
                                      t-att-data-field-id="f.id"
                                      t-att-value="o['value']"/>
-                              <label class="form-check-label">
-                                <t t-esc="o['label']"/>
-                              </label>
+                              <label class="form-check-label"><t t-esc="o['label']"/></label>
                             </div>
                           </t>
                         </t>
-
                         <t t-elif="f.field_type == 'file'">
                           <input class="form-control" type="file"
                                  t-att-name="f.name or ('field_%s' % f.id)"
@@ -123,179 +104,191 @@
                     </t>
                   </t>
 
-                  <!-- ================= ACTION BUTTON ================= -->
                   <div class="d-grid mt-4">
-                    <t t-if="has_branching">
-                      <button type="button"
-                              id="sfb-continue"
-                              class="btn btn-primary btn-lg">
-                        Continue
-                      </button>
-                    </t>
-                    <t t-else="">
-                      <button type="submit"
-                              class="btn btn-primary btn-lg">
-                        Submit
-                      </button>
-                    </t>
+                    <button type="submit" class="btn btn-primary btn-lg">Submit</button>
                   </div>
 
-                </form>
-
-                <!-- ==================================================
-                     FIELD LOGIC JS (SHOW / HIDE) ✅ FINAL
-                ================================================== -->
-                <script type="text/javascript"><![CDATA[
-                (function(){
-                  function getRules(){
-                    var el = document.getElementById("sfb-rules-json");
-                    if(!el) return [];
-                    try {
-                      return JSON.parse(el.textContent.trim() || "[]");
-                    } catch(e){
-                      console.error("Field logic JSON error", e);
-                      return [];
-                    }
-                  }
-
-                  function nodes(fid){
-                    return document.querySelectorAll(
-                      'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
-                    );
-                  }
-
-                  function wrap(fid){
-                    return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
-                  }
-
-                  function valueOf(fid){
-                    var els = nodes(fid);
-                    if(!els.length) return "";
-
-                    var first = els[0];
-
-                    if(first.type === "radio"){
-                      for(var i=0;i<els.length;i++){
-                        if(els[i].checked) return els[i].value || "";
-                      }
-                      return "";
-                    }
-
-                    if(first.type === "checkbox"){
-                      var vals=[];
-                      els.forEach(function(x){
-                        if(x.checked) vals.push(x.value || "true");
-                      });
-                      return vals;
-                    }
-
-                    return first.value || "";
-                  }
-
-                  function match(op,left,right){
-                    var want = String(right||"").toLowerCase().trim();
-                    var vals = Array.isArray(left) ? left : [left];
-                    vals = vals.map(v => String(v||"").toLowerCase());
-
-                    if(op === "contains" || op === "ilike" || op === "like"){
-                      return vals.some(v => v.indexOf(want) !== -1);
-                    }
-                    if(op === "!="){
-                      return vals.every(v => v !== want);
-                    }
-                    if(op === "in"){
-                      return want.split(",").some(w => vals.includes(w.trim()));
-                    }
-                    return vals.includes(want);
-                  }
-
-                  var RULES = getRules();
-                  if(!RULES.length) return;
-
-                  RULES.forEach(function(r){
-                    if(r.action === "show"){
-                      var w = wrap(r.target);
-                      if(w) w.style.display = "none";
-                    }
-                  });
-
-                  function apply(){
-                    RULES.forEach(function(r){
-                      var ok = match(r.op, valueOf(r.trigger), r.value);
-                      var w = wrap(r.target);
-                      if(!w) return;
-
-                      if(r.action === "show"){
-                        w.style.display = ok ? "" : "none";
-                      } else if(r.action === "hide"){
-                        w.style.display = ok ? "none" : "";
-                      }
-                    });
-                  }
-
-                  var form = document.getElementById("smart-form");
-                  if(!form) return;
-
-                  form.addEventListener("input", apply, true);
-                  form.addEventListener("change", apply, true);
-                  apply();
-                })();
-                ]]></script>
-
-                <!-- ==================================================
-                     BRANCHING JS (BACKEND AUTHORITATIVE)
-                ================================================== -->
-                <t t-if="has_branching">
+                  <!-- ✅ Inline Conditional Logic -->
                   <script type="text/javascript"><![CDATA[
-                  (function(){
-                    function collect(){
-                      var out={};
-                      document.querySelectorAll(
-                        'input[data-field-id],select[data-field-id],textarea[data-field-id]'
-                      ).forEach(function(el){
-                        var id = el.dataset.fieldId;
-                        if(!id) return;
+                    (function(){
+                      function safeRules(){
+                        var el = document.getElementById("sfb-rules-json");
+                        if(!el) return [];
+                        try { return JSON.parse((el.textContent||"[]").trim()||"[]") || []; }
+                        catch(e){ return []; }
+                      }
+                      function inputNodes(fid){
+                        return document.querySelectorAll(
+                          'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
+                        );
+                      }
+                      function wrap(fid){
+                        return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
+                      }
+                      function valueOf(fid){
+                        var nodes = inputNodes(fid);
+                        if(!nodes.length) return "";
+                        var first = nodes[0];
+                        if(first.type==="radio"){
+                          for(var i=0;i<nodes.length;i++){ if(nodes[i].checked) return nodes[i].value||""; }
+                          return "";
+                        }
+                        if(first.type==="checkbox"){
+                          var vals=[];
+                          for(var j=0;j<nodes.length;j++){ if(nodes[j].checked) vals.push(nodes[j].value||"true"); }
+                          return vals;
+                        }
+                        return first.value||"";
+                      }
+                      function num(x){
+                        try { return parseFloat(x); } catch(e){ return NaN; }
+                      }
+                      function compare(op,left,right){
+                        var r = (right==null?"":String(right)).trim();
+                        // numeric ops
+                        if(op===">"||op===">="||op==="<"||op==="<="){
+                          var ln = Array.isArray(left) ? NaN : num(left);
+                          var rn = num(r);
+                          if(isNaN(ln)||isNaN(rn)) return false;
+                          if(op===">") return ln>rn;
+                          if(op===">=") return ln>=rn;
+                          if(op==="<") return ln<rn;
+                          if(op==="<=") return ln<=rn;
+                        }
+                        // string ops
+                        var want = r.toLowerCase();
+                        var vals = Array.isArray(left) ? left.map(String) : [String(left||"")];
+                        vals = vals.map(function(v){return v.toLowerCase();});
 
-                        if(el.type==="radio"){
-                          if(el.checked) out[id]=el.value||"";
-                          return;
+                        if(op==="contains") return vals.some(function(v){return v.indexOf(want)!==-1;});
+                        if(op==="!=") return vals.every(function(v){return v!==want;});
+                        if(op==="in"||op==="not in"){
+                          var wanted = want.split(",").map(function(s){return s.trim();}).filter(Boolean);
+                          var ok = vals.some(function(v){return wanted.indexOf(v)!==-1;});
+                          return op==="in"? ok : !ok;
                         }
-                        if(el.type==="checkbox"){
-                          out[id]=out[id]||[];
-                          if(el.checked) out[id].push(el.value||"true");
-                          return;
-                        }
-                        out[id]=el.value||"";
+                        // default '='
+                        return vals.some(function(v){return v===want;});
+                      }
+
+                      var rules = safeRules();
+                      if(!rules.length) return;
+
+                      // hide targets of "show" rules by default
+                      var targets = {};
+                      rules.forEach(function(r){ if(r.action==="show") targets[String(r.target)] = true; });
+                      Object.keys(targets).forEach(function(tid){
+                        var w = wrap(tid);
+                        if(w) w.style.display="none";
                       });
-                      return out;
-                    }
 
-                    var btn = document.getElementById("sfb-continue");
-                    var form = document.getElementById("smart-form");
-                    if(!btn || !form) return;
+                      function apply(){
+                        rules.forEach(function(r){
+                          var trig = String(r.trigger);
+                          var targ = String(r.target);
+                          var ok = compare(r.op, valueOf(trig), r.value);
 
-                    btn.addEventListener("click", function(){
-                      var token = form.querySelector('input[name="token"]').value;
+                          var tw = wrap(targ);
+                          if(!tw) return;
 
-                      fetch("/smart_form/branching/"+encodeURIComponent(token),{
-                        method:"POST",
-                        headers:{"Content-Type":"application/json"},
-                        body:JSON.stringify({answers:collect()}),
-                        credentials:"same-origin"
-                      })
-                      .then(r => r.json())
-                      .then(function(d){
-                        if(d && d.next_token){
-                          window.location.href="/smart_form/"+d.next_token;
-                        } else {
-                          form.submit();
-                        }
-                      });
-                    });
-                  })();
+                          if(r.action==="show"){
+                            tw.style.display = ok ? "" : "none";
+                            if(ok){
+                              var trw = wrap(trig);
+                              if(trw && trw.nextElementSibling !== tw){
+                                trw.parentNode.insertBefore(tw, trw.nextElementSibling);
+                              }
+                            } else {
+                              // clear when hidden
+                              tw.querySelectorAll("input,select,textarea").forEach(function(i){
+                                if(i.type==="checkbox"||i.type==="radio") i.checked=false;
+                                else i.value="";
+                              });
+                            }
+                          } else if(r.action==="hide"){
+                            tw.style.display = ok ? "none" : "";
+                          }
+                        });
+                      }
+
+                      var form = document.getElementById("smart-form");
+                      if(!form) return;
+                      apply();
+
+                      var t=null;
+                      function onChange(){
+                        if(t) clearTimeout(t);
+                        t=setTimeout(apply, 30);
+                      }
+                      form.addEventListener("input", onChange, true);
+                      form.addEventListener("change", onChange, true);
+                    })();
                   ]]></script>
-                </t>
 
+                  <!-- ✅ Branching on submit -->
+                  <script type="text/javascript"><![CDATA[
+                    (function(){
+                      function collectAnswers(){
+                        var out={};
+                        var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
+                        nodes.forEach(function(el){
+                          var fid=el.getAttribute('data-field-id');
+                          if(!fid) return;
+
+                          if(el.tagName==="SELECT"){
+                            var label="";
+                            try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
+                            out[fid] = {value:(el.value||""), label:(label||"")};
+                            return;
+                          }
+
+                          if(el.type==="radio"){
+                            if(el.checked) out[fid]=el.value||"";
+                            return;
+                          }
+                          if(el.type==="checkbox"){
+                            if(!out[fid]) out[fid]=[];
+                            if(el.checked) out[fid].push(el.value||"true");
+                            return;
+                          }
+                          out[fid]=el.value||"";
+                        });
+                        return out;
+                      }
+
+                      function post(url, payload){
+                        return fetch(url, {
+                          method: "POST",
+                          headers: {"Content-Type":"application/json"},
+                          body: JSON.stringify(payload||{}),
+                          credentials: "same-origin"
+                        }).then(function(r){ return r.ok ? r.json() : null; })
+                          .catch(function(){ return null; });
+                      }
+
+                      var form=document.getElementById("smart-form");
+                      if(!form) return;
+
+                      form.addEventListener("submit", function(e){
+                        var tokenEl=document.querySelector('input[name="token"]');
+                        var token=tokenEl ? tokenEl.value : "";
+                        if(!token) return;
+
+                        e.preventDefault();
+
+                        post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
+                          .then(function(data){
+                            if(data && data.success && data.next_token){
+                              window.location.href="/smart_form/"+data.next_token;
+                            } else {
+                              form.submit();
+                            }
+                          });
+                      }, true);
+                    })();
+                  ]]></script>
+
+                </form>
               </div>
             </div>
           </div>
