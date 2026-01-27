@@ -1,9 +1,10 @@
 (function () {
   "use strict";
 
-  // ---------------------------------------------
-  // COLLECT ANSWERS
-  // ---------------------------------------------
+  // rules_json is already rendered by backend
+  const RULES = window.SFB_RULES || [];
+  let nextFormToken = null;
+
   function collectAnswers(formEl) {
     const answers = {};
     formEl.querySelectorAll("[data-field-id]").forEach((el) => {
@@ -15,98 +16,74 @@
         if (el.checked) answers[fid].push(el.value || "true");
       } else if (el.type === "radio") {
         if (el.checked) answers[fid] = el.value;
-      } else if (el.value !== "" && el.value !== null) {
-        answers[fid] = el.value;
+      } else {
+        answers[fid] = el.value || "";
       }
     });
     return answers;
   }
 
-  // ---------------------------------------------
-  // CALL BRANCHING API
-  // ---------------------------------------------
-  async function callBranching(formEl) {
-    const tokenInput = formEl.querySelector('input[name="token"]');
-    if (!tokenInput) return null;
-
-    try {
-      const res = await fetch(
-        `/smart_form/branching/${encodeURIComponent(tokenInput.value)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers: collectAnswers(formEl) }),
-          credentials: "same-origin",
-        },
-      );
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (e) {
-      console.error("❌ Branching request failed", e);
-      return null;
-    }
+  function normalize(val) {
+    if (Array.isArray(val)) return val.map((v) => String(v).toLowerCase());
+    return [String(val || "").toLowerCase()];
   }
 
-  // ---------------------------------------------
-  // CTA PREVIEW (OPTIONAL)
-  // ---------------------------------------------
-  async function updateCTA(formEl) {
+  function match(rule, value) {
+    const vals = normalize(value);
+    const want = (rule.value || "").toLowerCase();
+
+    if (rule.op === "in") {
+      return vals.includes(want);
+    }
+    if (rule.op === "contains") {
+      return vals.some((v) => v.includes(want));
+    }
+    if (rule.op === "!=") {
+      return vals.every((v) => v !== want);
+    }
+    return vals.includes(want); // default "="
+  }
+
+  function evaluateBranching(formEl) {
+    nextFormToken = null;
+    const answers = collectAnswers(formEl);
+
+    for (const rule of RULES) {
+      const key = String(rule.trigger);
+      if (!(key in answers)) continue;
+
+      if (match(rule, answers[key])) {
+        nextFormToken = rule.target_token || null;
+        break;
+      }
+    }
+
+    // Optional CTA preview (like field logic preview)
     const cta = document.getElementById("sfb-branching-cta");
-    if (!cta) return;
-
-    const data = await callBranching(formEl);
-
-    if (data && data.success && data.next_token) {
-      cta.innerHTML = `
-        <a class="btn btn-outline-primary" href="/smart_form/${data.next_token}">
-          Continue
-        </a>`;
-    } else {
-      cta.innerHTML = "";
+    if (cta) {
+      if (nextFormToken) {
+        cta.innerHTML = `<a class="btn btn-outline-primary" href="/smart_form/${nextFormToken}">Continue</a>`;
+      } else {
+        cta.innerHTML = "";
+      }
     }
   }
 
-  // ---------------------------------------------
-  // SUBMIT HANDLER (FINAL AUTHORITY)
-  // ---------------------------------------------
-  async function onSubmit(ev) {
-    const formEl = ev.target;
-    if (!(formEl instanceof HTMLFormElement)) return;
-
-    const tokenInput = formEl.querySelector('input[name="token"]');
-    if (!tokenInput) return;
-
-    ev.preventDefault(); // 🔥 intercept once
-
-    const data = await callBranching(formEl);
-
-    // 🔁 Branch exists → redirect
-    if (data && data.success && data.next_token) {
-      window.location.href = `/smart_form/${data.next_token}`;
-      return;
-    }
-
-    // ✅ Terminal form → submit ONCE
-    document.removeEventListener("submit", onSubmit, true);
-    formEl.submit();
-  }
-
-  // ---------------------------------------------
-  // INIT
-  // ---------------------------------------------
   document.addEventListener("DOMContentLoaded", () => {
-    const formEl =
-      document.querySelector("form[action='/smart_form/submit']") ||
-      document.querySelector("form");
-
+    const formEl = document.querySelector("form");
     if (!formEl) return;
 
-    updateCTA(formEl);
-    formEl.addEventListener("change", () => updateCTA(formEl));
+    // Evaluate on change (JUST LIKE FIELD LOGIC)
+    formEl.addEventListener("change", () => evaluateBranching(formEl));
+
+    // Final decision on submit
+    formEl.addEventListener("submit", (e) => {
+      if (nextFormToken) {
+        e.preventDefault();
+        window.location.href = `/smart_form/${nextFormToken}`;
+      }
+    });
   });
 
-  // 🔥 CAPTURE PHASE SUBMIT INTERCEPT
-  document.addEventListener("submit", onSubmit, true);
-
-  console.log("✅ Smart Form Branching JS ACTIVE");
+  console.log("✅ Branching logic loaded (field-logic style)");
 })();
