@@ -6,11 +6,18 @@ from odoo.http import request
 
 class SmartFormPublic(http.Controller):
 
-    # --------------------------------------------------
-    # FORM PAGE (FIELD LOGIC INCLUDED)
-    # --------------------------------------------------
-    @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
+    # ==================================================
+    # FORM PAGE (FIELD LOGIC + BRANCHING INFO)
+    # ==================================================
+    @http.route(
+        "/smart_form/<string:token>",
+        type="http",
+        auth="public",
+        website=True,
+        sitemap=False,
+    )
     def smart_form_page(self, token, **kw):
+
         form = request.env["smart.form"].sudo().search(
             [("token", "=", token), ("active", "=", True)],
             limit=1,
@@ -18,6 +25,9 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
+        # ------------------------------
+        # FIELD LOGIC RULES (SHOW / HIDE)
+        # ------------------------------
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -29,19 +39,36 @@ class SmartFormPublic(http.Controller):
                     "target": r.target_field_id.id,
                 })
 
+        # ------------------------------
+        # BRANCHING FLAG (CRITICAL)
+        # ------------------------------
+        has_branching = bool(
+            request.env["smart.form.branch.rule"]
+            .sudo()
+            .search([("form_id", "=", form.id)], limit=1)
+        )
+
         return request.render(
             "smart_form_builder.smart_form_page",
             {
                 "form": form,
                 "rules_json": json.dumps(rules),
+                "has_branching": has_branching,   # ✅ USED BY TEMPLATE
             },
         )
 
-    # --------------------------------------------------
-    # FIELD OPTIONS
-    # --------------------------------------------------
-    @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
+    # ==================================================
+    # FIELD OPTIONS (DYNAMIC / STATIC)
+    # ==================================================
+    @http.route(
+        "/smart_form/options/<int:field_id>",
+        type="http",
+        auth="public",
+        website=True,
+        csrf=False,
+    )
     def smart_form_options(self, field_id, token=None, **kw):
+
         field = request.env["smart.form.field"].sudo().browse(field_id)
         if not field.exists():
             return request.make_response(
@@ -65,9 +92,9 @@ class SmartFormPublic(http.Controller):
             [("Content-Type", "application/json")],
         )
 
-    # --------------------------------------------------
-    # BRANCHING (NAVIGATION ONLY)
-    # --------------------------------------------------
+    # ==================================================
+    # BRANCHING (NAVIGATION ONLY — NO SUBMIT)
+    # ==================================================
     @http.route(
         "/smart_form/branching/<string:token>",
         type="http",
@@ -77,6 +104,7 @@ class SmartFormPublic(http.Controller):
         methods=["POST"],
     )
     def smart_form_branching(self, token, **kw):
+
         form = request.env["smart.form"].sudo().search(
             [("token", "=", token), ("active", "=", True)],
             limit=1,
@@ -95,6 +123,9 @@ class SmartFormPublic(http.Controller):
             order="sequence,id",
         )
 
+        # ------------------------------
+        # NORMALIZE VALUES
+        # ------------------------------
         def _vals(v):
             if isinstance(v, dict):
                 return [str(x).strip() for x in v.values() if x]
@@ -103,6 +134,9 @@ class SmartFormPublic(http.Controller):
             s = str(v).strip()
             return [s] if s else []
 
+        # ------------------------------
+        # MATCH RULE
+        # ------------------------------
         def _match(rule, val):
             vals = [v.lower() for v in _vals(val)]
             want = (rule.value_text or "").strip().lower()
@@ -120,6 +154,9 @@ class SmartFormPublic(http.Controller):
 
             return any(v == want for v in vals)
 
+        # ------------------------------
+        # EVALUATE RULES
+        # ------------------------------
         next_form = None
         evaluated = False
 
@@ -127,11 +164,15 @@ class SmartFormPublic(http.Controller):
             key = str(r.trigger_field_id.id)
             if key not in answers:
                 continue
+
             evaluated = True
             if _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
 
+        # ------------------------------
+        # FALLBACK
+        # ------------------------------
         if not next_form and evaluated and rules and rules[0].fallback_form_id:
             next_form = rules[0].fallback_form_id
 
@@ -143,10 +184,17 @@ class SmartFormPublic(http.Controller):
             [("Content-Type", "application/json")],
         )
 
-    # --------------------------------------------------
-    # FORM SUBMIT (FINAL, CORRECT)
-    # --------------------------------------------------
-    @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
+    # ==================================================
+    # FORM SUBMIT (TERMINAL FORMS ONLY)
+    # ==================================================
+    @http.route(
+        "/smart_form/submit",
+        type="http",
+        auth="public",
+        website=True,
+        csrf=False,
+        methods=["POST"],
+    )
     def smart_form_submit(self, **post):
 
         token = post.get("token")
@@ -157,9 +205,9 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # ------------------------------------------------
-        # COLLECT FORM DATA
-        # ------------------------------------------------
+        # ------------------------------
+        # COLLECT DATA
+        # ------------------------------
         data = {}
         files = request.httprequest.files
 
@@ -188,9 +236,9 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
-        # ------------------------------------------------
-        # OPTIONAL PARTNER LOGIC (FIXED)
-        # ------------------------------------------------
+        # ------------------------------
+        # OPTIONAL PARTNER LOGIC
+        # ------------------------------
         first_name = (data.get("field_24") or "").strip()
         last_name = (data.get("field_25") or "").strip()
         email = (data.get("field_13") or "").strip().lower()
@@ -211,11 +259,10 @@ class SmartFormPublic(http.Controller):
                     "email": email,
                     "phone": phone,
                 })
-                data_source = "form"
 
-        # ------------------------------------------------
-        # CREATE SUBMISSION (ONCE, CLEAN)
-        # ------------------------------------------------
+        # ------------------------------
+        # CREATE SUBMISSION
+        # ------------------------------
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
             "partner_id": partner.id if partner else False,

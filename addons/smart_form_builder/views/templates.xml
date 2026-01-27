@@ -6,10 +6,11 @@
           <div class="col-12 col-lg-8">
             <div class="card shadow-sm border-0">
               <div class="card-body p-4 p-md-5">
+
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <!-- Rules JSON (must not be escaped) -->
+                <!-- Rules JSON -->
                 <script type="application/json" id="sfb-rules-json">
                   <t t-raw="rules_json or '[]'"/>
                 </script>
@@ -38,47 +39,39 @@
                         <t t-if="f.field_type == 'text'">
                           <input class="form-control" type="text"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                                 t-att-data-field-id="f.id"/>
                         </t>
                         <t t-elif="f.field_type == 'email'">
                           <input class="form-control" type="email"
-                                 placeholder="name@example.com"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                                 t-att-data-field-id="f.id"/>
                         </t>
                         <t t-elif="f.field_type == 'phone'">
                           <input class="form-control" type="tel"
-                                 placeholder="+91 XXXXX XXXXX"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                                 t-att-data-field-id="f.id"/>
                         </t>
                         <t t-elif="f.field_type == 'number'">
                           <input class="form-control" type="number"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                                 t-att-data-field-id="f.id"/>
                         </t>
                         <t t-elif="f.field_type == 'textarea'">
                           <textarea class="form-control" rows="4"
                                     t-att-name="f.name or ('field_%s' % f.id)"
-                                    t-att-data-field-id="f.id"
-                                    t-att-required="'required' if f.required else None"></textarea>
+                                    t-att-data-field-id="f.id"/>
                         </t>
                         <t t-elif="f.field_type == 'select'">
-                          <div class="sfb-select-wrap">
-                            <select class="form-select sfb-enhanced-select"
-                                    t-att-name="f.name or ('field_%s' % f.id)"
-                                    t-att-data-field-id="f.id"
-                                    t-att-required="'required' if f.required else None">
-                              <option value="">-- Select --</option>
-                              <t t-foreach="f.get_options()" t-as="o">
-                                <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
-                              </t>
-                            </select>
-                          </div>
+                          <select class="form-select"
+                                  t-att-name="f.name or ('field_%s' % f.id)"
+                                  t-att-data-field-id="f.id">
+                            <option value="">-- Select --</option>
+                            <t t-foreach="f.get_options()" t-as="o">
+                              <option t-att-value="o['value']">
+                                <t t-esc="o['label']"/>
+                              </option>
+                            </t>
+                          </select>
                         </t>
                         <t t-elif="f.field_type == 'radio'">
                           <t t-foreach="f.get_options()" t-as="o">
@@ -87,7 +80,9 @@
                                      t-att-name="f.name or ('field_%s' % f.id)"
                                      t-att-data-field-id="f.id"
                                      t-att-value="o['value']"/>
-                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                              <label class="form-check-label">
+                                <t t-esc="o['label']"/>
+                              </label>
                             </div>
                           </t>
                         </t>
@@ -98,7 +93,9 @@
                                      t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
                                      t-att-data-field-id="f.id"
                                      t-att-value="o['value']"/>
-                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                              <label class="form-check-label">
+                                <t t-esc="o['label']"/>
+                              </label>
                             </div>
                           </t>
                         </t>
@@ -111,79 +108,81 @@
                     </t>
                   </t>
 
+                  <!-- ================= ACTION BUTTON ================= -->
                   <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg">Submit</button>
+
+                    <!-- 🔀 BRANCHED FORM -->
+                    <t t-if="has_branching">
+                      <button type="button"
+                              id="sfb-continue"
+                              class="btn btn-primary btn-lg">
+                        Continue
+                      </button>
+                    </t>
+
+                    <!-- ✅ TERMINAL FORM -->
+                    <t t-else="">
+                      <button type="submit"
+                              class="btn btn-primary btn-lg">
+                        Submit
+                      </button>
+                    </t>
+
                   </div>
 
-                  <!-- ================= FIELD LOGIC (UNCHANGED) ================= -->
-                  <!-- (your entire inline conditional logic block stays EXACTLY same) -->
+                </form>
 
-                  <!-- ================= BRANCHING ON SUBMIT (FIXED ONLY) ================= -->
+                <!-- ================= BRANCHING JS (CLEAN) ================= -->
+                <t t-if="has_branching">
                   <script type="text/javascript"><![CDATA[
                     (function(){
                       function collectAnswers(){
-                        var out={};
+                        var out = {};
                         document.querySelectorAll(
                           'input[data-field-id],select[data-field-id],textarea[data-field-id]'
                         ).forEach(function(el){
-                          var fid=el.getAttribute('data-field-id');
+                          var fid = el.getAttribute('data-field-id');
                           if(!fid) return;
 
-                          if(el.type==="radio"){
-                            if(el.checked) out[fid]=el.value||"";
+                          if(el.type === "radio"){
+                            if(el.checked) out[fid] = el.value || "";
                             return;
                           }
-                          if(el.type==="checkbox"){
-                            if(!out[fid]) out[fid]=[];
-                            if(el.checked) out[fid].push(el.value||"true");
+                          if(el.type === "checkbox"){
+                            out[fid] = out[fid] || [];
+                            if(el.checked) out[fid].push(el.value || "true");
                             return;
                           }
-                          out[fid]=el.value||"";
+                          out[fid] = el.value || "";
                         });
                         return out;
                       }
 
-                      function post(url,payload){
-                        return fetch(url,{
-                          method:"POST",
-                          headers:{"Content-Type":"application/json"},
-                          body:JSON.stringify(payload||{}),
-                          credentials:"same-origin"
-                        }).then(function(r){
-                          return r.ok ? r.json() : null;
-                        }).catch(function(){
-                          return null;
-                        });
-                      }
+                      var btn = document.getElementById("sfb-continue");
+                      if(!btn) return;
 
-                      var form=document.getElementById("smart-form");
-                      if(!form) return;
+                      btn.addEventListener("click", function(){
+                        var token = document.querySelector('input[name="token"]').value;
 
-                      function onSubmit(e){
-                        var tokenEl=document.querySelector('input[name="token"]');
-                        if(!tokenEl) return;
-
-                        e.preventDefault();
-
-                        post(
-                          "/smart_form/branching/"+encodeURIComponent(tokenEl.value),
-                          {answers:collectAnswers()}
-                        ).then(function(data){
+                        fetch("/smart_form/branching/" + encodeURIComponent(token), {
+                          method: "POST",
+                          headers: {"Content-Type":"application/json"},
+                          body: JSON.stringify({answers: collectAnswers()}),
+                          credentials: "same-origin"
+                        })
+                        .then(function(r){ return r.json(); })
+                        .then(function(data){
                           if(data && data.success && data.next_token){
-                            window.location.href="/smart_form/"+data.next_token;
+                            window.location.href = "/smart_form/" + data.next_token;
                           } else {
-                            // 🔧 FIX: remove handler before native submit
-                            form.removeEventListener("submit", onSubmit, true);
-                            form.submit();
+                            alert("No matching branch rule.");
                           }
                         });
-                      }
-
-                      form.addEventListener("submit", onSubmit, true);
+                      });
                     })();
                   ]]></script>
+                </t>
 
-                </form>
               </div>
             </div>
           </div>
