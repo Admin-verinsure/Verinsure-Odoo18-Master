@@ -9,10 +9,8 @@
         <field name="form_id"/>
         <field name="ip"/>
         <field name="user_agent"/>
-          <field name="target_model" readonly="1"/>
-          <field name="target_res_id" readonly="1"/>
-        <field name="target_model"/>
-        <field name="target_res_id"/>
+        <field name="target_model" readonly="1"/>
+        <field name="target_res_id" readonly="1"/>
       </list>
     </field>
   </record>
@@ -20,14 +18,19 @@
   <record id="view_smart_form_submission_form" model="ir.ui.view">
     <field name="name">smart.form.submission.form</field>
     <field name="model">smart.form.submission</field>
+    <field name="type">form</field>
     <field name="arch" type="xml">
-      <form>
+      <form string="Submission">
         <sheet>
           <group>
             <field name="form_id" readonly="1"/>
             <field name="create_date" readonly="1"/>
             <field name="ip" readonly="1"/>
             <field name="user_agent" readonly="1"/>
+          </group>
+          <group>
+            <field name="target_model" readonly="1"/>
+            <field name="target_res_id" readonly="1"/>
           </group>
           <group>
             <field name="data_json" widget="text" readonly="1"/>
