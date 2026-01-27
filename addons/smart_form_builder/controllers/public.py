@@ -199,19 +199,21 @@ class SmartFormPublic(http.Controller):
             "data_json": json.dumps(data, ensure_ascii=False),
         })
 
-        # ✅ Optional: also store into a configured target model (e.g. Contacts/res.partner)
+        # Optional: also create a record in configured Odoo model (e.g., Contacts) using field mappings
         try:
-            if getattr(form, "store_in_model", False) and getattr(form, "target_model_id", False):
-                vals = form._build_target_record_vals(answers_by_id)
+            if getattr(form, 'store_in_model', False) and getattr(form, 'target_model_id', False):
+                vals = form.sudo()._build_target_vals_from_answers(answers_by_id)
                 if vals:
-                    rec = request.env[form.target_model_id.model].sudo().create(vals)
+                    model_name = form.target_model_id.model
+                    rec = request.env[model_name].sudo().create(vals)
                     submission.sudo().write({
-                        "target_model": form.target_model_id.model,
-                        "target_res_id": rec.id,
+                        'target_model': model_name,
+                        'target_res_id': rec.id,
                     })
         except Exception:
-            # Never block form submit/branching on target model creation issues
+            # Never break public submission/branching due to model-storage issues
             pass
+
 
         # ✅ Server-side branching: always works even if JS fails
         next_form, reason = self._eval_next_form(form, answers_by_id)
@@ -219,3 +221,4 @@ class SmartFormPublic(http.Controller):
             return request.redirect(f"/smart_form/{next_form.token}")
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})
+
