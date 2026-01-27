@@ -11,12 +11,8 @@
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
                 <!-- ==================================================
-                     FIELD LOGIC RULES JSON (DO NOT ESCAPE)
+                     FORM
                 ================================================== -->
-                <script type="application/json" id="sfb-rules-json">
-<t t-raw="rules_json or '[]'"/>
-                </script>
-
                 <form action="/smart_form/submit"
                       method="post"
                       enctype="multipart/form-data"
@@ -140,17 +136,11 @@
                 </form>
 
                 <!-- ==================================================
-                     FIELD LOGIC JS (SHOW / HIDE) ✅ RESTORED
+                     FIELD LOGIC JS (SAFE – NO JSON.parse)
                 ================================================== -->
                 <script type="text/javascript"><![CDATA[
                   (function(){
-                    function rules(){
-                      try {
-                        return JSON.parse(
-                          document.getElementById("sfb-rules-json").textContent || "[]"
-                        );
-                      } catch(e){ return []; }
-                    }
+                    var RULES = {{ rules_json | safe }};
 
                     function nodes(fid){
                       return document.querySelectorAll(
@@ -202,39 +192,40 @@
                       return vals.includes(want);
                     }
 
-                    var r = rules();
-                    if(!r.length) return;
+                    if(!RULES.length) return;
 
-                    r.forEach(function(x){
-                      if(x.action === "show"){
-                        var w = wrap(x.target);
+                    RULES.forEach(function(r){
+                      if(r.action === "show"){
+                        var w = wrap(r.target);
                         if(w) w.style.display = "none";
                       }
                     });
 
                     function apply(){
-                      r.forEach(function(x){
-                        var ok = match(x.op, value(x.trigger), x.value);
-                        var w = wrap(x.target);
+                      RULES.forEach(function(r){
+                        var ok = match(r.op, value(r.trigger), r.value);
+                        var w = wrap(r.target);
                         if(!w) return;
 
-                        if(x.action === "show"){
+                        if(r.action === "show"){
                           w.style.display = ok ? "" : "none";
                         }
-                        if(x.action === "hide"){
+                        if(r.action === "hide"){
                           w.style.display = ok ? "none" : "";
                         }
                       });
                     }
 
-                    document.getElementById("smart-form")
-                      .addEventListener("change", apply, true);
+                    var form = document.getElementById("smart-form");
+                    if(!form) return;
+
+                    form.addEventListener("change", apply, true);
                     apply();
                   })();
                 ]]></script>
 
                 <!-- ==================================================
-                     BRANCHING JS (BACKEND EVALUATED)
+                     BRANCHING JS (BACKEND AUTHORITATIVE)
                 ================================================== -->
                 <t t-if="has_branching">
                   <script type="text/javascript"><![CDATA[
@@ -279,7 +270,7 @@
                           if(d && d.next_token){
                             window.location.href="/smart_form/"+d.next_token;
                           } else {
-                            form.submit(); // ✅ terminal
+                            form.submit(); // ✅ terminal submit
                           }
                         });
                       });
