@@ -10,9 +10,9 @@
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <!-- Rules JSON -->
+                <!-- RULES JSON (FIELD LOGIC ONLY) -->
                 <script type="application/json" id="sfb-rules-json">
-                  <t t-raw="rules_json or '[]'"/>
+<t t-raw="rules_json or '[]'"/>
                 </script>
 
                 <form action="/smart_form/submit"
@@ -22,7 +22,7 @@
 
                   <input type="hidden" name="token" t-att-value="form.token"/>
 
-                  <!-- ================= FIELDS (UNCHANGED) ================= -->
+                  <!-- ================= FIELDS ================= -->
                   <t t-foreach="form.field_ids" t-as="f">
                     <t t-if="f.field_type == 'subheading'">
                       <div class="mt-4 mb-2">
@@ -33,7 +33,9 @@
                       <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
                         <label class="form-label">
                           <span t-esc="f.label"/>
-                          <t t-if="f.required"><span class="text-danger">*</span></t>
+                          <t t-if="f.required">
+                            <span class="text-danger">*</span>
+                          </t>
                         </label>
 
                         <t t-if="f.field_type == 'text'">
@@ -41,26 +43,31 @@
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"/>
                         </t>
+
                         <t t-elif="f.field_type == 'email'">
                           <input class="form-control" type="email"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"/>
                         </t>
+
                         <t t-elif="f.field_type == 'phone'">
                           <input class="form-control" type="tel"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"/>
                         </t>
+
                         <t t-elif="f.field_type == 'number'">
                           <input class="form-control" type="number"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"/>
                         </t>
+
                         <t t-elif="f.field_type == 'textarea'">
                           <textarea class="form-control" rows="4"
                                     t-att-name="f.name or ('field_%s' % f.id)"
                                     t-att-data-field-id="f.id"/>
                         </t>
+
                         <t t-elif="f.field_type == 'select'">
                           <select class="form-select"
                                   t-att-name="f.name or ('field_%s' % f.id)"
@@ -73,6 +80,7 @@
                             </t>
                           </select>
                         </t>
+
                         <t t-elif="f.field_type == 'radio'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
@@ -86,6 +94,7 @@
                             </div>
                           </t>
                         </t>
+
                         <t t-elif="f.field_type == 'checkbox'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
@@ -99,6 +108,7 @@
                             </div>
                           </t>
                         </t>
+
                         <t t-elif="f.field_type == 'file'">
                           <input class="form-control" type="file"
                                  t-att-name="f.name or ('field_%s' % f.id)"
@@ -110,8 +120,6 @@
 
                   <!-- ================= ACTION BUTTON ================= -->
                   <div class="d-grid mt-4">
-
-                    <!-- 🔀 BRANCHED FORM -->
                     <t t-if="has_branching">
                       <button type="button"
                               id="sfb-continue"
@@ -119,20 +127,17 @@
                         Continue
                       </button>
                     </t>
-
-                    <!-- ✅ TERMINAL FORM -->
                     <t t-else="">
                       <button type="submit"
                               class="btn btn-primary btn-lg">
                         Submit
                       </button>
                     </t>
-
                   </div>
 
                 </form>
 
-                <!-- ================= BRANCHING JS (CLEAN) ================= -->
+                <!-- ================= BRANCHING JS ================= -->
                 <t t-if="has_branching">
                   <script type="text/javascript"><![CDATA[
                     (function(){
@@ -149,7 +154,7 @@
                             return;
                           }
                           if(el.type === "checkbox"){
-                            out[fid] = out[fid] || [];
+                            if(!out[fid]) out[fid] = [];
                             if(el.checked) out[fid].push(el.value || "true");
                             return;
                           }
@@ -159,23 +164,27 @@
                       }
 
                       var btn = document.getElementById("sfb-continue");
-                      if(!btn) return;
+                      var form = document.getElementById("smart-form");
+                      if(!btn || !form) return;
 
                       btn.addEventListener("click", function(){
-                        var token = document.querySelector('input[name="token"]').value;
+                        var tokenEl = form.querySelector('input[name="token"]');
+                        if(!tokenEl) return;
 
-                        fetch("/smart_form/branching/" + encodeURIComponent(token), {
+                        fetch("/smart_form/branching/" + encodeURIComponent(tokenEl.value), {
                           method: "POST",
                           headers: {"Content-Type":"application/json"},
                           body: JSON.stringify({answers: collectAnswers()}),
                           credentials: "same-origin"
                         })
-                        .then(function(r){ return r.json(); })
+                        .then(function(r){
+                          return r.ok ? r.json() : null;
+                        })
                         .then(function(data){
                           if(data && data.success && data.next_token){
                             window.location.href = "/smart_form/" + data.next_token;
                           } else {
-                            alert("No matching branch rule.");
+                            alert("No matching branch rule. Please check your inputs.");
                           }
                         });
                       });
