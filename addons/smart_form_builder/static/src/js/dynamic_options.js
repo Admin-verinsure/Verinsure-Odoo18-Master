@@ -1,35 +1,58 @@
 (function () {
   "use strict";
 
-  async function loadOptions(selectEl) {
+  function loadOptions(selectEl) {
     try {
-      const fieldId = selectEl.dataset.fieldId;
-      const token = selectEl.dataset.formToken;
-      if (!fieldId) return;
+      var fieldId = selectEl.getAttribute("data-field-id") || (selectEl.dataset ? selectEl.dataset.fieldId : null);
+      var token = selectEl.getAttribute("data-form-token") || (selectEl.dataset ? selectEl.dataset.formToken : null);
+      if (!fieldId) { return; }
 
-      const url = `/smart_form/options/${encodeURIComponent(fieldId)}` + (token ? `?token=${encodeURIComponent(token)}` : "");
-      const res = await fetch(url, { method: "GET", credentials: "same-origin" });
-      if (!res.ok) return;
+      var url = "/smart_form/options/" + encodeURIComponent(fieldId);
+      if (token) {
+        url += "?token=" + encodeURIComponent(token);
+      }
 
-      const data = await res.json();
-      if (!data || !data.success) return;
+      fetch(url, { method: "GET", credentials: "same-origin" })
+        .then(function (res) {
+          if (!res || !res.ok) { return null; }
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data || !data.success) { return; }
 
-      const placeholder = selectEl.querySelector("option") ? selectEl.querySelector("option").cloneNode(true) : null;
-      selectEl.innerHTML = "";
-      if (placeholder) selectEl.appendChild(placeholder);
+          var firstOpt = selectEl.querySelector("option");
+          var placeholder = firstOpt ? firstOpt.cloneNode(true) : null;
 
-      (data.options || []).forEach((o) => {
-        const opt = document.createElement("option");
-        opt.value = o.value;
-        opt.textContent = o.label;
-        selectEl.appendChild(opt);
-      });
+          selectEl.innerHTML = "";
+          if (placeholder) { selectEl.appendChild(placeholder); }
+
+          var opts = data.options || [];
+          for (var i = 0; i < opts.length; i++) {
+            var o = opts[i] || {};
+            var opt = document.createElement("option");
+            opt.value = o.value;
+            opt.textContent = o.label;
+            selectEl.appendChild(opt);
+          }
+        })
+        .catch(function () {
+          // silent
+        });
     } catch (e) {
       // silent
     }
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("select[data-dynamic-options='1']").forEach(loadOptions);
-  });
+  function init() {
+    var nodes = document.querySelectorAll("select[data-dynamic-options='1']");
+    for (var i = 0; i < nodes.length; i++) {
+      loadOptions(nodes[i]);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();

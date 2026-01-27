@@ -2,107 +2,116 @@
   "use strict";
 
   function collectAnswers(formEl) {
-    const answers = {};
-    const seenRadio = new Set();
-    const seenCheckbox = new Set();
+    var answers = {};
+    var seenRadio = {};
+    var seenCheckbox = {};
 
-    // Collect values
-    formEl.querySelectorAll("[data-field-id]").forEach((el) => {
-      const fid = el.dataset.fieldId;
-      if (!fid) return;
+    var nodes = formEl.querySelectorAll("[data-field-id]");
+    for (var k = 0; k < nodes.length; k++) {
+      var el = nodes[k];
+      var fid = el.getAttribute("data-field-id") || (el.dataset ? el.dataset.fieldId : null);
+      if (!fid) { continue; }
 
-      const tag = (el.tagName || "").toLowerCase();
-      const type = (el.type || "").toLowerCase();
+      var tag = (el.tagName || "").toLowerCase();
+      var type = (el.type || "").toLowerCase();
 
       if (type === "checkbox") {
-        seenCheckbox.add(fid);
-        if (!answers[fid]) answers[fid] = [];
-        if (el.checked) answers[fid].push(el.value || "true");
-        return;
+        seenCheckbox[fid] = true;
+        if (!answers[fid]) { answers[fid] = []; }
+        if (el.checked) { answers[fid].push(el.value || "true"); }
+        continue;
       }
 
       if (type === "radio") {
-        seenRadio.add(fid);
+        seenRadio[fid] = true;
         if (el.checked) {
           answers[fid] = el.value;
         }
-        return;
+        continue;
       }
 
       if (tag === "select") {
-        const value = el.value || "";
-        const label = el.selectedOptions && el.selectedOptions[0] ? (el.selectedOptions[0].textContent || "").trim() : "";
-        answers[fid] = { value, label };
-        return;
+        var value = el.value || "";
+        var label = "";
+        try {
+          label = (el.selectedOptions && el.selectedOptions[0]) ? (el.selectedOptions[0].textContent || "").trim() : "";
+        } catch (e) {
+          label = "";
+        }
+        answers[fid] = { value: value, label: label };
+        continue;
       }
 
-      // default inputs/textarea
-      answers[fid] = el.value != null ? String(el.value) : "";
-    });
+      answers[fid] = (el.value != null) ? String(el.value) : "";
+    }
 
-    // Ensure missing radios/checkboxes still appear so backend can evaluate != rules
-    seenRadio.forEach((fid) => {
-      if (!(fid in answers)) answers[fid] = "";
-    });
-    seenCheckbox.forEach((fid) => {
-      if (!(fid in answers)) answers[fid] = [];
-    });
+    // Ensure missing radios/checkboxes appear
+    for (var r in seenRadio) {
+      if (seenRadio.hasOwnProperty(r) && !(r in answers)) { answers[r] = ""; }
+    }
+    for (var c in seenCheckbox) {
+      if (seenCheckbox.hasOwnProperty(c) && !(c in answers)) { answers[c] = []; }
+    }
 
     return answers;
   }
 
-  async function evaluateBranching(formEl) {
-    const tokenInput = formEl.querySelector('input[name="token"]');
-    const token = tokenInput ? tokenInput.value : null;
-    if (!token) return null;
+  function evaluateBranching(formEl, cb) {
+    cb = cb || function () {};
+    var tokenInput = formEl.querySelector("input[name='token']");
+    var token = tokenInput ? tokenInput.value : null;
+    if (!token) { return cb(null); }
 
-    const answers = collectAnswers(formEl);
+    var answers = collectAnswers(formEl);
 
-    try {
-      const res = await fetch(`/smart_form/branching/${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-        credentials: "same-origin",
+    fetch("/smart_form/branching/" + encodeURIComponent(token), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers: answers }),
+      credentials: "same-origin"
+    })
+      .then(function (res) {
+        if (!res || !res.ok) { return null; }
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || !data.success) { return cb(null); }
+        return cb(data.next_token || null);
+      })
+      .catch(function () {
+        return cb(null);
       });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data || !data.success) return null;
-      return data.next_token || null;
-    } catch (e) {
-      return null;
-    }
   }
 
   function init() {
-    const formEl = document.getElementById("smart-form");
-    if (!formEl) return;
+    var formEl = document.getElementById("smart-form");
+    if (!formEl) { return; }
 
-    // Evaluate on change to update optional CTA if it exists
-    const maybeUpdateCTA = async () => {
-      const nextToken = await evaluateBranching(formEl);
-      const cta = document.getElementById("sfb-branching-cta");
-      if (!cta) return;
-      if (nextToken) {
-        cta.style.display = "";
-        cta.setAttribute("href", `/smart_form/${encodeURIComponent(nextToken)}`);
-      } else {
-        cta.style.display = "none";
-        cta.removeAttribute("href");
-      }
-    };
+    function maybeUpdateCTA() {
+      evaluateBranching(formEl, function (nextToken) {
+        var cta = document.getElementById("sfb-branching-cta");
+        if (!cta) { return; }
+        if (nextToken) {
+          cta.style.display = "";
+          cta.setAttribute("href", "/smart_form/" + encodeURIComponent(nextToken));
+        } else {
+          cta.style.display = "none";
+          cta.removeAttribute("href");
+        }
+      });
+    }
 
-    formEl.addEventListener("change", () => {
+    formEl.addEventListener("change", function () {
       maybeUpdateCTA();
     });
 
-    // Optional: intercept submit for client-side redirect (server-side also handles it)
-    formEl.addEventListener("submit", async (ev) => {
-      const nextToken = await evaluateBranching(formEl);
-      if (nextToken) {
-        ev.preventDefault();
-        window.location.href = `/smart_form/${encodeURIComponent(nextToken)}`;
-      }
+    formEl.addEventListener("submit", function (ev) {
+      evaluateBranching(formEl, function (nextToken) {
+        if (nextToken) {
+          ev.preventDefault();
+          window.location.href = "/smart_form/" + encodeURIComponent(nextToken);
+        }
+      });
     });
 
     maybeUpdateCTA();
