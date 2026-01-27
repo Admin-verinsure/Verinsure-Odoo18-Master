@@ -26,7 +26,7 @@ class SmartFormPublic(http.Controller):
             return request.not_found()
 
         # ------------------------------------
-        # FIELD LOGIC RULES (SHOW / HIDE)
+        # FIELD LOGIC RULES
         # ------------------------------------
         rules = []
         if hasattr(form, "logic_rule_ids"):
@@ -52,7 +52,6 @@ class SmartFormPublic(http.Controller):
             "smart_form_builder.smart_form_page",
             {
                 "form": form,
-                # ⚠️ MUST BE json.dumps (valid JSON ONLY)
                 "rules_json": json.dumps(rules),
                 "has_branching": has_branching,
             },
@@ -94,7 +93,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # ==================================================
-    # BRANCHING (EVALUATION ONLY — NO SUBMIT)
+    # BRANCHING (EVALUATION ONLY)
     # ==================================================
     @http.route(
         "/smart_form/branching/<string:token>",
@@ -136,11 +135,20 @@ class SmartFormPublic(http.Controller):
             return [s] if s else []
 
         # ------------------------------
-        # MATCH RULE
+        # MATCH RULE (✅ FIXED)
         # ------------------------------
         def _match(rule, val):
             vals = [v.lower() for v in _vals(val)]
             want = (rule.value_text or "").strip().lower()
+
+            # ✅ CHECKBOX SEMANTIC FIX
+            if isinstance(val, list):
+                # checked
+                if rule.operator == "contains" and want in ("true", "yes", "1", "on"):
+                    return bool(vals)
+                # unchecked
+                if rule.operator == "contains" and want in ("false", "no", "0", "off"):
+                    return not bool(vals)
 
             if rule.operator in ("in", "not in"):
                 wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
@@ -153,19 +161,16 @@ class SmartFormPublic(http.Controller):
             if rule.operator == "!=":
                 return all(v != want for v in vals)
 
-            # default '='
             return any(v == want for v in vals)
 
         # ------------------------------
-        # EVALUATE BRANCHING
+        # EVALUATE RULES
         # ------------------------------
         next_form = None
         evaluated_any = False
 
         for r in rules:
             key = str(r.trigger_field_id.id)
-
-            # IMPORTANT: only evaluate if answer exists
             if key not in answers:
                 continue
 
@@ -175,7 +180,7 @@ class SmartFormPublic(http.Controller):
                 break
 
         # ------------------------------
-        # FALLBACK (ONLY IF RULE WAS EVALUATED)
+        # FALLBACK (ONLY IF EVALUATED)
         # ------------------------------
         if not next_form and evaluated_any:
             for r in rules:
@@ -192,7 +197,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # ==================================================
-    # FORM SUBMIT (TERMINAL FORMS ONLY)
+    # FORM SUBMIT (TERMINAL ONLY)
     # ==================================================
     @http.route(
         "/smart_form/submit",
@@ -212,9 +217,6 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # ------------------------------
-        # COLLECT DATA
-        # ------------------------------
         data = {}
         files = request.httprequest.files
 
@@ -243,9 +245,6 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
-        # ------------------------------
-        # OPTIONAL PARTNER LOGIC
-        # ------------------------------
         first_name = (data.get("field_24") or "").strip()
         last_name = (data.get("field_25") or "").strip()
         email = (data.get("field_13") or "").strip().lower()
@@ -257,19 +256,14 @@ class SmartFormPublic(http.Controller):
         if email:
             Partner = request.env["res.partner"].sudo()
             partner = Partner.search([("email", "=ilike", email)], limit=1)
-
-            if partner:
-                data_source = "partner"
-            else:
+            if not partner:
                 partner = Partner.create({
                     "name": f"{first_name} {last_name}".strip() or email,
                     "email": email,
                     "phone": phone,
                 })
+            data_source = "partner"
 
-        # ------------------------------
-        # CREATE SUBMISSION
-        # ------------------------------
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
             "partner_id": partner.id if partner else False,

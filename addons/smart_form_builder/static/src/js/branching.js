@@ -5,6 +5,14 @@
   let pending = false; // prevent request flooding
 
   // --------------------------------------------------
+  // CHECK IF BRANCHING EXISTS
+  // --------------------------------------------------
+  function hasBranching() {
+    const el = document.getElementById("sfb-has-branching");
+    return el && el.value === "1";
+  }
+
+  // --------------------------------------------------
   // COLLECT ANSWERS (SAFE + CLEAN)
   // --------------------------------------------------
   function collectAnswers(formEl) {
@@ -43,9 +51,10 @@
   }
 
   // --------------------------------------------------
-  // CALL BACKEND BRANCHING (AUTHORITATIVE)
+  // CALL BACKEND BRANCHING (ONLY IF ENABLED)
   // --------------------------------------------------
   async function evaluateBranching(formEl) {
+    if (!hasBranching()) return;
     if (pending) return;
 
     const tokenEl = formEl.querySelector('input[name="token"]');
@@ -68,12 +77,8 @@
       if (!res.ok) return;
 
       const data = await res.json();
-
-      if (data && data.success && data.next_token) {
-        nextFormToken = data.next_token;
-      } else {
-        nextFormToken = null;
-      }
+      nextFormToken =
+        data && data.success && data.next_token ? data.next_token : null;
 
       // OPTIONAL PREVIEW CTA
       const cta = document.getElementById("sfb-branching-cta");
@@ -95,6 +100,12 @@
   document.addEventListener("DOMContentLoaded", () => {
     const formEl = document.getElementById("smart-form");
     if (!formEl) return;
+
+    // 🚫 NO BRANCHING → DO NOTHING (NORMAL SUBMIT)
+    if (!hasBranching()) {
+      console.log("ℹ️ No branching rules — normal submit");
+      return;
+    }
 
     // 🔁 Evaluate only on meaningful changes
     formEl.addEventListener("change", () => evaluateBranching(formEl));
