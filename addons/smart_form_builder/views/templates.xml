@@ -10,7 +10,9 @@
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <!-- RULES JSON (FIELD LOGIC ONLY) -->
+                <!-- ==================================================
+                     FIELD LOGIC RULES JSON (DO NOT ESCAPE)
+                ================================================== -->
                 <script type="application/json" id="sfb-rules-json">
 <t t-raw="rules_json or '[]'"/>
                 </script>
@@ -137,28 +139,124 @@
 
                 </form>
 
-                <!-- ================= BRANCHING JS ================= -->
+                <!-- ==================================================
+                     FIELD LOGIC JS (SHOW / HIDE) ✅ RESTORED
+                ================================================== -->
+                <script type="text/javascript"><![CDATA[
+                  (function(){
+                    function rules(){
+                      try {
+                        return JSON.parse(
+                          document.getElementById("sfb-rules-json").textContent || "[]"
+                        );
+                      } catch(e){ return []; }
+                    }
+
+                    function nodes(fid){
+                      return document.querySelectorAll(
+                        'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
+                      );
+                    }
+
+                    function wrap(fid){
+                      return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
+                    }
+
+                    function value(fid){
+                      var els = nodes(fid);
+                      if(!els.length) return "";
+                      var e = els[0];
+
+                      if(e.type === "radio"){
+                        for(var i=0;i<els.length;i++){
+                          if(els[i].checked) return els[i].value || "";
+                        }
+                        return "";
+                      }
+
+                      if(e.type === "checkbox"){
+                        var v=[];
+                        els.forEach(function(x){
+                          if(x.checked) v.push(x.value || "true");
+                        });
+                        return v;
+                      }
+
+                      return e.value || "";
+                    }
+
+                    function match(op,left,right){
+                      var want = String(right||"").toLowerCase();
+                      var vals = Array.isArray(left) ? left : [left];
+                      vals = vals.map(v => String(v||"").toLowerCase());
+
+                      if(op === "contains" || op === "ilike"){
+                        return vals.some(v => v.indexOf(want) !== -1);
+                      }
+                      if(op === "!="){
+                        return vals.every(v => v !== want);
+                      }
+                      if(op === "in"){
+                        return want.split(",").some(w => vals.includes(w.trim()));
+                      }
+                      return vals.includes(want);
+                    }
+
+                    var r = rules();
+                    if(!r.length) return;
+
+                    r.forEach(function(x){
+                      if(x.action === "show"){
+                        var w = wrap(x.target);
+                        if(w) w.style.display = "none";
+                      }
+                    });
+
+                    function apply(){
+                      r.forEach(function(x){
+                        var ok = match(x.op, value(x.trigger), x.value);
+                        var w = wrap(x.target);
+                        if(!w) return;
+
+                        if(x.action === "show"){
+                          w.style.display = ok ? "" : "none";
+                        }
+                        if(x.action === "hide"){
+                          w.style.display = ok ? "none" : "";
+                        }
+                      });
+                    }
+
+                    document.getElementById("smart-form")
+                      .addEventListener("change", apply, true);
+                    apply();
+                  })();
+                ]]></script>
+
+                <!-- ==================================================
+                     BRANCHING JS (BACKEND EVALUATED)
+                ================================================== -->
                 <t t-if="has_branching">
                   <script type="text/javascript"><![CDATA[
                     (function(){
-                      function collectAnswers(){
-                        var out = {};
+                      function collect(){
+                        var out={};
                         document.querySelectorAll(
                           'input[data-field-id],select[data-field-id],textarea[data-field-id]'
                         ).forEach(function(el){
-                          var fid = el.getAttribute('data-field-id');
-                          if(!fid) return;
+                          var id = el.dataset.fieldId;
+                          if(!id) return;
 
-                          if(el.type === "radio"){
-                            if(el.checked) out[fid] = el.value || "";
+                          if(el.type==="radio"){
+                            if(el.checked) out[id]=el.value||"";
                             return;
                           }
-                          if(el.type === "checkbox"){
-                            if(!out[fid]) out[fid] = [];
-                            if(el.checked) out[fid].push(el.value || "true");
+                          if(el.type==="checkbox"){
+                            out[id]=out[id]||[];
+                            if(el.checked) out[id].push(el.value||"true");
                             return;
                           }
-                          out[fid] = el.value || "";
+                          out[id]=el.value||"";
                         });
                         return out;
                       }
@@ -168,23 +266,20 @@
                       if(!btn || !form) return;
 
                       btn.addEventListener("click", function(){
-                        var tokenEl = form.querySelector('input[name="token"]');
-                        if(!tokenEl) return;
+                        var token = form.querySelector('input[name="token"]').value;
 
-                        fetch("/smart_form/branching/" + encodeURIComponent(tokenEl.value), {
-                          method: "POST",
-                          headers: {"Content-Type":"application/json"},
-                          body: JSON.stringify({answers: collectAnswers()}),
-                          credentials: "same-origin"
+                        fetch("/smart_form/branching/"+encodeURIComponent(token),{
+                          method:"POST",
+                          headers:{"Content-Type":"application/json"},
+                          body:JSON.stringify({answers:collect()}),
+                          credentials:"same-origin"
                         })
-                        .then(function(r){
-                          return r.ok ? r.json() : null;
-                        })
-                        .then(function(data){
-                          if(data && data.success && data.next_token){
-                            window.location.href = "/smart_form/" + data.next_token;
+                        .then(r => r.json())
+                        .then(function(d){
+                          if(d && d.next_token){
+                            window.location.href="/smart_form/"+d.next_token;
                           } else {
-                            alert("No matching branch rule. Please check your inputs.");
+                            form.submit(); // ✅ terminal
                           }
                         });
                       });
