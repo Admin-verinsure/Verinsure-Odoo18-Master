@@ -206,23 +206,14 @@ class SmartFormPublic(http.Controller):
             if form.target_model_id and form.target_model_id.model:
                 target_model = form.target_model_id.model
 
-                Model = None
-
                 # Safety deny-list for public forms
                 deny = {
                     "res.users", "ir.config_parameter", "ir.model", "ir.model.fields",
                     "ir.ui.view", "ir.ui.menu", "ir.actions.actions", "ir.actions.server",
                     "ir.cron", "ir.rule", "ir.module.module",
                 }
-                if target_model not in deny:
-                    # NOTE: `model in request.env` isn't reliable across Odoo versions.
-                    # Use safe access instead.
-                    try:
-                        Model = request.env[target_model].sudo()
-                    except Exception:
-                        Model = None
-
-                if Model:
+                if target_model not in deny and target_model in request.env:
+                    Model = request.env[target_model].sudo()
 
                     # Build vals from form technical names that exist on the target model
                     mf = Model._fields
@@ -265,14 +256,6 @@ class SmartFormPublic(http.Controller):
                                 pass
                         except Exception:
                             continue
-
-                    # If the target model has a required `name` (e.g., res.partner),
-                    # auto-fill it from common identifiers when not provided.
-                    if "name" in mf and not vals.get("name"):
-                        for k in ("email", "mobile", "phone"):
-                            if vals.get(k):
-                                vals["name"] = vals[k]
-                                break
 
                     # Duplicate prevention: try to find an existing record by common identifiers
                     existing = None
