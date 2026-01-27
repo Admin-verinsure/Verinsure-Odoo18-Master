@@ -6,306 +6,206 @@
           <div class="col-12 col-lg-8">
             <div class="card shadow-sm border-0">
               <div class="card-body p-4 p-md-5">
+
                 <h2 class="mb-1" t-esc="form.name"/>
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
-                <!-- Rules JSON (must not be escaped) -->
-                <script type="application/json" id="sfb-rules-json"><t t-raw="rules_json or '[]'"/></script>
+                <!-- ============================= -->
+                <!-- FIELD + LOGIC RULES (JSON) -->
+                <!-- ============================= -->
+                <script type="application/json" id="sfb-rules-json">
+                  <t t-raw="rules_json or '[]'"/>
+                </script>
 
-                <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
+                <form
+                  id="smart-form"
+                  action="/smart_form/submit"
+                  method="post"
+                  enctype="multipart/form-data">
+
                   <input type="hidden" name="token" t-att-value="form.token"/>
 
+                  <!-- ============================= -->
+                  <!-- FORM FIELDS -->
+                  <!-- ============================= -->
                   <t t-foreach="form.field_ids" t-as="f">
+
                     <t t-if="f.field_type == 'subheading'">
                       <div class="mt-4 mb-2">
-                        <h5 class="mb-0" t-esc="f.label"/>
+                        <h5 t-esc="f.label"/>
                       </div>
                     </t>
+
                     <t t-else="">
                       <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
+
                         <label class="form-label">
                           <span t-esc="f.label"/>
-                          <t t-if="f.required"><span class="text-danger">*</span></t>
+                          <t t-if="f.required">
+                            <span class="text-danger">*</span>
+                          </t>
                         </label>
 
                         <t t-if="f.field_type == 'text'">
                           <input class="form-control" type="text"
-                                 t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"
+                            t-att-required="'required' if f.required else None"/>
                         </t>
+
                         <t t-elif="f.field_type == 'email'">
                           <input class="form-control" type="email"
-                                 placeholder="name@example.com"
-                                 t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                            placeholder="name@example.com"
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"
+                            t-att-required="'required' if f.required else None"/>
                         </t>
+
                         <t t-elif="f.field_type == 'phone'">
                           <input class="form-control" type="tel"
-                                 placeholder="+91 XXXXX XXXXX"
-                                 t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"
+                            t-att-required="'required' if f.required else None"/>
                         </t>
+
                         <t t-elif="f.field_type == 'number'">
                           <input class="form-control" type="number"
-                                 t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"
-                                 t-att-required="'required' if f.required else None"/>
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"
+                            t-att-required="'required' if f.required else None"/>
                         </t>
+
                         <t t-elif="f.field_type == 'textarea'">
                           <textarea class="form-control" rows="4"
-                                    t-att-name="f.name or ('field_%s' % f.id)"
-                                    t-att-data-field-id="f.id"
-                                    t-att-required="'required' if f.required else None"></textarea>
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"
+                            t-att-required="'required' if f.required else None"/>
                         </t>
+
                         <t t-elif="f.field_type == 'select'">
-                          <div class="sfb-select-wrap">
-                            <select class="form-select sfb-enhanced-select"
-                                    t-att-name="f.name or ('field_%s' % f.id)"
-                                    t-att-data-field-id="f.id"
-                                    t-att-required="'required' if f.required else None">
-                              <option value="">-- Select --</option>
-                              <t t-foreach="f.get_options()" t-as="o">
-                                <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
-                              </t>
-                            </select>
-                          </div>
+                          <select class="form-select"
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id">
+                            <option value="">-- Select --</option>
+                            <t t-foreach="f.get_options()" t-as="o">
+                              <option t-att-value="o['value']">
+                                <t t-esc="o['label']"/>
+                              </option>
+                            </t>
+                          </select>
                         </t>
+
                         <t t-elif="f.field_type == 'radio'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
                               <input class="form-check-input" type="radio"
-                                     t-att-name="f.name or ('field_%s' % f.id)"
-                                     t-att-data-field-id="f.id"
-                                     t-att-value="o['value']"/>
-                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                                t-att-name="f.name or ('field_%s' % f.id)"
+                                t-att-data-field-id="f.id"
+                                t-att-value="o['value']"/>
+                              <label class="form-check-label">
+                                <t t-esc="o['label']"/>
+                              </label>
                             </div>
                           </t>
                         </t>
+
                         <t t-elif="f.field_type == 'checkbox'">
                           <t t-foreach="f.get_options()" t-as="o">
                             <div class="form-check">
                               <input class="form-check-input" type="checkbox"
-                                     t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
-                                     t-att-data-field-id="f.id"
-                                     t-att-value="o['value']"/>
-                              <label class="form-check-label"><t t-esc="o['label']"/></label>
+                                t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
+                                t-att-data-field-id="f.id"
+                                t-att-value="o['value']"/>
+                              <label class="form-check-label">
+                                <t t-esc="o['label']"/>
+                              </label>
                             </div>
                           </t>
                         </t>
+
                         <t t-elif="f.field_type == 'file'">
                           <input class="form-control" type="file"
-                                 t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                            t-att-name="f.name or ('field_%s' % f.id)"
+                            t-att-data-field-id="f.id"/>
                         </t>
+
                       </div>
                     </t>
                   </t>
 
                   <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg">Submit</button>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                      Submit
+                    </button>
                   </div>
 
-                  <!-- ✅ Inline Conditional Logic -->
-                  <script type="text/javascript"><![CDATA[
-                    (function(){
-                      function safeRules(){
-                        var el = document.getElementById("sfb-rules-json");
-                        if(!el) return [];
-                        try { return JSON.parse((el.textContent||"[]").trim()||"[]") || []; }
-                        catch(e){ return []; }
-                      }
-                      function inputNodes(fid){
-                        return document.querySelectorAll(
-                          'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
-                        );
-                      }
-                      function wrap(fid){
-                        return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
-                      }
-                      function valueOf(fid){
-                        var nodes = inputNodes(fid);
-                        if(!nodes.length) return "";
-                        var first = nodes[0];
-                        if(first.type==="radio"){
-                          for(var i=0;i<nodes.length;i++){ if(nodes[i].checked) return nodes[i].value||""; }
-                          return "";
-                        }
-                        if(first.type==="checkbox"){
-                          var vals=[];
-                          for(var j=0;j<nodes.length;j++){ if(nodes[j].checked) vals.push(nodes[j].value||"true"); }
-                          return vals;
-                        }
-                        return first.value||"";
-                      }
-                      function num(x){
-                        try { return parseFloat(x); } catch(e){ return NaN; }
-                      }
-                      function compare(op,left,right){
-                        var r = (right==null?"":String(right)).trim();
-                        // numeric ops
-                        if(op===">"||op===">="||op==="<"||op==="<="){
-                          var ln = Array.isArray(left) ? NaN : num(left);
-                          var rn = num(r);
-                          if(isNaN(ln)||isNaN(rn)) return false;
-                          if(op===">") return ln>rn;
-                          if(op===">=") return ln>=rn;
-                          if(op==="<") return ln<rn;
-                          if(op==="<=") return ln<=rn;
-                        }
-                        // string ops
-                        var want = r.toLowerCase();
-                        var vals = Array.isArray(left) ? left.map(String) : [String(left||"")];
-                        vals = vals.map(function(v){return v.toLowerCase();});
-
-                        if(op==="contains") return vals.some(function(v){return v.indexOf(want)!==-1;});
-                        if(op==="!=") return vals.every(function(v){return v!==want;});
-                        if(op==="in"||op==="not in"){
-                          var wanted = want.split(",").map(function(s){return s.trim();}).filter(Boolean);
-                          var ok = vals.some(function(v){return wanted.indexOf(v)!==-1;});
-                          return op==="in"? ok : !ok;
-                        }
-                        // default '='
-                        return vals.some(function(v){return v===want;});
-                      }
-
-                      var rules = safeRules();
-                      if(!rules.length) return;
-
-                      // hide targets of "show" rules by default
-                      var targets = {};
-                      rules.forEach(function(r){ if(r.action==="show") targets[String(r.target)] = true; });
-                      Object.keys(targets).forEach(function(tid){
-                        var w = wrap(tid);
-                        if(w) w.style.display="none";
-                      });
-
-                      function apply(){
-                        rules.forEach(function(r){
-                          var trig = String(r.trigger);
-                          var targ = String(r.target);
-                          var ok = compare(r.op, valueOf(trig), r.value);
-
-                          var tw = wrap(targ);
-                          if(!tw) return;
-
-                          if(r.action==="show"){
-                            tw.style.display = ok ? "" : "none";
-                            if(ok){
-                              var trw = wrap(trig);
-                              if(trw && trw.nextElementSibling !== tw){
-                                trw.parentNode.insertBefore(tw, trw.nextElementSibling);
-                              }
-                            } else {
-                              // clear when hidden
-                              tw.querySelectorAll("input,select,textarea").forEach(function(i){
-                                if(i.type==="checkbox"||i.type==="radio") i.checked=false;
-                                else i.value="";
-                              });
-                            }
-                          } else if(r.action==="hide"){
-                            tw.style.display = ok ? "none" : "";
-                          }
-                        });
-                      }
-
-                      var form = document.getElementById("smart-form");
-                      if(!form) return;
-                      apply();
-
-                      var t=null;
-                      function onChange(){
-                        if(t) clearTimeout(t);
-                        t=setTimeout(apply, 30);
-                      }
-                      form.addEventListener("input", onChange, true);
-                      form.addEventListener("change", onChange, true);
-                    })();
-                  ]]></script>
-
-                  <!-- ✅ Branching on submit -->
+                  <!-- ============================= -->
+                  <!-- BRANCHING (FINAL & FIXED) -->
+                  <!-- ============================= -->
                   <script type="text/javascript"><![CDATA[
                     (function(){
                       function collectAnswers(){
-                        var out={};
-                        var nodes=document.querySelectorAll('input[data-field-id],select[data-field-id],textarea[data-field-id]');
-                        nodes.forEach(function(el){
-                          var fid=el.getAttribute('data-field-id');
+                        var out = {};
+                        document.querySelectorAll(
+                          'input[data-field-id],select[data-field-id],textarea[data-field-id]'
+                        ).forEach(function(el){
+                          var fid = el.getAttribute('data-field-id');
                           if(!fid) return;
 
-                          if(el.tagName==="SELECT"){
-                            var label="";
-                            try{ label = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : ""; }catch(e){}
-                            out[fid] = {value:(el.value||""), label:(label||"")};
+                          if(el.type === "radio"){
+                            if(el.checked) out[fid] = el.value || "";
                             return;
                           }
 
-                          if(el.type==="radio"){
-                            if(el.checked) out[fid]=el.value||"";
+                          if(el.type === "checkbox"){
+                            if(!out[fid]) out[fid] = [];
+                            if(el.checked) out[fid].push(el.value || "true");
                             return;
                           }
-                          if(el.type==="checkbox"){
-                            if(!out[fid]) out[fid]=[];
-                            if(el.checked) out[fid].push(el.value||"true");
-                            return;
-                          }
-                          out[fid]=el.value||"";
+
+                          out[fid] = el.value || "";
                         });
                         return out;
                       }
 
                       function post(url, payload){
-                        return fetch(url, {
-                          method: "POST",
-                          headers: {"Content-Type":"application/json"},
-                          body: JSON.stringify(payload||{}),
-                          credentials: "same-origin"
-                        }).then(function(r){ return r.ok ? r.json() : null; })
-                          .catch(function(){ return null; });
+                        return fetch(url,{
+                          method:"POST",
+                          headers:{ "Content-Type":"application/json" },
+                          body:JSON.stringify(payload||{}),
+                          credentials:"same-origin"
+                        }).then(function(r){
+                          return r.ok ? r.json() : null;
+                        }).catch(function(){ return null; });
                       }
 
-                      var form=document.getElementById("smart-form");
+                      var form = document.getElementById("smart-form");
                       if(!form) return;
 
-                      form.addEventListener("submit", function(e){
-                        var tokenEl=document.querySelector('input[name="token"]');
-                        var token=tokenEl ? tokenEl.value : "";
-                        if(!token) return;
+                      function onSubmit(e){
+                        var tokenEl = document.querySelector('input[name="token"]');
+                        if(!tokenEl) return;
 
                         e.preventDefault();
 
-                        post("/smart_form/branching/"+encodeURIComponent(token), {answers: collectAnswers()})
-                          .then(function(data){
-                            if(data && data.success && data.next_token){
-                              window.location.href="/smart_form/"+data.next_token;
-                            } else {
-                              form.submit();
-                            }
-                          });
-                      }, true);
+                        post(
+                          "/smart_form/branching/" + encodeURIComponent(tokenEl.value),
+                          { answers: collectAnswers() }
+                        ).then(function(data){
+                          if(data && data.success && data.next_token){
+                            window.location.href = "/smart_form/" + data.next_token;
+                          } else {
+                            form.removeEventListener("submit", onSubmit, true);
+                            form.submit();
+                          }
+                        });
+                      }
+
+                      form.addEventListener("submit", onSubmit, true);
                     })();
                   ]]></script>
 
                 </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </t>
-  </template>
-
-  <template id="smart_form_thanks" name="Forms Thanks">
-    <t t-call="website.layout">
-      <div class="container my-5">
-        <div class="row justify-content-center">
-          <div class="col-12 col-lg-6">
-            <div class="card shadow-sm border-0">
-              <div class="card-body p-4 p-md-5 text-center">
-                <h3 class="mb-2">Thank you!</h3>
-                <p class="text-muted mb-0">Your response has been submitted.</p>
               </div>
             </div>
           </div>
