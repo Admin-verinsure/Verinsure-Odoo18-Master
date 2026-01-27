@@ -9,8 +9,7 @@ class SmartForm(models.Model):
     name = fields.Char(required=True)
     token = fields.Char(index=True, readonly=True, copy=False, default=lambda self: secrets.token_urlsafe(16))
     active = fields.Boolean(default=True)
-    target_model_id = fields.Many2one("ir.model", string="Target Model", help="If set, a record will be created in this model on submission. Only fields whose Technical Name matches a field on the model will be written; others are ignored.")
-
+    target_model_id = fields.Many2one("ir.model", string="Target Model", help="Optional. If set, each submission will create a new record in this model. Form field Technical Name must match a field on the model; non-matching fields are ignored.")
 
     field_ids = fields.One2many("smart.form.field", "form_id", string="Fields", copy=True)
     submission_ids = fields.One2many("smart.form.submission", "form_id", string="Submissions", readonly=True)
