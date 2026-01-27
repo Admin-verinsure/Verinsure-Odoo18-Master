@@ -44,13 +44,13 @@ class SmartFormPublic(http.Controller):
 
         return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
                                      [("Content-Type", "application/json")])
-    @http.route("/smart_form/branching/<string:token>", type="json", auth="public", website=True, csrf=False, methods=["POST"])
+    @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_branching(self, token, **kw):
         form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
         if not form:
-            return {"success": False, "next_token": None}
+            return request.make_response(json.dumps({"success": False, "next_token": None}), [("Content-Type","application/json")])
 
-        payload = request.get_json_data(silent=True) or {}
+        payload = (request.httprequest.get_json(silent=True) or {})
         answers = payload.get("answers") or {}
 
         rules = request.env["smart.form.branch.rule"].sudo().search(
@@ -108,10 +108,7 @@ class SmartFormPublic(http.Controller):
         if not next_form and fallback_form:
             next_form = fallback_form
 
-        return {
-            "success": True,
-            "next_token": next_form.token if next_form else None
-        }
+        return request.make_response(json.dumps({"success": True, "next_token": (next_form.token if next_form else None)}), [("Content-Type","application/json")])
 
     @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
     def smart_form_submit(self, **post):
@@ -158,5 +155,66 @@ class SmartFormPublic(http.Controller):
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),
         })
+
+        # Server-side branching (robust even if JS fails):
+        # Evaluate rules in order; on match redirect to target form; else use fallback; else show thanks.
+        rules = request.env["smart.form.branch.rule"].sudo().search([("form_id", "=", form.id)], order="sequence,id")
+
+        def _as_list(v):
+            if v is None:
+                return []
+            if isinstance(v, (list, tuple, set)):
+                return [str(x).strip() for x in v if str(x).strip()]
+            s = str(v).strip()
+            return [s] if s else []
+
+        def _match(rule, raw_answer):
+            op = (rule.operator or "=").strip()
+            rule_val = (rule.value_text or "").strip()
+            ans_list = _as_list(raw_answer)
+            ans_scalar = (ans_list[0] if ans_list else "")
+
+            if op in (">", ">=", "<", "<="):
+                try:
+                    a = float(ans_scalar)
+                    b = float(rule_val)
+                except Exception:
+                    return False
+                if op == ">":
+                    return a > b
+                if op == ">=":
+                    return a >= b
+                if op == "<":
+                    return a < b
+                return a <= b
+
+            if op == "contains":
+                if not rule_val:
+                    return False
+                if ans_list:
+                    return any(rule_val in a for a in ans_list)
+                return rule_val in (ans_scalar or "")
+
+            if op == "!=":
+                return (ans_scalar or "") != rule_val
+            return (ans_scalar or "") == rule_val
+
+        next_form = None
+        fallback_form = None
+        for rule in rules:
+            raw_answer = data.get(str(rule.field_id.id)) if rule.field_id else None
+            if _match(rule, raw_answer):
+                if rule.target_form_id:
+                    next_form = rule.target_form_id
+                # match but no target => submit current form (no redirect)
+                break
+            if not fallback_form and rule.fallback_form_id:
+                fallback_form = rule.fallback_form_id
+
+        if not next_form and fallback_form:
+            next_form = fallback_form
+
+        if next_form:
+            return request.redirect(f"/smart_form/{next_form.token}")
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})
