@@ -7,7 +7,7 @@ from odoo.http import request
 class SmartFormPublic(http.Controller):
 
     # ==================================================
-    # FORM PAGE (FIELD LOGIC + BRANCHING INFO)
+    # FORM PAGE
     # ==================================================
     @http.route(
         "/smart_form/<string:token>",
@@ -25,9 +25,7 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # ------------------------------------
-        # FIELD LOGIC RULES
-        # ------------------------------------
+        # Field logic rules (unchanged)
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -39,9 +37,7 @@ class SmartFormPublic(http.Controller):
                     "target": r.target_field_id.id,
                 })
 
-        # ------------------------------------
-        # BRANCHING PRESENT FLAG
-        # ------------------------------------
+        # Branching flag
         has_branching = bool(
             request.env["smart.form.branch.rule"]
             .sudo()
@@ -58,42 +54,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # ==================================================
-    # FIELD OPTIONS
-    # ==================================================
-    @http.route(
-        "/smart_form/options/<int:field_id>",
-        type="http",
-        auth="public",
-        website=True,
-        csrf=False,
-    )
-    def smart_form_options(self, field_id, token=None, **kw):
-
-        field = request.env["smart.form.field"].sudo().browse(field_id)
-        if not field.exists():
-            return request.make_response(
-                json.dumps({"success": False, "options": []}),
-                [("Content-Type", "application/json")],
-            )
-
-        if token:
-            form = request.env["smart.form"].sudo().search(
-                [("token", "=", token)],
-                limit=1,
-            )
-            if not form or field.form_id.id != form.id:
-                return request.make_response(
-                    json.dumps({"success": False, "options": []}),
-                    [("Content-Type", "application/json")],
-                )
-
-        return request.make_response(
-            json.dumps({"success": True, "options": field.get_options()}),
-            [("Content-Type", "application/json")],
-        )
-
-    # ==================================================
-    # BRANCHING (EVALUATION ONLY)
+    # BRANCHING (AUTHORITATIVE)
     # ==================================================
     @http.route(
         "/smart_form/branching/<string:token>",
@@ -111,7 +72,7 @@ class SmartFormPublic(http.Controller):
         )
         if not form:
             return request.make_response(
-                json.dumps({"success": False, "next_token": None}),
+                json.dumps({"success": True, "next_token": None}),
                 [("Content-Type", "application/json")],
             )
 
@@ -123,66 +84,70 @@ class SmartFormPublic(http.Controller):
             order="sequence,id",
         )
 
+        # ❗ No branching rules → behave like terminal form
+        if not rules:
+            return request.make_response(
+                json.dumps({"success": True, "next_token": None}),
+                [("Content-Type", "application/json")],
+            )
+
         # ------------------------------
-        # NORMALIZE ANSWERS
+        # NORMALIZE VALUES
         # ------------------------------
         def _vals(v):
-            if isinstance(v, dict):
-                return [str(x).strip() for x in v.values() if x]
             if isinstance(v, list):
-                return [str(x).strip() for x in v if x]
-            s = str(v).strip()
+                return [str(x).strip().lower() for x in v if x]
+            s = str(v or "").strip().lower()
             return [s] if s else []
 
         # ------------------------------
-        # MATCH RULE (✅ FIXED)
+        # MATCH RULE (FINAL)
         # ------------------------------
         def _match(rule, val):
-            vals = [v.lower() for v in _vals(val)]
+            vals = _vals(val)
             want = (rule.value_text or "").strip().lower()
+            op = (rule.operator or "").lower()
 
-            # ✅ CHECKBOX SEMANTIC FIX
-            if isinstance(val, list):
-                # checked
-                if rule.operator == "contains" and want in ("true", "yes", "1", "on"):
-                    return bool(vals)
-                # unchecked
-                if rule.operator == "contains" and want in ("false", "no", "0", "off"):
-                    return not bool(vals)
+            if not vals:
+                return False
 
-            if rule.operator in ("in", "not in"):
-                wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
-                ok = any(v in wanted for v in vals)
-                return ok if rule.operator == "in" else not ok
-
-            if rule.operator == "contains":
+            # ilike / contains / like
+            if op in ("ilike", "contains", "like"):
                 return any(want in v for v in vals)
 
-            if rule.operator == "!=":
+            # in / not in
+            if op in ("in", "not in"):
+                wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
+                ok = any(v in wanted for v in vals)
+                return ok if op == "in" else not ok
+
+            # not equal
+            if op in ("!=", "not_equal"):
                 return all(v != want for v in vals)
 
+            # default equal
             return any(v == want for v in vals)
 
         # ------------------------------
         # EVALUATE RULES
         # ------------------------------
         next_form = None
-        evaluated_any = False
+        evaluated = False
 
         for r in rules:
             key = str(r.trigger_field_id.id)
             if key not in answers:
                 continue
 
-            evaluated_any = True
+            evaluated = True
             if _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
 
         # ------------------------------
-        # FALLBACK (ONLY IF EVALUATED)
+        # FALLBACK
         # ------------------------------
-        if not next_form and evaluated_any:
+        if not next_form and evaluated:
             for r in rules:
                 if r.fallback_form_id:
                     next_form = r.fallback_form_id
@@ -245,6 +210,7 @@ class SmartFormPublic(http.Controller):
 
             data[key] = post.get(key) or ""
 
+        # Partner logic (unchanged)
         first_name = (data.get("field_24") or "").strip()
         last_name = (data.get("field_25") or "").strip()
         email = (data.get("field_13") or "").strip().lower()
