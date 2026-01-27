@@ -3,24 +3,42 @@
 
   function collectAnswers(formEl) {
     const answers = {};
+    const checkboxGroups = new Set();
+    const radioGroups = new Set();
+
     formEl.querySelectorAll("[data-field-id]").forEach((el) => {
       const fid = el.dataset.fieldId;
       if (!fid) return;
 
+      // Track group existence so backend can evaluate "not equal"/fallback even when empty.
+      if (el.type === "checkbox") checkboxGroups.add(fid);
+      if (el.type === "radio") radioGroups.add(fid);
+
       if (el.type === "checkbox") {
         if (!answers[fid]) answers[fid] = [];
         if (el.checked) answers[fid].push(el.value || "true");
-      } else if (el.type === "radio") {
+        return;
+      }
+
+      if (el.type === "radio") {
         if (el.checked) answers[fid] = el.value;
-      } else {
-        if (el.value !== "" && el.value !== null) {
-        answers[fid] = el.value;
+        return;
       }
-      }
+
+      // text/select/textarea/number/etc
+      answers[fid] = (el.value === undefined || el.value === null) ? "" : String(el.value);
     });
+
+    // Ensure empty groups are still present
+    checkboxGroups.forEach((fid) => {
+      if (!answers[fid]) answers[fid] = [];
+    });
+    radioGroups.forEach((fid) => {
+      if (answers[fid] === undefined) answers[fid] = "";
+    });
+
     return answers;
   }
-
   async function evaluateBranching(formEl) {
     const tokenInput = formEl.querySelector('input[name="token"]');
     const token = tokenInput ? tokenInput.value : null;
