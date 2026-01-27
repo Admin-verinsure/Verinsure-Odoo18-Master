@@ -22,7 +22,9 @@
                       </div>
                     </t>
                     <t t-else="">
-                      <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
+                      <div class="mb-3 sfb-field" t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None">
                         <label class="form-label">
                           <span t-esc="f.label"/>
                           <t t-if="f.required"><span class="text-danger">*</span></t>
@@ -32,6 +34,8 @@
                           <input class="form-control" type="text"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                  t-att-required="'required' if f.required else None"/>
                         </t>
                         <t t-elif="f.field_type == 'email'">
@@ -39,6 +43,8 @@
                                  placeholder="name@example.com"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                  t-att-required="'required' if f.required else None"/>
                         </t>
                         <t t-elif="f.field_type == 'phone'">
@@ -46,18 +52,24 @@
                                  placeholder="+91 XXXXX XXXXX"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                  t-att-required="'required' if f.required else None"/>
                         </t>
                         <t t-elif="f.field_type == 'number'">
                           <input class="form-control" type="number"
                                  t-att-name="f.name or ('field_%s' % f.id)"
                                  t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                  t-att-required="'required' if f.required else None"/>
                         </t>
                         <t t-elif="f.field_type == 'textarea'">
                           <textarea class="form-control" rows="4"
                                     t-att-name="f.name or ('field_%s' % f.id)"
                                     t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                     t-att-required="'required' if f.required else None"></textarea>
                         </t>
                         <t t-elif="f.field_type == 'select'">
@@ -65,10 +77,17 @@
                             <select class="form-select sfb-enhanced-select"
                                     t-att-name="f.name or ('field_%s' % f.id)"
                                     t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                     t-att-required="'required' if f.required else None">
                               <option value="">-- Select --</option>
-                              <t t-foreach="f.get_options()" t-as="o">
-                                <option t-att-value="o['value']"><t t-esc="o['label']"/></option>
+                              <t t-if="f.option_source != 'model'">
+
+                                <t t-foreach="f.get_options()" t-as="o">
+<option t-att-value="o['value']"><t t-esc="o['label']"/></option>
+
+                                </t>
+
                               </t>
                             </select>
                           </div>
@@ -79,6 +98,8 @@
                               <input class="form-check-input" type="radio"
                                      t-att-name="f.name or ('field_%s' % f.id)"
                                      t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                      t-att-value="o['value']"/>
                               <label class="form-check-label"><t t-esc="o['label']"/></label>
                             </div>
@@ -90,6 +111,8 @@
                               <input class="form-check-input" type="checkbox"
                                      t-att-name="(f.name or ('field_%s' % f.id)) + '[]'"
                                      t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"
                                      t-att-value="o['value']"/>
                               <label class="form-check-label"><t t-esc="o['label']"/></label>
                             </div>
@@ -98,7 +121,9 @@
                         <t t-elif="f.field_type == 'file'">
                           <input class="form-control" type="file"
                                  t-att-name="f.name or ('field_%s' % f.id)"
-                                 t-att-data-field-id="f.id"/>
+                                 t-att-data-field-id="f.id"
+                                    t-att-data-form-token="form.token"
+                                    t-att-data-dynamic-options="'1' if f.option_source == 'model' else None"/>
                         </t>
                       </div>
                     </t>
