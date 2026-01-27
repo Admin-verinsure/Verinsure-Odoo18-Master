@@ -44,73 +44,93 @@ class SmartFormPublic(http.Controller):
 
         return request.make_response(json.dumps({"success": True, "options": field.get_options()}),
                                      [("Content-Type", "application/json")])
-    @http.route("/smart_form/branching/<string:token>", type="http", auth="public", website=True, csrf=False, methods=["POST"])
-    def smart_form_branching(self, token, **kw):
-        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
-        if not form:
-            return request.make_response(json.dumps({"success": False, "next_token": None}), [("Content-Type","application/json")])
 
-        payload = (request.httprequest.get_json(silent=True) or {})
-        answers = payload.get("answers") or {}
-
+    def _eval_next_form(self, form, answers):
+        """Return (next_form_record_or_None, reason_str). reason:
+        - 'target' : matched target
+        - 'submit' : matched but no target, so submit
+        - 'fallback' : no match, using fallback
+        - 'none' : no match and no fallback
+        """
         rules = request.env["smart.form.branch.rule"].sudo().search(
             [("form_id", "=", form.id)],
             order="sequence,id"
         )
 
-        def _as_list(v):
-            if v is None:
-                return []
-            if isinstance(v, (list, tuple, set)):
+        def _vals(v):
+            # Accept dict {value,label} or list or scalar -> list[str]
+            if isinstance(v, dict):
+                out = []
+                if v.get("value") not in (None, ""):
+                    out.append(str(v.get("value")).strip())
+                if v.get("label") not in (None, ""):
+                    out.append(str(v.get("label")).strip())
+                return [x for x in out if x]
+            if isinstance(v, list):
                 return [str(x).strip() for x in v if str(x).strip()]
             s = str(v).strip()
             return [s] if s else []
 
-        def _match(rule, raw_answer):
-            op = (rule.operator or "=").strip()
-            rule_val = (rule.value_text or "").strip()
+        def _match(rule, val):
+            vals = _vals(val)
+            want = (rule.value_text or "").strip()
 
-            # Checkbox answers arrive as list; other types as string
-            ans_list = _as_list(raw_answer)
-            ans_scalar = ans_list[0] if ans_list else ""
+            # normalize
+            vals_l = [v.lower() for v in vals]
+            want_l = want.lower()
+
+            op = rule.operator or "="
 
             if op in ("in", "not in"):
-                candidates = [x.strip() for x in rule_val.split(",") if x.strip()]
-                hit = any(a in candidates for a in ans_list) if ans_list else (ans_scalar in candidates)
-                return hit if op == "in" else (not hit)
+                wanted = [x.strip().lower() for x in want.split(",") if x.strip()]
+                ok = any(v in wanted for v in vals_l)
+                return ok if op == "in" else (not ok)
 
             if op == "contains":
-                if not rule_val:
-                    return False
-                # list contains
-                if ans_list:
-                    return any(rule_val in a for a in ans_list)
-                return rule_val in (ans_scalar or "")
+                return any(want_l in v for v in vals_l)
 
-            # default: = or !=
             if op == "!=":
-                return (ans_scalar or "") != rule_val
-            return (ans_scalar or "") == rule_val
+                # if no value selected, treat as not equal unless want is empty
+                if not vals_l:
+                    return want_l != ""
+                return all(v != want_l for v in vals_l)
 
-        next_form = None
-        fallback_form = None
+            # default '='
+            if want_l == "" and not vals_l:
+                return True
+            return any(v == want_l for v in vals_l)
+
+        first_fallback = None
 
         for r in rules:
+            if not first_fallback and r.fallback_form_id:
+                first_fallback = r.fallback_form_id
+
             key = str(r.trigger_field_id.id)
-            if _match(r, answers.get(key)):
-                # If rule matched, honor target if present; otherwise "submit"
-                next_form = r.target_form_id
-                break
-            # capture first available fallback in priority order
-            if fallback_form is None and r.fallback_form_id:
-                fallback_form = r.fallback_form_id
 
-        if not next_form and fallback_form:
-            next_form = fallback_form
+            # if missing, treat as empty string to allow rules like !=
+            val = answers.get(key, "")
 
-        return request.make_response(json.dumps({"success": True, "next_token": (next_form.token if next_form else None)}), [("Content-Type","application/json")])
+            if _match(r, val):
+                if r.target_form_id:
+                    return r.target_form_id, "target"
+                return None, "submit"
 
-    @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False, methods=["POST"])
+        if first_fallback:
+            return first_fallback, "fallback"
+        return None, "none"
+    @http.route("/smart_form/branching/<string:token>", type="json", auth="public", website=True, csrf=False)
+    def smart_form_branching(self, token, **kw):
+        form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
+        if not form:
+            return {"success": False, "next_token": None, "reason": "not_found"}
+
+        payload = kw or {}
+        answers = payload.get("answers") or {}
+
+        next_form, reason = self._eval_next_form(form, answers)
+        return {"success": True, "next_token": next_form.token if next_form else None, "reason": reason}
+    @http.route("/smart_form/submit", type="http", auth="public", website=True, csrf=False)
     def smart_form_submit(self, **post):
         token = post.get("token")
         form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
@@ -125,10 +145,14 @@ class SmartFormPublic(http.Controller):
         })
 
         data = {}
+        answers_by_id = {}
         files = request.httprequest.files
 
         for f in form.field_ids.sudo():
             key = f.name or f"field_{f.id}"
+
+            if f.field_type == "subheading":
+                continue
 
             if f.field_type == "file":
                 fs = files.get(key)
@@ -142,79 +166,43 @@ class SmartFormPublic(http.Controller):
                         "mimetype": getattr(fs, "mimetype", None) or "application/octet-stream",
                     })
                     data[key] = fs.filename
+                    answers_by_id[str(f.id)] = {"value": fs.filename, "label": fs.filename}
                 else:
                     data[key] = ""
+                    answers_by_id[str(f.id)] = ""
                 continue
 
             if f.field_type == "checkbox":
-                data[key] = request.httprequest.form.getlist(f"{key}[]")
+                vals = request.httprequest.form.getlist(f"{key}[]")
+                data[key] = vals
+                answers_by_id[str(f.id)] = vals
                 continue
 
-            data[key] = post.get(key) or ""
+            val = post.get(key) or ""
+            data[key] = val
+
+            # For select/radio, also attach label for matching human text
+            if f.field_type in ("select", "radio"):
+                label = None
+                try:
+                    for o in (f.get_options() or []):
+                        if str(o.get("value")) == str(val):
+                            label = o.get("label")
+                            break
+                except Exception:
+                    label = None
+                answers_by_id[str(f.id)] = {"value": val, "label": label or val}
+            else:
+                answers_by_id[str(f.id)] = val
 
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),
         })
 
-        # Server-side branching (robust even if JS fails):
-        # Evaluate rules in order; on match redirect to target form; else use fallback; else show thanks.
-        rules = request.env["smart.form.branch.rule"].sudo().search([("form_id", "=", form.id)], order="sequence,id")
-
-        def _as_list(v):
-            if v is None:
-                return []
-            if isinstance(v, (list, tuple, set)):
-                return [str(x).strip() for x in v if str(x).strip()]
-            s = str(v).strip()
-            return [s] if s else []
-
-        def _match(rule, raw_answer):
-            op = (rule.operator or "=").strip()
-            rule_val = (rule.value_text or "").strip()
-            ans_list = _as_list(raw_answer)
-            ans_scalar = (ans_list[0] if ans_list else "")
-
-            if op in (">", ">=", "<", "<="):
-                try:
-                    a = float(ans_scalar)
-                    b = float(rule_val)
-                except Exception:
-                    return False
-                if op == ">":
-                    return a > b
-                if op == ">=":
-                    return a >= b
-                if op == "<":
-                    return a < b
-                return a <= b
-
-            if op == "contains":
-                if not rule_val:
-                    return False
-                if ans_list:
-                    return any(rule_val in a for a in ans_list)
-                return rule_val in (ans_scalar or "")
-
-            if op == "!=":
-                return (ans_scalar or "") != rule_val
-            return (ans_scalar or "") == rule_val
-
-        next_form = None
-        fallback_form = None
-        for rule in rules:
-            raw_answer = data.get(str(rule.field_id.id)) if rule.field_id else None
-            if _match(rule, raw_answer):
-                if rule.target_form_id:
-                    next_form = rule.target_form_id
-                # match but no target => submit current form (no redirect)
-                break
-            if not fallback_form and rule.fallback_form_id:
-                fallback_form = rule.fallback_form_id
-
-        if not next_form and fallback_form:
-            next_form = fallback_form
-
-        if next_form:
+        # ✅ Server-side branching: always works even if JS fails
+        next_form, reason = self._eval_next_form(form, answers_by_id)
+        if next_form and next_form.token:
             return request.redirect(f"/smart_form/{next_form.token}")
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})
+
