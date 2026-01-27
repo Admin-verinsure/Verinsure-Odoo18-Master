@@ -9,6 +9,7 @@
         <field name="token"/>
         <field name="submission_count" string="Submissions"/>
         <field name="active"/>
+              <field name="target_model_id" options="{'no_create': True}"/>
       </list>
     </field>
   </record>
@@ -27,8 +28,8 @@
           <group>
             <field name="name"/>
             <field name="active"/>
+              <field name="target_model_id" options="{'no_create': True}"/>
             <field name="token" readonly="1"/>
-            <field name="target_model_id" options="{'no_create': True}" domain="[('transient','=',False)]"/>
           </group>
 
           <notebook>
