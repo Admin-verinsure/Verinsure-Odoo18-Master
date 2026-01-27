@@ -25,9 +25,9 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
-        # ------------------------------
+        # ------------------------------------
         # FIELD LOGIC RULES (SHOW / HIDE)
-        # ------------------------------
+        # ------------------------------------
         rules = []
         if hasattr(form, "logic_rule_ids"):
             for r in form.logic_rule_ids.sudo():
@@ -39,9 +39,9 @@ class SmartFormPublic(http.Controller):
                     "target": r.target_field_id.id,
                 })
 
-        # ------------------------------
-        # BRANCHING FLAG (CRITICAL)
-        # ------------------------------
+        # ------------------------------------
+        # BRANCHING PRESENT FLAG
+        # ------------------------------------
         has_branching = bool(
             request.env["smart.form.branch.rule"]
             .sudo()
@@ -52,13 +52,14 @@ class SmartFormPublic(http.Controller):
             "smart_form_builder.smart_form_page",
             {
                 "form": form,
+                # ⚠️ MUST BE json.dumps (valid JSON ONLY)
                 "rules_json": json.dumps(rules),
-                "has_branching": has_branching,   # ✅ USED BY TEMPLATE
+                "has_branching": has_branching,
             },
         )
 
     # ==================================================
-    # FIELD OPTIONS (DYNAMIC / STATIC)
+    # FIELD OPTIONS
     # ==================================================
     @http.route(
         "/smart_form/options/<int:field_id>",
@@ -93,7 +94,7 @@ class SmartFormPublic(http.Controller):
         )
 
     # ==================================================
-    # BRANCHING (NAVIGATION ONLY — NO SUBMIT)
+    # BRANCHING (EVALUATION ONLY — NO SUBMIT)
     # ==================================================
     @http.route(
         "/smart_form/branching/<string:token>",
@@ -124,7 +125,7 @@ class SmartFormPublic(http.Controller):
         )
 
         # ------------------------------
-        # NORMALIZE VALUES
+        # NORMALIZE ANSWERS
         # ------------------------------
         def _vals(v):
             if isinstance(v, dict):
@@ -152,29 +153,35 @@ class SmartFormPublic(http.Controller):
             if rule.operator == "!=":
                 return all(v != want for v in vals)
 
+            # default '='
             return any(v == want for v in vals)
 
         # ------------------------------
-        # EVALUATE RULES
+        # EVALUATE BRANCHING
         # ------------------------------
         next_form = None
-        evaluated = False
+        evaluated_any = False
 
         for r in rules:
             key = str(r.trigger_field_id.id)
+
+            # IMPORTANT: only evaluate if answer exists
             if key not in answers:
                 continue
 
-            evaluated = True
+            evaluated_any = True
             if _match(r, answers.get(key)):
                 next_form = r.target_form_id
                 break
 
         # ------------------------------
-        # FALLBACK
+        # FALLBACK (ONLY IF RULE WAS EVALUATED)
         # ------------------------------
-        if not next_form and evaluated and rules and rules[0].fallback_form_id:
-            next_form = rules[0].fallback_form_id
+        if not next_form and evaluated_any:
+            for r in rules:
+                if r.fallback_form_id:
+                    next_form = r.fallback_form_id
+                    break
 
         return request.make_response(
             json.dumps({
