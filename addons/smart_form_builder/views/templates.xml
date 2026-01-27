@@ -11,6 +11,13 @@
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
                 <!-- ==================================================
+                     FIELD LOGIC RULES JSON (VALID JSON ONLY)
+                ================================================== -->
+                <script type="application/json" id="sfb-rules-json">
+<t t-raw="rules_json or '[]'"/>
+                </script>
+
+                <!-- ==================================================
                      FORM
                 ================================================== -->
                 <form action="/smart_form/submit"
@@ -136,92 +143,103 @@
                 </form>
 
                 <!-- ==================================================
-                     FIELD LOGIC JS (SAFE – NO JSON.parse)
+                     FIELD LOGIC JS (SHOW / HIDE) ✅ FINAL
                 ================================================== -->
                 <script type="text/javascript"><![CDATA[
-                  (function(){
-                    var RULES = {{ rules_json | safe }};
+                (function(){
+                  function getRules(){
+                    var el = document.getElementById("sfb-rules-json");
+                    if(!el) return [];
+                    try {
+                      return JSON.parse(el.textContent.trim() || "[]");
+                    } catch(e){
+                      console.error("Field logic JSON error", e);
+                      return [];
+                    }
+                  }
 
-                    function nodes(fid){
-                      return document.querySelectorAll(
-                        'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
-                      );
+                  function nodes(fid){
+                    return document.querySelectorAll(
+                      'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
+                    );
+                  }
+
+                  function wrap(fid){
+                    return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
+                  }
+
+                  function valueOf(fid){
+                    var els = nodes(fid);
+                    if(!els.length) return "";
+
+                    var first = els[0];
+
+                    if(first.type === "radio"){
+                      for(var i=0;i<els.length;i++){
+                        if(els[i].checked) return els[i].value || "";
+                      }
+                      return "";
                     }
 
-                    function wrap(fid){
-                      return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
+                    if(first.type === "checkbox"){
+                      var vals=[];
+                      els.forEach(function(x){
+                        if(x.checked) vals.push(x.value || "true");
+                      });
+                      return vals;
                     }
 
-                    function value(fid){
-                      var els = nodes(fid);
-                      if(!els.length) return "";
-                      var e = els[0];
+                    return first.value || "";
+                  }
 
-                      if(e.type === "radio"){
-                        for(var i=0;i<els.length;i++){
-                          if(els[i].checked) return els[i].value || "";
-                        }
-                        return "";
-                      }
+                  function match(op,left,right){
+                    var want = String(right||"").toLowerCase().trim();
+                    var vals = Array.isArray(left) ? left : [left];
+                    vals = vals.map(v => String(v||"").toLowerCase());
 
-                      if(e.type === "checkbox"){
-                        var v=[];
-                        els.forEach(function(x){
-                          if(x.checked) v.push(x.value || "true");
-                        });
-                        return v;
-                      }
-
-                      return e.value || "";
+                    if(op === "contains" || op === "ilike" || op === "like"){
+                      return vals.some(v => v.indexOf(want) !== -1);
                     }
-
-                    function match(op,left,right){
-                      var want = String(right||"").toLowerCase();
-                      var vals = Array.isArray(left) ? left : [left];
-                      vals = vals.map(v => String(v||"").toLowerCase());
-
-                      if(op === "contains" || op === "ilike"){
-                        return vals.some(v => v.indexOf(want) !== -1);
-                      }
-                      if(op === "!="){
-                        return vals.every(v => v !== want);
-                      }
-                      if(op === "in"){
-                        return want.split(",").some(w => vals.includes(w.trim()));
-                      }
-                      return vals.includes(want);
+                    if(op === "!="){
+                      return vals.every(v => v !== want);
                     }
+                    if(op === "in"){
+                      return want.split(",").some(w => vals.includes(w.trim()));
+                    }
+                    return vals.includes(want);
+                  }
 
-                    if(!RULES.length) return;
+                  var RULES = getRules();
+                  if(!RULES.length) return;
 
+                  RULES.forEach(function(r){
+                    if(r.action === "show"){
+                      var w = wrap(r.target);
+                      if(w) w.style.display = "none";
+                    }
+                  });
+
+                  function apply(){
                     RULES.forEach(function(r){
+                      var ok = match(r.op, valueOf(r.trigger), r.value);
+                      var w = wrap(r.target);
+                      if(!w) return;
+
                       if(r.action === "show"){
-                        var w = wrap(r.target);
-                        if(w) w.style.display = "none";
+                        w.style.display = ok ? "" : "none";
+                      } else if(r.action === "hide"){
+                        w.style.display = ok ? "none" : "";
                       }
                     });
+                  }
 
-                    function apply(){
-                      RULES.forEach(function(r){
-                        var ok = match(r.op, value(r.trigger), r.value);
-                        var w = wrap(r.target);
-                        if(!w) return;
+                  var form = document.getElementById("smart-form");
+                  if(!form) return;
 
-                        if(r.action === "show"){
-                          w.style.display = ok ? "" : "none";
-                        }
-                        if(r.action === "hide"){
-                          w.style.display = ok ? "none" : "";
-                        }
-                      });
-                    }
-
-                    var form = document.getElementById("smart-form");
-                    if(!form) return;
-
-                    form.addEventListener("change", apply, true);
-                    apply();
-                  })();
+                  form.addEventListener("input", apply, true);
+                  form.addEventListener("change", apply, true);
+                  apply();
+                })();
                 ]]></script>
 
                 <!-- ==================================================
@@ -229,52 +247,52 @@
                 ================================================== -->
                 <t t-if="has_branching">
                   <script type="text/javascript"><![CDATA[
-                    (function(){
-                      function collect(){
-                        var out={};
-                        document.querySelectorAll(
-                          'input[data-field-id],select[data-field-id],textarea[data-field-id]'
-                        ).forEach(function(el){
-                          var id = el.dataset.fieldId;
-                          if(!id) return;
+                  (function(){
+                    function collect(){
+                      var out={};
+                      document.querySelectorAll(
+                        'input[data-field-id],select[data-field-id],textarea[data-field-id]'
+                      ).forEach(function(el){
+                        var id = el.dataset.fieldId;
+                        if(!id) return;
 
-                          if(el.type==="radio"){
-                            if(el.checked) out[id]=el.value||"";
-                            return;
-                          }
-                          if(el.type==="checkbox"){
-                            out[id]=out[id]||[];
-                            if(el.checked) out[id].push(el.value||"true");
-                            return;
-                          }
-                          out[id]=el.value||"";
-                        });
-                        return out;
-                      }
-
-                      var btn = document.getElementById("sfb-continue");
-                      var form = document.getElementById("smart-form");
-                      if(!btn || !form) return;
-
-                      btn.addEventListener("click", function(){
-                        var token = form.querySelector('input[name="token"]').value;
-
-                        fetch("/smart_form/branching/"+encodeURIComponent(token),{
-                          method:"POST",
-                          headers:{"Content-Type":"application/json"},
-                          body:JSON.stringify({answers:collect()}),
-                          credentials:"same-origin"
-                        })
-                        .then(r => r.json())
-                        .then(function(d){
-                          if(d && d.next_token){
-                            window.location.href="/smart_form/"+d.next_token;
-                          } else {
-                            form.submit(); // ✅ terminal submit
-                          }
-                        });
+                        if(el.type==="radio"){
+                          if(el.checked) out[id]=el.value||"";
+                          return;
+                        }
+                        if(el.type==="checkbox"){
+                          out[id]=out[id]||[];
+                          if(el.checked) out[id].push(el.value||"true");
+                          return;
+                        }
+                        out[id]=el.value||"";
                       });
-                    })();
+                      return out;
+                    }
+
+                    var btn = document.getElementById("sfb-continue");
+                    var form = document.getElementById("smart-form");
+                    if(!btn || !form) return;
+
+                    btn.addEventListener("click", function(){
+                      var token = form.querySelector('input[name="token"]').value;
+
+                      fetch("/smart_form/branching/"+encodeURIComponent(token),{
+                        method:"POST",
+                        headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({answers:collect()}),
+                        credentials:"same-origin"
+                      })
+                      .then(r => r.json())
+                      .then(function(d){
+                        if(d && d.next_token){
+                          window.location.href="/smart_form/"+d.next_token;
+                        } else {
+                          form.submit();
+                        }
+                      });
+                    });
+                  })();
                   ]]></script>
                 </t>
 
