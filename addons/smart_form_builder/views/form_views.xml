@@ -81,6 +81,27 @@
                 </list>
               </field>
             </page>
+<page string="Database Storage">
+  <group>
+    <field name="store_in_model"/>
+    <field name="target_model_id" attrs="{'invisible': [('store_in_model','=',False)], 'required': [('store_in_model','=',True)]}"/>
+  </group>
+
+  <group attrs="{'invisible': [('store_in_model','=',False)]}">
+    <field name="field_mapping_ids" context="{'default_form_id': active_id}" nolabel="1">
+      <list editable="bottom">
+        <field name="sequence" widget="handle"/>
+        <field name="form_field_id"/>
+        <field name="model_field_id"/>
+      </list>
+    </field>
+  </group>
+
+  <p class="text-muted" attrs="{'invisible': [('store_in_model','=',False)]}">
+    Map only the fields you want to store. Unmapped form fields will be ignored.
+  </p>
+</page>
+
           </notebook>
         </sheet>
       </form>
