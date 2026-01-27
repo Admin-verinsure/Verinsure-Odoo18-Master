@@ -7,6 +7,125 @@ from odoo.http import request
 
 class SmartFormPublic(http.Controller):
 
+    def _store_in_target_model(self, form, data):
+        """Create a record in the selected target model (if any). Ignores unmapped/unsupported fields."""
+        if not form.target_model_id:
+            return (None, None)
+
+        model_name = form.target_model_id.model
+
+        # Safety: block very sensitive technical models from public creation
+        blocked_exact = {"res.users", "res.groups", "ir.config_parameter"}
+        blocked_prefixes = ("ir.", "mail.", "base.module")
+        if model_name in blocked_exact or any(model_name.startswith(p) for p in blocked_prefixes):
+            return (model_name, None)
+
+        Model = request.env[model_name].sudo()
+        model_fields = Model._fields
+
+        vals = {}
+        for f in form.field_ids:
+            key = f.name or f"field_{f.id}"
+
+            # We never write these
+            if f.field_type in ("subheading", "file"):
+                continue
+
+            if key not in data or key not in model_fields:
+                continue
+
+            field = model_fields[key]
+            v = data.get(key)
+
+            # Skip risky/complex types (can be extended later)
+            if field.type in ("one2many", "many2many", "binary"):
+                continue
+
+            try:
+                if field.type == "boolean":
+                    if isinstance(v, bool):
+                        vals[key] = v
+                    elif isinstance(v, str):
+                        vals[key] = v.strip().lower() in ("1", "true", "yes", "y", "on")
+                    else:
+                        vals[key] = bool(v)
+                elif field.type == "integer":
+                    vals[key] = int(v) if v not in ("", None) else False
+                elif field.type in ("float", "monetary"):
+                    vals[key] = float(v) if v not in ("", None) else False
+                elif field.type == "many2one":
+                    vals[key] = int(v) if v not in ("", None) else False
+                else:
+                    # char/text/html/date/datetime/selection and most others
+                    vals[key] = v
+            except Exception:
+                # Bad conversion, ignore the field
+                continue
+
+        if not vals:
+            return (model_name, None)
+
+        try:
+            rec = Model.create(vals)
+            return (model_name, rec.id)
+        except Exception:
+            # Do not crash the public flow
+            return (model_name, None)
+
+
+    Model = request.env[model_name].sudo()
+    model_fields = Model._fields
+
+    vals = {}
+    for f in form.field_ids:
+        key = f.name or f"field_{f.id}"
+        if f.field_type in ("subheading", "file"):
+            continue
+        if key not in data:
+            continue
+        if key not in model_fields:
+            continue
+
+        field = model_fields[key]
+        v = data.get(key)
+
+        # Skip x2many/binary fields to avoid crashes (can be extended later)
+        if field.type in ("one2many", "many2many", "binary"):
+            continue
+
+        try:
+            if field.type == "boolean":
+                if isinstance(v, bool):
+                    vals[key] = v
+                elif isinstance(v, str):
+                    vals[key] = v.strip().lower() in ("1", "true", "yes", "y", "on")
+                else:
+                    vals[key] = bool(v)
+            elif field.type in ("integer",):
+                vals[key] = int(v) if v not in ("", None) else False
+            elif field.type in ("float", "monetary"):
+                vals[key] = float(v) if v not in ("", None) else False
+            elif field.type == "many2one":
+                # Expect an ID from the form (string or int)
+                vals[key] = int(v) if v not in ("", None) else False
+            else:
+                # char/text/html/date/datetime/selection and others: keep as string
+                vals[key] = v
+        except Exception:
+            # Ignore bad value conversions
+            continue
+
+    if not vals:
+        return (model_name, None)
+
+    try:
+        rec = Model.create(vals)
+        return (model_name, rec.id)
+    except Exception:
+        # Don't crash public flow
+        return (model_name, None)
+
+
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
         form = request.env["smart.form"].sudo().search([("token", "=", token), ("active", "=", True)], limit=1)
