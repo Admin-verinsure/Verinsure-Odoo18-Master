@@ -1,130 +1,15 @@
 import json
 import base64
+import logging
 
 from odoo import http
 from odoo.http import request
 
 
+_logger = logging.getLogger(__name__)
+
+
 class SmartFormPublic(http.Controller):
-
-    def _store_in_target_model(self, form, data):
-        """Create a record in the selected target model (if any). Ignores unmapped/unsupported fields."""
-        if not form.target_model_id:
-            return (None, None)
-
-        model_name = form.target_model_id.model
-
-        # Safety: block very sensitive technical models from public creation
-        blocked_exact = {"res.users", "res.groups", "ir.config_parameter"}
-        blocked_prefixes = ("ir.", "mail.", "base.module")
-        if model_name in blocked_exact or any(model_name.startswith(p) for p in blocked_prefixes):
-            return (model_name, None)
-
-        Model = request.env[model_name].sudo()
-        model_fields = Model._fields
-
-        vals = {}
-        for f in form.field_ids:
-            key = f.name or f"field_{f.id}"
-
-            # We never write these
-            if f.field_type in ("subheading", "file"):
-                continue
-
-            if key not in data or key not in model_fields:
-                continue
-
-            field = model_fields[key]
-            v = data.get(key)
-
-            # Skip risky/complex types (can be extended later)
-            if field.type in ("one2many", "many2many", "binary"):
-                continue
-
-            try:
-                if field.type == "boolean":
-                    if isinstance(v, bool):
-                        vals[key] = v
-                    elif isinstance(v, str):
-                        vals[key] = v.strip().lower() in ("1", "true", "yes", "y", "on")
-                    else:
-                        vals[key] = bool(v)
-                elif field.type == "integer":
-                    vals[key] = int(v) if v not in ("", None) else False
-                elif field.type in ("float", "monetary"):
-                    vals[key] = float(v) if v not in ("", None) else False
-                elif field.type == "many2one":
-                    vals[key] = int(v) if v not in ("", None) else False
-                else:
-                    # char/text/html/date/datetime/selection and most others
-                    vals[key] = v
-            except Exception:
-                # Bad conversion, ignore the field
-                continue
-
-        if not vals:
-            return (model_name, None)
-
-        try:
-            rec = Model.create(vals)
-            return (model_name, rec.id)
-        except Exception:
-            # Do not crash the public flow
-            return (model_name, None)
-
-
-    Model = request.env[model_name].sudo()
-    model_fields = Model._fields
-
-    vals = {}
-    for f in form.field_ids:
-        key = f.name or f"field_{f.id}"
-        if f.field_type in ("subheading", "file"):
-            continue
-        if key not in data:
-            continue
-        if key not in model_fields:
-            continue
-
-        field = model_fields[key]
-        v = data.get(key)
-
-        # Skip x2many/binary fields to avoid crashes (can be extended later)
-        if field.type in ("one2many", "many2many", "binary"):
-            continue
-
-        try:
-            if field.type == "boolean":
-                if isinstance(v, bool):
-                    vals[key] = v
-                elif isinstance(v, str):
-                    vals[key] = v.strip().lower() in ("1", "true", "yes", "y", "on")
-                else:
-                    vals[key] = bool(v)
-            elif field.type in ("integer",):
-                vals[key] = int(v) if v not in ("", None) else False
-            elif field.type in ("float", "monetary"):
-                vals[key] = float(v) if v not in ("", None) else False
-            elif field.type == "many2one":
-                # Expect an ID from the form (string or int)
-                vals[key] = int(v) if v not in ("", None) else False
-            else:
-                # char/text/html/date/datetime/selection and others: keep as string
-                vals[key] = v
-        except Exception:
-            # Ignore bad value conversions
-            continue
-
-    if not vals:
-        return (model_name, None)
-
-    try:
-        rec = Model.create(vals)
-        return (model_name, rec.id)
-    except Exception:
-        # Don't crash public flow
-        return (model_name, None)
-
 
     @http.route("/smart_form/<string:token>", type="http", auth="public", website=True, sitemap=False)
     def smart_form_page(self, token, **kw):
@@ -313,6 +198,92 @@ class SmartFormPublic(http.Controller):
                 answers_by_id[str(f.id)] = {"value": val, "label": label or val}
             else:
                 answers_by_id[str(f.id)] = val
+
+        # ✅ Optional: create / link a record in the selected target model
+        target_model = None
+        target_res_id = None
+        try:
+            if form.target_model_id and form.target_model_id.model:
+                target_model = form.target_model_id.model
+
+                # Safety deny-list for public forms
+                deny = {
+                    "res.users", "ir.config_parameter", "ir.model", "ir.model.fields",
+                    "ir.ui.view", "ir.ui.menu", "ir.actions.actions", "ir.actions.server",
+                    "ir.cron", "ir.rule", "ir.module.module",
+                }
+                if target_model not in deny and target_model in request.env:
+                    Model = request.env[target_model].sudo()
+
+                    # Build vals from form technical names that exist on the target model
+                    mf = Model._fields
+                    vals = {}
+                    for f in form.field_ids:
+                        tech = (f.name or "").strip()
+                        if not tech:
+                            continue
+                        if tech not in mf:
+                            continue
+
+                        v = data.get(tech)
+                        if v in (None, "", False):
+                            continue
+                        # ignore file blobs
+                        if isinstance(v, dict) and ("content" in v or "filename" in v):
+                            continue
+
+                        field = mf[tech]
+                        try:
+                            # basic conversions by field type
+                            if field.type in ("char", "text", "html"):
+                                vals[tech] = str(v)
+                            elif field.type == "boolean":
+                                vals[tech] = bool(v) if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")
+                            elif field.type == "integer":
+                                vals[tech] = int(v)
+                            elif field.type in ("float", "monetary"):
+                                vals[tech] = float(v)
+                            elif field.type in ("date", "datetime"):
+                                vals[tech] = v
+                            elif field.type == "selection":
+                                allowed = {k for (k, _lbl) in (field.selection or [])}
+                                if str(v) in allowed:
+                                    vals[tech] = str(v)
+                            elif field.type == "many2one":
+                                if str(v).isdigit():
+                                    vals[tech] = int(v)
+                            else:
+                                pass
+                        except Exception:
+                            continue
+
+                    # Duplicate prevention: try to find an existing record by common identifiers
+                    existing = None
+                    if vals:
+                        candidates = ["email", "mobile", "phone", "vat", "name"]
+                        for k in candidates:
+                            if k in vals and vals.get(k):
+                                try:
+                                    existing = Model.search([(k, "=", vals[k])], limit=1)
+                                except Exception:
+                                    existing = None
+                                if existing:
+                                    break
+
+                    if existing:
+                        target_res_id = existing.id
+                    elif vals:
+                        rec = Model.create(vals)
+                        target_res_id = rec.id
+        except Exception as e:
+            _logger.exception("Smart Form: target model create/link failed: %s", e)
+
+        # Save record link on submission (even if not created)
+        if target_model and target_res_id:
+            submission.sudo().write({
+                "target_model": target_model,
+                "target_res_id": target_res_id,
+            })
 
         submission.sudo().write({
             "data_json": json.dumps(data, ensure_ascii=False),
