@@ -9,8 +9,6 @@
         <field name="form_id"/>
         <field name="ip"/>
         <field name="user_agent"/>
-        <field name="target_model"/>
-        <field name="target_res_id"/>
       </list>
     </field>
   </record>
@@ -26,8 +24,6 @@
             <field name="create_date" readonly="1"/>
             <field name="ip" readonly="1"/>
             <field name="user_agent" readonly="1"/>
-            <field name="target_model" readonly="1"/>
-            <field name="target_res_id" readonly="1"/>
           </group>
           <group>
             <field name="data_json" widget="text" readonly="1"/>

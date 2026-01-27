@@ -199,23 +199,10 @@ class SmartFormPublic(http.Controller):
             "data_json": json.dumps(data, ensure_ascii=False),
         })
 
-        # ✅ Optional: also store into a configured target model (e.g. Contacts/res.partner)
-        try:
-            if getattr(form, "store_in_model", False) and getattr(form, "target_model_id", False):
-                vals = form._build_target_record_vals(answers_by_id)
-                if vals:
-                    rec = request.env[form.target_model_id.model].sudo().create(vals)
-                    submission.sudo().write({
-                        "target_model": form.target_model_id.model,
-                        "target_res_id": rec.id,
-                    })
-        except Exception:
-            # Never block form submit/branching on target model creation issues
-            pass
-
         # ✅ Server-side branching: always works even if JS fails
         next_form, reason = self._eval_next_form(form, answers_by_id)
         if next_form and next_form.token:
             return request.redirect(f"/smart_form/{next_form.token}")
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})
+
