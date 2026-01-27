@@ -18,7 +18,6 @@
     ],
     "assets": {
         "web.assets_frontend": [
-            "smart_form_builder/static/src/css/sfb_form.css",
             "smart_form_builder/static/src/css/sfb_dropdown.css",
             "smart_form_builder/static/src/js/dynamic_options.js",
             "smart_form_builder/static/src/js/branching.js",

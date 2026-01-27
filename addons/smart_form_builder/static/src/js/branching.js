@@ -3,47 +3,63 @@
 
   function collectAnswers(formEl) {
     const answers = {};
-    const checkboxGroups = new Set();
-    const radioGroups = new Set();
+    const seenRadio = new Set();
+    const seenCheckbox = new Set();
 
+    // Collect values
     formEl.querySelectorAll("[data-field-id]").forEach((el) => {
       const fid = el.dataset.fieldId;
       if (!fid) return;
 
-      if (el.type === "checkbox") checkboxGroups.add(fid);
-      if (el.type === "radio") radioGroups.add(fid);
+      const tag = (el.tagName || "").toLowerCase();
+      const type = (el.type || "").toLowerCase();
 
-      if (el.type === "checkbox") {
-        if (!Array.isArray(answers[fid])) answers[fid] = [];
-        if (el.checked) answers[fid].push(el.value);
-      } else if (el.type === "radio") {
-        if (el.checked) answers[fid] = el.value;
-      } else if (el.tagName === "SELECT" && el.multiple) {
-        answers[fid] = Array.from(el.selectedOptions).map((o) => o.value);
-      } else {
-        answers[fid] = el.value;
+      if (type === "checkbox") {
+        seenCheckbox.add(fid);
+        if (!answers[fid]) answers[fid] = [];
+        if (el.checked) answers[fid].push(el.value || "true");
+        return;
       }
+
+      if (type === "radio") {
+        seenRadio.add(fid);
+        if (el.checked) {
+          answers[fid] = el.value;
+        }
+        return;
+      }
+
+      if (tag === "select") {
+        const value = el.value || "";
+        const label = el.selectedOptions && el.selectedOptions[0] ? (el.selectedOptions[0].textContent || "").trim() : "";
+        answers[fid] = { value, label };
+        return;
+      }
+
+      // default inputs/textarea
+      answers[fid] = el.value != null ? String(el.value) : "";
     });
 
-    // Ensure groups exist even when nothing selected
-    checkboxGroups.forEach((fid) => {
-      if (!answers[fid]) answers[fid] = [];
+    // Ensure missing radios/checkboxes still appear so backend can evaluate != rules
+    seenRadio.forEach((fid) => {
+      if (!(fid in answers)) answers[fid] = "";
     });
-    radioGroups.forEach((fid) => {
-      if (answers[fid] === undefined) answers[fid] = "";
+    seenCheckbox.forEach((fid) => {
+      if (!(fid in answers)) answers[fid] = [];
     });
 
     return answers;
   }
 
-  async function getNextToken(formEl) {
-    const token = formEl.querySelector("input[name='token']")?.value;
+  async function evaluateBranching(formEl) {
+    const tokenInput = formEl.querySelector('input[name="token"]');
+    const token = tokenInput ? tokenInput.value : null;
     if (!token) return null;
 
     const answers = collectAnswers(formEl);
 
     try {
-      const res = await fetch(`/smart_form/branching/${token}`, {
+      const res = await fetch(`/smart_form/branching/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),
@@ -51,55 +67,50 @@
       });
       if (!res.ok) return null;
       const data = await res.json();
-      if (data && data.success && data.next_token) return data.next_token;
-      return null;
+      if (!data || !data.success) return null;
+      return data.next_token || null;
     } catch (e) {
       return null;
     }
   }
 
-  async function refreshContinueCTA(formEl) {
-    const cta = document.getElementById("sfb-branching-cta");
-    if (!cta) return;
-
-    const nextToken = await getNextToken(formEl);
-    if (!nextToken) {
-      cta.innerHTML = "";
-      return;
-    }
-    cta.innerHTML = `<a class="btn btn-outline-primary" href="/smart_form/${nextToken}">Continue</a>`;
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const formEl =
-      document.querySelector("form[action='/smart_form/submit']") ||
-      document.querySelector("form");
+  function init() {
+    const formEl = document.getElementById("smart-form");
     if (!formEl) return;
 
-    // Live CTA preview (optional)
-    refreshContinueCTA(formEl);
-    formEl.addEventListener("change", () => refreshContinueCTA(formEl));
-
-    // Core: branching redirect on submit
-    formEl.addEventListener("submit", async (ev) => {
-      // Only handle our public form
-      const tokenInput = formEl.querySelector("input[name='token']");
-      if (!tokenInput) return;
-
-      // If user held meta/ctrl (open new tab), or form has explicit no-branching flag, don't intercept
-      if (ev.metaKey || ev.ctrlKey || formEl.dataset.noBranching === "1") return;
-
-      ev.preventDefault();
-      const nextToken = await getNextToken(formEl);
-
-      // If branching produced a next form, redirect instead of submitting
+    // Evaluate on change to update optional CTA if it exists
+    const maybeUpdateCTA = async () => {
+      const nextToken = await evaluateBranching(formEl);
+      const cta = document.getElementById("sfb-branching-cta");
+      if (!cta) return;
       if (nextToken) {
-        window.location.href = `/smart_form/${nextToken}`;
-        return;
+        cta.style.display = "";
+        cta.setAttribute("href", `/smart_form/${encodeURIComponent(nextToken)}`);
+      } else {
+        cta.style.display = "none";
+        cta.removeAttribute("href");
       }
+    };
 
-      // Otherwise, submit current form normally
-      formEl.submit();
+    formEl.addEventListener("change", () => {
+      maybeUpdateCTA();
     });
-  });
+
+    // Optional: intercept submit for client-side redirect (server-side also handles it)
+    formEl.addEventListener("submit", async (ev) => {
+      const nextToken = await evaluateBranching(formEl);
+      if (nextToken) {
+        ev.preventDefault();
+        window.location.href = `/smart_form/${encodeURIComponent(nextToken)}`;
+      }
+    });
+
+    maybeUpdateCTA();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
