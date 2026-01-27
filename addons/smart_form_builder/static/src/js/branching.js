@@ -2,19 +2,19 @@
   "use strict";
 
   let nextFormToken = null;
-  let pending = false; // prevent request flooding
+  let pending = false;
 
-  // --------------------------------------------------
+  // ---------------------------------------------
   // CHECK IF BRANCHING EXISTS
-  // --------------------------------------------------
+  // ---------------------------------------------
   function hasBranching() {
     const el = document.getElementById("sfb-has-branching");
     return el && el.value === "1";
   }
 
-  // --------------------------------------------------
-  // COLLECT ANSWERS (SAFE + CLEAN)
-  // --------------------------------------------------
+  // ---------------------------------------------
+  // COLLECT ANSWERS (MATCHES BACKEND EXPECTATION)
+  // ---------------------------------------------
   function collectAnswers(formEl) {
     const answers = {};
 
@@ -26,7 +26,6 @@
         const fid = el.dataset.fieldId;
         if (!fid) return;
 
-        // RADIO
         if (el.type === "radio") {
           if (el.checked) {
             answers[fid] = el.value || "";
@@ -34,7 +33,6 @@
           return;
         }
 
-        // CHECKBOX
         if (el.type === "checkbox") {
           if (!answers[fid]) answers[fid] = [];
           if (el.checked) {
@@ -43,19 +41,17 @@
           return;
         }
 
-        // OTHER INPUTS
         answers[fid] = el.value || "";
       });
 
     return answers;
   }
 
-  // --------------------------------------------------
-  // CALL BACKEND BRANCHING (ONLY IF ENABLED)
-  // --------------------------------------------------
+  // ---------------------------------------------
+  // CALL BACKEND BRANCHING
+  // ---------------------------------------------
   async function evaluateBranching(formEl) {
-    if (!hasBranching()) return;
-    if (pending) return;
+    if (!hasBranching() || pending) return;
 
     const tokenEl = formEl.querySelector('input[name="token"]');
     if (!tokenEl) return;
@@ -80,7 +76,7 @@
       nextFormToken =
         data && data.success && data.next_token ? data.next_token : null;
 
-      // OPTIONAL PREVIEW CTA
+      // Optional preview CTA
       const cta = document.getElementById("sfb-branching-cta");
       if (cta) {
         cta.innerHTML = nextFormToken
@@ -88,40 +84,39 @@
           : "";
       }
     } catch (e) {
-      console.error("❌ Branching evaluation failed", e);
+      console.error("Branching evaluation failed", e);
     } finally {
       pending = false;
     }
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------
   // INIT
-  // --------------------------------------------------
+  // ---------------------------------------------
   document.addEventListener("DOMContentLoaded", () => {
     const formEl = document.getElementById("smart-form");
     if (!formEl) return;
 
-    // 🚫 NO BRANCHING → DO NOTHING (NORMAL SUBMIT)
-    if (!hasBranching()) {
-      console.log("ℹ️ No branching rules — normal submit");
-      return;
-    }
+    // No branching → behave like normal form
+    if (!hasBranching()) return;
 
-    // 🔁 Evaluate only on meaningful changes
+    // Re-evaluate like field logic
+    formEl.addEventListener("input", () => evaluateBranching(formEl));
     formEl.addEventListener("change", () => evaluateBranching(formEl));
 
-    // 🚀 CONTINUE BUTTON (NO SUBMIT HIJACK)
+    // Continue button
     const btn = document.getElementById("sfb-continue");
-    if (btn) {
-      btn.addEventListener("click", () => {
-        if (nextFormToken) {
-          window.location.href = `/smart_form/${nextFormToken}`;
-        } else {
-          alert("No matching branch rule. Please review your inputs.");
-        }
-      });
-    }
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (nextFormToken) {
+        window.location.href = `/smart_form/${nextFormToken}`;
+      } else {
+        // ✅ NO MATCH + NO FALLBACK → NORMAL SUBMIT
+        formEl.submit();
+      }
+    });
   });
 
-  console.log("✅ Branching JS loaded (backend-evaluated, safe)");
+  console.log("✅ Branching JS loaded (final, stable)");
 })();
