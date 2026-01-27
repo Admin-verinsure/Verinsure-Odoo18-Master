@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  // ---------------------------------------------
+  // COLLECT ANSWERS
+  // ---------------------------------------------
   function collectAnswers(formEl) {
     const answers = {};
     formEl.querySelectorAll("[data-field-id]").forEach((el) => {
@@ -19,14 +22,16 @@
     return answers;
   }
 
+  // ---------------------------------------------
+  // CALL BRANCHING API
+  // ---------------------------------------------
   async function callBranching(formEl) {
     const tokenInput = formEl.querySelector('input[name="token"]');
-    const token = tokenInput ? tokenInput.value : null;
-    if (!token) return null;
+    if (!tokenInput) return null;
 
     try {
       const res = await fetch(
-        `/smart_form/branching/${encodeURIComponent(token)}`,
+        `/smart_form/branching/${encodeURIComponent(tokenInput.value)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -37,18 +42,19 @@
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
-      console.error("Branching call failed", e);
+      console.error("❌ Branching request failed", e);
       return null;
     }
   }
 
   // ---------------------------------------------
-  // LIVE PREVIEW (KEEPING YOUR EXISTING FEATURE)
+  // CTA PREVIEW (OPTIONAL)
   // ---------------------------------------------
   async function updateCTA(formEl) {
-    const data = await callBranching(formEl);
     const cta = document.getElementById("sfb-branching-cta");
     if (!cta) return;
+
+    const data = await callBranching(formEl);
 
     if (data && data.success && data.next_token) {
       cta.innerHTML = `
@@ -61,33 +67,29 @@
   }
 
   // ---------------------------------------------
-  // SUBMIT INTERCEPT (THIS IS THE FIX)
+  // SUBMIT HANDLER (FINAL AUTHORITY)
   // ---------------------------------------------
-  document.addEventListener(
-    "submit",
-    async function (ev) {
-      const formEl = ev.target;
-      if (!(formEl instanceof HTMLFormElement)) return;
+  async function onSubmit(ev) {
+    const formEl = ev.target;
+    if (!(formEl instanceof HTMLFormElement)) return;
 
-      const tokenInput = formEl.querySelector('input[name="token"]');
-      if (!tokenInput) return;
+    const tokenInput = formEl.querySelector('input[name="token"]');
+    if (!tokenInput) return;
 
-      ev.preventDefault(); // 🔥 CRITICAL
+    ev.preventDefault(); // 🔥 intercept once
 
-      const data = await callBranching(formEl);
+    const data = await callBranching(formEl);
 
-      if (data && data.success && data.next_token) {
-        // 🔁 Branch or fallback exists → redirect
-        window.location.href = `/smart_form/${data.next_token}`;
-        return;
-      }
+    // 🔁 Branch exists → redirect
+    if (data && data.success && data.next_token) {
+      window.location.href = `/smart_form/${data.next_token}`;
+      return;
+    }
 
-      // ✅ Terminal form → allow actual submit
-      formEl.removeEventListener("submit", arguments.callee, true);
-      formEl.submit();
-    },
-    true, // 🔥 CAPTURE PHASE (VERY IMPORTANT)
-  );
+    // ✅ Terminal form → submit ONCE
+    document.removeEventListener("submit", onSubmit, true);
+    formEl.submit();
+  }
 
   // ---------------------------------------------
   // INIT
@@ -103,5 +105,8 @@
     formEl.addEventListener("change", () => updateCTA(formEl));
   });
 
-  console.log("✅ Smart Form Branching JS loaded");
+  // 🔥 CAPTURE PHASE SUBMIT INTERCEPT
+  document.addEventListener("submit", onSubmit, true);
+
+  console.log("✅ Smart Form Branching JS ACTIVE");
 })();
