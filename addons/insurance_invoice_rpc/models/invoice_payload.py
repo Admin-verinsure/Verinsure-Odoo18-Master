@@ -105,46 +105,45 @@ class InvoicePocPayload(models.Model):
     # -----------------------------
     # Agent (employee.details) - SEARCH BY NAME, NO EMAIL
     # -----------------------------
-def _get_or_create_employee_details(self, agent):
-    """employee.details has NO email field.
+    def _get_or_create_employee_details(self, agent):
+        """employee.details has NO email field.
 
-    Requirement:
-      1) Search agent by name first (exact match)
-      2) If not found, create
-      3) Phone optional (validate & store if provided)
-      4) If multiple with same name, prefer matching phone (if phone provided)
-    """
-    name = (agent.get("name") or "").strip()
-    phone = (agent.get("phone") or "").strip()
+        Requirement:
+          1) Search agent by name first (exact match)
+          2) If not found, create
+          3) Phone optional (validate & store if provided)
+          4) If multiple with same name, prefer matching phone (if phone provided)
+        """
+        name = (agent.get("name") or "").strip()
+        phone = (agent.get("phone") or "").strip()
 
-    if not name:
-        raise ValidationError(_("policy.agent.name is required"))
+        if not name:
+            raise ValidationError(_("policy.agent.name is required"))
 
-    # validate phone only if provided
-    self._validate_phone(phone, "Agent")
+        # validate phone only if provided
+        self._validate_phone(phone, "Agent")
 
-    Emp = self.env["employee.details"]
+        Emp = self.env["employee.details"]
 
-    rec = False
-    if phone:
-        rec = Emp.search([("name", "=", name), ("phone", "=", phone)], limit=1)
+        rec = False
+        if phone:
+            rec = Emp.search([("name", "=", name), ("phone", "=", phone)], limit=1)
 
-    if not rec:
-        rec = Emp.search([("name", "=", name)], limit=1)
+        if not rec:
+            rec = Emp.search([("name", "=", name)], limit=1)
 
-    if rec:
-        vals = {}
-        if phone and not rec.phone:
+        if rec:
+            vals = {}
+            if phone and not rec.phone:
+                vals["phone"] = phone
+            if vals:
+                rec.write(vals)
+            return rec
+
+        vals = {"name": name}
+        if phone:
             vals["phone"] = phone
-        if vals:
-            rec.write(vals)
-        return rec
-
-    vals = {"name": name}
-    if phone:
-        vals["phone"] = phone
-    return Emp.create(vals)
-
+        return Emp.create(vals)
 
     # -----------------------------
     # Policy Type / Policy / Insurance
@@ -193,6 +192,24 @@ def _get_or_create_employee_details(self, agent):
             raise ValidationError(_("policy.policy_number is required"))
 
         payment_type = self._validate_insurance_payment_type(policy_data.get("payment_type"))
+        if not payment_type:
+            raise ValidationError(_("policy.payment_type is required"))
+
+        # REQUIRED fields in your DB: start_date, amount_installment, state
+        start_date = payload.get("invoice_date") or fields.Date.today()
+
+        # Use total invoice lines as default installment amount, fallback to policy amount
+        lines = payload.get("lines") or []
+        total_lines = 0.0
+        for l in lines:
+            total_lines += float(l.get("qty") or 1) * float(l.get("unit_price") or 0)
+
+        amount_installment = total_lines if total_lines > 0 else float(policy_data.get("amount") or 0.0)
+
+        # NOTE: If your insurance.details.state selection keys differ,
+        # change "draft" to a valid key. You can check via:
+        # env["insurance.details"]._fields["state"].selection
+        state = "draft"
 
         vals = {
             "name": policy_data.get("name") or _("Insurance"),
@@ -201,11 +218,14 @@ def _get_or_create_employee_details(self, agent):
             "policy_id": policy.id,
             "policy_number": int(policy_number),
             "policy_duration": int(policy_data.get("policy_duration") or 0),
-            "amount": float(policy_data.get("amount") or 0.0),
             "currency_id": currency.id,
+            "payment_type": payment_type,
+            "start_date": start_date,
+            "amount_installment": float(amount_installment),
+            "state": state,
+            # amount is optional in your DB, but OK to set
+            "amount": float(policy_data.get("amount") or 0.0),
         }
-        if payment_type:
-            vals["payment_type"] = payment_type
 
         return self.env["insurance.details"].create(vals)
 
@@ -220,7 +240,7 @@ def _get_or_create_employee_details(self, agent):
             "partner_id": partner.id,
             "invoice_user_id": salesperson.id,
             "currency_id": currency.id,
-            "insurance_id": insurance.id,
+            "insurance_id": insurance.id,  # exists in your DB
         }
 
         if payload.get("invoice_date"):
