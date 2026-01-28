@@ -103,7 +103,6 @@ class InvoicePocPayload(models.Model):
         })
 
     def _get_or_create_employee_details(self, agent):
-        # Agent stored in employee.details
         name = (agent.get("name") or "").strip()
         email = (agent.get("email") or "").strip().lower()
         phone = (agent.get("phone") or "").strip()
@@ -157,7 +156,6 @@ class InvoicePocPayload(models.Model):
         return self.env["policy.details"].create(vals)
 
     def _validate_insurance_payment_type(self, payment_type_value):
-        # insurance.details.payment_type selection: fixed/installment (confirmed)
         field = self.env["insurance.details"]._fields.get("payment_type")
         if not field:
             return False
@@ -207,8 +205,7 @@ class InvoicePocPayload(models.Model):
             "partner_id": partner.id,
             "invoice_user_id": salesperson.id,
             "currency_id": currency.id,
-            # IMPORTANT: in your DB this already exists and links to insurance.details
-            "insurance_id": insurance.id,
+            "insurance_id": insurance.id,  # exists in your DB
         }
 
         if payload.get("invoice_date"):
@@ -246,7 +243,17 @@ class InvoicePocPayload(models.Model):
 
     def _post_and_email(self, move):
         move.action_post()
-        template = self.env.ref("insurance_policy_invoice_poc.mail_template_invoice_poc", raise_if_not_found=False)
+
+        # Safe template lookup: prefer xmlid created in post_init_hook, else by name
+        template = False
+        try:
+            template = self.env.ref("insurance_policy_invoice_poc.mail_template_invoice_poc", raise_if_not_found=False)
+        except Exception:
+            template = False
+
+        if not template:
+            template = self.env["mail.template"].search([("name", "=", "Insurance Invoice - Customer Email")], limit=1)
+
         if template and move.partner_id.email:
             template.send_mail(move.id, force_send=True)
 
@@ -265,7 +272,6 @@ class InvoicePocPayload(models.Model):
                 policy_data = payload.get("policy") or {}
                 employee = rec._get_or_create_employee_details(policy_data.get("agent") or {})
 
-                # Policy-first flow
                 policy = rec._create_policy(policy_data, currency)
                 insurance = rec._create_insurance(payload, policy, partner, employee, currency)
 
