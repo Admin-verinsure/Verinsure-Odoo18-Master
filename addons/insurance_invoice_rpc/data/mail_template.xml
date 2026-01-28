@@ -1,19 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <data>
     <record id="mail_template_invoice_poc" model="mail.template">
-      <field name="name">Insurance Invoice - Customer Email</field>
-      <field name="model_id" ref="account.model_account_move"/>
-      <field name="subject">Your Invoice ${object.name}</field>
-      <field name="email_from">${(object.company_id.email or user.email) | safe}</field>
-      <field name="email_to">${object.partner_id.email or ''}</field>
-      <field name="body_html" type="html">
-        <![CDATA[
-          <p>Hello ${object.partner_id.name},</p>
-          <p>Your invoice <b>${object.name}</b> has been created and posted.</p>
-          <p>Total: <b>${object.amount_total} ${object.currency_id.name}</b></p>
-          <p>Thank you.</p>
-        ]]>
-      </field>
+        <field name="name">Insurance Invoice - Customer Email</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="subject">Your Invoice ${object.name}</field>
+        <field name="email_from">${(object.company_id.email or user.email) | safe}</field>
+        <field name="email_to">${object.partner_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <![CDATA[
+                <p>Hello ${object.partner_id.name},</p>
+                <p>Your invoice <b>${object.name}</b> has been created and posted.</p>
+                <p>Total: <b>${object.amount_total} ${object.currency_id.name}</b></p>
+                <p>Thank you.</p>
+            ]]>
+        </field>
     </record>
-  </data>
 </odoo>
