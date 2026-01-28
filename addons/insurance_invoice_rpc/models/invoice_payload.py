@@ -71,7 +71,7 @@ class InvoicePocPayload(models.Model):
         return tax_ids
 
     # -----------------------------
-    # Customer
+    # Customer / Agent
     # -----------------------------
     def _get_or_create_partner(self, customer):
         name = (customer.get("name") or "").strip()
@@ -102,54 +102,47 @@ class InvoicePocPayload(models.Model):
             "customer_rank": 1,
         })
 
-    # -----------------------------
-    # Agent (employee.details) - SEARCH BY NAME, NO EMAIL
-    # -----------------------------
     def _get_or_create_employee_details(self, agent):
-        """
-        employee.details has NO email field in your DB.
-
-        Requirement:
-          1) Search agent by name (exact match)
-          2) If not found, create
-          3) Phone is optional, but validated and stored if provided
-
-        Safety improvement:
-          - If multiple records exist with same name, prefer one that matches phone (if provided).
+        """Your employee.details model has NO email field.
+        So we:
+          1) validate phone and search/create by phone (primary key-like)
+          2) optionally link user_id if a matching res.users exists for the given email
         """
         name = (agent.get("name") or "").strip()
+        email = (agent.get("email") or "").strip().lower()
         phone = (agent.get("phone") or "").strip()
 
         if not name:
             raise ValidationError(_("policy.agent.name is required"))
-
-        # validate phone only if provided
         self._validate_phone(phone, "Agent")
 
         Emp = self.env["employee.details"]
 
-        # 1) If phone is given, first try (name + phone) to avoid duplicates
-        rec = False
-        if phone:
-            rec = Emp.search([("name", "=", name), ("phone", "=", phone)], limit=1)
+        # Primary: find by phone (field exists)
+        rec = Emp.search([("phone", "=", phone)], limit=1)
 
-        # 2) Fallback: search by name only
-        if not rec:
-            rec = Emp.search([("name", "=", name)], limit=1)
+        # Optional: map email -> res.users and set user_id on employee.details if possible
+        user = False
+        if email and "user_id" in Emp._fields:
+            Users = self.env["res.users"].sudo()
+            domain = ["|", ("login", "=", email), ("email", "=", email)]
+            user = Users.search(domain, limit=1)
 
         if rec:
-            # update phone if missing and we got a phone
             vals = {}
+            if name and not rec.name:
+                vals["name"] = name
             if phone and not rec.phone:
                 vals["phone"] = phone
+            if user and not rec.user_id:
+                vals["user_id"] = user.id
             if vals:
                 rec.write(vals)
             return rec
 
-        # Not found -> create
-        vals = {"name": name}
-        if phone:
-            vals["phone"] = phone
+        vals = {"name": name, "phone": phone}
+        if user:
+            vals["user_id"] = user.id
         return Emp.create(vals)
 
     # -----------------------------
@@ -226,7 +219,7 @@ class InvoicePocPayload(models.Model):
             "partner_id": partner.id,
             "invoice_user_id": salesperson.id,
             "currency_id": currency.id,
-            "insurance_id": insurance.id,
+            "insurance_id": insurance.id,  # exists in your DB
         }
 
         if payload.get("invoice_date"):
@@ -265,6 +258,7 @@ class InvoicePocPayload(models.Model):
     def _post_and_email(self, move):
         move.action_post()
 
+        # Safe template lookup: xmlid (created by post_init_hook) OR by name
         template = False
         try:
             template = self.env.ref("insurance_policy_invoice_poc.mail_template_invoice_poc", raise_if_not_found=False)
