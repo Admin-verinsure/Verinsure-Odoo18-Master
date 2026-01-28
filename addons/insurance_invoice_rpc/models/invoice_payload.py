@@ -149,12 +149,16 @@ class InvoicePocPayload(models.Model):
     # Policy Type / Policy / Insurance
     # -----------------------------
     def _get_policy_type(self, type_name):
+        """Option B: auto-create policy.type if missing."""
         if not type_name:
             return False
+
         pt = self.env["policy.type"].search([("name", "=", type_name)], limit=1)
-        if not pt:
-            raise ValidationError(_("policy.type not found by name: %s") % type_name)
-        return pt
+        if pt:
+            return pt
+
+        # Auto-create if missing
+        return self.env["policy.type"].create({"name": type_name})
 
     def _create_policy(self, policy_data, currency):
         pt = self._get_policy_type(policy_data.get("type_name"))
