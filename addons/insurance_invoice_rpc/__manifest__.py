@@ -1,12 +1,13 @@
-# -*- coding: utf-8 -*-
 {
-    "name": "Insurance RPC: Create Insurance + Invoice + Email (Cybro)",
-    "version": "18.0.1.3.0",
+    "name": "Insurance Policy-first Invoice (POC)",
+    "version": "18.0.1.0.0",
     "category": "Insurance",
-    "summary": "RPC create insurance.details + invoice + email. Links invoice under Insurance (invoice_ids). Creates new agents with required fields.",
-    "depends": ["base", "account", "mail", "insurance_management_cybro"],
+    "summary": "Create policy + insurance + invoice from JSON payload (policy-first)",
+    "depends": ["base", "mail", "account"],
     "data": [
-        "views/account_move_view.xml",
+        "security/ir.model.access.csv",
+        "data/mail_template.xml",
+        "views/invoice_payload_views.xml",
     ],
     "installable": True,
     "application": False,
