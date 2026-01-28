@@ -1,12 +1,32 @@
 <odoo>
-  <menuitem id="menu_smart_form_root" name="Smart Form Builder" sequence="10"/>
+  <menuitem
+      id="menu_smart_form_root"
+      name="Smart Form Builder"
+      web_icon="smart_form_builder,static/description/icon.png"
+      sequence="10"
+  />
 
-  <menuitem id="menu_smart_forms" name="Forms" parent="menu_smart_form_root"
-            action="action_smart_form" sequence="10"/>
+  <menuitem
+      id="menu_smart_forms"
+      name="Forms"
+      parent="menu_smart_form_root"
+      action="action_smart_form"
+      sequence="10"
+  />
 
-  <menuitem id="menu_smart_form_branch_rules" name="Branch Rules" parent="menu_smart_form_root"
-            action="action_smart_form_branch_rules" sequence="20"/>
+  <menuitem
+      id="menu_smart_form_branch_rules"
+      name="Branch Rules"
+      parent="menu_smart_form_root"
+      action="action_smart_form_branch_rules"
+      sequence="20"
+  />
 
-  <menuitem id="menu_smart_form_submissions" name="Submissions" parent="menu_smart_form_root"
-            action="action_smart_form_submissions" sequence="30"/>
+  <menuitem
+      id="menu_smart_form_submissions"
+      name="Submissions"
+      parent="menu_smart_form_root"
+      action="action_smart_form_submissions"
+      sequence="30"
+  />
 </odoo>
