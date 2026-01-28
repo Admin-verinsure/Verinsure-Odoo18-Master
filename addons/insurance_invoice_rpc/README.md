@@ -1,10 +1,11 @@
-# Insurance Policy-first Invoice (POC) - Odoo 18
+# Insurance Policy-first Invoice (POC) - Odoo 18 (NO XML)
 
-This build intentionally ships **NO XML files** to avoid strict RelaxNG validation errors on your server.
+This build ships no XML due to strict RelaxNG validation on your server.
 
-What it provides:
-- Model: invoice.poc.payload
-- Method: action_create_policy_and_invoice()
-- Post-init hook creates a Mail Template and registers an XMLID.
+Agent mapping:
+- employee.details has no email field
+- we search/create by phone
+- we optionally link user_id if res.users with matching login/email exists
 
-You can run your payload via Odoo shell to test invoice creation end-to-end.
+Models used:
+- policy.details, policy.type, insurance.details, employee.details, account.move.insurance_id
