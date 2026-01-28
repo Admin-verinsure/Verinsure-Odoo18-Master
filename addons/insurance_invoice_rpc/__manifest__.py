@@ -1,6 +1,6 @@
 {
     "name": "Insurance Policy-first Invoice (POC)",
-    "version": "18.0.1.0.3",
+    "version": "18.0.1.0.4",
     "category": "Insurance",
     "summary": "Create policy + insurance + invoice from JSON payload (policy-first)",
     "depends": ["base", "mail", "account"],

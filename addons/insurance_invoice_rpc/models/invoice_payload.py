@@ -103,33 +103,47 @@ class InvoicePocPayload(models.Model):
         })
 
     def _get_or_create_employee_details(self, agent):
+        """Your employee.details model has NO email field.
+        So we:
+          1) validate phone and search/create by phone (primary key-like)
+          2) optionally link user_id if a matching res.users exists for the given email
+        """
         name = (agent.get("name") or "").strip()
         email = (agent.get("email") or "").strip().lower()
         phone = (agent.get("phone") or "").strip()
 
         if not name:
             raise ValidationError(_("policy.agent.name is required"))
-        if not email:
-            raise ValidationError(_("policy.agent.email is required"))
         self._validate_phone(phone, "Agent")
 
         Emp = self.env["employee.details"]
-        rec = Emp.search([("email", "=", email)], limit=1)
+
+        # Primary: find by phone (field exists)
+        rec = Emp.search([("phone", "=", phone)], limit=1)
+
+        # Optional: map email -> res.users and set user_id on employee.details if possible
+        user = False
+        if email and "user_id" in Emp._fields:
+            Users = self.env["res.users"].sudo()
+            domain = ["|", ("login", "=", email), ("email", "=", email)]
+            user = Users.search(domain, limit=1)
+
         if rec:
             vals = {}
             if name and not rec.name:
                 vals["name"] = name
             if phone and not rec.phone:
                 vals["phone"] = phone
+            if user and not rec.user_id:
+                vals["user_id"] = user.id
             if vals:
                 rec.write(vals)
             return rec
 
-        return Emp.create({
-            "name": name,
-            "email": email,
-            "phone": phone,
-        })
+        vals = {"name": name, "phone": phone}
+        if user:
+            vals["user_id"] = user.id
+        return Emp.create(vals)
 
     # -----------------------------
     # Policy Type / Policy / Insurance
@@ -244,7 +258,7 @@ class InvoicePocPayload(models.Model):
     def _post_and_email(self, move):
         move.action_post()
 
-        # Safe template lookup: prefer xmlid created in post_init_hook, else by name
+        # Safe template lookup: xmlid (created by post_init_hook) OR by name
         template = False
         try:
             template = self.env.ref("insurance_policy_invoice_poc.mail_template_invoice_poc", raise_if_not_found=False)
