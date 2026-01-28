@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import api, SUPERUSER_ID
 
-MODULE = "insurance_policy_invoice_poc"
+MODULE = "insurance_invoice_rpc"
 
 
 def post_init_hook(cr, registry):
