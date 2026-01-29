@@ -4,7 +4,7 @@ import re
 from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
-PHONE_RE = re.compile(r"^\d{10}$")
+PHONE_RE = re.compile(r"^\d+$")
 
 
 class InvoicePocPayload(models.Model):
