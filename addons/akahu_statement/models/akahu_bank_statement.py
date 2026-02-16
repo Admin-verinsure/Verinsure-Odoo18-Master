@@ -85,6 +85,19 @@ class StatementLineDeferPosting(models.Model):
                 move.button_draft()
         return res
 
+# ---------------------------------------------------------
+# SQL-level uniqueness protection (race-condition safe)
+# ---------------------------------------------------------
+class StatementLineAkahuUnique(models.Model):
+    _inherit = 'account.bank.statement.line'
+
+    unique_import_id = fields.Char(index=True)
+
+    _sql_constraints = [
+        ('unique_import_id_uniq',
+         'unique(unique_import_id)',
+         'This Akahu transaction has already been imported.')
+    ]
 
 # ---------------------------------------------------------
 # Main Service: Import + Reconcile
@@ -168,8 +181,11 @@ class AkahuBankStatement(models.Model):
     @api.model
     def _line_exists(self, unique_id: str) -> bool:
         return bool(unique_id) and bool(
-            self.env['account.bank.statement.line'].search_count([('unique_import_id', '=', unique_id)])
+            self.env['account.bank.statement.line']
+            .sudo()
+            .search_count([('unique_import_id', '=', unique_id)])
         )
+
 
     def _rp_domain(self, inbound: bool):
         """Version-proof receivable/payable domain."""
@@ -258,6 +274,13 @@ class AkahuBankStatement(models.Model):
                     description = (tx.get("description") or tx.get("details") or "").strip() or "Akahu"
                     counterpart = (tx.get("counterparty") or {}).get("name") or ""
                     amount = float(tx.get("amount") or 0.0)
+                    tx_type = tx.get("type")
+
+                    if tx_type == "DEBIT":
+                        amount = -abs(amount)
+                    elif tx_type == "CREDIT":
+                        amount = abs(amount)
+
 
                     vals = {
                         'statement_id': st.id,
@@ -342,6 +365,8 @@ class AkahuBankStatement(models.Model):
                 ('company_id', '=', stl.company_id.id),
                 (posted_field, '=', 'posted'),
                 ('reconciled', '=', False),
+                ('date', '>=', stl.date - timedelta(days=30)),
+                ('date', '<=', stl.date + timedelta(days=5)),
             ] + self._rp_domain(inbound)
 
             if partner:
