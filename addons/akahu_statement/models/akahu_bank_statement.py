@@ -395,7 +395,7 @@ class AkahuBankStatement(models.Model):
                     res = abs(line.amount_residual_currency)
                 else:
                     res = abs(line.amount_residual)
-                if abs(res - wanted) <= amount_tolerance:
+                if 0 < wanted <= res + amount_tolerance:
                     keep.append(line)
 
             if require_text_hint and getattr(stl, 'payment_ref', None):
@@ -479,7 +479,7 @@ class AkahuBankStatement(models.Model):
                 # Need opposite sign vs invoice line so they can offset
                 if (signed > 0 and counterpart.balance > 0) or (signed < 0 and counterpart.balance < 0):
                     return False
-                return (not l.reconciled) and (abs(residual - wanted) <= tol)
+                return (not l.reconciled) and (0 < wanted <= residual + tol)
 
             bank_arap_leg = (draft_move.line_ids.filtered(_is_matching_bank_arap_line))[:1]
             if not bank_arap_leg:
