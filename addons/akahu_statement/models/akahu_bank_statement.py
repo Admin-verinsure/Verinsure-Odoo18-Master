@@ -85,19 +85,6 @@ class StatementLineDeferPosting(models.Model):
                 move.button_draft()
         return res
 
-# ---------------------------------------------------------
-# SQL-level uniqueness protection (race-condition safe)
-# ---------------------------------------------------------
-class StatementLineAkahuUnique(models.Model):
-    _inherit = 'account.bank.statement.line'
-
-    unique_import_id = fields.Char(index=True)
-
-    _sql_constraints = [
-        ('unique_import_id_uniq',
-         'unique(unique_import_id)',
-         'This Akahu transaction has already been imported.')
-    ]
 
 # ---------------------------------------------------------
 # Main Service: Import + Reconcile
@@ -181,11 +168,8 @@ class AkahuBankStatement(models.Model):
     @api.model
     def _line_exists(self, unique_id: str) -> bool:
         return bool(unique_id) and bool(
-            self.env['account.bank.statement.line']
-            .sudo()
-            .search_count([('unique_import_id', '=', unique_id)])
+            self.env['account.bank.statement.line'].search_count([('unique_import_id', '=', unique_id)])
         )
-
 
     def _rp_domain(self, inbound: bool):
         """Version-proof receivable/payable domain."""
@@ -221,15 +205,13 @@ class AkahuBankStatement(models.Model):
         journal = self._get_target_journal(journal_id)
         tz_name = tz_name or self.env.user.tz or "UTC"
 
-        since_dt = datetime.utcnow() - timedelta(days=int(days_back))
-        since = since_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
-
+        since = (fields.Datetime.now() - timedelta(days=int(days_back))).strftime('%Y-%m-%dT%H:%M:%SZ')
 
         acc_resp = requests.get(f"{AKAHU_API}/accounts", headers=headers, timeout=60)
         acc_data = self._json_or_raise(acc_resp, "/accounts")
         accounts = acc_data.get("items", []) or []
         _logger.info("Akahu: %d account(s) discovered", len(accounts))
-        _logger.warning("AKAHU DEBUG → accounts from API: %s", accounts)
+
         # Optional: restrict to a specific Akahu account via system parameter
         only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
         if only_acc:
@@ -245,23 +227,14 @@ class AkahuBankStatement(models.Model):
             if not acc_id:
                 continue
 
-            params = {'limit': page_limit}
+            params = {'start': since, 'limit': page_limit}
             url = f"{AKAHU_API}/accounts/{acc_id}/transactions"
 
             while True:
-                _logger.warning(
-                    "AKAHU DEBUG → requesting transactions for %s with params=%s",
-                    acc_id, params
-                )
                 resp = requests.get(url, headers=headers, params=params, timeout=90)
                 data = self._json_or_raise(resp, f"/accounts/{acc_id}/transactions")
 
                 items = data.get("items", []) or []
-                _logger.warning(
-                    "AKAHU DEBUG → API returned %s transactions",
-                    len(items)                
-                )
-
                 if not isinstance(items, list):
                     raise UserError(_("Akahu: unexpected transactions payload for account %s.") % acc_id)
 
@@ -285,13 +258,6 @@ class AkahuBankStatement(models.Model):
                     description = (tx.get("description") or tx.get("details") or "").strip() or "Akahu"
                     counterpart = (tx.get("counterparty") or {}).get("name") or ""
                     amount = float(tx.get("amount") or 0.0)
-                    tx_type = tx.get("type")
-
-                    if tx_type == "DEBIT":
-                        amount = -abs(amount)
-                    elif tx_type == "CREDIT":
-                        amount = abs(amount)
-
 
                     vals = {
                         'statement_id': st.id,
@@ -376,8 +342,6 @@ class AkahuBankStatement(models.Model):
                 ('company_id', '=', stl.company_id.id),
                 (posted_field, '=', 'posted'),
                 ('reconciled', '=', False),
-                ('date', '>=', stl.date - timedelta(days=30)),
-                ('date', '<=', stl.date + timedelta(days=5)),
             ] + self._rp_domain(inbound)
 
             if partner:
