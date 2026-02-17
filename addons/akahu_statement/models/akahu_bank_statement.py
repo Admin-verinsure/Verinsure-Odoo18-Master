@@ -231,7 +231,10 @@ class AkahuBankStatement(models.Model):
         _logger.info("Akahu: %d account(s) discovered", len(accounts))
         _logger.warning("AKAHU DEBUG → accounts from API: %s", accounts)
         # Optional: restrict to a specific Akahu account via system parameter
-        only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
+        only_acc = (self.env['ir.config_parameter']
+            .sudo()
+            .get_param('akahu.account_id') or '').strip()
+  # e.g. "acc_abc123"
         if only_acc:
             accounts = [a for a in accounts if (a.get('_id') or '') == only_acc]
             if not accounts:
