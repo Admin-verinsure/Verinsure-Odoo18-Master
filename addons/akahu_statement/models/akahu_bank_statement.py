@@ -477,7 +477,11 @@ class AkahuBankStatement(models.Model):
                 # Need opposite sign vs invoice line so they can offset
                 if (signed > 0 and counterpart.balance > 0) or (signed < 0 and counterpart.balance < 0):
                     return False
-                return (not l.reconciled) and (0 < wanted <= residual + tol)
+                return (
+                    not l.reconciled
+                    and residual + tol >= wanted
+                )
+
 
             bank_arap_leg = (draft_move.line_ids.filtered(_is_matching_bank_arap_line))[:1]
             if not bank_arap_leg:
