@@ -245,7 +245,7 @@ class AkahuBankStatement(models.Model):
             if not acc_id:
                 continue
 
-            params = {'start': since, 'limit': page_limit}
+            params = {'limit': page_limit}
             url = f"{AKAHU_API}/accounts/{acc_id}/transactions"
 
             while True:
