@@ -379,8 +379,6 @@ class AkahuBankStatement(models.Model):
                 ('company_id', '=', stl.company_id.id),
                 (posted_field, '=', 'posted'),
                 ('reconciled', '=', False),
-                ('date', '>=', stl.date - timedelta(days=30)),
-                ('date', '<=', stl.date + timedelta(days=5)),
             ] + self._rp_domain(inbound)
 
             if partner:
