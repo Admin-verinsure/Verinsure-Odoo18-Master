@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+raise Exception("AKAHU FILE LOADED")
 
 import logging
 from datetime import datetime, timedelta, date
