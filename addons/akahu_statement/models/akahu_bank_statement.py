@@ -229,7 +229,7 @@ class AkahuBankStatement(models.Model):
         acc_data = self._json_or_raise(acc_resp, "/accounts")
         accounts = acc_data.get("items", []) or []
         _logger.info("Akahu: %d account(s) discovered", len(accounts))
-
+        _logger.warning("AKAHU DEBUG → accounts from API: %s", accounts)
         # Optional: restrict to a specific Akahu account via system parameter
         only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
         if only_acc:
@@ -249,10 +249,19 @@ class AkahuBankStatement(models.Model):
             url = f"{AKAHU_API}/accounts/{acc_id}/transactions"
 
             while True:
+                _logger.warning(
+                    "AKAHU DEBUG → requesting transactions for %s with params=%s",
+                    acc_id, params
+                )
                 resp = requests.get(url, headers=headers, params=params, timeout=90)
                 data = self._json_or_raise(resp, f"/accounts/{acc_id}/transactions")
 
                 items = data.get("items", []) or []
+                _logger.warning(
+                    "AKAHU DEBUG → API returned %s transactions",
+                    len(items)                
+                )
+
                 if not isinstance(items, list):
                     raise UserError(_("Akahu: unexpected transactions payload for account %s.") % acc_id)
 
