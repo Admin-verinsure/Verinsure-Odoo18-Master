@@ -221,7 +221,9 @@ class AkahuBankStatement(models.Model):
         journal = self._get_target_journal(journal_id)
         tz_name = tz_name or self.env.user.tz or "UTC"
 
-        since = (fields.Datetime.now() - timedelta(days=int(days_back))).strftime('%Y-%m-%dT%H:%M:%SZ')
+        since_dt = datetime.utcnow() - timedelta(days=int(days_back))
+        since = since_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+
 
         acc_resp = requests.get(f"{AKAHU_API}/accounts", headers=headers, timeout=60)
         acc_data = self._json_or_raise(acc_resp, "/accounts")
