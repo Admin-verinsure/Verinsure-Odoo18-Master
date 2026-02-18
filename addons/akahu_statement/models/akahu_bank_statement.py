@@ -473,15 +473,7 @@ class AkahuBankStatement(models.Model):
                     return False
                 if l.partner_id != counterpart.partner_id:
                     return False
-                signed, residual = _signed_amt_and_residual(l)
-                # Need opposite sign vs invoice line so they can offset
-                if (signed > 0 and counterpart.balance > 0) or (signed < 0 and counterpart.balance < 0):
-                    return False
-                return (
-                    not l.reconciled
-                    and residual + tol >= wanted
-                )
-
+                return not l.reconciled and abs(_signed_amt_and_residual(l)[1] - wanted) <= tol     
 
             bank_arap_leg = (draft_move.line_ids.filtered(_is_matching_bank_arap_line))[:1]
             if not bank_arap_leg:
