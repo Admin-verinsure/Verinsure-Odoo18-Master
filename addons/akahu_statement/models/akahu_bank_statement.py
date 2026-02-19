@@ -331,35 +331,41 @@ class AkahuBankStatement(models.Model):
 
     # ------------------ auto-reconcile ------------------
     @api.model
-    def auto_reconcile_bank_lines(self, journal_id=None, max_days=7, amount_tolerance=0.50, require_text_hint=False):
-        """
-        For each bank statement line:
-          - Find a single matching posted AR/AP open item within tolerance.
-          - If found, transform the line's DRAFT liquidity move:
-            replace the non-bank leg with that AR/AP (and partner),
-            POST the move, then RECONCILE (exact pair).
-          - If zero / multiple matches, leave the move in DRAFT.
-        """
+    def auto_reconcile_bank_lines(
+        self,
+        journal_id=None,
+        max_days=7,
+        amount_tolerance=0.50,
+        require_text_hint=False,
+    ):
         journal = self._get_target_journal(journal_id)
-        Move = self.env['account.move']
-        AML = self.env['account.move.line']
-        Partner = self.env['res.partner']
+        AML = self.env["account.move.line"]
+        Partner = self.env["res.partner"]
 
         if not journal.default_account_id:
-            raise UserError(_("Bank journal %s has no Default Account configured.") % journal.display_name)
+            raise UserError(
+                _("Bank journal %s has no Default Account configured.")
+                % journal.display_name
+            )
 
         since = fields.Date.today() - timedelta(days=int(max_days))
 
-        st_lines = self.env['account.bank.statement.line'].search([
-            ('journal_id', '=', journal.id),
-            ('date', '>=', since),
-        ], order='date asc')
+        st_lines = self.env["account.bank.statement.line"].search(
+            [
+                ("journal_id", "=", journal.id),
+                ("date", ">=", since),
+            ],
+            order="date asc",
+        )
 
-        reconciled_count, ambiguous, missing = 0, 0, 0
+        reconciled_count = 0
+        ambiguous = 0
+        missing = 0
 
         for stl in st_lines:
-            # already reconciled?
-            if any(ml.reconciled for ml in getattr(stl, 'move_line_ids', [])):
+
+            # Skip already reconciled lines
+            if stl.is_reconciled:
                 continue
 
             amount = float(stl.amount or 0.0)
@@ -369,146 +375,138 @@ class AkahuBankStatement(models.Model):
             inbound = amount > 0
             wanted = abs(amount)
 
-            # partner hint
-            partner = stl.partner_id if getattr(stl, 'partner_id', False) else None
-            if not partner and getattr(stl, 'partner_name', None):
-                partner = Partner.search([('name', 'ilike', stl.partner_name)], limit=1)
+            # ---------------------------------------
+            # Partner detection
+            # ---------------------------------------
+            partner = stl.partner_id
+            if not partner and stl.partner_name:
+                partner = Partner.search(
+                    [("name", "ilike", stl.partner_name)],
+                    limit=1,
+                )
 
-            posted_field = 'parent_state' if 'parent_state' in AML._fields else 'move_id.state'
+            # ---------------------------------------
+            # Find open AR/AP move lines
+            # ---------------------------------------
+            posted_field = (
+                "parent_state"
+                if "parent_state" in AML._fields
+                else "move_id.state"
+            )
+
             domain = [
-                ('company_id', '=', stl.company_id.id),
-                (posted_field, '=', 'posted'),
-                ('reconciled', '=', False),
+                ("company_id", "=", stl.company_id.id),
+                (posted_field, "=", "posted"),
+                ("reconciled", "=", False),
             ] + self._rp_domain(inbound)
 
             if partner:
-                domain.append(('partner_id', '=', partner.id))
+                domain.append(("partner_id", "=", partner.id))
 
             candidates = AML.search(domain, limit=200)
 
-            # amount tolerance (+ optional text hint)
+            # ---------------------------------------
+            # Filter by amount tolerance
+            # ---------------------------------------
             keep = []
             for line in candidates:
-                if getattr(stl, 'currency_id', False) and line.currency_id and line.currency_id == stl.currency_id:
-                    res = abs(line.amount_residual_currency)
-                else:
-                    res = abs(line.amount_residual)
-                if 0 < wanted <= res + amount_tolerance:
+                residual = abs(line.amount_residual)
+                if residual + amount_tolerance >= wanted:
                     keep.append(line)
 
-            if require_text_hint and getattr(stl, 'payment_ref', None):
-                ref_l = (stl.payment_ref or "").lower()
-                hinted = []
-                for l in keep:
-                    blob = " ".join([
-                        l.move_id.ref or "",
-                        l.move_id.name or "",
-                        l.name or "",
-                        getattr(l.move_id, 'invoice_payment_ref', '') or "",
-                    ]).lower()
-                    if ref_l and ref_l in blob:
-                        hinted.append(l)
-                if hinted:
-                    keep = hinted
-
-            # decide
             if len(keep) == 0:
                 missing += 1
                 continue
+
             if len(keep) > 1:
                 ambiguous += 1
                 continue
 
-            counterpart = keep[0]  # the AR/AP open item we will reconcile to
+            counterpart = keep[0]
+
+            # ---------------------------------------
+            # Find draft move from bank statement
+            # ---------------------------------------
+            draft_move = None
+
+            if stl.move_id and stl.move_id.state == "draft":
+                draft_move = stl.move_id
+
+            if not draft_move:
+                missing += 1
+                continue
+
             bank_account = journal.default_account_id
 
-            # --- find the draft liquidity move attached to the statement line
-            draft_move = None
-            if hasattr(stl, 'move_id') and stl.move_id and stl.move_id.state == 'draft':
-                draft_move = stl.move_id
-            if not draft_move and hasattr(stl, 'journal_entry_ids'):
-                draft_move = stl.journal_entry_ids.filtered(lambda m: m.state == 'draft' and m.journal_id == journal)[:1]
-            if not draft_move:
-                # no draft liquidity move found → skip (do NOT create a second move)
+            bank_lines = draft_move.line_ids.filtered(
+                lambda l: l.account_id == bank_account
+            )
+
+            suspense_lines = draft_move.line_ids.filtered(
+                lambda l: l.account_id != bank_account
+            )
+
+            if not suspense_lines:
                 missing += 1
                 continue
 
-            # --- rewrite the non-bank leg to AR/AP + partner
-            bank_lines = draft_move.line_ids.filtered(lambda l: l.account_id == bank_account)
-            other_lines = draft_move.line_ids - bank_lines or draft_move.line_ids
-            label = stl.payment_ref or stl.name or '/'
-            if not draft_move.ref:
-                draft_move.ref = label[:140]
+            # ---------------------------------------
+            # Replace suspense with AR/AP
+            # ---------------------------------------
+            for line in suspense_lines:
+                line.write(
+                    {
+                        "account_id": counterpart.account_id.id,
+                        "partner_id": counterpart.partner_id.id,
+                    }
+                )
 
-            for ol in other_lines:
-                ol.write({
-                    'account_id': counterpart.account_id.id,
-                    'partner_id': counterpart.partner_id.id,
-                })
-
-            # --- post the move (after account/partner rewrite)
-            if draft_move.state == 'draft':
+            # ---------------------------------------
+            # Post the move
+            # ---------------------------------------
+            if draft_move.state == "draft":
                 draft_move.action_post()
 
-            # Ensure partner also on the bank leg (helps some builds/views)
+            # Ensure partner on bank leg
             for bl in bank_lines:
                 if not bl.partner_id:
-                    bl.write({'partner_id': counterpart.partner_id.id})
+                    bl.write({"partner_id": counterpart.partner_id.id})
 
-            def _signed_amt_and_residual(l):
-                """Return (signed_amount, residual_abs) in correct currency context."""
-                if stl.currency_id and l.currency_id and l.currency_id == stl.currency_id:
-                    signed = l.amount_currency           # signed in line currency
-                    residual = abs(l.amount_residual_currency)
-                else:
-                    signed = l.balance                   # signed in company currency
-                    residual = abs(l.amount_residual)
-                return signed, residual
-
+            # ---------------------------------------
+            # Find AR/AP leg on bank move
+            # ---------------------------------------
             tol = float(amount_tolerance or 0.0)
 
-            # counterpart.balance > 0 means debit line (receivable), < 0 credit (payable)
-            def _is_matching_bank_arap_line(l):
-                if l.account_id != counterpart.account_id:
-                    return False
-                if l.partner_id != counterpart.partner_id:
-                    return False
-                return not l.reconciled and abs(_signed_amt_and_residual(l)[1] - wanted) <= tol     
-
-            bank_arap_leg = (draft_move.line_ids.filtered(_is_matching_bank_arap_line))[:1]
-            if not bank_arap_leg:
-                _logger.warning(
-                    "Akahu: could not identify AR/AP leg on bank move %s; counterpart line=%s amount=%s tol=%s",
-                    draft_move.display_name, counterpart.id, wanted, tol
+            bank_arap_leg = draft_move.line_ids.filtered(
+                lambda l: (
+                    l.account_id == counterpart.account_id
+                    and l.partner_id == counterpart.partner_id
+                    and not l.reconciled
+                    and abs(abs(l.balance) - wanted) <= tol
                 )
+            )[:1]
+
+            if not bank_arap_leg:
                 missing += 1
                 continue
 
-            # --- reconcile the exact pair only ---
+            # ---------------------------------------
+            # Reconcile
+            # ---------------------------------------
             (bank_arap_leg + counterpart).reconcile()
-
-            # ensure link back for traceability
-            if hasattr(stl, 'journal_entry_ids') and draft_move not in stl.journal_entry_ids:
-                stl.write({'journal_entry_ids': [(4, draft_move.id)]})
-
-            # Optional: log resulting invoice payment state
-            inv = counterpart.move_id
-            try:
-                inv.invalidate_recordset(['payment_state', 'amount_residual'])
-            except Exception:
-                pass
-            _logger.info(
-                "Akahu: reconciled bank %s line %s with invoice line %s → invoice %s payment_state=%s residual=%.2f",
-                draft_move.name or draft_move.id,
-                bank_arap_leg.id, counterpart.id,
-                inv.name or inv.id, getattr(inv, 'payment_state', 'n/a'),
-                float(getattr(inv, 'amount_residual', 0.0)),
-            )
 
             reconciled_count += 1
 
         _logger.info(
             "Akahu auto-reconcile: %d reconciled, %d ambiguous, %d missing (journal=%s).",
-            reconciled_count, ambiguous, missing, journal.display_name
+            reconciled_count,
+            ambiguous,
+            missing,
+            journal.display_name,
         )
-        return {'reconciled': reconciled_count, 'ambiguous': ambiguous, 'missing': missing}
+
+        return {
+            "reconciled": reconciled_count,
+            "ambiguous": ambiguous,
+            "missing": missing,
+        }
