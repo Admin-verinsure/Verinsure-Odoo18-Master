@@ -439,11 +439,11 @@ class AkahuBankStatement(models.Model):
             bank_account = journal.default_account_id
 
             bank_lines = draft_move.line_ids.filtered(
-                lambda l: l.account_id == bank_account
+                lambda l: l.account_id == 'asset_cash'
             )
 
             suspense_lines = draft_move.line_ids.filtered(
-                lambda l: l.account_id != bank_account
+                lambda l: l.account_id != 'asset_cash'
             )
 
             if not suspense_lines:
