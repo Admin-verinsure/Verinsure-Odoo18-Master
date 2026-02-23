@@ -1,5 +1,5 @@
 {
-    "name": "Akahu Bank Import & Auto Reconcile Pro",
+    "name": "Akahu Import & Auto Reconcile Pro",
     "version": "1.0.0",
     "category": "Accounting",
     "summary": "Akahu import + automatic reconciliation (Odoo 18)",
