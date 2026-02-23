@@ -5,10 +5,9 @@
         <field name="arch" type="xml">
             <list>
                 <field name="date"/>
+                <field name="created"/>
                 <field name="matched"/>
-                <field name="ambiguous"/>
                 <field name="skipped"/>
-                <field name="no_partner"/>
             </list>
         </field>
     </record>
