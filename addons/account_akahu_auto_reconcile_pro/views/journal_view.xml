@@ -5,7 +5,7 @@
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
             <xpath expr="//sheet/notebook" position="inside">
-                <page string="Akahu & Reconciliation">
+                <page string="Akahu &amp; Reconciliation">
                     <group>
                         <field name="akahu_enabled"/>
                         <field name="akahu_app_token"/>
