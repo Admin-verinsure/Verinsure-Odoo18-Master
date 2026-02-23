@@ -5,7 +5,6 @@ class AutoReconcileLog(models.Model):
     _description = "Auto Reconcile Log"
 
     date = fields.Datetime(default=fields.Datetime.now)
+    created = fields.Integer()
     matched = fields.Integer()
-    ambiguous = fields.Integer()
     skipped = fields.Integer()
-    no_partner = fields.Integer()

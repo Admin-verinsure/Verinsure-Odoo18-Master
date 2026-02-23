@@ -1,71 +1,40 @@
-from odoo import models, fields, api
-from datetime import timedelta
+from odoo import models
 
 class AutoReconcileEngine(models.Model):
     _name = "auto.reconcile.engine"
     _description = "Auto Reconcile Engine"
 
-    @api.model
-    def run_auto_reconcile(self, journal_id=None):
+    def run_auto_reconcile(self, journal_id):
+        journal = self.env['account.journal'].browse(journal_id)
+        matched = 0
 
-        if journal_id:
-            journals = self.env['account.journal'].browse(journal_id)
-        else:
-            journals = self.env['account.journal'].search([
-                ('type','=','bank'),
-                ('auto_reconcile_enabled','=',True)
+        lines = self.env['account.bank.statement.line'].search([
+            ('journal_id','=',journal.id),
+        ])
+
+        for line in lines:
+            if not line.partner_id or not line.move_id:
+                continue
+
+            liquidity = line.move_id.line_ids.filtered(
+                lambda l: l.account_id == journal.default_account_id and not l.reconciled
+            )
+            if not liquidity:
+                continue
+
+            open_lines = self.env['account.move.line'].search([
+                ('partner_id','=',line.partner_id.id),
+                ('account_id.account_type','in',['asset_receivable','liability_payable']),
+                ('reconciled','=',False),
+                ('move_id.state','=','posted'),
             ])
 
-        for journal in journals:
+            candidates = open_lines.filtered(
+                lambda l: abs(l.amount_residual - abs(line.amount)) < 0.05
+            )
 
-            matched = ambiguous = skipped = no_partner = 0
-            since_date = fields.Date.today() - timedelta(days=journal.auto_reconcile_days)
+            if len(candidates) == 1:
+                (liquidity + candidates).reconcile()
+                matched += 1
 
-            lines = self.env['account.bank.statement.line'].search([
-                ('journal_id','=',journal.id),
-                ('date','>=',since_date),
-            ])
-
-            for line in lines:
-
-                if not line.move_id or not line.partner_id:
-                    no_partner += 1
-                    continue
-
-                liquidity = line.move_id.line_ids.filtered(
-                    lambda l: l.account_id == journal.default_account_id and not l.reconciled
-                )
-
-                if not liquidity:
-                    skipped += 1
-                    continue
-
-                open_lines = self.env['account.move.line'].search([
-                    ('partner_id','=',line.partner_id.id),
-                    ('account_id.account_type','in',['asset_receivable','liability_payable']),
-                    ('reconciled','=',False),
-                    ('move_id.state','=','posted'),
-                    ('company_id','=',line.company_id.id),
-                ])
-
-                candidates = open_lines.filtered(
-                    lambda l: abs(l.amount_residual - abs(line.amount)) <= journal.auto_reconcile_tolerance
-                )
-
-                if len(candidates) == 1:
-                    try:
-                        (liquidity + candidates).reconcile()
-                        matched += 1
-                    except Exception:
-                        skipped += 1
-                elif len(candidates) > 1:
-                    ambiguous += 1
-                else:
-                    skipped += 1
-
-            self.env['auto.reconcile.log'].create({
-                'matched': matched,
-                'ambiguous': ambiguous,
-                'skipped': skipped,
-                'no_partner': no_partner,
-            })
+        return matched
