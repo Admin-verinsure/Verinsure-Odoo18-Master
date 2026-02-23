@@ -66,7 +66,7 @@ class AkahuImportWizard(models.TransientModel):
                 self.journal_id.id
             )
 
-        self.env['auto.reconcile.log'].create({
+        self.env['auto.reconcile.log'].sudo().create({
             'created': created,
             'matched': matched,
             'skipped': skipped,
