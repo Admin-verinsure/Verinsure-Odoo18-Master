@@ -1,5 +1,5 @@
-
 <odoo>
+
     <record id="ir_cron_auto_reconcile" model="ir.cron">
         <field name="name">Auto Bank Reconciliation</field>
         <field name="model_id" ref="model_auto_reconcile_engine"/>
@@ -7,7 +7,7 @@
         <field name="code">model.run_auto_reconcile()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
     </record>
+
 </odoo>
