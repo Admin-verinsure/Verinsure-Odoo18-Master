@@ -1,9 +1,8 @@
-
 from odoo import models, fields
 
 class AutoReconcileLog(models.Model):
     _name = "auto.reconcile.log"
-    _description = "Auto Reconciliation Log"
+    _description = "Auto Reconcile Log"
 
     date = fields.Datetime(default=fields.Datetime.now)
     matched = fields.Integer()
