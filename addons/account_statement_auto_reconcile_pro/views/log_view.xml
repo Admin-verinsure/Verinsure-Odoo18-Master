@@ -1,0 +1,27 @@
+
+<odoo>
+    <record id="view_auto_reconcile_log_tree" model="ir.ui.view">
+        <field name="name">auto.reconcile.log.tree</field>
+        <field name="model">auto.reconcile.log</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="date"/>
+                <field name="matched"/>
+                <field name="ambiguous"/>
+                <field name="skipped"/>
+                <field name="no_partner"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_auto_reconcile_log" model="ir.actions.act_window">
+        <field name="name">Auto Reconcile Logs</field>
+        <field name="res_model">auto.reconcile.log</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <menuitem id="menu_auto_reconcile_log"
+              name="Auto Reconcile Logs"
+              parent="account.menu_finance"
+              action="action_auto_reconcile_log"/>
+</odoo>
