@@ -246,6 +246,7 @@ class AkahuBankStatement(models.Model):
 
         reconciled = 0
         missing = 0
+        ambiguous = 0
 
         for stl in st_lines:
 
@@ -263,6 +264,10 @@ class AkahuBankStatement(models.Model):
 
             if not partner:
                 missing += 1
+                continue
+            
+            if len(match) > 1:
+                ambiguous += 1
                 continue
 
             domain = [
@@ -319,7 +324,8 @@ class AkahuBankStatement(models.Model):
         _logger.info(
             "Akahu auto-reconcile: %s reconciled, %s missing.",
             reconciled,
+            ambiguous,
             missing,
         )
 
-        return {"reconciled": reconciled, "missing": missing}
+        return {"reconciled": reconciled, "missing": missing ,"ambiguous": ambiguous}
