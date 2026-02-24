@@ -31,14 +31,11 @@ class AkahuEngine(models.Model):
 
         statement = self.env['account.bank.statement'].search([
             ('journal_id', '=', journal.id),
-            ('state', '=', 'open')
-        ], limit=1)
+        ], order='id desc', limit=1)
 
         if not statement:
             statement = self.env['account.bank.statement'].create({
                 'journal_id': journal.id,
-                'balance_start': 0.0,
-                'balance_end_real': 0.0,
             })
 
         created_lines = []
