@@ -10,9 +10,12 @@ class AkahuImportWizard(models.TransientModel):
         required=True
     )
 
+    auto_reconcile = fields.Boolean(default=True)
+
     def action_import(self):
-        result = self.env['akahu.statement.engine'].fetch_and_reconcile(
-            self.journal_id.id
+        result = self.env['akahu.engine'].fetch_and_reconcile(
+            self.journal_id.id,
+            self.auto_reconcile
         )
 
         return {
@@ -20,7 +23,7 @@ class AkahuImportWizard(models.TransientModel):
             'tag': 'display_notification',
             'params': {
                 'title': 'Akahu Import Completed',
-                'message': f"Created: {result['created']} | Reconciled: {result['matched']}",
+                'message': f"Created: {result['created']} | Auto Reconciled: {result['matched']}",
                 'type': 'success',
             }
         }
