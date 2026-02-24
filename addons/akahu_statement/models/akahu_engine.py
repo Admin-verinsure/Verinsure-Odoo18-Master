@@ -29,7 +29,6 @@ class AkahuEngine(models.Model):
 
         data = response.json()
 
-        # Ensure open bank statement exists
         statement = self.env['account.bank.statement'].search([
             ('journal_id', '=', journal.id),
             ('state', '=', 'open')
@@ -42,8 +41,8 @@ class AkahuEngine(models.Model):
                 'balance_end_real': 0.0,
             })
 
+        created_lines = []
         created = 0
-        matched = 0
 
         for tx in data.get("items", []):
 
@@ -52,15 +51,14 @@ class AkahuEngine(models.Model):
             amount = tx.get("amount")
 
             existing = self.env['account.bank.statement.line'].search([
-                ('payment_ref','=',tx_id)
+                ('akahu_transaction_id','=',tx_id)
             ], limit=1)
 
             if existing:
                 continue
 
-            # ---- Partner Detection ----
+            # Partner detection (invoice based)
             partner_id = False
-
             invoice = self.env['account.move'].search([
                 ('name','ilike',description),
                 ('state','=','posted'),
@@ -70,35 +68,46 @@ class AkahuEngine(models.Model):
             if invoice:
                 partner_id = invoice.partner_id.id
 
-            # ---- Create Statement Line ----
             line = self.env['account.bank.statement.line'].create({
                 'statement_id': statement.id,
                 'journal_id': journal.id,
                 'amount': amount,
                 'payment_ref': tx_id,
                 'partner_id': partner_id,
+                'akahu_transaction_id': tx_id,
             })
 
+            created_lines.append(line)
             created += 1
 
-            if auto_reconcile and partner_id:
+        # Ensure ORM state stable
+        self.env.cr.flush()
+
+        matched = 0
+
+        if auto_reconcile:
+
+            for line in created_lines:
+
+                if not line.partner_id:
+                    continue
 
                 open_lines = self.env['account.move.line'].search([
-                    ('partner_id','=',partner_id),
+                    ('partner_id','=',line.partner_id.id),
                     ('account_id.account_type','in',['asset_receivable','liability_payable']),
                     ('reconciled','=',False),
                     ('move_id.state','=','posted')
                 ])
 
                 candidates = open_lines.filtered(
-                    lambda l: abs(l.amount_residual - abs(amount)) < 0.05
+                    lambda l: abs(l.amount_residual - abs(line.amount)) < 0.05
                 )
 
                 if len(candidates) == 1:
                     line.process_reconciliation({
                         'counterpart_aml_dicts': [{
                             'move_line': candidates.id,
-                            'amount': abs(amount),
+                            'amount': abs(line.amount),
                         }]
                     })
                     matched += 1

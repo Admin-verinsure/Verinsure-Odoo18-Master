@@ -1,6 +1,6 @@
 {
-    "name": "Akahu Statement Import (Auto Reconcile Working)",
-    "version": "3.0.0",
+    "name": "Akahu Statement Import PRO (Odoo 18)",
+    "version": "4.0.0",
     "category": "Accounting",
     "depends": ["account"],
     "data": [
