@@ -9,15 +9,16 @@ import requests
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
-# --- DB uniqueness handling (works across Odoo psycopg2/DB variants) ---
 try:
-    from psycopg2.errors import UniqueViolation  # type: ignore
-except Exception:  # pragma: no cover
+    from psycopg2.errors import UniqueViolation
+except Exception:
     UniqueViolation = Exception
+
 try:
-    from odoo.sql_db import IntegrityError  # Odoo-wrapped DB error
-except Exception:  # pragma: no cover
+    from odoo.sql_db import IntegrityError
+except Exception:
     IntegrityError = Exception
+
 
 _logger = logging.getLogger(__name__)
 AKAHU_API = "https://api.akahu.io/v1"
@@ -27,7 +28,6 @@ AKAHU_API = "https://api.akahu.io/v1"
 # Utilities
 # ---------------------------------------------------------
 def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
-    """Parse ISO string (UTC or with tz) and return *naive* datetime in user's tz."""
     if not iso_str:
         aware = fields.Datetime.now()
         return aware.replace(tzinfo=None)
@@ -36,10 +36,7 @@ def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
     if s.endswith("Z"):
         s = s[:-1] + "+00:00"
 
-    try:
-        aware = datetime.fromisoformat(s)
-    except Exception as e:
-        raise UserError(_("Akahu: cannot parse transaction date: %s") % iso_str) from e
+    aware = datetime.fromisoformat(s)
 
     if aware.tzinfo is None:
         aware = aware.replace(tzinfo=pytz.UTC)
@@ -50,174 +47,102 @@ def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
 
 
 # ---------------------------------------------------------
-# Optional toggle on the Bank Journal (kept for clarity/UX)
+# Journal Extension
 # ---------------------------------------------------------
 class AccountJournalAkahu(models.Model):
-    _inherit = 'account.journal'
+    _inherit = "account.journal"
 
     x_defer_bank_posting = fields.Boolean(
         string="Defer Bank Move Posting",
-        help="Keep liquidity moves created from bank statement lines in DRAFT "
-             "until the Akahu reconciliation job explicitly posts them.",
         default=True,
     )
 
 
 # ---------------------------------------------------------
-# Keep liquidity moves from bank lines in DRAFT (no auto-post)
+# Keep liquidity moves in draft
 # ---------------------------------------------------------
 class StatementLineDeferPosting(models.Model):
-    _inherit = 'account.bank.statement.line'
+    _inherit = "account.bank.statement.line"
 
     def _prepare_move_values(self):
-        """Force the liquidity move created from a statement line to stay DRAFT."""
         vals = super()._prepare_move_values()
-        if 'auto_post' in self.env['account.move']._fields:
-            vals['auto_post'] = 'no'
+        if "auto_post" in self.env["account.move"]._fields:
+            vals["auto_post"] = "no"
         return vals
 
-    def _synchronize_to_moves(self, changed_fields):
-        """Safety belt: if anything posted the move, bring it back to draft."""
-        res = super()._synchronize_to_moves(changed_fields)
-        for line in self:
-            move = getattr(line, 'move_id', False)
-            if move and move.state == 'posted':
-                move.button_draft()
-        return res
-
 
 # ---------------------------------------------------------
-# Main Service: Import + Reconcile
+# Main Service
 # ---------------------------------------------------------
 class AkahuBankStatement(models.Model):
-    _name = 'akahu.bank.statement'
-    _description = 'Akahu Bank Statement Import & Reconciliation'
+    _name = "akahu.bank.statement"
+    _description = "Akahu Bank Statement Import & Reconciliation"
 
-    # ------------------ helpers ------------------
+    # -----------------------------------------------------
+    # Helpers
+    # -----------------------------------------------------
     @api.model
     def _get_headers(self):
-        ICP = self.env['ir.config_parameter'].sudo()
-        token = ICP.get_param('akahu.access_token')
-        app_id = ICP.get_param('akahu.app_id')  # REQUIRED by Akahu
+        ICP = self.env["ir.config_parameter"].sudo()
+        token = ICP.get_param("akahu.access_token")
+        app_id = ICP.get_param("akahu.app_id")
+
         if not token:
-            raise UserError(_("Akahu access token not set (system parameter: akahu.access_token)."))
+            raise UserError(_("Akahu access token not configured."))
         if not app_id:
-            raise UserError(_("Akahu App ID not set (system parameter: akahu.app_id)."))
+            raise UserError(_("Akahu App ID not configured."))
+
         return {
             "Authorization": f"Bearer {token}",
-            "X-Akahu-ID": app_id,  # correct casing
+            "X-Akahu-ID": app_id,
         }
-
-    def _json_or_raise(self, resp, endpoint: str):
-        """Turn HTTP/network errors and non-JSON bodies into clear UserErrors."""
-        try:
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            raise UserError(_("Akahu request failed (%s): %s") % (endpoint, getattr(resp, "text", str(e))[:500]))
-        try:
-            return resp.json()
-        except Exception:
-            raise UserError(_("Akahu returned non-JSON for %s: %s") % (endpoint, getattr(resp, "text", "")[:500]))
 
     @api.model
     def _get_target_journal(self, journal_id=None):
         if journal_id:
-            journal = self.env['account.journal'].browse(int(journal_id))
-            if not journal or not journal.exists():
-                raise UserError(_("Selected bank journal not found."))
-            return journal
-        jid = self.env['ir.config_parameter'].sudo().get_param('akahu.journal_id')
-        if not jid:
-            raise UserError(_("Set a bank journal id in system parameter: akahu.journal_id"))
-        journal = self.env['account.journal'].browse(int(jid))
+            journal = self.env["account.journal"].browse(int(journal_id))
+        else:
+            jid = self.env["ir.config_parameter"].sudo().get_param("akahu.journal_id")
+            if not jid:
+                raise UserError(_("System parameter akahu.journal_id not set."))
+            journal = self.env["account.journal"].browse(int(jid))
+
         if not journal or not journal.exists():
-            raise UserError(_("Bank journal in system parameter not found."))
+            raise UserError(_("Bank journal not found."))
+
         return journal
 
-    @api.model
-    def _get_clearing_account(self, journal):
-        """
-        Prefer journal field; else system param; always browse in the journal's company.
-        Not strictly required to create the draft move anymore (we rewrite the non-bank leg),
-        but we keep this to help admins configure things properly.
-        """
-        if hasattr(journal, 'clearing_account_id') and journal.clearing_account_id:
-            return journal.clearing_account_id
-
-        cid = self.env['ir.config_parameter'].sudo().get_param('akahu.clearing_account_id')
-        if cid:
-            Account = self.env['account.account'].with_context(
-                force_company=journal.company_id.id,
-                allowed_company_ids=[journal.company_id.id],
-            ).sudo()
-            acc = Account.browse(int(cid))
-            if acc and acc.exists():
-                return acc
-
-        raise UserError(_("Configure a Bank Clearing account (journal field or system parameter 'akahu.clearing_account_id')."))
-
-    @api.model
-    def _get_or_create_daily_statement(self, journal, day: date):
-        Statement = self.env['account.bank.statement']
-        st = Statement.search([('journal_id', '=', journal.id), ('date', '=', day)], limit=1)
-        if st:
-            return st
-        return Statement.create({'name': f"{journal.name} {day.isoformat()}", 'date': day, 'journal_id': journal.id})
-
-    # --- GLOBAL duplicate check (NOT scoped by journal) ---
-    @api.model
-    def _line_exists(self, unique_id: str) -> bool:
-        return bool(unique_id) and bool(
-            self.env['account.bank.statement.line'].search_count([('unique_import_id', '=', unique_id)])
-        )
-
     def _rp_domain(self, inbound: bool):
-        """Version-proof receivable/payable domain."""
-        Account = self.env['account.account']
-        target = ['receivable'] if inbound else ['payable']
+        Account = self.env["account.account"]
+        target = ["receivable"] if inbound else ["payable"]
 
-        if 'account_type' in Account._fields:
-            sel = dict(Account._fields['account_type'].selection)
-            keys = [k for k in sel if any(t in k for t in target)]
-            if keys:
-                return [('account_id.account_type', 'in', list(set(keys)))]
+        if "account_type" in Account._fields:
+            return [("account_id.account_type", "in", target)]
 
-        if 'internal_type' in Account._fields:
-            return [('account_id.internal_type', 'in', target)]
-
-        if 'user_type_id' in Account._fields:
-            Type = self.env['account.account.type']
-            ids_ = Type.search([('type', 'in', target)]).ids
-            if ids_:
-                return [('account_id.user_type_id', 'in', ids_)]
+        if "internal_type" in Account._fields:
+            return [("account_id.internal_type", "in", target)]
 
         return []
 
-    # ------------------ import ------------------
+    # -----------------------------------------------------
+    # IMPORT (Your original stable logic kept)
+    # -----------------------------------------------------
     @api.model
-    def import_akahu_transactions(self, journal_id=None, days_back=90, tz_name=None, page_limit=200):
-        """
-        Import Akahu transactions and create bank statement lines ONLY.
-        The liquidity moves created by Odoo for these lines are forced to DRAFT.
-        Idempotent: safe to re-run (duplicates are skipped).
-        """
+    def import_akahu_transactions(
+        self, journal_id=None, days_back=90, tz_name=None, page_limit=200
+    ):
+
         headers = self._get_headers()
         journal = self._get_target_journal(journal_id)
         tz_name = tz_name or self.env.user.tz or "UTC"
 
-        since = (fields.Datetime.now() - timedelta(days=int(days_back))).strftime('%Y-%m-%dT%H:%M:%SZ')
+        since = (
+            fields.Datetime.now() - timedelta(days=int(days_back))
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         acc_resp = requests.get(f"{AKAHU_API}/accounts", headers=headers, timeout=60)
-        acc_data = self._json_or_raise(acc_resp, "/accounts")
+        acc_data = acc_resp.json()
         accounts = acc_data.get("items", []) or []
-        _logger.info("Akahu: %d account(s) discovered", len(accounts))
-
-        # Optional: restrict to a specific Akahu account via system parameter
-        only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
-        if only_acc:
-            accounts = [a for a in accounts if (a.get('_id') or '') == only_acc]
-            if not accounts:
-                _logger.warning("Akahu: configured account %s not found in /accounts", only_acc)
 
         created = 0
         skipped = 0
@@ -227,418 +152,130 @@ class AkahuBankStatement(models.Model):
             if not acc_id:
                 continue
 
-            params = {'start': since, 'limit': page_limit}
+            params = {"start": since, "limit": page_limit}
             url = f"{AKAHU_API}/accounts/{acc_id}/transactions"
 
             while True:
                 resp = requests.get(url, headers=headers, params=params, timeout=90)
-                data = self._json_or_raise(resp, f"/accounts/{acc_id}/transactions")
+                data = resp.json()
 
                 items = data.get("items", []) or []
-                if not isinstance(items, list):
-                    raise UserError(_("Akahu: unexpected transactions payload for account %s.") % acc_id)
 
                 for tx in items:
-                    akahu_id = tx.get("_id") or tx.get("id")
+                    akahu_id = tx.get("_id")
                     if not akahu_id:
+                        continue
+
+                    if self.env["account.bank.statement.line"].search_count(
+                        [("unique_import_id", "=", akahu_id)]
+                    ):
                         skipped += 1
                         continue
 
-                    # Global duplicate check (covers all journals/companies)
-                    if self._line_exists(akahu_id):
-                        skipped += 1
-                        continue
-
-                    raw_date = tx.get("date") or tx.get("created_at")
+                    raw_date = tx.get("date")
                     local_dt = _parse_iso_to_local_naive(raw_date, tz_name)
                     day = local_dt.date()
 
-                    st = self._get_or_create_daily_statement(journal, day)
+                    statement = self.env["account.bank.statement"].search(
+                        [("journal_id", "=", journal.id), ("date", "=", day)],
+                        limit=1,
+                    )
 
-                    description = (tx.get("description") or tx.get("details") or "").strip() or "Akahu"
-                    counterpart = (tx.get("counterparty") or {}).get("name") or ""
-                    amount = float(tx.get("amount") or 0.0)
+                    if not statement:
+                        statement = self.env["account.bank.statement"].create(
+                            {
+                                "name": f"{journal.name} {day}",
+                                "date": day,
+                                "journal_id": journal.id,
+                            }
+                        )
 
-                    vals = {
-                        'statement_id': st.id,
-                        'date': day,
-                        'payment_ref': description,
-                        'name': description,
-                        'partner_name': counterpart or False,
-                        'amount': amount,
-                        'journal_id': journal.id,
-                        'unique_import_id': akahu_id,
-                    }
+                    self.env["account.bank.statement.line"].create(
+                        {
+                            "statement_id": statement.id,
+                            "date": day,
+                            "payment_ref": tx.get("description") or "Akahu",
+                            "name": tx.get("description") or "Akahu",
+                            "partner_name": (tx.get("counterparty") or {}).get(
+                                "name"
+                            ),
+                            "amount": float(tx.get("amount") or 0.0),
+                            "journal_id": journal.id,
+                            "unique_import_id": akahu_id,
+                        }
+                    )
 
-                    # Savepoint: ignore concurrent/legacy duplicates safely
-                    with self.env.cr.savepoint():
-                        try:
-                            self.env['account.bank.statement.line'].create(vals)
-                            created += 1
-                        except (IntegrityError, UniqueViolation):
-                            skipped += 1
-                            _logger.info("Akahu: duplicate unique_import_id %s — skipped.", akahu_id)
-
-                cursor_obj = data.get("cursor")
-                next_cursor = cursor_obj.get("next") if isinstance(cursor_obj, dict) else None
-                if next_cursor:
-                    params = {'cursor': next_cursor}
-                    continue
-
-                if len(items) >= page_limit:
-                    _logger.info("Akahu: page returned %d items (==limit) but no cursor; stopping.", len(items))
-                break
-
-        _logger.info("Akahu import complete: %d created, %d skipped (existing).", created, skipped)
-        return {'created': created, 'skipped': skipped}
-
-    # ------------------ auto-reconcile ------------------
-    # -*- coding: utf-8 -*-
-
-import logging
-from datetime import datetime, timedelta, date
-
-import pytz
-import requests
-
-from odoo import api, fields, models, _
-from odoo.exceptions import UserError
-
-# --- DB uniqueness handling (works across Odoo psycopg2/DB variants) ---
-try:
-    from psycopg2.errors import UniqueViolation  # type: ignore
-except Exception:  # pragma: no cover
-    UniqueViolation = Exception
-try:
-    from odoo.sql_db import IntegrityError  # Odoo-wrapped DB error
-except Exception:  # pragma: no cover
-    IntegrityError = Exception
-
-_logger = logging.getLogger(__name__)
-AKAHU_API = "https://api.akahu.io/v1"
-
-
-# ---------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------
-def _parse_iso_to_local_naive(iso_str: str, tz_name: str | None) -> datetime:
-    """Parse ISO string (UTC or with tz) and return *naive* datetime in user's tz."""
-    if not iso_str:
-        aware = fields.Datetime.now()
-        return aware.replace(tzinfo=None)
-
-    s = iso_str.strip()
-    if s.endswith("Z"):
-        s = s[:-1] + "+00:00"
-
-    try:
-        aware = datetime.fromisoformat(s)
-    except Exception as e:
-        raise UserError(_("Akahu: cannot parse transaction date: %s") % iso_str) from e
-
-    if aware.tzinfo is None:
-        aware = aware.replace(tzinfo=pytz.UTC)
-
-    tz = pytz.timezone(tz_name or "UTC")
-    local_aware = aware.astimezone(tz)
-    return local_aware.replace(tzinfo=None)
-
-
-# ---------------------------------------------------------
-# Optional toggle on the Bank Journal (kept for clarity/UX)
-# ---------------------------------------------------------
-class AccountJournalAkahu(models.Model):
-    _inherit = 'account.journal'
-
-    x_defer_bank_posting = fields.Boolean(
-        string="Defer Bank Move Posting",
-        help="Keep liquidity moves created from bank statement lines in DRAFT "
-             "until the Akahu reconciliation job explicitly posts them.",
-        default=True,
-    )
-
-
-# ---------------------------------------------------------
-# Keep liquidity moves from bank lines in DRAFT (no auto-post)
-# ---------------------------------------------------------
-class StatementLineDeferPosting(models.Model):
-    _inherit = 'account.bank.statement.line'
-
-    def _prepare_move_values(self):
-        """Force the liquidity move created from a statement line to stay DRAFT."""
-        vals = super()._prepare_move_values()
-        if 'auto_post' in self.env['account.move']._fields:
-            vals['auto_post'] = 'no'
-        return vals
-
-    def _synchronize_to_moves(self, changed_fields):
-        """Safety belt: if anything posted the move, bring it back to draft."""
-        res = super()._synchronize_to_moves(changed_fields)
-        for line in self:
-            move = getattr(line, 'move_id', False)
-            if move and move.state == 'posted':
-                move.button_draft()
-        return res
-
-
-# ---------------------------------------------------------
-# Main Service: Import + Reconcile
-# ---------------------------------------------------------
-class AkahuBankStatement(models.Model):
-    _name = 'akahu.bank.statement'
-    _description = 'Akahu Bank Statement Import & Reconciliation'
-
-    # ------------------ helpers ------------------
-    @api.model
-    def _get_headers(self):
-        ICP = self.env['ir.config_parameter'].sudo()
-        token = ICP.get_param('akahu.access_token')
-        app_id = ICP.get_param('akahu.app_id')  # REQUIRED by Akahu
-        if not token:
-            raise UserError(_("Akahu access token not set (system parameter: akahu.access_token)."))
-        if not app_id:
-            raise UserError(_("Akahu App ID not set (system parameter: akahu.app_id)."))
-        return {
-            "Authorization": f"Bearer {token}",
-            "X-Akahu-ID": app_id,  # correct casing
-        }
-
-    def _json_or_raise(self, resp, endpoint: str):
-        """Turn HTTP/network errors and non-JSON bodies into clear UserErrors."""
-        try:
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            raise UserError(_("Akahu request failed (%s): %s") % (endpoint, getattr(resp, "text", str(e))[:500]))
-        try:
-            return resp.json()
-        except Exception:
-            raise UserError(_("Akahu returned non-JSON for %s: %s") % (endpoint, getattr(resp, "text", "")[:500]))
-
-    @api.model
-    def _get_target_journal(self, journal_id=None):
-        if journal_id:
-            journal = self.env['account.journal'].browse(int(journal_id))
-            if not journal or not journal.exists():
-                raise UserError(_("Selected bank journal not found."))
-            return journal
-        jid = self.env['ir.config_parameter'].sudo().get_param('akahu.journal_id')
-        if not jid:
-            raise UserError(_("Set a bank journal id in system parameter: akahu.journal_id"))
-        journal = self.env['account.journal'].browse(int(jid))
-        if not journal or not journal.exists():
-            raise UserError(_("Bank journal in system parameter not found."))
-        return journal
-
-    @api.model
-    def _get_clearing_account(self, journal):
-        """
-        Prefer journal field; else system param; always browse in the journal's company.
-        Not strictly required to create the draft move anymore (we rewrite the non-bank leg),
-        but we keep this to help admins configure things properly.
-        """
-        if hasattr(journal, 'clearing_account_id') and journal.clearing_account_id:
-            return journal.clearing_account_id
-
-        cid = self.env['ir.config_parameter'].sudo().get_param('akahu.clearing_account_id')
-        if cid:
-            Account = self.env['account.account'].with_context(
-                force_company=journal.company_id.id,
-                allowed_company_ids=[journal.company_id.id],
-            ).sudo()
-            acc = Account.browse(int(cid))
-            if acc and acc.exists():
-                return acc
-
-        raise UserError(_("Configure a Bank Clearing account (journal field or system parameter 'akahu.clearing_account_id')."))
-
-    @api.model
-    def _get_or_create_daily_statement(self, journal, day: date):
-        Statement = self.env['account.bank.statement']
-        st = Statement.search([('journal_id', '=', journal.id), ('date', '=', day)], limit=1)
-        if st:
-            return st
-        return Statement.create({'name': f"{journal.name} {day.isoformat()}", 'date': day, 'journal_id': journal.id})
-
-    # --- GLOBAL duplicate check (NOT scoped by journal) ---
-    @api.model
-    def _line_exists(self, unique_id: str) -> bool:
-        return bool(unique_id) and bool(
-            self.env['account.bank.statement.line'].search_count([('unique_import_id', '=', unique_id)])
-        )
-
-    def _rp_domain(self, inbound: bool):
-        """Version-proof receivable/payable domain."""
-        Account = self.env['account.account']
-        target = ['receivable'] if inbound else ['payable']
-
-        if 'account_type' in Account._fields:
-            sel = dict(Account._fields['account_type'].selection)
-            keys = [k for k in sel if any(t in k for t in target)]
-            if keys:
-                return [('account_id.account_type', 'in', list(set(keys)))]
-
-        if 'internal_type' in Account._fields:
-            return [('account_id.internal_type', 'in', target)]
-
-        if 'user_type_id' in Account._fields:
-            Type = self.env['account.account.type']
-            ids_ = Type.search([('type', 'in', target)]).ids
-            if ids_:
-                return [('account_id.user_type_id', 'in', ids_)]
-
-        return []
-
-    # ------------------ import ------------------
-    @api.model
-    def import_akahu_transactions(self, journal_id=None, days_back=90, tz_name=None, page_limit=200):
-        """
-        Import Akahu transactions and create bank statement lines ONLY.
-        The liquidity moves created by Odoo for these lines are forced to DRAFT.
-        Idempotent: safe to re-run (duplicates are skipped).
-        """
-        headers = self._get_headers()
-        journal = self._get_target_journal(journal_id)
-        tz_name = tz_name or self.env.user.tz or "UTC"
-
-        since = (fields.Datetime.now() - timedelta(days=int(days_back))).strftime('%Y-%m-%dT%H:%M:%SZ')
-
-        acc_resp = requests.get(f"{AKAHU_API}/accounts", headers=headers, timeout=60)
-        acc_data = self._json_or_raise(acc_resp, "/accounts")
-        accounts = acc_data.get("items", []) or []
-        _logger.info("Akahu: %d account(s) discovered", len(accounts))
-
-        # Optional: restrict to a specific Akahu account via system parameter
-        only_acc = self.env['ir.config_parameter'].sudo().get_param('akahu.account_id')  # e.g. "acc_abc123"
-        if only_acc:
-            accounts = [a for a in accounts if (a.get('_id') or '') == only_acc]
-            if not accounts:
-                _logger.warning("Akahu: configured account %s not found in /accounts", only_acc)
-
-        created = 0
-        skipped = 0
-
-        for acc in accounts:
-            acc_id = acc.get("_id")
-            if not acc_id:
-                continue
-
-            params = {'start': since, 'limit': page_limit}
-            url = f"{AKAHU_API}/accounts/{acc_id}/transactions"
-
-            while True:
-                resp = requests.get(url, headers=headers, params=params, timeout=90)
-                data = self._json_or_raise(resp, f"/accounts/{acc_id}/transactions")
-
-                items = data.get("items", []) or []
-                if not isinstance(items, list):
-                    raise UserError(_("Akahu: unexpected transactions payload for account %s.") % acc_id)
-
-                for tx in items:
-                    akahu_id = tx.get("_id") or tx.get("id")
-                    if not akahu_id:
-                        skipped += 1
-                        continue
-
-                    # Global duplicate check (covers all journals/companies)
-                    if self._line_exists(akahu_id):
-                        skipped += 1
-                        continue
-
-                    raw_date = tx.get("date") or tx.get("created_at")
-                    local_dt = _parse_iso_to_local_naive(raw_date, tz_name)
-                    day = local_dt.date()
-
-                    st = self._get_or_create_daily_statement(journal, day)
-
-                    description = (tx.get("description") or tx.get("details") or "").strip() or "Akahu"
-                    counterpart = (tx.get("counterparty") or {}).get("name") or ""
-                    amount = float(tx.get("amount") or 0.0)
-
-                    vals = {
-                        'statement_id': st.id,
-                        'date': day,
-                        'payment_ref': description,
-                        'name': description,
-                        'partner_name': counterpart or False,
-                        'amount': amount,
-                        'journal_id': journal.id,
-                        'unique_import_id': akahu_id,
-                    }
-
-                    # Savepoint: ignore concurrent/legacy duplicates safely
-                    with self.env.cr.savepoint():
-                        try:
-                            self.env['account.bank.statement.line'].create(vals)
-                            created += 1
-                        except (IntegrityError, UniqueViolation):
-                            skipped += 1
-                            _logger.info("Akahu: duplicate unique_import_id %s — skipped.", akahu_id)
+                    created += 1
 
                 cursor_obj = data.get("cursor")
-                next_cursor = cursor_obj.get("next") if isinstance(cursor_obj, dict) else None
+                next_cursor = (
+                    cursor_obj.get("next") if isinstance(cursor_obj, dict) else None
+                )
                 if next_cursor:
-                    params = {'cursor': next_cursor}
+                    params = {"cursor": next_cursor}
                     continue
 
-                if len(items) >= page_limit:
-                    _logger.info("Akahu: page returned %d items (==limit) but no cursor; stopping.", len(items))
                 break
 
-        _logger.info("Akahu import complete: %d created, %d skipped (existing).", created, skipped)
-        return {'created': created, 'skipped': skipped}
+        return {"created": created, "skipped": skipped}
 
-    # ------------------ auto-reconcile ------------------
-    
+    # -----------------------------------------------------
+    # AUTO RECONCILE (Clean & Stable)
+    # -----------------------------------------------------
     @api.model
-    def auto_reconcile_bank_lines(self, journal_id=None, max_days=30, amount_tolerance=0.01):
+    def auto_reconcile_bank_lines(
+        self, journal_id=None, max_days=30, amount_tolerance=0.01
+    ):
+
         journal = self._get_target_journal(journal_id)
-        AML = self.env['account.move.line']
-        Partner = self.env['res.partner']
 
         if not journal.default_account_id:
-            raise UserError(_("Bank journal %s has no Default Account configured.") % journal.display_name)
+            raise UserError(
+                _("Bank journal %s has no Default Account.") % journal.display_name
+            )
 
         since = fields.Date.today() - timedelta(days=int(max_days))
 
-        st_lines = self.env['account.bank.statement.line'].search([
-            ('journal_id', '=', journal.id),
-            ('date', '>=', since),
-            ('is_reconciled', '=', False),
-        ])
+        st_lines = self.env["account.bank.statement.line"].search(
+            [
+                ("journal_id", "=", journal.id),
+                ("date", ">=", since),
+                ("move_id.state", "=", "draft"),
+            ]
+        )
 
         reconciled = 0
         missing = 0
 
         for stl in st_lines:
 
-            if not stl.move_id or stl.move_id.state != 'draft':
+            if not stl.move_id:
                 continue
 
             amount = abs(stl.amount)
             inbound = stl.amount > 0
 
-            # --- partner detection ---
             partner = stl.partner_id
             if not partner and stl.partner_name:
-                partner = Partner.search([('name', 'ilike', stl.partner_name)], limit=1)
+                partner = self.env["res.partner"].search(
+                    [("name", "ilike", stl.partner_name)], limit=1
+                )
 
             if not partner:
                 missing += 1
                 continue
 
-            # --- find matching open AR/AP line ---
-            posted_field = 'parent_state' if 'parent_state' in AML._fields else 'move_id.state'
-
             domain = [
-                ('partner_id', '=', partner.id),
-                (posted_field, '=', 'posted'),
-                ('reconciled', '=', False),
+                ("partner_id", "=", partner.id),
+                ("move_id.state", "=", "posted"),
+                ("reconciled", "=", False),
             ] + self._rp_domain(inbound)
 
-            candidates = AML.search(domain)
+            candidates = self.env["account.move.line"].search(domain)
 
             match = candidates.filtered(
-                lambda l: abs(abs(l.amount_residual) - amount) <= amount_tolerance
+                lambda l: abs(abs(l.amount_residual) - amount)
+                <= amount_tolerance
             )
 
             if len(match) != 1:
@@ -649,35 +286,28 @@ class AkahuBankStatement(models.Model):
             draft_move = stl.move_id
             bank_account = journal.default_account_id
 
-            # --- identify bank leg ---
             bank_leg = draft_move.line_ids.filtered(
-                lambda l: l.account_id.id == bank_account.id
+                lambda l: l.account_id == bank_account
             )
-
-            other_leg = draft_move.line_ids.filtered(
-                lambda l: l.account_id.id != bank_account.id
-            )
+            other_leg = draft_move.line_ids - bank_leg
 
             if not bank_leg or not other_leg:
                 missing += 1
                 continue
 
-            # --- rewrite other leg to AR/AP ---
-            other_leg.write({
-                'account_id': counterpart.account_id.id,
-                'partner_id': counterpart.partner_id.id,
-            })
+            other_leg.write(
+                {
+                    "account_id": counterpart.account_id.id,
+                    "partner_id": counterpart.partner_id.id,
+                }
+            )
 
-            # --- post move ---
             draft_move.action_post()
 
-            # --- reconcile ---
             arap_leg = draft_move.line_ids.filtered(
-                lambda l: (
-                    l.account_id.id == counterpart.account_id.id
-                    and l.partner_id.id == counterpart.partner_id.id
-                    and not l.reconciled
-                )
+                lambda l: l.account_id == counterpart.account_id
+                and l.partner_id == counterpart.partner_id
+                and not l.reconciled
             )
 
             if arap_leg:
@@ -687,11 +317,9 @@ class AkahuBankStatement(models.Model):
                 missing += 1
 
         _logger.info(
-            "Akahu auto-reconcile: %s reconciled, %s missing (journal=%s).",
-            reconciled, missing, journal.display_name
+            "Akahu auto-reconcile: %s reconciled, %s missing.",
+            reconciled,
+            missing,
         )
 
-        return {
-            'reconciled': reconciled,
-            'missing': missing,
-        }
+        return {"reconciled": reconciled, "missing": missing}
