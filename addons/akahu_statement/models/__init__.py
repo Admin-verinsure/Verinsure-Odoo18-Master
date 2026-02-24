@@ -1,1 +1,1 @@
-from . import akahu_bank_statement
+from . import akahu_statement

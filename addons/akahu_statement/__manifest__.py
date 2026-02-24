@@ -1,19 +1,13 @@
 {
-    'name': 'Akahu Statement',
-    'version': '18.0.1.0.0',
-    'summary': 'Import NZ bank transactions from Akahu',
-    'description': 'Import NZ bank transactions from Akahu.',
-    'category': 'Accounting',
-    'author': 'Verinsure',
-    'depends': ['account'],
-    'data': [
-        'data/ir_cron.xml',
-        'security/ir.model.access.csv',
-        'views/import_akahu_statement_view.xml',
-
+    "name": "Akahu Statement Import (Fixed Reconciliation)",
+    "version": "2.0.0",
+    "category": "Accounting",
+    "depends": ["account"],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/import_view.xml"
     ],
-    'installable': True,
-    'application': True,
-    'auto_install': False,
+    "installable": True,
+    "application": False,
+    "license": "LGPL-3"
 }
-

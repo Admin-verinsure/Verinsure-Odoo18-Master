@@ -1,0 +1,32 @@
+<odoo>
+    <record id="view_akahu_import_wizard_form" model="ir.ui.view">
+        <field name="name">akahu.import.wizard.form</field>
+        <field name="model">akahu.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Akahu Transactions">
+                <group>
+                    <field name="journal_id"/>
+                </group>
+                <footer>
+                    <button name="action_import"
+                            string="Import & Reconcile"
+                            type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_akahu_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Akahu Transactions</field>
+        <field name="res_model">akahu.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_akahu_import"
+              name="Import Akahu Transactions"
+              parent="account.menu_finance"
+              action="action_akahu_import_wizard"/>
+</odoo>
