@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Server Action: import + reconcile -->
+  <record id="action_akahu_bank_sync" model="ir.actions.server">
+    <field name="name">Akahu: Import + Reconcile</field>
+    <field name="model_id" ref="model_akahu_bank_statement"/>
+    <field name="state">code</field>
+    <field name="code"><![CDATA[
+model.sudo().import_akahu_transactions(days_back=30)
+model.sudo().auto_reconcile_bank_lines(max_days=14, amount_tolerance=0.50)
+    ]]></field>
+  </record>
+
+  <!-- Cron: run the server action every 30 minutes -->
+  <record id="ir_cron_akahu_import" model="ir.cron">
+    <field name="name">Akahu: Import + Reconcile (every 30 min)</field>
+    <field name="active">True</field>
+    <field name="interval_number">30</field>
+    <field name="interval_type">minutes</field>
+    <field name="ir_actions_server_id" ref="action_akahu_bank_sync"/>
+    <!-- run as superuser to avoid permission issues -->
+    <field name="user_id" ref="base.user_root"/>
+  </record>
+</odoo>
