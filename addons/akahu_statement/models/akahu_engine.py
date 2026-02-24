@@ -21,13 +21,16 @@ class AkahuEngine(models.Model):
             "Content-Type": "application/json"
         }
 
-        response = requests.get(
-            f"{base_url}/transactions?account={account_id}",
-            headers=headers,
-            timeout=30
-        )
+        all_transactions = []
+        url = f"{base_url}/transactions?account={account_id}"
+        
+        while url:
+            response = requests.get(url, headers=headers, timeout=20)
+            data = response.json()
+            all_transactions.extend(data.get("items", []))
+            url = data.get("next_page")
 
-        data = response.json()
+        
 
         statement = self.env['account.bank.statement'].search([
             ('journal_id', '=', journal.id),
@@ -41,7 +44,7 @@ class AkahuEngine(models.Model):
         created_lines = []
         created = 0
 
-        for tx in data.get("items", []):
+        for tx in all_transactions:
 
             tx_id = tx.get("id")
             description = tx.get("description") or ""
@@ -96,17 +99,26 @@ class AkahuEngine(models.Model):
                     ('move_id.state','=','posted')
                 ])
 
-                candidates = open_lines.filtered(
-                    lambda l: abs(l.amount_residual - abs(line.amount)) < 0.05
-                )
-
+                candidates = self.env['account.move.line']
+                
+                for aml in open_lines:
+                    
+                    if aml.account_id.account_type == 'asset_receivable':
+                        expected_amount = aml.amount_residual
+                    else:
+                        expected_amount = -aml.amount_residual
+                        
+                    if abs(expected_amount - line.amount) < 0.05:
+                        candidates |= aml
+                        
                 if len(candidates) == 1:
                     line.process_reconciliation({
                         'counterpart_aml_dicts': [{
-                            'move_line': candidates.id,
-                            'amount': abs(line.amount),
+                            'move_id': candidates.id,
+                            'amount':abs(line.amount),
                         }]
                     })
+                    
                     matched += 1
 
         return {"created": created, "matched": matched}
