@@ -1,1 +1,1 @@
-from . import import_akahu_statement_wizard
+from . import import_wizard
