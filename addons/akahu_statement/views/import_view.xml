@@ -6,10 +6,11 @@
             <form string="Import Akahu Transactions">
                 <group>
                     <field name="journal_id"/>
+                    <field name="auto_reconcile"/>
                 </group>
                 <footer>
                     <button name="action_import"
-                            string="Import & Reconcile"
+                            string="Import"
                             type="object"
                             class="btn-primary"/>
                     <button string="Cancel" special="cancel"/>

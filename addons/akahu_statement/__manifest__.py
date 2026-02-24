@@ -1,6 +1,6 @@
 {
-    "name": "Akahu Statement Import (Fixed Reconciliation)",
-    "version": "2.0.0",
+    "name": "Akahu Statement Import (Auto Reconcile Working)",
+    "version": "3.0.0",
     "category": "Accounting",
     "depends": ["account"],
     "data": [
