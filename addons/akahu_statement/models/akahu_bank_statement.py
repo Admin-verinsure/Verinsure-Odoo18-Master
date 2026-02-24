@@ -224,7 +224,7 @@ class AkahuBankStatement(models.Model):
     # -----------------------------------------------------
     @api.model
     def auto_reconcile_bank_lines(
-        self, journal_id=None, max_days=30, amount_tolerance=0.01
+        self, journal_id=None, max_days=30, amount_tolerance=0.01, require_text_hint=False,
     ):
 
         journal = self._get_target_journal(journal_id)
