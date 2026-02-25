@@ -1,2 +1,2 @@
 from . import invoice_payload 
-from . import products
+from . import product
