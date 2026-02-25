@@ -270,7 +270,20 @@ class InvoicePocPayload(models.Model):
         cmd = []
         for l in lines:
             tax_ids = self._get_tax_ids_by_names(l.get("tax_names") or [], move.company_id)
+            
+            product_guid = l.get("product_guid")
+            if not product_guid:
+                raise ValidationError("Missing product_guid in invoice line")
+            
+            product = self.env["product.product"].search(
+                [("external_guid", "=", product_guid)],
+                limit=1,
+            )
+            if not product:
+                raise ValidationError(f"Product with external_guid {product_guid} not found for invoice line. Create a product with this GUID first.")
+                
             cmd.append((0, 0, {
+                "product_id": product.id,
                 "name": l.get("name") or _("Premium"),
                 "quantity": float(l.get("qty") or 1.0),
                 "price_unit": float(l.get("unit_price") or 0.0),
