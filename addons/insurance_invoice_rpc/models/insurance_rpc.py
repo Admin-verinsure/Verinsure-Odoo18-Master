@@ -379,12 +379,14 @@ class InsuranceDetails(models.Model):
 
         # Product
         Product = self.env["product.product"].sudo()
-        product = Product.search(
-            [("sale_ok", "=", True), "|", ("company_id", "=", False), ("company_id", "=", company.id)],
-            limit=1,
-        )
+        
+        product_guid = payload.get("product_guid")
+        if not product_guid:
+            raise UserError("Missing product_guid in payload")
+        
+        product = Product.search([("external_guid", "=", product_guid)], limit=1)
         if not product:
-            product = Product.create({"name": "Insurance Service", "type": "service", "sale_ok": True, "company_id": company.id})
+            raise UserError(f"Product with external_guid {product_guid} not found. Create a product with this GUID first.")
 
         # Journal
         journal = self.env["account.journal"].sudo().search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
