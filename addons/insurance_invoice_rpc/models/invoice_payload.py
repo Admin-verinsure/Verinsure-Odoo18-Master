@@ -275,12 +275,16 @@ class InvoicePocPayload(models.Model):
             if not product_guid:
                 raise ValidationError("Missing product_guid in invoice line")
             
-            product = self.env["product.product"].search(
-                [("external_guid", "=", product_guid)],
+            template = self.env["product.template"].sudo().search(
+                [("x_external_guid", "=", product_guid)],
                 limit=1,
             )
-            if not product:
-                raise ValidationError(f"Product with external_guid {product_guid} not found for invoice line. Create a product with this GUID first.")
+            if not template:
+                raise ValidationError(
+                    _("Product not found for GUID: %s") % product_guid
+                )
+            
+            product = template.product_variant_id
                 
             cmd.append((0, 0, {
                 "product_id": product.id,
