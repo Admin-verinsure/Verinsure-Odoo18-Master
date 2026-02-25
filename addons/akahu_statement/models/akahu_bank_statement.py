@@ -125,7 +125,7 @@ class AkahuBankStatement(models.Model):
         return []
 
     # -----------------------------------------------------
-    # IMPORT (Your original stable logic kept)
+    # IMPORT (Idempotent + Safe)
     # -----------------------------------------------------
     @api.model
     def import_akahu_transactions(
@@ -158,7 +158,6 @@ class AkahuBankStatement(models.Model):
             while True:
                 resp = requests.get(url, headers=headers, params=params, timeout=90)
                 data = resp.json()
-
                 items = data.get("items", []) or []
 
                 for tx in items:
@@ -166,9 +165,12 @@ class AkahuBankStatement(models.Model):
                     if not akahu_id:
                         continue
 
-                    if self.env["account.bank.statement.line"].search_count(
-                        [("unique_import_id", "=", akahu_id)]
-                    ):
+                    existing_line = self.env["account.bank.statement.line"].search(
+                        [("unique_import_id", "=", akahu_id)],
+                        limit=1,
+                    )
+
+                    if existing_line:
                         skipped += 1
                         continue
 
@@ -196,9 +198,7 @@ class AkahuBankStatement(models.Model):
                             "date": day,
                             "payment_ref": tx.get("description") or "Akahu",
                             "name": tx.get("description") or "Akahu",
-                            "partner_name": (tx.get("counterparty") or {}).get(
-                                "name"
-                            ),
+                            "partner_name": (tx.get("counterparty") or {}).get("name"),
                             "amount": float(tx.get("amount") or 0.0),
                             "journal_id": journal.id,
                             "unique_import_id": akahu_id,
@@ -217,14 +217,23 @@ class AkahuBankStatement(models.Model):
 
                 break
 
-        return {"created": created, "skipped": skipped}
+        # 🔥 Retry reconciliation after import
+        rec_result = self.auto_reconcile_bank_lines(journal_id=journal.id)
+
+        return {
+            "created": created,
+            "skipped": skipped,
+            "reconciled": rec_result["reconciled"],
+            "ambiguous": rec_result["ambiguous"],
+            "missing": rec_result["missing"],
+        }
 
     # -----------------------------------------------------
-    # AUTO RECONCILE (Clean & Stable)
+    # STRICT 1:1 AUTO RECONCILE
     # -----------------------------------------------------
     @api.model
     def auto_reconcile_bank_lines(
-        self, journal_id=None, max_days=30, amount_tolerance=0.01, require_text_hint=False,
+        self, journal_id=None, max_days=30, amount_tolerance=0.01
     ):
 
         journal = self._get_target_journal(journal_id)
@@ -236,13 +245,11 @@ class AkahuBankStatement(models.Model):
 
         since = fields.Date.today() - timedelta(days=int(max_days))
 
-        st_lines = self.env["account.bank.statement.line"].search(
-            [
-                ("journal_id", "=", journal.id),
-                ("date", ">=", since),
-                ("move_id.state", "=", "draft"),
-            ]
-        )
+        st_lines = self.env["account.bank.statement.line"].search([
+            ("journal_id", "=", journal.id),
+            ("date", ">=", since),
+            ("move_id.state", "=", "draft"),
+        ])
 
         reconciled = 0
         missing = 0
@@ -259,15 +266,12 @@ class AkahuBankStatement(models.Model):
             partner = stl.partner_id
             if not partner and stl.partner_name:
                 partner = self.env["res.partner"].search(
-                    [("name", "ilike", stl.partner_name)], limit=1
+                    [("name", "ilike", stl.partner_name)],
+                    limit=1,
                 )
 
             if not partner:
                 missing += 1
-                continue
-            
-            if len(match) > 1:
-                ambiguous += 1
                 continue
 
             domain = [
@@ -278,16 +282,21 @@ class AkahuBankStatement(models.Model):
 
             candidates = self.env["account.move.line"].search(domain)
 
-            match = candidates.filtered(
-                lambda l: abs(abs(l.amount_residual) - amount)
-                <= amount_tolerance
-            )
+            matches = [
+                line
+                for line in candidates
+                if abs(abs(line.amount_residual) - amount) <= amount_tolerance
+            ]
 
-            if len(match) != 1:
+            if len(matches) == 0:
                 missing += 1
                 continue
 
-            counterpart = match[0]
+            if len(matches) > 1:
+                ambiguous += 1
+                continue
+
+            counterpart = matches[0]
             draft_move = stl.move_id
             bank_account = journal.default_account_id
 
@@ -300,32 +309,37 @@ class AkahuBankStatement(models.Model):
                 missing += 1
                 continue
 
-            other_leg.write(
-                {
-                    "account_id": counterpart.account_id.id,
-                    "partner_id": counterpart.partner_id.id,
-                }
-            )
+            other_leg.write({
+                "account_id": counterpart.account_id.id,
+                "partner_id": counterpart.partner_id.id,
+            })
 
             draft_move.action_post()
 
-            arap_leg = draft_move.line_ids.filtered(
-                lambda l: l.account_id == counterpart.account_id
-                and l.partner_id == counterpart.partner_id
-                and not l.reconciled
+            new_leg = draft_move.line_ids.filtered(
+                lambda l: (
+                    l.account_id == counterpart.account_id
+                    and l.partner_id == counterpart.partner_id
+                    and not l.reconciled
+                )
             )
 
-            if arap_leg:
-                (arap_leg + counterpart).reconcile()
-                reconciled += 1
-            else:
+            if not new_leg:
                 missing += 1
+                continue
+
+            (new_leg + counterpart).reconcile()
+            reconciled += 1
 
         _logger.info(
-            "Akahu auto-reconcile: %s reconciled, %s missing.",
+            "Akahu reconciliation → Reconciled: %s | Ambiguous: %s | Missing: %s",
             reconciled,
             ambiguous,
             missing,
         )
 
-        return {"reconciled": reconciled, "missing": missing ,"ambiguous": ambiguous}
+        return {
+            "reconciled": reconciled,
+            "ambiguous": ambiguous,
+            "missing": missing,
+        }
