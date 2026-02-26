@@ -4,7 +4,7 @@ import re
 from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
-PHONE_RE = re.compile(r"^\d{10}$")
+
 
 
 class InvoicePocPayload(models.Model):
@@ -38,10 +38,7 @@ class InvoicePocPayload(models.Model):
             raise ValidationError(_("Invalid JSON: %s") % str(e))
 
     def _validate_phone(self, phone, label):
-        if phone and not PHONE_RE.match(phone):
-            raise ValidationError(
-                _("%s phone must be exactly 10 digits.") % label
-            )
+        return True
 
     def _get_currency(self, code):
         if not code:
