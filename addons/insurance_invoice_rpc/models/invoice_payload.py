@@ -274,6 +274,8 @@ class InvoicePocPayload(models.Model):
         cmd = []
         for l in lines:
             
+            tax_ids = self._get_tax_ids_by_names(l.get("tax_names") or [], move.company_id)
+            
             product_guid = (l.get("product_guid") or "").strip()
             if not product_guid:
                 raise ValidationError("Missing product_guid in invoice line")
@@ -295,15 +297,15 @@ class InvoicePocPayload(models.Model):
             # qty = float(l.get("qty") or 1.0)
             qty = float(l.get("qty") or 1.0)
             price = float(l.get("unit_price") or product.lst_price)
-            taxes = product.taxes_id.filtered(
-                lambda t: not t.company_id or t.company_id == move.company_id
-            )
+            #taxes = product.taxes_id.filtered(
+             #   lambda t: not t.company_id or t.company_id == move.company_id
+            #)
             cmd.append((0, 0, {
                 "product_id": product.id,
                 "name": product.name,
                 "quantity": qty,
                 "price_unit": price,
-                "tax_ids": [(6, 0, taxes.ids)],
+                "tax_ids": [(6, 0, tax_ids)],
             }))
               
         move.write({"invoice_line_ids": cmd})
