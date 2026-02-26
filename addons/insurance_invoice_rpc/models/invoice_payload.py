@@ -294,8 +294,8 @@ class InvoicePocPayload(models.Model):
                 "product_id": product.id,
                 "name": product.name,
                 "quantity": qty,
-                "price_unit": product.lst_price,   # 🔥 Odoo-side price
-                "tax_ids": [(6, 0, product.taxes_id.ids)],  # 🔥 Odoo-side taxes
+                "quantity": float(l.get("qty") or 1.0),
+                "price_unit": float(l.get("unit_price") or 0.0),  # 🔥 Odoo-side taxes
             }))
               
         move.write({"invoice_line_ids": cmd})
