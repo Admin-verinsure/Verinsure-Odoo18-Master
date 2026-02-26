@@ -5,6 +5,8 @@ from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
 
+
+
 class InvoicePocPayload(models.Model):
     _name = "invoice.poc.payload"
     _description = "Invoice POC Payload"
@@ -175,23 +177,15 @@ class InvoicePocPayload(models.Model):
 
     def _create_invoice(self, payload, partner, salesperson, currency, insurance):
 
-        Move = self.env["account.move"]
+        company = self.env.company
 
-        # 1️⃣ Create invoice header ONLY
-        move_vals = {
-            "move_type": "out_invoice",
-            "partner_id": partner.id,
-            "invoice_user_id": salesperson.id,
-            "currency_id": currency.id,
-            "insurance_id": insurance.id,
-        }
+        journal = self.env["account.journal"].search(
+            [("type", "=", "sale"), ("company_id", "=", company.id)],
+            limit=1
+        )
+        if not journal:
+            raise ValidationError("No Sales Journal found.")
 
-        if payload.get("invoice_date"):
-            move_vals["invoice_date"] = payload["invoice_date"]
-
-        move = Move.create(move_vals)
-
-        # 2️⃣ Prepare invoice lines (ONLY product + qty)
         invoice_lines = []
 
         for l in (payload.get("lines") or []):
@@ -200,8 +194,13 @@ class InvoicePocPayload(models.Model):
             if not product_guid:
                 raise ValidationError("Missing product_guid")
 
-            template = self.env["product.template"].search(
-                [("x_external_guid", "=", product_guid)],
+            template = self.env["product.template"].sudo().search(
+                [
+                    ("x_external_guid", "=", product_guid),
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", company.id),
+                ],
                 limit=1,
             )
             if not template:
@@ -213,21 +212,32 @@ class InvoicePocPayload(models.Model):
 
             invoice_lines.append((0, 0, {
                 "product_id": product.id,
+                "name": product.name,
                 "quantity": float(l.get("qty") or 1.0),
-                # DO NOT pass price_unit
-                # DO NOT pass tax_ids
-                # DO NOT pass account_id
+                "price_unit": float(
+                    l.get("unit_price") or product.lst_price
+                ),
+                # DO NOT pass tax_ids → let product sales tax apply
             }))
 
         if not invoice_lines:
             raise ValidationError(_("Invoice lines required."))
 
-        # 3️⃣ Write lines after header creation
-        move.write({
-            "invoice_line_ids": invoice_lines
-        })
+        move_vals = {
+            "move_type": "out_invoice",
+            "partner_id": partner.id,
+            "invoice_user_id": salesperson.id,
+            "currency_id": currency.id,
+            "insurance_id": insurance.id,
+            "company_id": company.id,
+            "journal_id": journal.id,
+            "invoice_line_ids": invoice_lines,
+        }
 
-        return move
+        if payload.get("invoice_date"):
+            move_vals["invoice_date"] = payload["invoice_date"]
+
+        return self.env["account.move"].with_company(company).create(move_vals)
 
     # -------------------------------------------------------
     # Post + Email
