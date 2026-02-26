@@ -293,9 +293,11 @@ class InvoicePocPayload(models.Model):
             cmd.append((0, 0, {
                 "product_id": product.id,
                 "name": product.name,
-                "quantity": qty,
                 "quantity": float(l.get("qty") or 1.0),
-                "price_unit": float(l.get("unit_price") or 0.0),  # 🔥 Odoo-side taxes
+                "price_unit": float(l.get("unit_price") or 0.0),
+                "tax_ids": [(6, 0, product.taxes_id.filtered(
+                    lambda t: t.company_id == move.company_id
+                ).ids)]# 🔥 Odoo-side taxes
             }))
               
         move.write({"invoice_line_ids": cmd})
