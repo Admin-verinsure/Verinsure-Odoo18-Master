@@ -296,7 +296,7 @@ class InvoicePocPayload(models.Model):
             }))
               
         move.write({"invoice_line_ids": cmd})
-        move._recompute_dynamic_lines(recompute_all_taxes=True)          
+        # move._recompute_dynamic_lines(recompute_all_taxes=True)          
     
         return move
 
