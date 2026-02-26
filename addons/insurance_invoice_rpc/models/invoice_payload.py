@@ -244,7 +244,8 @@ class InvoicePocPayload(models.Model):
             "partner_id": partner.id,
             "invoice_user_id": salesperson.id,
             "currency_id": currency.id,
-            "insurance_id": insurance.id,  # exists in your DB
+            "insurance_id": insurance.id,
+            "company_id": partner.company_id.id or self.env.company.id,# exists in your DB
         }
 
         if payload.get("invoice_date"):
