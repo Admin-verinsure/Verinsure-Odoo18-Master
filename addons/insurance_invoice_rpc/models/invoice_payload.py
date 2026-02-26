@@ -290,16 +290,11 @@ class InvoicePocPayload(models.Model):
                 )
             qty = float(l.get("qty") or 1.0)
             
-            line = self.env["account.move.line"].new({
-                "move_id": move.id,
+            cmd.append((0, 0, {
                 "product_id": product.id, 
                 "quantity": qty,
-            })
-            
-            
-            line._onchange_product_id()
-            
-            cmd.append((0,0,line._convert_to_write(line._cache)))  
+            }))
+              
         move.write({"invoice_line_ids": cmd})
         move._recompute_dynamic_lines(recompute_all_taxes=True)          
     
