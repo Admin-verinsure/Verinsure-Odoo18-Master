@@ -269,9 +269,8 @@ class InvoicePocPayload(models.Model):
 
         cmd = []
         for l in lines:
-            tax_ids = self._get_tax_ids_by_names(l.get("tax_names") or [], move.company_id)
             
-            product_guid = l.get("product_guid")
+            product_guid = (l.get("product_guid") or "").strip()
             if not product_guid:
                 raise ValidationError("Missing product_guid in invoice line")
             
@@ -285,16 +284,26 @@ class InvoicePocPayload(models.Model):
                 )
             
             product = template.product_variant_id
-                
-            cmd.append((0, 0, {
-                "product_id": product.id,
-                "name": l.get("name") or _("Premium"),
-                "quantity": float(l.get("qty") or 1.0),
-                "price_unit": float(l.get("unit_price") or 0.0),
-                "tax_ids": [(6, 0, tax_ids)],
-            }))
-
+            if not product:
+                raise ValidationError(
+                    _("No product variant found for template with GUID: %s") % product_guid
+                )
+            qty = float(l.get("qty") or 1.0)
+            
+            line = self.env["account.move.line"].new({
+                "move_id": move.id,
+                "product_id": product.id, 
+                "quantity": qty,
+            })
+            
+            
+            line._onchange_product_id()
+            line._onchange_quantity()
+            
+            cmd.append((0,0,line._convert_to_write(line._cache)))  
         move.write({"invoice_line_ids": cmd})
+        move._recompute_dynamic_lines(recompute_all_taxes=True)          
+    
         return move
 
     def _post_and_email(self, move):
