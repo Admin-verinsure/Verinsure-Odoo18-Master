@@ -298,7 +298,6 @@ class InvoicePocPayload(models.Model):
             
             
             line._onchange_product_id()
-            line._onchange_quantity()
             
             cmd.append((0,0,line._convert_to_write(line._cache)))  
         move.write({"invoice_line_ids": cmd})
