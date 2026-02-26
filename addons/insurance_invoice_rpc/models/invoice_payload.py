@@ -262,7 +262,10 @@ class InvoicePocPayload(models.Model):
         if payload.get("notes"):
             move_vals["narration"] = payload["notes"]
 
-        move = Move.create(move_vals)
+        company = insurance.company_id or self.env.company
+
+        move_vals["company_id"] = company.id
+        move = Move.with_company(company).create(move_vals)
 
         lines = payload.get("lines") or []
         if not lines:
