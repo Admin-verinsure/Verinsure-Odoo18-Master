@@ -248,7 +248,7 @@ class InvoicePocPayload(models.Model):
                 "name": product.name,
                 "quantity": float(l.get("qty") or 1.0),
                 "price_unit": float(l.get("unit_price") or product.lst_price),
-                "tax_ids": [([])],
+            
             }))
 
         move_vals = {
