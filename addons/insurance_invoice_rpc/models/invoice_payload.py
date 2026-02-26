@@ -288,16 +288,18 @@ class InvoicePocPayload(models.Model):
                 raise ValidationError(
                     _("No product variant found for template with GUID: %s") % product_guid
                 )
+            # qty = float(l.get("qty") or 1.0)
             qty = float(l.get("qty") or 1.0)
-            
+            price = float(l.get("unit_price") or product.lst_price)
+            taxes = product.taxes_id.filtered(
+                lambda t: not t.company_id or t.company_id == move.company_id
+            )
             cmd.append((0, 0, {
                 "product_id": product.id,
                 "name": product.name,
-                "quantity": float(l.get("qty") or 1.0),
-                "price_unit": float(l.get("unit_price") or 0.0),
-                "tax_ids": [(6, 0, product.taxes_id.filtered(
-                    lambda t: t.company_id == move.company_id
-                ).ids)]# 🔥 Odoo-side taxes
+                "quantity": qty,
+                "price_unit": price,
+                "tax_ids": [(6, 0, taxes.ids)],
             }))
               
         move.write({"invoice_line_ids": cmd})
