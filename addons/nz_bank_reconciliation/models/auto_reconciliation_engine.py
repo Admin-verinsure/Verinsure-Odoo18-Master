@@ -1,0 +1,276 @@
+# -*- coding: utf-8 -*-
+import logging
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
+
+# FIX 5: Payroll account codes to EXCLUDE from auto-reconciliation
+# Adjust these to match your actual NZ chart of accounts
+PAYROLL_ACCOUNT_CODES = ['820', '825', '830', '835', '840', '9500', '9510', '9520']
+
+
+class AutoReconciliationEngine(models.Model):
+    _name = 'auto.reconciliation.engine'
+    _description = 'Auto Reconciliation Engine'
+
+    @api.model
+    def run_all(self, company_ids=None, preview_mode=False):
+        if not company_ids:
+            companies = self.env['res.company'].sudo().search([])
+        else:
+            companies = self.env['res.company'].sudo().browse(company_ids)
+
+        all_results = {}
+        for company in companies:
+            _logger.info("Auto Reconciliation: Processing company %s", company.name)
+            try:
+                results = self._process_company(company, preview_mode=preview_mode)
+                all_results[company.id] = results
+            except Exception as e:
+                _logger.error("Auto Reconciliation failed for %s: %s", company.name, str(e))
+                all_results[company.id] = {'error': str(e)}
+
+        if not preview_mode:
+            self._create_log_entries(all_results)
+        return all_results
+
+    def _process_company(self, company, preview_mode=False):
+        config = self.env['auto.reconciliation.config'].sudo().search([
+            ('company_id', '=', company.id), ('active', '=', True),
+        ], limit=1)
+        run = lambda fn, flag: fn(company, preview_mode) if (not config or getattr(config, flag)) else {'matched': [], 'matched_count': 0}
+        return {
+            'company_name': company.name,
+            'company_id': company.id,
+            'bank_statement':   run(self._reconcile_bank_statements,   'enable_bank'),
+            'customer_payment': run(self._reconcile_customer_payments,  'enable_customer'),
+            'vendor_payment':   run(self._reconcile_vendor_payments,    'enable_vendor'),
+            'intercompany':     run(self._reconcile_intercompany,       'enable_intercompany'),
+        }
+
+    # ── FIX 1 + 2 + 3 + 5: Bank Statements ───────────────────────────────────
+    def _reconcile_bank_statements(self, company, preview_mode=False):
+        matched = []
+        unmatched_count = 0
+        BankLine = self.env['account.bank.statement.line'].sudo()
+        MoveLine = self.env['account.move.line'].sudo()
+
+        stmt_lines = BankLine.search([
+            ('company_id', '=', company.id),
+            ('is_reconciled', '=', False),
+            ('journal_id.type', 'in', ['bank', 'cash']),
+        ])
+
+        for stmt_line in stmt_lines:
+            company_currency = company.currency_id
+            stmt_currency = stmt_line.foreign_currency_id or stmt_line.currency_id or company_currency
+            is_foreign = stmt_currency != company_currency
+            match_amount = abs(stmt_line.amount_currency if is_foreign else stmt_line.amount)
+            if match_amount == 0:
+                continue
+
+            domain = [
+                ('company_id', '=', company.id),
+                ('reconciled', '=', False),
+                ('parent_state', '=', 'posted'),
+                ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
+                ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+            ]
+            # FIX 2: currency-aware matching
+            if is_foreign:
+                sign = 1 if stmt_line.amount >= 0 else -1
+                domain += [('currency_id', '=', stmt_currency.id), ('amount_currency', '=', sign * match_amount)]
+            else:
+                if stmt_line.amount > 0:
+                    domain.append(('debit', '=', match_amount))
+                else:
+                    domain.append(('credit', '=', match_amount))
+
+            candidates = MoveLine.search(domain, limit=1)
+            if candidates:
+                matched.append({
+                    'type': 'bank_statement',
+                    'statement_line_id': stmt_line.id,
+                    'statement_line_name': stmt_line.payment_ref or stmt_line.name,
+                    'move_line_id': candidates[0].id,
+                    'move_line_name': candidates[0].name,
+                    'amount': match_amount,
+                    'currency': stmt_currency.name,
+                    'date': str(stmt_line.date),
+                    'company': company.name,
+                })
+                if not preview_mode:
+                    self._apply_bank_reconciliation_community(stmt_line, candidates[0])
+            else:
+                unmatched_count += 1
+
+        return {'matched': matched, 'matched_count': len(matched), 'unmatched_count': unmatched_count}
+
+    def _apply_bank_reconciliation_community(self, stmt_line, move_line):
+        """FIX 1: Community-compatible — uses move_line.reconcile() not stmt_line.reconcile()"""
+        try:
+            stmt_move_lines = stmt_line.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable') and not l.reconciled
+            )
+            if stmt_move_lines:
+                (stmt_move_lines[0] | move_line).reconcile()
+            else:
+                suspense = stmt_line.move_id.line_ids.filtered(lambda l: not l.reconciled and l.id != move_line.id)
+                if suspense:
+                    (suspense[0] | move_line).reconcile()
+        except Exception as e:
+            _logger.warning("Bank recon (Community) failed for stmt_line %s: %s", stmt_line.id, str(e))
+
+    # ── FIX 2 + 5: Customer Payments ─────────────────────────────────────────
+    def _reconcile_customer_payments(self, company, preview_mode=False):
+        matched = []
+        Payment = self.env['account.payment'].sudo()
+        Move = self.env['account.move'].sudo()
+
+        for payment in Payment.search([
+            ('company_id', '=', company.id), ('state', '=', 'posted'),
+            ('payment_type', '=', 'inbound'), ('reconciled_invoice_ids', '=', False),
+        ]):
+            invoices = Move.search([
+                ('company_id', '=', company.id), ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
+                ('amount_residual', '=', payment.amount),
+                ('currency_id', '=', payment.currency_id.id),
+                ('partner_id', '=', payment.partner_id.id),
+            ], limit=1)
+            if invoices:
+                matched.append({
+                    'type': 'customer_payment', 'payment_id': payment.id,
+                    'payment_name': payment.name, 'invoice_id': invoices[0].id,
+                    'invoice_name': invoices[0].name, 'amount': payment.amount,
+                    'currency': payment.currency_id.name,
+                    'partner': payment.partner_id.name, 'company': company.name,
+                })
+                if not preview_mode:
+                    self._apply_ar_reconciliation(payment, invoices[0], 'asset_receivable')
+        return {'matched': matched, 'matched_count': len(matched)}
+
+    # ── FIX 2 + 5: Vendor Payments ───────────────────────────────────────────
+    def _reconcile_vendor_payments(self, company, preview_mode=False):
+        matched = []
+        Payment = self.env['account.payment'].sudo()
+        Move = self.env['account.move'].sudo()
+
+        for payment in Payment.search([
+            ('company_id', '=', company.id), ('state', '=', 'posted'),
+            ('payment_type', '=', 'outbound'), ('reconciled_bill_ids', '=', False),
+            ('journal_id.name', 'not ilike', 'payroll'),  # FIX 5
+        ]):
+            bills = Move.search([
+                ('company_id', '=', company.id), ('move_type', '=', 'in_invoice'),
+                ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
+                ('amount_residual', '=', payment.amount),
+                ('currency_id', '=', payment.currency_id.id),
+                ('partner_id', '=', payment.partner_id.id),
+                ('invoice_line_ids.account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+            ], limit=1)
+            if bills:
+                matched.append({
+                    'type': 'vendor_payment', 'payment_id': payment.id,
+                    'payment_name': payment.name, 'bill_id': bills[0].id,
+                    'bill_name': bills[0].name, 'amount': payment.amount,
+                    'currency': payment.currency_id.name,
+                    'partner': payment.partner_id.name, 'company': company.name,
+                })
+                if not preview_mode:
+                    self._apply_ar_reconciliation(payment, bills[0], 'liability_payable')
+        return {'matched': matched, 'matched_count': len(matched)}
+
+    def _apply_ar_reconciliation(self, payment, move, account_type):
+        try:
+            p_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == account_type and not l.reconciled)
+            m_lines = move.line_ids.filtered(lambda l: l.account_id.account_type == account_type and not l.reconciled)
+            if p_lines and m_lines:
+                (p_lines[0] | m_lines[0]).reconcile()
+        except Exception as e:
+            _logger.warning("Payment/invoice reconciliation failed for payment %s: %s", payment.id, str(e))
+
+    # ── FIX 4: Inter-company with explicit mapping ────────────────────────────
+    def _reconcile_intercompany(self, company, preview_mode=False):
+        matched = []
+        MoveLine = self.env['account.move.line'].sudo()
+
+        # FIX 4: Use explicit mapping table
+        mappings = self.env['akahu.company.mapping'].sudo().search([
+            ('company_id', '=', company.id), ('active', '=', True),
+        ])
+        if not mappings:
+            _logger.info("IC reconciliation skipped for %s: no mappings set up.", company.name)
+            return {'matched': [], 'matched_count': 0}
+
+        partner_to_company = {m.partner_id.id: m.counterpart_company_id.id for m in mappings}
+
+        ic_lines = MoveLine.search([
+            ('company_id', '=', company.id), ('reconciled', '=', False),
+            ('parent_state', '=', 'posted'),
+            ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
+            ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+            ('partner_id', 'in', list(partner_to_company.keys())),
+        ])
+
+        for line in ic_lines:
+            cc_id = partner_to_company.get(line.partner_id.id)
+            if not cc_id:
+                continue
+
+            domain = [
+                ('company_id', '=', cc_id), ('reconciled', '=', False),
+                ('parent_state', '=', 'posted'),
+                ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
+            ]
+            # FIX 2: currency-aware IC matching
+            if line.currency_id and line.currency_id != company.currency_id:
+                domain += [('currency_id', '=', line.currency_id.id), ('amount_currency', '=', -line.amount_currency)]
+                domain.append(('account_id.account_type', '=', 'liability_payable' if line.debit > 0 else 'asset_receivable'))
+            else:
+                if line.debit > 0:
+                    domain += [('credit', '=', line.debit), ('account_id.account_type', '=', 'liability_payable')]
+                else:
+                    domain += [('debit', '=', line.credit), ('account_id.account_type', '=', 'asset_receivable')]
+
+            counterpart = MoveLine.search(domain, limit=1)
+            if counterpart:
+                cc_name = self.env['res.company'].browse(cc_id).name
+                line_currency = line.currency_id or company.currency_id
+                matched.append({
+                    'type': 'intercompany', 'line_id': line.id, 'line_name': line.name,
+                    'counterpart_line_id': counterpart.id, 'counterpart_line_name': counterpart.name,
+                    'amount': abs(line.amount_currency if line.currency_id else (line.debit or line.credit)),
+                    'currency': line_currency.name,
+                    'company_from': company.name, 'company_to': cc_name,
+                })
+                if not preview_mode:
+                    try:
+                        (line | counterpart).reconcile()
+                    except Exception as e:
+                        _logger.warning("IC reconciliation failed: %s", str(e))
+
+        return {'matched': matched, 'matched_count': len(matched)}
+
+    def _create_log_entries(self, all_results):
+        Log = self.env['auto.reconciliation.log'].sudo()
+        for company_id, result in all_results.items():
+            if 'error' in result:
+                Log.create({'company_id': company_id, 'state': 'failed', 'notes': result['error'], 'total_matched': 0})
+                continue
+            total = sum(result.get(k, {}).get('matched_count', 0) for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany'])
+            Log.create({
+                'company_id': company_id,
+                'bank_matched': result.get('bank_statement', {}).get('matched_count', 0),
+                'customer_matched': result.get('customer_payment', {}).get('matched_count', 0),
+                'vendor_matched': result.get('vendor_payment', {}).get('matched_count', 0),
+                'intercompany_matched': result.get('intercompany', {}).get('matched_count', 0),
+                'total_matched': total, 'state': 'done',
+            })
+
+    @api.model
+    def cron_run_auto_reconciliation(self):
+        _logger.info("Auto Reconciliation Cron: Starting")
+        self.run_all()
+        _logger.info("Auto Reconciliation Cron: Completed")
