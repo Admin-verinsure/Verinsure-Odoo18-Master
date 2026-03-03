@@ -8,6 +8,11 @@ class PaymentProviderAkahu(models.Model):
         ondelete={'akahu': 'set default'}
     )
 
+    akahu_api_url = fields.Char(
+        string="Akahu API URL",
+        default="https://api.akahu.io"
+    )
+
     akahu_app_token = fields.Char("Akahu App Token")
     akahu_user_token = fields.Char("Akahu User Token")
 
