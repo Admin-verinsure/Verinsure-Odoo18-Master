@@ -7,9 +7,9 @@
         <field name="inherit_id" ref="payment.payment_provider_form"/>
         <field name="arch" type="xml">
 
-            <!-- Add fields after provider credentials group -->
             <group name="provider_credentials" position="after">
                 <group invisible="code != 'akahu'">
+                    <field name="akahu_api_url"/>
                     <field name="akahu_app_token"/>
                     <field name="akahu_user_token"/>
                 </group>
