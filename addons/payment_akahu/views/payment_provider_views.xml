@@ -4,12 +4,17 @@
         <field name="model">payment.provider</field>
         <field name="inherit_id" ref="payment.view_payment_provider_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='credentials']" position="inside">
-                <field name="akahu_app_token"
-                       attrs="{'invisible': [('code','!=','akahu')]}"/>
-                <field name="akahu_user_token"
-                       attrs="{'invisible': [('code','!=','akahu')]}"/>
+
+            <!-- Insert inside configuration notebook -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Akahu Configuration" attrs="{'invisible': [('code','!=','akahu')]}">
+                    <group>
+                        <field name="akahu_app_token"/>
+                        <field name="akahu_user_token"/>
+                    </group>
+                </page>
             </xpath>
+
         </field>
     </record>
 </odoo>
