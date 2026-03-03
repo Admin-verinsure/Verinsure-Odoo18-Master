@@ -20,13 +20,12 @@ class PaymentTransactionAkahu(models.Model):
                 "reference": self.reference,
             }
 
-            # Example API call (implement actual endpoint)
+            # Example API call (replace with real Akahu endpoint)
             # response = requests.post(
             #     f"{provider.akahu_api_url}/payments",
             #     json=payload,
             #     headers=headers
             # )
-
             # res.update({'redirect_url': response.json().get('redirect_url')})
 
         return res
