@@ -1,0 +1,15 @@
+<odoo>
+    <record id="view_payment_provider_form_akahu" model="ir.ui.view">
+        <field name="name">payment.provider.form.akahu</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.view_payment_provider_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='credentials']" position="inside">
+                <field name="akahu_app_token"
+                       attrs="{'invisible': [('code','!=','akahu')]}"/>
+                <field name="akahu_user_token"
+                       attrs="{'invisible': [('code','!=','akahu')]}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
