@@ -1,33 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Extends the Accounting Dashboard kanban view -->
-
     <record id="view_account_journal_dashboard_akahu" model="ir.ui.view">
         <field name="name">account.journal.dashboard.kanban.akahu</field>
         <field name="model">account.journal</field>
-        <field name="inherit_id" ref="account.view_account_journal_dashboard_kanban"/>
+        <field name="inherit_id" ref="account.account_journal_dashboard_kanban_view"/>
         <field name="arch" type="xml">
 
-            <!-- Inject fields after 'type' -->
-            <xpath expr="//field[@name='type']" position="after">
-                <field name="has_akahu"/>
-                <field name="akahu_last_synced"/>
-            </xpath>
-
-            <!-- Inject Fetch Transactions button -->
-            <xpath expr="//div[contains(@class,'o_kanban_card_manage_section')]" position="before">
+            <xpath expr="//div[contains(@class,'o_kanban_record')]" position="inside">
                 <t t-if="record.has_akahu.raw_value">
-                    <div class="o_akahu_fetch_section">
+                    <div class="o_akahu_fetch_section mt-2">
                         <button name="action_fetch_akahu_transactions"
                                 type="object"
-                                class="btn btn-sm btn-primary o_akahu_fetch_btn">
+                                class="btn btn-sm btn-primary">
+
                             <i class="fa fa-cloud-download me-1"/>
                             Fetch Transactions
                         </button>
+
                         <t t-if="record.akahu_last_synced.raw_value">
                             <small class="text-muted ms-2">
-                                Last: <t t-esc="record.akahu_last_synced.value"/>
+                                Last:
+                                <t t-esc="record.akahu_last_synced.value"/>
                             </small>
                         </t>
                     </div>
