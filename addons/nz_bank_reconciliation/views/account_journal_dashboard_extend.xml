@@ -7,12 +7,13 @@
         <field name="inherit_id" ref="account.account_journal_dashboard_kanban_view"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//t[@t-name='kanban-box']" position="inside">
+            <xpath expr="//article[contains(@class,'o_kanban_record')]" position="inside">
                 <t t-if="record.has_akahu.raw_value">
                     <div class="o_akahu_fetch_section mt-2">
                         <button name="action_fetch_akahu_transactions"
                                 type="object"
                                 class="btn btn-sm btn-primary">
+
                             <i class="fa fa-cloud-download me-1"/>
                             Fetch Transactions
                         </button>
