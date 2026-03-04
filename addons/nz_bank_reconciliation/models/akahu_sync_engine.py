@@ -166,16 +166,17 @@ class AkahuSyncEngine(models.Model):
 
         Format stored: [akahu_id:trans_XXXXXXX]
         """
+        # Odoo 18: column renamed from narration → memo
         self.env.cr.execute("""
-            SELECT narration FROM account_bank_statement_line
+            SELECT memo FROM account_bank_statement_line
             WHERE journal_id = %s
-              AND narration LIKE '%%[akahu_id:trans_%%'
+              AND memo LIKE '%%[akahu_id:trans_%%'
         """, (journal.id,))
         rows = self.env.cr.fetchall()
         ids = set()
-        for (narration,) in rows:
-            if narration:
-                for part in narration.split('[akahu_id:'):
+        for (memo,) in rows:
+            if memo:
+                for part in memo.split('[akahu_id:'):
                     if ']' in part:
                         ids.add('trans_' + part.split(']')[0].replace('trans_', ''))
         return ids
@@ -260,7 +261,7 @@ class AkahuSyncEngine(models.Model):
             'date': tx_date,
             'payment_ref': payment_ref[:255],
             'amount': amount,
-            'narration': narration,
+            'memo': narration,  # Odoo 18: field renamed narration → memo
             'partner_name': meta.get('other_account', False) or False,
             'company_id': akahu_account.company_id.id,
         }
