@@ -13,14 +13,27 @@
                 <field name="akahu_last_synced"/>
             </xpath>
 
-            <!-- Add Fetch Transactions button -->
+            <!-- Add Akahu fetch button in bank journal actions -->
             <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
-                <button t-if="record.has_akahu.raw_value"
-                        name="action_fetch_akahu_transactions"
-                        type="object"
-                        class="btn btn-secondary">
-                    Fetch Transactions
-                </button>
+
+                <t t-if="record.has_akahu and record.has_akahu.raw_value">
+
+                    <button name="action_fetch_akahu_transactions"
+                            type="object"
+                            class="btn btn-secondary">
+                        <i class="fa fa-refresh me-1"/>
+                        Fetch Transactions
+                    </button>
+
+                    <t t-if="record.akahu_last_synced and record.akahu_last_synced.raw_value">
+                        <span class="text-muted ms-2 small">
+                            Last Sync:
+                            <t t-esc="record.akahu_last_synced.value"/>
+                        </span>
+                    </t>
+
+                </t>
+
             </xpath>
 
         </field>
