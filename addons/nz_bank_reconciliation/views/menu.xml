@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!--
-        NZ Bank Reconciliation menu — nested under Accounting > Configuration.
-        Removed from the top Accounting header navigation entirely.
-    -->
-
     <!-- Parent group under Accounting > Configuration -->
     <menuitem id="menu_nz_bank_recon_config_root"
               name="NZ Bank Reconciliation"
-              parent="account.account_configuration"
+              parent="account.menu_finance_configuration"
               sequence="50"
               groups="account.group_account_manager"/>
 
