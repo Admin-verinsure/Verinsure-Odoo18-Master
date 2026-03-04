@@ -7,15 +7,20 @@
         <field name="inherit_id" ref="account.account_journal_dashboard_kanban_view"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
+            <!-- Load Akahu fields into the kanban dataset -->
+            <xpath expr="//field[@name='bank_account_id']" position="after">
+                <field name="has_akahu"/>
+                <field name="akahu_last_synced"/>
+            </xpath>
 
+            <!-- Add Fetch Transactions button -->
+            <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
                 <button t-if="record.has_akahu.raw_value"
                         name="action_fetch_akahu_transactions"
                         type="object"
                         class="btn btn-secondary">
                     Fetch Transactions
                 </button>
-
             </xpath>
 
         </field>
