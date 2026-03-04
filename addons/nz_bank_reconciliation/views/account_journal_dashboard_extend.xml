@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Add has_akahu + akahu_last_synced fields to the kanban view -->
+    <record id="view_account_journal_dashboard_akahu_fields" model="ir.ui.view">
+        <field name="name">account.journal.dashboard.kanban.akahu.fields</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_dashboard_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban" position="inside">
+                <field name="has_akahu"/>
+                <field name="akahu_last_synced"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inject the Fetch Transactions button into the kanban card manage section -->
+    <record id="view_account_journal_dashboard_akahu_btn" model="ir.ui.view">
+        <field name="name">account.journal.dashboard.kanban.akahu.btn</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_dashboard_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('o_kanban_card_manage_section')]" position="before">
+                <t t-if="record.has_akahu.raw_value">
+                    <div class="o_akahu_fetch_section">
+                        <button name="action_fetch_akahu_transactions"
+                                type="object"
+                                class="btn btn-sm btn-primary o_akahu_fetch_btn">
+                            <i class="fa fa-cloud-download me-1"/>
+                            Fetch Transactions
+                        </button>
+                        <t t-if="record.akahu_last_synced.raw_value">
+                            <small class="text-muted ms-2">
+                                Last: <t t-esc="record.akahu_last_synced.value"/>
+                            </small>
+                        </t>
+                    </div>
+                </t>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
