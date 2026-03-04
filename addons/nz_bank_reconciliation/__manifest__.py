@@ -45,6 +45,7 @@ UX
         # Views — Akahu
         'views/akahu_credential_views.xml',
         'views/akahu_account_views.xml',
+        'views/account_journal_dashboard_extend.xml',
         'views/akahu_sync_log_views.xml',
         'views/akahu_company_mapping_views.xml',
         # Views — Reconciliation

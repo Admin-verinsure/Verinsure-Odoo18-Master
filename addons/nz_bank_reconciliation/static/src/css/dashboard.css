@@ -45,3 +45,25 @@
     letter-spacing: 0.05em;
     color: #6c757d;
 }
+
+/* ── Fetch Transactions button on Accounting Dashboard journal cards ── */
+.o_akahu_fetch_section {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px 6px 12px;
+    border-top: 1px solid #e9ecef;
+    margin-top: 4px;
+}
+
+.o_akahu_fetch_btn {
+    font-size: 0.8rem !important;
+    padding: 3px 10px !important;
+}
+
+.o_akahu_fetch_section small {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
