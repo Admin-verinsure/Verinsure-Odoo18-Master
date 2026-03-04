@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!--
-        Extends the Accounting Dashboard kanban view.
-
-        SAFE APPROACH for Odoo 18 Community:
-        - Use a single <record> with two separate xpath expressions
-        - First xpath adds fields after 'type' field (exists in all journal kanban views)
-        - Second xpath adds the Fetch button before the card manage section
-    -->
+    <!-- Extends the Accounting Dashboard kanban view -->
 
     <record id="view_account_journal_dashboard_akahu" model="ir.ui.view">
         <field name="name">account.journal.dashboard.kanban.akahu</field>
@@ -16,14 +9,14 @@
         <field name="inherit_id" ref="account.view_account_journal_dashboard_kanban"/>
         <field name="arch" type="xml">
 
-            <!-- Inject fields after 'type' — this field always exists in account.journal kanban -->
+            <!-- Inject fields after 'type' -->
             <xpath expr="//field[@name='type']" position="after">
                 <field name="has_akahu"/>
                 <field name="akahu_last_synced"/>
             </xpath>
 
-            <!-- Inject Fetch Transactions button inside the kanban card -->
-            <xpath expr="//div[hasclass('o_kanban_card_manage_section')]" position="before">
+            <!-- Inject Fetch Transactions button -->
+            <xpath expr="//div[contains(@class,'o_kanban_card_manage_section')]" position="before">
                 <t t-if="record.has_akahu.raw_value">
                     <div class="o_akahu_fetch_section">
                         <button name="action_fetch_akahu_transactions"
