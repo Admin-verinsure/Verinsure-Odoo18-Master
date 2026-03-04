@@ -7,25 +7,15 @@
         <field name="inherit_id" ref="account.account_journal_dashboard_kanban_view"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//article[contains(@class,'o_kanban_record')]" position="inside">
-                <t t-if="record.has_akahu.raw_value">
-                    <div class="o_akahu_fetch_section mt-2">
-                        <button name="action_fetch_akahu_transactions"
-                                type="object"
-                                class="btn btn-sm btn-primary">
+            <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
 
-                            <i class="fa fa-cloud-download me-1"/>
-                            Fetch Transactions
-                        </button>
+                <button t-if="record.has_akahu.raw_value"
+                        name="action_fetch_akahu_transactions"
+                        type="object"
+                        class="btn btn-secondary">
+                    Fetch Transactions
+                </button>
 
-                        <t t-if="record.akahu_last_synced.raw_value">
-                            <small class="text-muted ms-2">
-                                Last:
-                                <t t-esc="record.akahu_last_synced.value"/>
-                            </small>
-                        </t>
-                    </div>
-                </t>
             </xpath>
 
         </field>
