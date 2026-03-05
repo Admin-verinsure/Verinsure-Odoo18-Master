@@ -12,14 +12,8 @@ class AkahuSyncEngine(models.Model):
     Core sync engine. Pulls transactions from Akahu and creates
     account.bank.statement.line records in Odoo for reconciliation.
 
-    Akahu transaction fields we use:
-      _id           → akahu_transaction_id (stored on statement line to avoid duplicates)
-      date          → date
-      description   → payment_ref
-      amount        → amount  (positive = credit to account, negative = debit)
-      balance       → running balance (optional)
-      meta.particulars / meta.code / meta.reference → appended to narration
-      type          → transaction type label
+    Odoo 18 deduplication: uses unique_import_id column (built-in).
+    No custom narration/memo embedding needed.
     """
     _name = 'akahu.sync.engine'
     _description = 'Akahu Sync Engine'
@@ -56,14 +50,13 @@ class AkahuSyncEngine(models.Model):
         """
         Sync one Akahu account → Odoo bank statement lines.
         Handles pagination with cursor.
-        Skips transactions already imported (deduplication by akahu_transaction_id).
+        Deduplication via unique_import_id (Odoo 18 native column).
         Returns dict with 'imported' count.
         """
         cred = akahu_account.credential_id
         account_id = akahu_account.akahu_account_id
 
         if not account_id:
-            # Refresh metadata first to get the Akahu account ID
             akahu_account.action_refresh_account_info()
             account_id = akahu_account.akahu_account_id
 
@@ -81,7 +74,6 @@ class AkahuSyncEngine(models.Model):
         all_transactions = []
         params = {}
 
-        # Use cursor from last sync if available (incremental sync)
         if akahu_account.sync_cursor:
             params['cursor'] = akahu_account.sync_cursor
 
@@ -97,7 +89,6 @@ class AkahuSyncEngine(models.Model):
             try:
                 data = cred._api_get(akahu_account.user_token, path, params=params)
             except UserError as e:
-                # Mark account INACTIVE if auth failed
                 if '401' in str(e) or '403' in str(e):
                     akahu_account.write({'akahu_status': 'INACTIVE'})
                 raise
@@ -105,12 +96,10 @@ class AkahuSyncEngine(models.Model):
             items = data.get('items', [])
             all_transactions.extend(items)
 
-            # Handle pagination cursor
             cursor = data.get('cursor', {})
             next_cursor = cursor.get('next') if cursor else None
 
             if not next_cursor:
-                # Save the latest cursor for next incremental sync
                 last_cursor = cursor.get('current') if cursor else None
                 break
             else:
@@ -122,7 +111,7 @@ class AkahuSyncEngine(models.Model):
             len(all_transactions), page_count, akahu_account.name
         )
 
-        # ── Deduplication ──────────────────────────────────────────────────────
+        # ── Deduplication via unique_import_id ────────────────────────────────
         existing_ids = self._get_existing_akahu_ids(akahu_account.journal_id)
         new_transactions = [
             t for t in all_transactions
@@ -160,26 +149,17 @@ class AkahuSyncEngine(models.Model):
 
     def _get_existing_akahu_ids(self, journal):
         """
-        Return set of akahu_transaction_id values already in this journal.
-        We store the Akahu _id in the narration field with a prefix to allow
-        deduplication without adding a custom field to account.bank.statement.line.
-
-        Format stored: [akahu_id:trans_XXXXXXX]
+        Odoo 18 uses unique_import_id for deduplication — a native column
+        on account_bank_statement_line. We store the Akahu _id there directly.
         """
-        # Odoo 18: column renamed from narration → memo
         self.env.cr.execute("""
-            SELECT memo FROM account_bank_statement_line
+            SELECT unique_import_id FROM account_bank_statement_line
             WHERE journal_id = %s
-              AND memo LIKE '%%[akahu_id:trans_%%'
+              AND unique_import_id LIKE 'akahu-%%'
         """, (journal.id,))
         rows = self.env.cr.fetchall()
-        ids = set()
-        for (memo,) in rows:
-            if memo:
-                for part in memo.split('[akahu_id:'):
-                    if ']' in part:
-                        ids.add('trans_' + part.split(']')[0].replace('trans_', ''))
-        return ids
+        # Strip the 'akahu-' prefix to get back the raw Akahu _id
+        return {row[0].replace('akahu-', '', 1) for row in rows if row[0]}
 
     def _create_statement_lines(self, akahu_account, transactions):
         """
@@ -187,12 +167,11 @@ class AkahuSyncEngine(models.Model):
         Returns count of lines created.
         """
         BankLine = self.env['account.bank.statement.line'].sudo()
-        journal = akahu_account.journal_id
         count = 0
 
         for tx in transactions:
             try:
-                line_vals = self._map_transaction_to_statement_line(tx, journal, akahu_account)
+                line_vals = self._map_transaction_to_statement_line(tx, akahu_account)
                 BankLine.create(line_vals)
                 count += 1
             except Exception as e:
@@ -203,25 +182,17 @@ class AkahuSyncEngine(models.Model):
 
         return count
 
-    def _map_transaction_to_statement_line(self, tx, journal, akahu_account):
+    def _map_transaction_to_statement_line(self, tx, akahu_account):
         """
         Map an Akahu transaction dict to account.bank.statement.line values.
 
-        Akahu transaction structure:
-        {
-            "_id": "trans_...",
-            "date": "2024-01-15T00:00:00.000Z",
-            "description": "COUNTDOWN NEWTON 100",
-            "amount": -45.50,         ← negative = money out, positive = money in
-            "balance": 1234.56,
-            "type": "CARD",
-            "meta": {
-                "particulars": "...",
-                "code": "...",
-                "reference": "...",
-                "other_account": "01-1234-..."
-            }
-        }
+        Odoo 18 schema used:
+          unique_import_id  → 'akahu-{tx._id}'  (deduplication)
+          payment_ref       → description + meta fields
+          amount            → transaction amount
+          partner_name      → other_account from meta
+          transaction_type  → Akahu tx type (CARD, TRANSFER etc.)
+          foreign_currency_id / amount_currency → for USD/AUD transactions
         """
         tx_id = tx.get('_id', '')
         date_str = tx.get('date', '')
@@ -229,7 +200,7 @@ class AkahuSyncEngine(models.Model):
         amount = float(tx.get('amount', 0.0))
         meta = tx.get('meta') or {}
 
-        # Parse date (ISO 8601 → Odoo date)
+        # Parse date
         try:
             dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
             tx_date = dt.date()
@@ -244,16 +215,7 @@ class AkahuSyncEngine(models.Model):
                 ref_parts.append(val.strip())
         payment_ref = ' | '.join(ref_parts)
 
-        # Build narration with Akahu ID embedded for deduplication
-        narration_parts = ['[akahu_id:%s]' % tx_id]
-        other_acc = meta.get('other_account')
-        if other_acc:
-            narration_parts.append('Other account: %s' % other_acc)
-        if tx.get('type'):
-            narration_parts.append('Type: %s' % tx['type'])
-        narration = ' | '.join(narration_parts)
-
-        # FIX 3: Route to correct journal (credit card vs bank)
+        # Route to correct journal (credit card vs bank)
         resolved_journal = self._resolve_journal(tx, akahu_account)
 
         vals = {
@@ -261,13 +223,14 @@ class AkahuSyncEngine(models.Model):
             'date': tx_date,
             'payment_ref': payment_ref[:255],
             'amount': amount,
-            'memo': narration,  # Odoo 18: field renamed narration → memo
-            'partner_name': meta.get('other_account', False) or False,
+            'partner_name': meta.get('other_account') or False,
+            'transaction_type': tx.get('type') or False,
             'company_id': akahu_account.company_id.id,
+            # Odoo 18 native deduplication field — prefix with 'akahu-' to namespace it
+            'unique_import_id': 'akahu-%s' % tx_id,
         }
 
-        # FIX 2: Multi-currency — store foreign currency if present in Akahu response
-        # ASB returns conversion details for foreign-currency card transactions
+        # Multi-currency: ASB returns conversion details for foreign card transactions
         # tx.meta.conversion = {"amount": -42.50, "currency": "USD", "rate": 0.6516}
         conversion = meta.get('conversion') or {}
         foreign_currency_code = conversion.get('currency')
@@ -282,11 +245,11 @@ class AkahuSyncEngine(models.Model):
 
         return vals
 
-    # ── FIX 3: Credit card journal routing ────────────────────────────────────
+    # ── Credit card journal routing ────────────────────────────────────────────
     CARD_TX_TYPES = {'CARD', 'EFTPOS', 'CREDIT_CARD'}
 
     def _resolve_journal(self, tx, akahu_account):
-        """FIX 3: Route CARD/EFTPOS transactions to a credit card journal if one exists."""
+        """Route CARD/EFTPOS transactions to a credit card journal if one exists."""
         tx_type = (tx.get('type') or '').upper()
         if tx_type in self.CARD_TX_TYPES:
             cc_journal = self.env['account.journal'].sudo().search([
@@ -297,4 +260,3 @@ class AkahuSyncEngine(models.Model):
             if cc_journal:
                 return cc_journal
         return akahu_account.journal_id
-
