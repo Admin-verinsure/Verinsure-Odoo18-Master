@@ -14,12 +14,11 @@
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
 
-    <!-- Replace the stock address band with our header block (wizard-safe) -->
+    <!-- Replace the stock address band -->
     <xpath expr="//t[@t-call='web.address_layout']" position="replace">
       <table style="width:100%; margin:0 0 8px 0;">
         <tr>
 
-          <!-- LEFT: logo -->
           <td style="width:50%; vertical-align:top;">
             <img t-if="company.logo"
                  t-att-src="image_data_uri(company.logo)"
@@ -27,7 +26,6 @@
                  alt="Company Logo"/>
           </td>
 
-          <!-- RIGHT: title + details -->
           <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
 
             <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
@@ -47,11 +45,12 @@
       </table>
     </xpath>
 
-    <!-- Tighten top spacing -->
     <xpath expr="/t" position="inside">
-      <style type="text/css">
-        .o_report_layout_boxed.article { margin-top: 0 !important; padding-top: 0 !important; }
-        .o_report_layout_boxed.article h2 { margin-top: 0 !important; }
+      <style>
+        .o_report_layout_boxed.article {
+          margin-top:0 !important;
+          padding-top:0 !important;
+        }
       </style>
     </xpath>
 
@@ -65,50 +64,19 @@
             inherit_id="web.external_layout_bubble"
             priority="199">
 
-    <!-- Collapse the original header completely -->
+    <!-- Collapse original header -->
     <xpath expr="/t/div[1]" position="replace">
       <div t-attf-class="header o_company_#{company.id}_layout"
            style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
     </xpath>
 
-    <!-- Replace the stock address band with our header block -->
-    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <table style="width:100%; margin:0 0 8px 0;">
-        <tr>
-
-          <!-- LEFT: logo -->
-          <td style="width:50%; vertical-align:top;">
-            <img t-if="company.logo"
-                 t-att-src="image_data_uri(company.logo)"
-                 style="max-height:80px;"
-                 alt="Company Logo"/>
-          </td>
-
-          <!-- RIGHT: title + details -->
-          <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
-
-            <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
-              <t t-esc="company.report_header or company.name or ''"/>
-            </div>
-
-            <t t-if="company.is_company_details_empty">
-              <span t-field="company.partner_id"
-                    t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
-            </t>
-            <t t-else="">
-              <span t-field="company.company_details"/>
-            </t>
-
-          </td>
-        </tr>
-      </table>
-    </xpath>
-
-    <!-- Tighten top spacing -->
-    <xpath expr="/t" position="inside">
-      <style type="text/css">
-        .o_report_layout_bubble.article { margin-top: 0 !important; padding-top: 0 !important; }
-        .o_report_layout_bubble.article h2 { margin-top: 0 !important; }
+    <!-- Adjust spacing inside article -->
+    <xpath expr="//div[contains(@class,'article')]" position="inside">
+      <style>
+        .o_report_layout_bubble.article {
+          margin-top:0 !important;
+          padding-top:0 !important;
+        }
       </style>
     </xpath>
 
