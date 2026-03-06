@@ -67,25 +67,16 @@
     <!-- BUBBLE LAYOUT HEADER FIX -->
     <!-- ============================= -->
     <template id="fix_bubble_header_pdf_alignment"
-              inherit_id="web.external_layout_bubble"
-              priority="200">
+          inherit_id="web.external_layout_bubble"
+          priority="200">
 
-        <!-- Remove PDF-only padding -->
-        <xpath expr="//div[contains(@t-attf-class,'header o_company')]" position="attributes">
-            <attribute name="t-attf-class">
-                header o_company_#{company.id}_layout
-            </attribute>
-        </xpath>
+    <!-- Fix wkhtmltopdf bubble positioning -->
+    <xpath expr="//svg[contains(@t-attf-class,'o_shape_bubble_1')]" position="attributes">
+        <attribute name="t-attf-class">
+            o_shape_bubble_1 z-n1 position-absolute
+        </attribute>
+    </xpath>
 
-        <!-- Prevent wkhtmltopdf fixed positioning -->
-        <xpath expr="//svg[contains(@t-attf-class,'o_shape_bubble_1')]" position="attributes">
-            <attribute name="t-attf-class">
-                o_shape_bubble_1 z-n1 position-absolute
-            </attribute>
-            <attribute name="width">900</attribute>
-            <attribute name="height">900</attribute>
-        </xpath>
-
-    </template>
+</template>
 
 </odoo>
