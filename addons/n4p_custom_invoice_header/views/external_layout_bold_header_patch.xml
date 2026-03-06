@@ -1,85 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!-- ================================= -->
-  <!-- BOXED LAYOUT HEADER FIX -->
-  <!-- ================================= -->
-  <template id="layout_bold_move_header_into_body"
-            inherit_id="web.external_layout_boxed"
-            priority="199">
+    <!-- ================================= -->
+    <!-- BOXED LAYOUT FIX -->
+    <!-- ================================= -->
+    <template id="layout_bold_move_header_into_body"
+              inherit_id="web.external_layout_boxed"
+              priority="199">
 
-    <!-- Collapse the original header completely -->
-    <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout"
-           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
-    </xpath>
+        <!-- Collapse original header -->
+        <xpath expr="/t/div[1]" position="replace">
+            <div t-attf-class="header o_company_#{company.id}_layout"
+                 style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+        </xpath>
 
-    <!-- Replace the stock address band -->
-    <xpath expr="//t[@t-call='web.address_layout']" position="replace">
-      <table style="width:100%; margin:0 0 8px 0;">
-        <tr>
+        <!-- Replace address layout -->
+        <xpath expr="//t[@t-call='web.address_layout']" position="replace">
 
-          <td style="width:50%; vertical-align:top;">
-            <img t-if="company.logo"
-                 t-att-src="image_data_uri(company.logo)"
-                 style="max-height:80px;"
-                 alt="Company Logo"/>
-          </td>
+            <table style="width:100%; margin:0 0 8px 0;">
+                <tr>
 
-          <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
+                    <td style="width:50%; vertical-align:top;">
+                        <img t-if="company.logo"
+                             t-att-src="image_data_uri(company.logo)"
+                             style="max-height:80px;"
+                             alt="Company Logo"/>
+                    </td>
 
-            <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
-              <t t-esc="company.report_header or company.name or ''"/>
-            </div>
+                    <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
 
-            <t t-if="company.is_company_details_empty">
-              <span t-field="company.partner_id"
-                    t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
-            </t>
-            <t t-else="">
-              <span t-field="company.company_details"/>
-            </t>
+                        <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
+                            <t t-esc="company.report_header or company.name or ''"/>
+                        </div>
 
-          </td>
-        </tr>
-      </table>
-    </xpath>
+                        <t t-if="company.is_company_details_empty">
+                            <span t-field="company.partner_id"
+                                  t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
+                        </t>
 
-    <xpath expr="/t" position="inside">
-      <style>
-        .o_report_layout_boxed.article {
-          margin-top:0 !important;
-          padding-top:0 !important;
-        }
-      </style>
-    </xpath>
+                        <t t-else="">
+                            <span t-field="company.company_details"/>
+                        </t>
 
-  </template>
+                    </td>
+
+                </tr>
+            </table>
+
+        </xpath>
+
+    </template>
 
 
-  <!-- ================================= -->
-  <!-- BUBBLE LAYOUT HEADER FIX -->
-  <!-- ================================= -->
-  <template id="layout_bubble_move_header_into_body"
-            inherit_id="web.external_layout_bubble"
-            priority="199">
+    <!-- ================================= -->
+    <!-- BUBBLE LAYOUT FIX -->
+    <!-- ================================= -->
+    <template id="layout_bubble_move_header_into_body"
+              inherit_id="web.external_layout_bubble"
+              priority="199">
 
-    <!-- Collapse original header -->
-    <xpath expr="/t/div[1]" position="replace">
-      <div t-attf-class="header o_company_#{company.id}_layout"
-           style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
-    </xpath>
+        <!-- Collapse header only -->
+        <xpath expr="/t/div[1]" position="replace">
+            <div t-attf-class="header o_company_#{company.id}_layout"
+                 style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
+        </xpath>
 
-    <!-- Adjust spacing inside article -->
-    <xpath expr="//div[contains(@class,'article')]" position="inside">
-      <style>
-        .o_report_layout_bubble.article {
-          margin-top:0 !important;
-          padding-top:0 !important;
-        }
-      </style>
-    </xpath>
-
-  </template>
+    </template>
 
 </odoo>
