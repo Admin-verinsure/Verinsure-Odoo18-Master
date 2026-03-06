@@ -1,22 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="preview_layout_report" inherit_id="web.preview_layout_report"
-              name="Invoice report preview">
-        <xpath expr="//t[@t-call='web.report_invoice_wizard_preview']"
-               position="replace">
-            <t t-set="o" t-value="res_company"/>
-            <t t-if="o.base_layout == 'normal'">
-                <t t-call="format_editor.report_preview_normal"/>
-            </t>
-            <t t-if="o.base_layout == 'old'">
-                <t t-call="format_editor.report_preview_old"/>
-            </t>
-            <t t-if="o.base_layout == 'modern'">
-                <t t-call="format_editor.report_preview_modern"/>
-            </t>
-            <t t-if="o.base_layout == 'default'">
-                <t t-call="web.report_invoice_wizard_preview"/>
-            </t>
+
+    <!-- ============================= -->
+    <!-- BOXED LAYOUT HEADER FIX -->
+    <!-- ============================= -->
+    <template id="layout_bold_move_header_into_body"
+              inherit_id="web.external_layout_boxed"
+              priority="199">
+
+        <!-- Collapse the original header completely -->
+        <xpath expr="/t/div[1]" position="replace">
+            <div t-attf-class="header o_company_#{company.id}_layout"
+                 style="display:none;height:0;line-height:0;padding:0;margin:0;border:0;"/>
         </xpath>
+
+        <!-- Replace the stock address band with our header block -->
+        <xpath expr="//t[@t-call='web.address_layout']" position="replace">
+
+            <table style="width:100%; margin:0 0 8px 0;">
+                <tr>
+
+                    <!-- LEFT: logo -->
+                    <td style="width:50%; vertical-align:top;">
+                        <img t-if="company.logo"
+                             t-att-src="image_data_uri(company.logo)"
+                             style="max-height:80px;"
+                             alt="Company Logo"/>
+                    </td>
+
+                    <!-- RIGHT: title + details -->
+                    <td style="width:50%; vertical-align:top; text-align:right; color:#000;">
+
+                        <div style="font-weight:700; font-size:18px; margin:0 0 4px 0;">
+                            <t t-esc="company.report_header or company.name or ''"/>
+                        </div>
+
+                        <t t-if="company.is_company_details_empty">
+                            <span t-field="company.partner_id"
+                                  t-options='{"widget":"contact","fields":["address"],"no_marker": true}'/>
+                        </t>
+                        <t t-else="">
+                            <span t-field="company.company_details"/>
+                        </t>
+
+                    </td>
+
+                </tr>
+            </table>
+
+        </xpath>
+
+        <!-- Tighten spacing -->
+        <xpath expr="/t" position="inside">
+            <style>
+                .o_report_layout_boxed.article {
+                    margin-top:0 !important;
+                    padding-top:0 !important;
+                }
+            </style>
+        </xpath>
+
     </template>
+
+
+    <!-- ============================= -->
+    <!-- BUBBLE LAYOUT HEADER FIX -->
+    <!-- ============================= -->
+    <template id="fix_bubble_header_pdf_alignment"
+              inherit_id="web.external_layout_bubble"
+              priority="200">
+
+        <!-- Remove PDF-only padding -->
+        <xpath expr="//div[contains(@t-attf-class,'header o_company')]" position="attributes">
+            <attribute name="t-attf-class">
+                header o_company_#{company.id}_layout
+            </attribute>
+        </xpath>
+
+        <!-- Prevent wkhtmltopdf fixed positioning -->
+        <xpath expr="//svg[contains(@t-attf-class,'o_shape_bubble_1')]" position="attributes">
+            <attribute name="t-attf-class">
+                o_shape_bubble_1 z-n1 position-absolute
+            </attribute>
+            <attribute name="width">900</attribute>
+            <attribute name="height">900</attribute>
+        </xpath>
+
+    </template>
+
 </odoo>
