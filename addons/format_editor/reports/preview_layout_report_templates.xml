@@ -66,17 +66,17 @@
     <!-- ============================= -->
     <!-- BUBBLE LAYOUT HEADER FIX -->
     <!-- ============================= -->
-    <template id="fix_bubble_header_pdf_alignment"
-          inherit_id="web.external_layout_bubble"
-          priority="200">
+    <template id="fix_bubble_svg_pdf_position"
+              inherit_id="web.external_layout_bubble"
+              priority="200">
 
-    <!-- Fix wkhtmltopdf bubble positioning -->
-    <xpath expr="//svg[contains(@t-attf-class,'o_shape_bubble_1')]" position="attributes">
-        <attribute name="t-attf-class">
-            o_shape_bubble_1 z-n1 position-absolute
-        </attribute>
-    </xpath>
+        <!-- Force bubble background to absolute instead of fixed -->
+        <xpath expr="//svg" position="attributes">
+            <attribute name="t-attf-class">
+                o_shape_bubble_1 z-n1 position-absolute
+            </attribute>
+        </xpath>
 
-</template>
+    </template>
 
 </odoo>
