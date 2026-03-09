@@ -75,7 +75,11 @@ class InvoicePocPayload(models.Model):
         self._validate_phone(phone, "Customer")
 
         partner = self.env["res.partner"].search(
-            [("email", "=", email)], limit=1
+            [("email", "=", email),
+             "|",
+             ("company_id", "=", False),
+             ("company_id", "=", self.env.company.id)
+             ], limit=1
         )
 
         if partner:
@@ -84,6 +88,9 @@ class InvoicePocPayload(models.Model):
                 vals["name"] = name
             if phone and not partner.phone:
                 vals["phone"] = phone
+                
+            if partner.company_id:
+                vals["company_id"] = False  # Make it a global contact    
             if vals:
                 partner.write(vals)
             return partner
@@ -93,6 +100,7 @@ class InvoicePocPayload(models.Model):
             "email": email,
             "phone": phone,
             "customer_rank": 1,
+            "company_id": False,
         })
 
     # -------------------------------------------------------
