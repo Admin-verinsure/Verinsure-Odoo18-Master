@@ -6,7 +6,10 @@
         <field name="arch" type="xml">
 
             <xpath expr="//field[@name='email']" position="after">
-                <field name="external_guid"/>
+                <div>
+                    <label for="external_guid"/>
+                    <field name="external_guid"/>
+                </div>
             </xpath>
 
         </field>
