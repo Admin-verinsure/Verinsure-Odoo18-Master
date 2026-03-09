@@ -63,45 +63,24 @@ class InvoicePocPayload(models.Model):
     # -------------------------------------------------------
 
     def _get_or_create_partner(self, customer):
-        name = (customer.get("name") or "").strip()
-        email = (customer.get("email") or "").strip().lower()
-        phone = (customer.get("phone") or "").strip()
-
-        if not name:
-            raise ValidationError(_("customer.name is required"))
-        if not email:
-            raise ValidationError(_("customer.email is required"))
-
-        self._validate_phone(phone, "Customer")
+        guid = (customer.get("external_guid") or "").strip()
+        if not guid:
+            raise ValidationError(_("customer.external_guid is required"))
 
         partner = self.env["res.partner"].search(
-            [("email", "=", email),
+            [("external_guid", "=", guid),
              "|",
              ("company_id", "=", False),
              ("company_id", "=", self.env.company.id)
              ], limit=1
         )
 
-        if partner:
-            vals = {}
-            if not partner.name:
-                vals["name"] = name
-            if phone and not partner.phone:
-                vals["phone"] = phone
-                
-            if partner.company_id:
-                vals["company_id"] = False  # Make it a global contact    
-            if vals:
-                partner.write(vals)
-            return partner
-
-        return self.env["res.partner"].create({
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "customer_rank": 1,
-            "company_id": False,
-        })
+        if not  partner:
+            raise ValidationError(_("No partner found for external_guid: %s") % guid)
+        return partner
+            
+            
+        
 
     # -------------------------------------------------------
     # Agent
