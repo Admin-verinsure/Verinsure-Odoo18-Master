@@ -42,15 +42,18 @@ class AccountJournalAkahuExtend(models.Model):
              'which disables the default Odoo Bank Feeds option.',
     )
 
-    @api.model
-    def _get_bank_statements_available_sources(self):
+    def _AccountJournal__get_bank_statements_available_sources(self):
         """
-        Override the dynamic selection method for bank_statements_source.
-        In Odoo 18 this field uses a function-based selection (not a static list),
-        so selection_add on the field definition crashes at registry load.
-        We call super() and safely append the Akahu option.
+        Override the private name-mangled method used by bank_statements_source.
+        In Odoo 18, the field selection chain is:
+          bank_statements_source
+            → _get_bank_statements_available_sources()   (public, calls private)
+              → __get_bank_statements_available_sources() (private, name-mangled to
+                 _AccountJournal__get_bank_statements_available_sources)
+        Other modules (account_accountant etc.) override the private one.
+        We must use the mangled name to properly call super() and extend the list.
         """
-        sources = super()._get_bank_statements_available_sources()
+        sources = super()._AccountJournal__get_bank_statements_available_sources()
         akahu_option = ('akahu', 'Akahu (NZ Open Banking)')
         if akahu_option not in sources:
             sources.append(akahu_option)
