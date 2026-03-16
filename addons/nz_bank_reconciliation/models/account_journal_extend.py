@@ -34,13 +34,21 @@ class AccountJournalAkahuExtend(models.Model):
         store=False,
     )
 
+    akahu_bank_feeds_disabled = fields.Boolean(
+        string='Bank Feeds Disabled (Akahu)',
+        compute='_compute_akahu_bank_feeds_disabled',
+        store=False,
+        help='True when this journal has an active Akahu account configured, '
+             'which disables the default Odoo Bank Feeds option.',
+    )
 
     @api.model
     def _get_bank_statements_available_sources(self):
         """
-        Override the dynamic selection function used by bank_statements_source.
+        Override the dynamic selection method for bank_statements_source.
         In Odoo 18 this field uses a function-based selection (not a static list),
-        so selection_add does not work — we call super() and append our option.
+        so selection_add on the field definition crashes at registry load.
+        We call super() and safely append the Akahu option.
         """
         sources = super()._get_bank_statements_available_sources()
         akahu_option = ('akahu', 'Akahu (NZ Open Banking)')
@@ -53,17 +61,13 @@ class AccountJournalAkahuExtend(models.Model):
         for journal in self:
             journal.has_akahu = bool(journal.akahu_account_ids)
 
-    akahu_is_active = fields.Boolean(
-        string='Akahu Feed Active',
-        compute='_compute_akahu_is_active',
-        store=False,
-        help='True when bank_statements_source is set to akahu.',
-    )
-
-    @api.depends('bank_statements_source')
-    def _compute_akahu_is_active(self):
+    @api.depends('akahu_account_ids', 'akahu_account_ids.active', 'akahu_account_ids.akahu_status')
+    def _compute_akahu_bank_feeds_disabled(self):
         for journal in self:
-            journal.akahu_is_active = journal.bank_statements_source == 'akahu'
+            active_accounts = journal.akahu_account_ids.filtered(
+                lambda a: a.active and a.akahu_status != 'INACTIVE'
+            )
+            journal.akahu_bank_feeds_disabled = bool(active_accounts)
 
     @api.depends('akahu_account_ids.last_synced')
     def _compute_akahu_last_synced(self):
