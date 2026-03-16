@@ -34,12 +34,12 @@ class AccountJournalAkahuExtend(models.Model):
         store=False,
     )
 
-    akahu_bank_feeds_disabled = fields.Boolean(
-        string='Bank Feeds Disabled (Akahu)',
-        compute='_compute_akahu_bank_feeds_disabled',
-        store=False,
-        help='True when this journal has an active Akahu account configured, '
-             'which disables the default Odoo Bank Feeds option.',
+    # Extend the native bank_statements_source selection to add the Akahu option.
+    # Odoo 18 supports selection_add on inherited models — the new value is
+    # appended after the existing options and stored in the same DB column.
+    bank_statements_source = fields.Selection(
+        selection_add=[('akahu', 'Akahu (NZ Open Banking)')],
+        ondelete={'akahu': 'set default'},
     )
 
     @api.depends('akahu_account_ids')
@@ -47,13 +47,17 @@ class AccountJournalAkahuExtend(models.Model):
         for journal in self:
             journal.has_akahu = bool(journal.akahu_account_ids)
 
-    @api.depends('akahu_account_ids', 'akahu_account_ids.active', 'akahu_account_ids.akahu_status')
-    def _compute_akahu_bank_feeds_disabled(self):
+    akahu_is_active = fields.Boolean(
+        string='Akahu Feed Active',
+        compute='_compute_akahu_is_active',
+        store=False,
+        help='True when bank_statements_source is set to akahu.',
+    )
+
+    @api.depends('bank_statements_source')
+    def _compute_akahu_is_active(self):
         for journal in self:
-            active_accounts = journal.akahu_account_ids.filtered(
-                lambda a: a.active and a.akahu_status != 'INACTIVE'
-            )
-            journal.akahu_bank_feeds_disabled = bool(active_accounts)
+            journal.akahu_is_active = journal.bank_statements_source == 'akahu'
 
     @api.depends('akahu_account_ids.last_synced')
     def _compute_akahu_last_synced(self):

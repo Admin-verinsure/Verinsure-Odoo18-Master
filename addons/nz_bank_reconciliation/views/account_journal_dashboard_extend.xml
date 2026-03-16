@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- ===================================================================
+         1. ACCOUNTING DASHBOARD — Kanban card buttons
+         =================================================================== -->
     <record id="view_account_journal_dashboard_akahu" model="ir.ui.view">
         <field name="name">account.journal.dashboard.kanban.akahu</field>
         <field name="model">account.journal</field>
@@ -11,14 +14,17 @@
             <xpath expr="//field[@name='bank_account_id']" position="after">
                 <field name="has_akahu"/>
                 <field name="akahu_last_synced"/>
-                <field name="akahu_bank_feeds_disabled"/>
+                <field name="akahu_is_active"/>
             </xpath>
 
-            <!-- Add Akahu buttons in bank journal actions -->
+            <!-- Add Akahu buttons inside bank journal card actions -->
             <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
 
-                <!-- Configure Bank Account button: shown when NO Akahu account is set up yet -->
-                <t t-if="!record.has_akahu.raw_value">
+                <!--
+                    Show "Configure Bank Account" only when Akahu feed is active
+                    but no akahu.account record is linked yet — guides user to finish setup.
+                -->
+                <t t-if="record.akahu_is_active.raw_value and !record.has_akahu.raw_value">
                     <button name="action_configure_akahu_account"
                             type="object"
                             class="btn btn-primary">
@@ -27,10 +33,9 @@
                     </button>
                 </t>
 
-                <!-- Fetch Transactions + last-sync info: shown when Akahu IS configured -->
-                <t t-if="record.has_akahu.raw_value">
+                <!-- Fully configured: show gear + fetch buttons -->
+                <t t-if="record.akahu_is_active.raw_value and record.has_akahu.raw_value">
 
-                    <!-- Re-configure button (secondary, always visible when configured) -->
                     <button name="action_configure_akahu_account"
                             type="object"
                             class="btn btn-secondary"
@@ -39,7 +44,6 @@
                         Bank Account
                     </button>
 
-                    <!-- Fetch Transactions button -->
                     <button name="action_fetch_akahu_transactions"
                             type="object"
                             class="btn btn-primary">
@@ -49,8 +53,7 @@
 
                     <t t-if="record.akahu_last_synced.raw_value">
                         <span class="text-muted ms-2 small">
-                            Last Sync:
-                            <t t-esc="record.akahu_last_synced.value"/>
+                            Last Sync: <t t-esc="record.akahu_last_synced.value"/>
                         </span>
                     </t>
 
@@ -58,60 +61,49 @@
 
             </xpath>
 
-            <!--
-                Disable the native Odoo "Bank Feeds" (bank_statements_source) field
-                when an active Akahu integration is configured for this journal.
-
-                In Odoo 18 the bank feed provider selector lives inside
-                account_journal_form (not the dashboard kanban), so we also
-                inherit that form view to show a warning banner and make the
-                field readonly when Akahu is active.
-            -->
-
         </field>
     </record>
 
-    <!--
-        Inherit the Journal *form* view to:
-          1. Load the akahu_bank_feeds_disabled field.
-          2. Show an info banner explaining that Bank Feeds are managed by Akahu.
-          3. Make the bank_statements_source selector invisible/readonly when Akahu
-             is configured — preventing conflicts with the Odoo native bank feed.
-    -->
+    <!-- ===================================================================
+         2. JOURNAL FORM — add Akahu radio option + conditional banner
+         =================================================================== -->
     <record id="view_account_journal_form_akahu_feeds" model="ir.ui.view">
         <field name="name">account.journal.form.akahu.feeds</field>
         <field name="model">account.journal</field>
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
 
-            <!-- Inject our computed field so it is available in the form -->
+            <!--
+                Inject akahu_is_active as a hidden field so it can drive
+                visibility of the banner further down the form.
+                Placed after bank_account_id which is always present on bank journals.
+            -->
             <xpath expr="//field[@name='bank_account_id']" position="after">
-                <field name="akahu_bank_feeds_disabled" invisible="1"/>
+                <field name="akahu_is_active" invisible="1"/>
             </xpath>
 
             <!--
-                In Odoo 18 the bank feed selector field is named
-                `bank_statements_source`. We wrap it in a conditional block:
-                  - When Akahu is active  → show a readonly info badge + hide the selector.
-                  - When Akahu is absent  → show the selector as normal.
-            -->
-            <xpath expr="//field[@name='bank_statements_source']" position="before">
-                <div class="alert alert-info d-flex align-items-center mb-2"
-                     role="alert"
-                     invisible="not akahu_bank_feeds_disabled">
-                    <i class="fa fa-plug fa-lg me-2"/>
-                    <span>
-                        <strong>Akahu Bank Feed Active.</strong>
-                        Transactions are fetched automatically via the Akahu integration.
-                        The default Odoo Bank Feeds option is disabled to prevent duplicate imports.
-                    </span>
-                </div>
-            </xpath>
+                Replace the bank_statements_source field block entirely.
 
-            <!-- Make bank_statements_source readonly + visually indicate it is managed by Akahu -->
-            <xpath expr="//field[@name='bank_statements_source']" position="attributes">
-                <attribute name="readonly">akahu_bank_feeds_disabled</attribute>
-                <attribute name="help">Managed by the Akahu integration when an active Akahu bank account is configured for this journal.</attribute>
+                Strategy in Odoo 18:
+                  - The field already includes our new 'akahu' value via selection_add
+                    in the Python model, so the radio widget renders all four options
+                    automatically: Import (ofx) / Undefined Yet / Online (OCA) / Akahu (NZ)
+                  - We place a conditional info banner directly AFTER the field.
+                  - The banner is visible only when akahu is selected.
+                  - No readonly tricks needed — the user owns the radio choice.
+            -->
+            <xpath expr="//field[@name='bank_statements_source']" position="after">
+                <div class="alert alert-info d-flex align-items-center mt-2 mb-0"
+                     role="alert"
+                     invisible="bank_statements_source != 'akahu'">
+                    <i class="fa fa-plug fa-lg me-3 text-info"/>
+                    <div>
+                        <strong>Akahu Bank Feed Active.</strong>
+                        Transactions are fetched automatically via the Akahu (NZ Open Banking) integration.
+                        The default Odoo Bank Feeds options above are inactive while Akahu is selected.
+                    </div>
+                </div>
             </xpath>
 
         </field>
