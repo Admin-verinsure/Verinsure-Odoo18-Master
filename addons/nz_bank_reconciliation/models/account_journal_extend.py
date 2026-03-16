@@ -34,13 +34,19 @@ class AccountJournalAkahuExtend(models.Model):
         store=False,
     )
 
-    # Extend the native bank_statements_source selection to add the Akahu option.
-    # Odoo 18 supports selection_add on inherited models — the new value is
-    # appended after the existing options and stored in the same DB column.
-    bank_statements_source = fields.Selection(
-        selection_add=[('akahu', 'Akahu (NZ Open Banking)')],
-        ondelete={'akahu': 'set default'},
-    )
+
+    @api.model
+    def _get_bank_statements_available_sources(self):
+        """
+        Override the dynamic selection function used by bank_statements_source.
+        In Odoo 18 this field uses a function-based selection (not a static list),
+        so selection_add does not work — we call super() and append our option.
+        """
+        sources = super()._get_bank_statements_available_sources()
+        akahu_option = ('akahu', 'Akahu (NZ Open Banking)')
+        if akahu_option not in sources:
+            sources.append(akahu_option)
+        return sources
 
     @api.depends('akahu_account_ids')
     def _compute_has_akahu(self):
