@@ -104,6 +104,9 @@ class SmartFormTable(http.Controller):
         )
         cols = self._build_columns(form, submissions)
 
+        # Only show the chain column when the form has branching rules configured
+        has_branching = bool(form.branch_rule_ids)
+
         def esc(s):
             return (str(s)
                     .replace("&", "&amp;").replace("<", "&lt;")
@@ -117,7 +120,9 @@ class SmartFormTable(http.Controller):
             </div>
         </th>'''
 
-        th_chain = '''<th class="col-field" title="Submission Chain" style="min-width:60px;width:60px;">
+        th_chain = ''
+        if has_branching:
+            th_chain = '''<th class="col-field" title="Submission Chain" style="min-width:60px;width:60px;">
             <div class="th-inner" style="min-width:auto;">
                 <span class="th-icon">&#128279;</span>
                 <span class="th-label">Chain</span>
@@ -153,16 +158,17 @@ class SmartFormTable(http.Controller):
             row_class = "row-even" if i % 2 == 0 else "row-odd"
             row = '<tr class="%s">' % row_class
             row += '<td class="cell-date">%s</td>' % esc(dt)
-            # Chain link cell — only show if a follow-up submission exists
-            has_chain = bool(sub.session_token and sub.child_submission_ids)
-            if has_chain:
-                chain_url = "/smart_form/chain/%d" % sub.id
-                row += ('<td style="text-align:center;padding:8px;vertical-align:middle;">'
-                        '<a href="%s" title="View chain" '
-                        'style="color:#4f46e5;font-size:1.1rem;text-decoration:none;">&#128279;</a>'
-                        '</td>') % chain_url
-            else:
-                row += '<td style="text-align:center;padding:8px;"></td>'
+            # Chain link cell — only rendered when the form has branching rules
+            if has_branching:
+                has_chain = bool(sub.session_token and sub.child_submission_ids)
+                if has_chain:
+                    chain_url = "/smart_form/chain/%d" % sub.id
+                    row += ('<td style="text-align:center;padding:8px;vertical-align:middle;">'
+                            '<a href="%s" title="View chain" '
+                            'style="color:#4f46e5;font-size:1.1rem;text-decoration:none;">&#128279;</a>'
+                            '</td>') % chain_url
+                else:
+                    row += '<td style="text-align:center;padding:8px;"></td>'
             for c in cols:
                 raw = data.get(c["key"], "")
                 val = self._cell_value(raw, c["ftype"], submission_id=sub.id)
@@ -177,7 +183,7 @@ class SmartFormTable(http.Controller):
             rows_html += row
 
         if not submissions:
-            span = len(cols) + 2  # +1 date +1 chain
+            span = len(cols) + 1 + (1 if has_branching else 0)  # +1 date, +1 chain only if branching
             rows_html = '<tr><td colspan="%d" class="cell-empty-state">No submissions yet.</td></tr>' % span
 
         total = len(submissions)
