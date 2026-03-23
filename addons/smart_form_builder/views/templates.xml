@@ -122,7 +122,7 @@
                       // All input/select/textarea elements for a field id
                       function inputNodes(fid){
                         return document.querySelectorAll(
-                          '[data-field-id="'+fid+'"]'
+                          'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
                         );
                       }
 
