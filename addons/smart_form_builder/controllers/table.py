@@ -258,19 +258,27 @@ class SmartFormTable(http.Controller):
     .table-wrap {
       padding: 0 32px 32px;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-scroll-inner {
+      min-width: 100%%;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
     }
     .table-card {
       background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-      overflow: hidden;
+      display: inline-block;
+      min-width: 100%%;
     }
 
     /* ── TABLE ── */
     table {
-      width: 100%%;
+      width: max-content;
+      min-width: 100%%;
       border-collapse: collapse;
       font-size: 0.875rem;
+      table-layout: auto;
     }
 
     /* Header */
@@ -414,6 +422,7 @@ class SmartFormTable(http.Controller):
 
 <!-- TABLE -->
 <div class="table-wrap">
+  <div class="table-scroll-inner">
   <div class="table-card">
     <table>
       <thead>
@@ -426,6 +435,7 @@ class SmartFormTable(http.Controller):
         %(rows_html)s
       </tbody>
     </table>
+  </div>
   </div>
 </div>
 
