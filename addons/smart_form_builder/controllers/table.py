@@ -181,6 +181,7 @@ class SmartFormTable(http.Controller):
       background: #f0f2f8;
       color: #1a202c;
       min-height: 100vh;
+      overflow-x: auto;
     }
 
     /* ── TOP BAR ── */
@@ -257,28 +258,29 @@ class SmartFormTable(http.Controller):
     /* ── TABLE WRAPPER ── */
     .table-wrap {
       padding: 0 32px 32px;
-      overflow-x: auto;
+      overflow-x: scroll;
+      overflow-y: visible;
       -webkit-overflow-scrolling: touch;
     }
     .table-scroll-inner {
+      display: inline-block;
       min-width: 100%%;
       border-radius: 14px;
-      overflow: hidden;
       box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      overflow: visible;
     }
     .table-card {
       background: #fff;
-      display: inline-block;
-      min-width: 100%%;
+      border-radius: 14px;
+      overflow: visible;
     }
 
     /* ── TABLE ── */
     table {
-      width: max-content;
-      min-width: 100%%;
       border-collapse: collapse;
       font-size: 0.875rem;
       table-layout: auto;
+      white-space: nowrap;
     }
 
     /* Header */
@@ -290,6 +292,7 @@ class SmartFormTable(http.Controller):
       vertical-align: bottom;
       border-right: 1px solid rgba(255,255,255,0.12);
       position: relative;
+      white-space: nowrap;
     }
     thead th:last-child { border-right: none; }
 
