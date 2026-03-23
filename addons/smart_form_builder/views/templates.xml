@@ -14,6 +14,7 @@
 
                 <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form" style="display:flex;flex-direction:column;">
                   <input type="hidden" name="token" t-att-value="form.token"/>
+                  <input type="hidden" name="sid" t-att-value="sid or ''"/>
 
                   <t t-foreach="form.field_ids" t-as="f">
                     <t t-if="f.field_type == 'subheading'">
