@@ -31,6 +31,15 @@ class SmartFormTable(http.Controller):
             })
         return cols
 
+    def _fmt_date(self, dt, fmt="%d/%m/%Y %H:%M:%S"):
+        """Safely format an Odoo datetime field — handles False, None, and datetime."""
+        if not dt:
+            return ""
+        try:
+            return dt.strftime(fmt)
+        except Exception:
+            return str(dt)
+
     def _cell_value(self, raw, ftype):
         if raw is None or raw == "":
             return ""
@@ -89,7 +98,7 @@ class SmartFormTable(http.Controller):
             except Exception:
                 data = {}
 
-            dt = sub.create_date.strftime("%d %b %Y, %H:%M") if sub.create_date else ""
+            dt = self._fmt_date(sub.create_date, "%d %b %Y, %H:%M")
             row_class = "row-even" if i % 2 == 0 else "row-odd"
             row = '<tr class="%s">' % row_class
             row += '<td class="cell-date">%s</td>' % esc(dt)
@@ -413,7 +422,7 @@ class SmartFormTable(http.Controller):
                 data = json.loads(sub.data_json or "{}")
             except Exception:
                 data = {}
-            dt = sub.create_date.strftime("%d/%m/%Y %H:%M:%S") if sub.create_date else ""
+            dt = self._fmt_date(sub.create_date, "%d/%m/%Y %H:%M:%S")
             writer.writerow([dt] + [
                 self._cell_value(data.get(c["key"], ""), c["ftype"]) for c in cols
             ])
