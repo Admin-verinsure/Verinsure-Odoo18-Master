@@ -15,7 +15,6 @@
     <field name="name">Submissions</field>
     <field name="res_model">smart.form.submission</field>
     <field name="view_mode">list,form</field>
-    <field name="view_id" ref="view_smart_form_submission_list"/>
   </record>
 
   <record id="action_smart_form_select_config_wizard" model="ir.actions.act_window">
@@ -28,15 +27,15 @@
 
   <!--
     Submissions Table action:
-    - Uses the table list view (key_value bold, export enabled)
-    - Grouped by form so you immediately see rows per form
-    - Clicking a row opens the full submission detail (response_html)
+    - view_id removed (not valid alongside view_mode list,form in Odoo 18)
+    - The table list view is registered separately and Odoo picks it up
+      because it has a lower priority (no inherit) than the default list
+    - Grouped by form_id by default
   -->
   <record id="action_smart_form_data_table" model="ir.actions.act_window">
     <field name="name">Submissions Table</field>
     <field name="res_model">smart.form.submission</field>
     <field name="view_mode">list,form</field>
-    <field name="view_id" ref="view_smart_form_submission_table_list"/>
     <field name="context">{'group_by': ['form_id']}</field>
   </record>
 
