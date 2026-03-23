@@ -289,10 +289,12 @@ class SmartFormTable(http.Controller):
     }
     thead th {
       padding: 0;
-      vertical-align: bottom;
+      vertical-align: top;
       border-right: 1px solid rgba(255,255,255,0.12);
       position: relative;
-      white-space: nowrap;
+      min-width: 140px;
+      width: 160px;
+      max-width: 200px;
     }
     thead th:last-child { border-right: none; }
 
@@ -301,9 +303,10 @@ class SmartFormTable(http.Controller):
       flex-direction: column;
       align-items: flex-start;
       gap: 4px;
-      padding: 14px 14px 12px;
-      min-width: 110px;
-      max-width: 180px;
+      padding: 12px 12px 10px;
+      width: 100%%;
+      height: 72px;
+      overflow: hidden;
     }
     .th-icon {
       font-size: 0.95rem;
@@ -312,17 +315,17 @@ class SmartFormTable(http.Controller):
     }
     .th-label {
       color: #fff;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      line-height: 1.3;
+      letter-spacing: 0.04em;
+      line-height: 1.35;
+      white-space: normal;
       word-break: break-word;
-      /* clamp to 2 lines max */
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
       overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
     }
     .key-pip {
       background: #fbbf24;
