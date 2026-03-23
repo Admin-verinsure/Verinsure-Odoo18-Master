@@ -1,74 +1,45 @@
 <odoo>
+  <record id="view_smart_form_submission_list" model="ir.ui.view">
+    <field name="name">smart.form.submission.list</field>
+    <field name="model">smart.form.submission</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="create_date"/>
+        <field name="form_id"/>
+        <field name="ip"/>
+        <field name="user_agent"/>
+        <field name="target_model" readonly="1"/>
+        <field name="target_res_id" readonly="1"/>
+      </list>
+    </field>
+  </record>
 
-    <!-- LIST VIEW -->
-    <record id="view_smart_form_submission_list" model="ir.ui.view">
-        <field name="name">smart.form.submission.list</field>
-        <field name="model">smart.form.submission</field>
-        <field name="arch" type="xml">
-            <list string="Form Submissions" default_order="create_date desc">
-                <field name="create_date" string="Submitted On" widget="datetime"/>
-                <field name="form_id" string="Form"/>
-                <field name="ip" string="IP Address" optional="show"/>
-                <field name="user_agent" string="Browser" optional="hide"/>
-                <field name="target_model" string="Linked Model" optional="show"/>
-                <field name="target_res_id" string="Linked Record ID" optional="hide"/>
-            </list>
-        </field>
-    </record>
+  <record id="view_smart_form_submission_form" model="ir.ui.view">
+    <field name="name">smart.form.submission.form</field>
+    <field name="model">smart.form.submission</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <group>
+            <group>
+              <field name="form_id" readonly="1"/>
+              <field name="create_date" readonly="1"/>
+            </group>
+            <group>
+              <field name="ip" readonly="1"/>
+              <field name="user_agent" readonly="1"/>
+              <field name="target_model" readonly="1" invisible="not target_model"/>
+              <field name="target_res_id" readonly="1" invisible="not target_res_id"/>
+            </group>
+          </group>
 
-    <!-- FORM VIEW -->
-    <record id="view_smart_form_submission_form" model="ir.ui.view">
-        <field name="name">smart.form.submission.form</field>
-        <field name="model">smart.form.submission</field>
-        <field name="arch" type="xml">
-            <form string="Submission Details">
-                <sheet>
-                    <!-- Submission Metadata -->
-                    <group string="Submission Info">
-                        <group>
-                            <field name="form_id" readonly="1"/>
-                            <field name="create_date" readonly="1" widget="datetime"/>
-                        </group>
-                        <group>
-                            <field name="ip" readonly="1" string="IP Address"/>
-                            <field name="user_agent" readonly="1" string="Browser"/>
-                            <field name="target_model" readonly="1" string="Linked Model"
-                                   invisible="not target_model"/>
-                            <field name="target_res_id" readonly="1" string="Linked Record ID"
-                                   invisible="not target_res_id"/>
-                        </group>
-                    </group>
+          <separator string="Form Responses"/>
+          <field name="response_html" readonly="1" widget="html" nolabel="1"/>
 
-                    <separator string="Form Responses"/>
-
-                    <!-- Rendered HTML table of responses -->
-                    <field name="response_html" readonly="1" widget="html" nolabel="1"/>
-
-                    <separator string="Raw JSON"/>
-
-                    <!-- Raw JSON for debugging -->
-                    <field name="data_json" readonly="1" widget="text" nolabel="1"/>
-
-                </sheet>
-            </form>
-        </field>
-    </record>
-
-    <!-- ACTION: submissions scoped to a specific form -->
-    <record id="action_smart_form_submissions_per_form" model="ir.actions.act_window">
-        <field name="name">Submissions</field>
-        <field name="res_model">smart.form.submission</field>
-        <field name="view_mode">list,form</field>
-        <field name="view_id" ref="view_smart_form_submission_list"/>
-        <field name="domain">[('form_id', '=', active_id)]</field>
-    </record>
-
-    <!-- ACTION: global all-submissions view -->
-    <record id="action_all_smart_form_submissions" model="ir.actions.act_window">
-        <field name="name">All Submissions</field>
-        <field name="res_model">smart.form.submission</field>
-        <field name="view_mode">list,form</field>
-        <field name="view_id" ref="view_smart_form_submission_list"/>
-    </record>
-
+          <separator string="Raw JSON"/>
+          <field name="data_json" widget="text" readonly="1" nolabel="1"/>
+        </sheet>
+      </form>
+    </field>
+  </record>
 </odoo>
