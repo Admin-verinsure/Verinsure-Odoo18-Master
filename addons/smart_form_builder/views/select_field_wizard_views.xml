@@ -13,11 +13,15 @@
 
           <group>
             <field name="is_dynamic"/>
-            <field name="option_model_id" invisible="is_dynamic != True" required="is_dynamic == True"/>
-            <field name="option_domain" placeholder="[('active','=',True)]" invisible="is_dynamic != True"/>
-            <field name="option_label_field" invisible="is_dynamic != True"/>
-            <field name="option_value_field" invisible="is_dynamic != True"/>
-            <field name="option_limit" invisible="is_dynamic != True"/>
+            <field name="option_model_id"
+                   invisible="not is_dynamic"
+                   required="is_dynamic"/>
+            <field name="option_domain"
+                   placeholder="[('active','=',True)]"
+                   invisible="not is_dynamic"/>
+            <field name="option_label_field" invisible="not is_dynamic"/>
+            <field name="option_value_field" invisible="not is_dynamic"/>
+            <field name="option_limit" invisible="not is_dynamic"/>
             <div class="o_form_label">Tip: If Dynamic Options is enabled, manual Options can be left empty.</div>
           </group>
         </sheet>

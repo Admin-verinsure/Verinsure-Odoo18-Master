@@ -1,12 +1,12 @@
 {
     "name": "Smart Form Builder (Standalone)",
-    "version": "18.0.1.3.0",
+    "version": "18.0.1.4.0",
     "category": "Tools",
     "summary": "Standalone form builder with dynamic DB dropdown options",
     "author": "Verinsure",
     "website": "https://verinsure.com",
     "license": "LGPL-3",
-    "depends": ["base", "website"],
+    "depends": ["base", "base_setup", "website"],
     "data": [
         "security/ir.model.access.csv",
         "views/actions.xml",
@@ -17,11 +17,13 @@
         "views/branch_rule_views.xml",
         "views/select_field_wizard_views.xml",
         "views/logic_rule_views.xml",
+        "views/settings_views.xml",
         "views/templates.xml",
     ],
     "assets": {
         "web.assets_frontend": [
             "smart_form_builder/static/src/css/sfb_dropdown.css",
+            "smart_form_builder/static/src/css/sfb_form.css",
             "smart_form_builder/static/src/js/dynamic_options.js",
             "smart_form_builder/static/src/js/branching.js",
             "smart_form_builder/static/src/js/smart_form_frontend.js",
