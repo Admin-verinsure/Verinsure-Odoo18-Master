@@ -153,15 +153,16 @@ class SmartFormTable(http.Controller):
             row_class = "row-even" if i % 2 == 0 else "row-odd"
             row = '<tr class="%s">' % row_class
             row += '<td class="cell-date">%s</td>' % esc(dt)
-            # Chain link cell
-            if sub.session_token:
+            # Chain link cell — only show if a follow-up submission exists
+            has_chain = bool(sub.session_token and sub.child_submission_ids)
+            if has_chain:
                 chain_url = "/smart_form/chain/%d" % sub.id
                 row += ('<td style="text-align:center;padding:8px;vertical-align:middle;">'
                         '<a href="%s" title="View chain" '
                         'style="color:#4f46e5;font-size:1.1rem;text-decoration:none;">&#128279;</a>'
                         '</td>') % chain_url
             else:
-                row += '<td style="text-align:center;color:#d1d5db;padding:8px;">&#8212;</td>'
+                row += '<td style="text-align:center;padding:8px;"></td>'
             for c in cols:
                 raw = data.get(c["key"], "")
                 val = self._cell_value(raw, c["ftype"], submission_id=sub.id)
@@ -733,13 +734,19 @@ class SmartFormTable(http.Controller):
         odd_fill      = PatternFill("solid", fgColor="FFFFFF")
 
         # ── Header row ──────────────────────────────────────────
-        headers = ["Submitted On"] + [c["label"] for c in cols]
+        headers = (["Submitted On"] + 
+                   [c["label"] for c in cols] +
+                   [("[%s] %s" % (fp, c["label"])) for fp, c in chain_cols])
         ws.row_dimensions[1].height = 36
 
         for col_idx, label in enumerate(headers, start=1):
             cell = ws.cell(row=1, column=col_idx, value=label)
-            is_key = (col_idx > 1 and cols[col_idx - 2]["is_key"])
-            cell.fill        = key_fill if is_key else header_fill
+            # col_idx 1=date, 2..len(cols)+1=main cols, rest=chain cols
+            main_col_offset = col_idx - 2
+            is_key = (0 <= main_col_offset < len(cols) and cols[main_col_offset]["is_key"])
+            is_chain = col_idx > len(cols) + 1
+            chain_fill = PatternFill("solid", fgColor="0891B2")  # teal for chain cols
+            cell.fill = key_fill if is_key else (chain_fill if is_chain else header_fill)
             cell.font        = key_font if is_key else header_font
             cell.alignment   = center_align
             cell.border      = thin_border
@@ -774,14 +781,45 @@ class SmartFormTable(http.Controller):
                 cell.alignment = left_align
                 cell.border    = thin_border
 
+            # Chain columns — fetch linked submission data
+            if chain_cols:
+                chain_data_map = {}
+                if sub.session_token:
+                    chain_subs = request.env["smart.form.submission"].sudo().search(
+                        [("session_token", "=", sub.session_token),
+                         ("form_id", "!=", form.id)],
+                        order="chain_depth asc"
+                    )
+                    for cs in chain_subs:
+                        try:
+                            chain_data_map[cs.form_id.id] = json.loads(cs.data_json or "{}")
+                        except Exception:
+                            pass
+                chain_start_col = len(cols) + 2
+                for cc_idx, (form_prefix, c) in enumerate(chain_cols):
+                    fid = next((fid for fid, cf in chain_forms.items()
+                               if cf.name == form_prefix), None)
+                    cd = chain_data_map.get(fid, {}) if fid else {}
+                    raw = cd.get(c["key"], "")
+                    val = self._cell_value(raw, c["ftype"], escape=True)
+                    cc_cell = ws.cell(row=row_idx, column=chain_start_col + cc_idx, value=val)
+                    cc_cell.fill      = row_fill
+                    cc_cell.font      = normal_font
+                    cc_cell.alignment = left_align
+                    cc_cell.border    = thin_border
+
         # ── Column widths ────────────────────────────────────────
         ws.column_dimensions[get_column_letter(1)].width = 20   # date
 
         for col_idx, c in enumerate(cols, start=2):
             label_len = len(c["label"])
-            # Width: enough for the label, capped between 12–35
             width = max(12, min(35, label_len * 1.1 + 4))
             ws.column_dimensions[get_column_letter(col_idx)].width = width
+        chain_start_col = len(cols) + 2
+        for cc_idx, (form_prefix, c) in enumerate(chain_cols):
+            label_len = len(c["label"]) + len(form_prefix) + 3
+            width = max(14, min(40, label_len * 1.0 + 4))
+            ws.column_dimensions[get_column_letter(chain_start_col + cc_idx)].width = width
 
         # ── Freeze top row + auto-filter ─────────────────────────
         ws.freeze_panes = "A2"
