@@ -1,5 +1,6 @@
 from odoo import api, fields, models
 import json
+import secrets
 
 
 class SmartFormSubmission(models.Model):
@@ -14,7 +15,36 @@ class SmartFormSubmission(models.Model):
     ip = fields.Char(readonly=True)
     user_agent = fields.Char(readonly=True)
 
-    # Extracted value of the form's key field — stored for fast list/search
+    # ── Branching chain linkage ───────────────────────────────────────
+    # A unique token generated on the first form submission and passed
+    # through the URL (?sid=...) to every subsequent branched form.
+    session_token = fields.Char(
+        string="Session Token",
+        index=True,
+        readonly=True,
+        help="Shared token across all submissions in a branching chain.",
+    )
+    parent_submission_id = fields.Many2one(
+        "smart.form.submission",
+        string="Parent Submission",
+        ondelete="set null",
+        readonly=True,
+        help="The submission from the previous form in the chain.",
+    )
+    child_submission_ids = fields.One2many(
+        "smart.form.submission",
+        "parent_submission_id",
+        string="Follow-up Submissions",
+        readonly=True,
+    )
+    chain_depth = fields.Integer(
+        string="Chain Step",
+        default=1,
+        readonly=True,
+        help="1 = first form, 2 = second form, etc.",
+    )
+
+    # ── Key value (for table labelling) ──────────────────────────────
     key_value = fields.Char(
         string="Key",
         compute="_compute_key_value",
@@ -30,9 +60,7 @@ class SmartFormSubmission(models.Model):
         store=False,
     )
 
-    # ----------------------------------------------------------------
-    # Key value extraction
-    # ----------------------------------------------------------------
+    # ── Key value extraction ──────────────────────────────────────────
     @api.depends("data_json", "form_id", "form_id.field_ids",
                  "form_id.field_ids.is_key_field")
     def _compute_key_value(self):
@@ -58,16 +86,27 @@ class SmartFormSubmission(models.Model):
             return ", ".join(str(v) for v in val if v)
         return str(val) if val else ""
 
-    # ----------------------------------------------------------------
-    # Computed HTML response table
-    # ----------------------------------------------------------------
-    def data(self):
+    # ── Chain helpers ─────────────────────────────────────────────────
+    def get_chain(self):
+        """Return all submissions in this chain ordered by depth."""
         self.ensure_one()
-        try:
-            return json.loads(self.data_json or "{}")
-        except Exception:
-            return {}
+        if not self.session_token:
+            return self
+        return self.search(
+            [("session_token", "=", self.session_token)],
+            order="chain_depth asc, create_date asc"
+        )
 
+    def action_view_chain(self):
+        """Open the chain view in a new browser tab."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/smart_form/chain/%d" % self.id,
+            "target": "new",
+        }
+
+    # ── Response HTML ─────────────────────────────────────────────────
     @api.depends("data_json", "form_id", "form_id.field_ids")
     def _compute_response_html(self):
         for rec in self:
@@ -129,9 +168,6 @@ class SmartFormSubmission(models.Model):
                 if f.field_type != "subheading":
                     known_keys.append(f.name or ("field_%s" % f.id))
 
-        # Include any extra keys in data not in form definition
-        # (e.g. fields that were hidden by logic but still submitted,
-        # or fields from branched forms)
         all_keys = known_keys + [k for k in data if k not in known_keys]
 
         rows = ""
@@ -141,22 +177,18 @@ class SmartFormSubmission(models.Model):
             bg = "#fff" if i % 2 == 0 else "#f9fafb"
             label = label_map.get(key, key.replace("_", " ").title())
             is_key = (key == key_field_key)
-            label_style = (
-                'padding:10px 14px;font-weight:700;color:#667eea;font-size:0.875rem;width:35%%;vertical-align:top;'
-                if is_key else
-                'padding:10px 14px;font-weight:600;color:#495057;font-size:0.875rem;width:35%%;vertical-align:top;'
-            )
-            key_badge = ' <span style="background:#667eea;color:#fff;border-radius:8px;padding:1px 7px;font-size:0.7rem;font-weight:600;vertical-align:middle;">KEY</span>' if is_key else ''
+            label_style = "font-weight:700;color:#4f46e5;" if is_key else "font-weight:600;color:#495057;"
+            key_badge = ' <span style="background:#4f46e5;color:#fff;border-radius:6px;padding:1px 6px;font-size:0.68rem;font-weight:700;vertical-align:middle;">KEY</span>' if is_key else ""
             rows += (
                 '<tr style="background:%s;border-bottom:1px solid #e9ecef;">'
-                '<td style="%s">%s%s</td>'
+                '<td style="padding:10px 14px;%sfont-size:0.875rem;width:35%%;vertical-align:top;">%s%s</td>'
                 '<td style="padding:10px 14px;color:#212529;font-size:0.9rem;vertical-align:top;word-break:break-word;">%s</td>'
                 '</tr>'
             ) % (bg, label_style, _esc(label), key_badge, _fmt(key, data[key]))
 
         return (
             '<table style="width:100%%;border-collapse:collapse;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;">'
-            '<thead><tr style="background:#667eea;">'
+            '<thead><tr style="background:#4f46e5;">'
             '<th style="padding:10px 14px;text-align:left;color:#fff;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;width:35%%;">Field</th>'
             '<th style="padding:10px 14px;text-align:left;color:#fff;font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Response</th>'
             '</tr></thead>'

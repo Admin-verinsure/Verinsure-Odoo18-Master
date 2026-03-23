@@ -51,12 +51,22 @@
     <field name="arch" type="xml">
       <form string="Submission Detail">
         <sheet>
+          <header>
+            <button name="action_view_chain" type="object"
+                    string="&#128279; View Submission Chain"
+                    class="btn-primary"
+                    invisible="not session_token or not child_submission_ids"/>
+          </header>
           <group>
             <group>
               <field name="form_id" readonly="1"/>
               <field name="create_date" readonly="1" widget="datetime"/>
               <field name="key_value" readonly="1" string="Key Value"
                      invisible="not key_value"/>
+              <field name="chain_depth" readonly="1" string="Chain Step"
+                     invisible="chain_depth == 1 and not parent_submission_id"/>
+              <field name="parent_submission_id" readonly="1"
+                     invisible="not parent_submission_id"/>
             </group>
             <group>
               <field name="ip" readonly="1"/>

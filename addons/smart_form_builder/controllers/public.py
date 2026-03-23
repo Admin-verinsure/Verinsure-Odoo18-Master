@@ -1,4 +1,5 @@
 import json
+import secrets
 import base64
 import logging
 
@@ -29,9 +30,12 @@ class SmartFormPublic(http.Controller):
                     "target": r.target_field_id.id,
                 })
 
+        # Carry the session token through branching chain
+        sid = kw.get("sid", "")
         return request.render("smart_form_builder.smart_form_page", {
             "form": form,
             "rules_json": Markup(json.dumps(rules)),
+            "sid": sid,
         })
 
     @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
@@ -142,11 +146,27 @@ class SmartFormPublic(http.Controller):
         if not form:
             return request.not_found()
 
+        # Session token: carry from previous form in chain, or generate new one
+        sid = post.get("sid", "").strip()
+        parent_sub = None
+        chain_depth = 1
+        if sid:
+            parent_sub = request.env["smart.form.submission"].sudo().search(
+                [("session_token", "=", sid)], order="chain_depth desc", limit=1
+            )
+            if parent_sub:
+                chain_depth = parent_sub.chain_depth + 1
+        if not sid:
+            sid = secrets.token_urlsafe(20)
+
         submission = request.env["smart.form.submission"].sudo().create({
             "form_id": form.id,
             "data_json": "{}",
             "ip": request.httprequest.remote_addr,
             "user_agent": request.httprequest.headers.get("User-Agent"),
+            "session_token": sid,
+            "parent_submission_id": parent_sub.id if parent_sub else False,
+            "chain_depth": chain_depth,
         })
 
         data = {}
@@ -356,7 +376,7 @@ class SmartFormPublic(http.Controller):
         # ✅ Server-side branching: always works even if JS fails
         next_form, reason = self._eval_next_form(form, answers_by_id)
         if next_form and next_form.token:
-            return request.redirect(f"/smart_form/{next_form.token}")
+            return request.redirect("/smart_form/%s?sid=%s" % (next_form.token, sid))
 
         return request.render("smart_form_builder.smart_form_thanks", {"form": form})
 
