@@ -69,3 +69,12 @@ class SmartForm(models.Model):
             "domain": [("form_id", "=", self.id)],
             "context": {"default_form_id": self.id},
         }
+
+    def action_open_table_view(self):
+        """Open the HTML submissions table in a new browser tab."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/smart_form/table/%d" % self.id,
+            "target": "new",
+        }
