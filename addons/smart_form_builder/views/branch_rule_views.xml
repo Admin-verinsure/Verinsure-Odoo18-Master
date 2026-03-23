@@ -2,10 +2,9 @@
   <record id="view_smart_form_branch_rule_list" model="ir.ui.view">
     <field name="name">smart.form.branch.rule.list</field>
     <field name="model">smart.form.branch.rule</field>
-    <field name="type">list</field>
     <field name="arch" type="xml">
       <list>
-        <field name="sequence"/>
+        <field name="sequence" widget="handle"/>
         <field name="form_id"/>
         <field name="trigger_field_id"/>
         <field name="operator"/>
@@ -23,17 +22,23 @@
       <form>
         <sheet>
           <group>
-            <field name="sequence"/>
-            <field name="form_id"/>
-            <field name="trigger_field_id"/>
+            <group>
+              <field name="sequence"/>
+              <field name="form_id"/>
+              <field name="trigger_field_id"/>
+            </group>
+            <group>
+              <field name="operator"/>
+              <field name="value_text"/>
+            </group>
           </group>
           <group>
-            <field name="operator"/>
-            <field name="value_text"/>
-          </group>
-          <group>
-            <field name="target_form_id"/>
-            <field name="fallback_form_id"/>
+            <group>
+              <field name="target_form_id"/>
+            </group>
+            <group>
+              <field name="fallback_form_id"/>
+            </group>
           </group>
         </sheet>
       </form>

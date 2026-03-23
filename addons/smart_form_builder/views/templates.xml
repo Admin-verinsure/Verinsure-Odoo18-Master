@@ -10,7 +10,7 @@
                 <p class="text-muted mb-4">Please fill the form below.</p>
 
                 <!-- Rules JSON (must not be escaped) -->
-                <script type="application/json" id="sfb-rules-json"><t t-raw="rules_json or '[]'"/></script>
+                <script type="application/json" id="sfb-rules-json"><t t-out="rules_json or '[]'"/></script>
 
                 <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
                   <input type="hidden" name="token" t-att-value="form.token"/>

@@ -2,7 +2,6 @@
   <record id="view_smart_form_field_list" model="ir.ui.view">
     <field name="name">smart.form.field.list</field>
     <field name="model">smart.form.field</field>
-    <field name="type">list</field>
     <field name="arch" type="xml">
       <list>
         <field name="form_id"/>
@@ -10,7 +9,8 @@
         <field name="label"/>
         <field name="field_type"/>
         <field name="required"/>
-        <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
+        <field name="option_source"
+               invisible="field_type not in ('select','radio','checkbox')"/>
       </list>
     </field>
   </record>
@@ -25,34 +25,35 @@
                   type="object"
                   string="Configure Options"
                   class="btn-primary"
-                  invisible="field_type != 'select'"/>
+                  invisible="field_type not in ('select','radio','checkbox')"/>
         </header>
         <sheet>
           <group>
-            <field name="form_id"/>
-            <field name="sequence"/>
-            <field name="name"/>
-            <field name="label"/>
-            <field name="field_type"/>
-            <field name="required"/>
+            <group>
+              <field name="form_id"/>
+              <field name="sequence"/>
+              <field name="label"/>
+              <field name="field_type"/>
+            </group>
+            <group>
+              <field name="name" string="Technical Name"/>
+              <field name="required"/>
+            </group>
           </group>
 
-          <group string="Options" invisible="field_type not in ('select','radio','checkbox')">
+          <group string="Options"
+                 invisible="field_type not in ('select','radio','checkbox')">
             <field name="option_source"/>
-
             <field name="option_values"
-                   placeholder="Option 1&#10;Option 2"
+                   placeholder="Option 1&#10;Option 2&#10;value|Label"
                    invisible="option_source != 'manual'"/>
-
             <field name="option_model_id" invisible="option_source != 'model'"/>
-            <field name="option_domain" placeholder="[('active','=',True)]" invisible="option_source != 'model'"/>
+            <field name="option_domain"
+                   placeholder="[('active','=',True)]"
+                   invisible="option_source != 'model'"/>
             <field name="option_label_field" invisible="option_source != 'model'"/>
             <field name="option_value_field" invisible="option_source != 'model'"/>
             <field name="option_limit" invisible="option_source != 'model'"/>
-
-            <div class="o_form_label" invisible="option_source != 'model'">
-              Tip: Use a simple domain, e.g. [('active','=',True)].
-            </div>
           </group>
         </sheet>
       </form>
