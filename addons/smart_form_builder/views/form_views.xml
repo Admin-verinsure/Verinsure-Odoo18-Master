@@ -23,6 +23,9 @@
           <button name="action_open_preview" type="object" string="Preview" class="btn-primary"/>
           <button name="action_open_public" type="object" string="Open Public" class="btn-secondary"/>
           <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
+          <button name="action_open_table_view" type="object" string="&#128202; Submissions Table"
+                  class="btn-secondary"
+                  invisible="submission_count == 0"/>
         </header>
         <sheet>
           <group>
