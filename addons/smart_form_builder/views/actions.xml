@@ -15,13 +15,29 @@
     <field name="name">Submissions</field>
     <field name="res_model">smart.form.submission</field>
     <field name="view_mode">list,form</field>
+    <field name="view_id" ref="view_smart_form_submission_list"/>
   </record>
+
   <record id="action_smart_form_select_config_wizard" model="ir.actions.act_window">
     <field name="name">Configure Select Field</field>
     <field name="res_model">smart.form.field.select.wizard</field>
     <field name="view_mode">form</field>
     <field name="target">new</field>
     <field name="context">{'default_field_id': active_id}</field>
+  </record>
+
+  <!--
+    Submissions Table action:
+    - Uses the table list view (key_value bold, export enabled)
+    - Grouped by form so you immediately see rows per form
+    - Clicking a row opens the full submission detail (response_html)
+  -->
+  <record id="action_smart_form_data_table" model="ir.actions.act_window">
+    <field name="name">Submissions Table</field>
+    <field name="res_model">smart.form.submission</field>
+    <field name="view_mode">list,form</field>
+    <field name="view_id" ref="view_smart_form_submission_table_list"/>
+    <field name="context">{'group_by': ['form_id']}</field>
   </record>
 
 </odoo>

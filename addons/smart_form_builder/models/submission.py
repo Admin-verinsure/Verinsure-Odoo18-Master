@@ -14,6 +14,15 @@ class SmartFormSubmission(models.Model):
     ip = fields.Char(readonly=True)
     user_agent = fields.Char(readonly=True)
 
+    # Extracted value of the form's key field — stored for fast list/search
+    key_value = fields.Char(
+        string="Key",
+        compute="_compute_key_value",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+
     response_html = fields.Html(
         string="Form Responses",
         compute="_compute_response_html",
@@ -21,6 +30,37 @@ class SmartFormSubmission(models.Model):
         store=False,
     )
 
+    # ----------------------------------------------------------------
+    # Key value extraction
+    # ----------------------------------------------------------------
+    @api.depends("data_json", "form_id", "form_id.field_ids",
+                 "form_id.field_ids.is_key_field")
+    def _compute_key_value(self):
+        for rec in self:
+            rec.key_value = rec._extract_key_value()
+
+    def _extract_key_value(self):
+        self.ensure_one()
+        if not self.form_id:
+            return ""
+        key_field = self.form_id.field_ids.filtered("is_key_field")[:1]
+        if not key_field:
+            return ""
+        try:
+            data = json.loads(self.data_json or "{}")
+        except Exception:
+            return ""
+        field_key = key_field.name or ("field_%s" % key_field.id)
+        val = data.get(field_key, "")
+        if isinstance(val, dict):
+            return str(val.get("label") or val.get("value") or "")
+        if isinstance(val, list):
+            return ", ".join(str(v) for v in val if v)
+        return str(val) if val else ""
+
+    # ----------------------------------------------------------------
+    # Computed HTML response table
+    # ----------------------------------------------------------------
     def data(self):
         self.ensure_one()
         try:
@@ -45,11 +85,14 @@ class SmartFormSubmission(models.Model):
 
         label_map = {}
         type_map = {}
+        key_field_key = None
         if self.form_id:
             for f in self.form_id.field_ids:
-                key = f.name or ("field_%s" % f.id)
-                label_map[key] = f.label or key
-                type_map[key] = f.field_type
+                k = f.name or ("field_%s" % f.id)
+                label_map[k] = f.label or k
+                type_map[k] = f.field_type
+                if f.is_key_field:
+                    key_field_key = k
 
         def _esc(s):
             return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
@@ -93,12 +136,19 @@ class SmartFormSubmission(models.Model):
                 continue
             bg = "#fff" if i % 2 == 0 else "#f9fafb"
             label = label_map.get(key, key.replace("_", " ").title())
+            is_key = (key == key_field_key)
+            label_style = (
+                'padding:10px 14px;font-weight:700;color:#667eea;font-size:0.875rem;width:35%%;vertical-align:top;'
+                if is_key else
+                'padding:10px 14px;font-weight:600;color:#495057;font-size:0.875rem;width:35%%;vertical-align:top;'
+            )
+            key_badge = ' <span style="background:#667eea;color:#fff;border-radius:8px;padding:1px 7px;font-size:0.7rem;font-weight:600;vertical-align:middle;">KEY</span>' if is_key else ''
             rows += (
                 '<tr style="background:%s;border-bottom:1px solid #e9ecef;">'
-                '<td style="padding:10px 14px;font-weight:600;color:#495057;font-size:0.875rem;width:35%%;vertical-align:top;">%s</td>'
+                '<td style="%s">%s%s</td>'
                 '<td style="padding:10px 14px;color:#212529;font-size:0.9rem;vertical-align:top;word-break:break-word;">%s</td>'
                 '</tr>'
-            ) % (bg, _esc(label), _fmt(key, data[key]))
+            ) % (bg, label_style, _esc(label), key_badge, _fmt(key, data[key]))
 
         return (
             '<table style="width:100%%;border-collapse:collapse;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;">'

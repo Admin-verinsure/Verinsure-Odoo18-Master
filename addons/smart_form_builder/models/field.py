@@ -14,6 +14,15 @@ class SmartFormField(models.Model):
     label = fields.Char(required=True)
     required = fields.Boolean(default=False)
 
+    # Mark this field as the "key" column for the data table (e.g. Email, Name)
+    # Only one field per form should be the key; enforced via onchange warning + constraint
+    is_key_field = fields.Boolean(
+        string="Key",
+        default=False,
+        help="Mark as the key column for the Submissions table (e.g. Email or Name). "
+             "Only one field per form can be the key.",
+    )
+
     field_type = fields.Selection([
         ("text", "Text"),
         ("textarea", "Textarea"),
@@ -49,6 +58,22 @@ class SmartFormField(models.Model):
     )
     option_limit = fields.Integer(default=10000)
 
+    @api.constrains("is_key_field")
+    def _check_single_key_field(self):
+        for rec in self:
+            if rec.is_key_field:
+                others = self.search([
+                    ("form_id", "=", rec.form_id.id),
+                    ("is_key_field", "=", True),
+                    ("id", "!=", rec.id),
+                ])
+                if others:
+                    from odoo.exceptions import ValidationError
+                    raise ValidationError(
+                        "Only one field per form can be marked as the Key field. "
+                        "Please uncheck the current key field (%s) first." % others[0].label
+                    )
+
     def _parse_manual_options(self):
         self.ensure_one()
         out = []
@@ -72,7 +97,6 @@ class SmartFormField(models.Model):
         if self.field_type not in ("select", "radio", "checkbox"):
             return []
 
-        # Dynamic options from a model
         if self.option_source == "model" and self.option_model_id:
             model = self.option_model_id.model
             domain = []
@@ -96,7 +120,6 @@ class SmartFormField(models.Model):
                 res.append({"value": value, "label": str(label)})
             return res
 
-        # Manual options
         return self._parse_manual_options()
 
     def action_open_select_config(self):
