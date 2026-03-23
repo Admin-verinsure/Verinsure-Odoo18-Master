@@ -345,7 +345,7 @@
                     })();
                   ]]></script>
 
-                  <!-- <!-- Branching on submit -->
+                  <!-- Branching on submit -->
                   <script type="text/javascript"><![CDATA[
                     (function(){
                       function collectAnswers(){
