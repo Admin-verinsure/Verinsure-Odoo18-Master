@@ -8,7 +8,7 @@
         <field name="token"/>
         <field name="submission_count" string="Submissions"/>
         <field name="active"/>
-        <field name="target_model_id" options="{'no_create': True}"/>
+              <field name="target_model_id" options="{'no_create': True}"/>
       </list>
     </field>
   </record>
@@ -20,38 +20,27 @@
       <form>
         <header>
           <button name="action_open_preview" type="object" string="Preview" class="btn-primary"/>
-          <button name="action_open_public" type="object" string="Open Public Link" class="btn-secondary"/>
-          <button name="action_view_submissions" type="object" string="View Submissions" class="btn-secondary"/>
+          <button name="action_open_public" type="object" string="Open Public" class="btn-secondary"/>
+          <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
         </header>
         <sheet>
           <group>
-            <group>
-              <field name="name"/>
-              <field name="active"/>
+            <field name="name"/>
+            <field name="active"/>
               <field name="target_model_id" options="{'no_create': True}"/>
-            </group>
-            <group>
-              <field name="token" readonly="1"/>
-              <field name="submission_count" readonly="1"/>
-            </group>
+            <field name="token" readonly="1"/>
           </group>
 
           <notebook>
             <page string="Fields">
               <field name="field_ids">
                 <list editable="bottom">
-                  <field name="sequence" widget="handle"/>
+                  <field name="sequence"/>
                   <field name="label"/>
                   <field name="field_type"/>
-                  <field name="name" string="Technical Name"/>
                   <field name="required"/>
-                  <field name="option_source"
-                         invisible="field_type not in ('select','radio','checkbox')"/>
-                  <button name="action_open_select_config"
-                          type="object"
-                          string="⚙ Options"
-                          class="btn-link"
-                          invisible="field_type not in ('select','radio','checkbox')"/>
+                  <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
+                  <button type="action" name="%(action_smart_form_select_config_wizard)d" string="Configure" class="btn-link" context="{'default_field_id': id}" invisible="field_type != 'select'"/>
                 </list>
               </field>
             </page>
@@ -59,7 +48,7 @@
             <page string="Branching">
               <field name="branch_rule_ids">
                 <list editable="bottom">
-                  <field name="sequence" widget="handle"/>
+                  <field name="sequence"/>
                   <field name="trigger_field_id" context="{'default_form_id': id}"/>
                   <field name="operator"/>
                   <field name="value_text"/>
@@ -67,13 +56,13 @@
                   <field name="fallback_form_id"/>
                 </list>
               </field>
-              <p class="text-muted mt-2">Branching evaluates rules in order. First match wins.</p>
+              <p class="text-muted">Branching evaluates rules in order. First match wins.</p>
             </page>
 
-            <page string="Conditional Logic">
+            <page string="Logic">
               <field name="logic_rule_ids">
                 <list editable="bottom">
-                  <field name="sequence" widget="handle"/>
+                  <field name="sequence"/>
                   <field name="trigger_field_id" context="{'default_form_id': id}"/>
                   <field name="operator"/>
                   <field name="value_text"/>
@@ -81,16 +70,15 @@
                   <field name="target_field_id" context="{'default_form_id': id}"/>
                 </list>
               </field>
-              <p class="text-muted mt-2">Use rules to show/hide/require fields based on answers.</p>
+              <p class="text-muted">Use rules to show/hide/require fields based on answers.</p>
             </page>
 
             <page string="Submissions">
               <field name="submission_ids" readonly="1">
                 <list>
-                  <field name="create_date" string="Submitted On" widget="datetime"/>
-                  <field name="ip" string="IP Address"/>
-                  <field name="user_agent" string="Browser"/>
-                  <field name="target_model" string="Linked Model"/>
+                  <field name="create_date"/>
+                  <field name="ip"/>
+                  <field name="user_agent"/>
                 </list>
               </field>
             </page>
