@@ -117,7 +117,8 @@ class SmartFormSubmission(models.Model):
             if ftype == "phone":
                 return '<a href="tel:%s" style="color:#1a56db;">%s</a>' % (_esc(s), _esc(s))
             if ftype == "file":
-                return '&#128206; <span>%s</span>' % _esc(s)
+                url = '/smart_form/file/%d/%s' % (self.id, _esc(s))
+                return '<a href="%s" style="color:#1a56db;text-decoration:none;" target="_blank">&#128206; %s</a>' % (url, _esc(s))
             if ftype == "textarea":
                 return '<div style="white-space:pre-wrap;background:#f8f9fa;border-radius:4px;padding:6px 10px;">%s</div>' % _esc(s)
             return _esc(s)
@@ -128,6 +129,9 @@ class SmartFormSubmission(models.Model):
                 if f.field_type != "subheading":
                     known_keys.append(f.name or ("field_%s" % f.id))
 
+        # Include any extra keys in data not in form definition
+        # (e.g. fields that were hidden by logic but still submitted,
+        # or fields from branched forms)
         all_keys = known_keys + [k for k in data if k not in known_keys]
 
         rows = ""
