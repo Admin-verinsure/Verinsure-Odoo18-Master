@@ -1,37 +1,104 @@
 <odoo>
+
+  <!-- LIST VIEW -->
   <record id="view_smart_form_submission_list" model="ir.ui.view">
     <field name="name">smart.form.submission.list</field>
     <field name="model">smart.form.submission</field>
-    <field name="type">list</field>
     <field name="arch" type="xml">
-      <list>
-        <field name="create_date"/>
-        <field name="form_id"/>
-        <field name="ip"/>
-        <field name="user_agent"/>
-        <field name="target_model" readonly="1"/>
-        <field name="target_res_id" readonly="1"/>
+      <list string="Form Submissions" default_order="create_date desc" decoration-muted="not data_json">
+        <field name="create_date" string="Submitted On" widget="datetime"/>
+        <field name="form_id" string="Form"/>
+        <field name="ip" string="IP Address" optional="show"/>
+        <field name="user_agent" string="Browser" optional="hide"/>
+        <field name="target_model" string="Linked Model" optional="show"/>
+        <field name="target_res_id" string="Linked Record ID" optional="hide"/>
       </list>
     </field>
   </record>
 
+  <!-- FORM VIEW -->
   <record id="view_smart_form_submission_form" model="ir.ui.view">
     <field name="name">smart.form.submission.form</field>
     <field name="model">smart.form.submission</field>
     <field name="arch" type="xml">
-      <form>
+      <form string="Submission Details" create="false" edit="false">
         <sheet>
-          <group>
-            <field name="form_id" readonly="1"/>
-            <field name="create_date" readonly="1"/>
-            <field name="ip" readonly="1"/>
-            <field name="user_agent" readonly="1"/>
+
+          <!-- Header Banner -->
+          <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            color: #fff;
+          ">
+            <h3 style="margin:0 0 4px;font-size:1.25rem;font-weight:700;">
+              <field name="form_id" readonly="1" style="color:#fff;font-size:inherit;font-weight:inherit;"/>
+            </h3>
+            <small style="opacity:0.85;">
+              Submitted on <field name="create_date" readonly="1" widget="datetime" style="display:inline;"/>
+            </small>
+          </div>
+
+          <!-- Meta Info Row -->
+          <group col="4" string="Submission Metadata">
+            <field name="ip" readonly="1" string="IP Address"/>
+            <field name="user_agent" readonly="1" string="Browser / User Agent"/>
+            <field name="target_model" readonly="1" string="Linked Model" attrs="{'invisible': [('target_model', '=', False)]}"/>
+            <field name="target_res_id" readonly="1" string="Linked Record ID" attrs="{'invisible': [('target_res_id', '=', 0)]}"/>
           </group>
-          <group>
-            <field name="data_json" widget="text" readonly="1"/>
-          </group>
+
+          <separator string="Form Responses"/>
+
+          <!-- Beautiful HTML response table -->
+          <div class="o_field_widget" style="margin:0 0 16px;">
+            <field name="response_html" readonly="1" widget="html" nolabel="1"/>
+          </div>
+
+          <!-- Collapsible Raw JSON -->
+          <div>
+            <details style="border:1px solid #dee2e6;border-radius:6px;padding:0;">
+              <summary style="
+                padding:10px 16px;
+                cursor:pointer;
+                font-size:0.85rem;
+                font-weight:600;
+                color:#6c757d;
+                background:#f8f9fa;
+                border-radius:6px;
+                user-select:none;
+                list-style:none;
+              ">
+                &#128196; Raw JSON Data
+              </summary>
+              <div style="padding:12px 16px;">
+                <field name="data_json" readonly="1" widget="text" nolabel="1"
+                       style="font-family:monospace;font-size:0.8rem;background:#1e1e1e;color:#d4d4d4;
+                              border-radius:6px;padding:12px;min-height:80px;"/>
+              </div>
+            </details>
+          </div>
+
         </sheet>
       </form>
     </field>
   </record>
+
+  <!-- ACTION: view submissions for a specific form -->
+  <record id="action_smart_form_submissions_per_form" model="ir.actions.act_window">
+    <field name="name">Submissions</field>
+    <field name="res_model">smart.form.submission</field>
+    <field name="view_mode">list,form</field>
+    <field name="view_id" ref="view_smart_form_submission_list"/>
+    <field name="domain">[('form_id', '=', active_id)]</field>
+  </record>
+
+  <!-- ACTION: global submissions view -->
+  <record id="action_all_smart_form_submissions" model="ir.actions.act_window">
+    <field name="name">All Submissions</field>
+    <field name="res_model">smart.form.submission</field>
+    <field name="view_mode">list,form</field>
+    <field name="view_id" ref="view_smart_form_submission_list"/>
+  </record>
+
 </odoo>
