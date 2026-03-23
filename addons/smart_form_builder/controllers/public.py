@@ -199,87 +199,120 @@ class SmartFormPublic(http.Controller):
             else:
                 answers_by_id[str(f.id)] = val
 
-        # ✅ Optional: create / link a record in the selected target model
+        # Optional: create / link a record in the selected target model
         target_model = None
         target_res_id = None
         try:
             if form.target_model_id and form.target_model_id.model:
                 target_model = form.target_model_id.model
 
-                Model = None
-
-                # Safety deny-list for public forms
+                # Safety deny-list — never allow writes to sensitive system models
                 deny = {
                     "res.users", "ir.config_parameter", "ir.model", "ir.model.fields",
                     "ir.ui.view", "ir.ui.menu", "ir.actions.actions", "ir.actions.server",
                     "ir.cron", "ir.rule", "ir.module.module",
                 }
+                Model = None
                 if target_model not in deny:
-                    # NOTE: `model in request.env` isn't reliable across Odoo versions.
-                    # Use safe access instead.
                     try:
                         Model = request.env[target_model].sudo()
                     except Exception:
                         Model = None
 
-                if Model:
-
-                    # Build vals from form technical names that exist on the target model
+                if Model is not None:
                     mf = Model._fields
                     vals = {}
-                    for f in form.field_ids:
-                        tech = (f.name or "").strip()
-                        if not tech:
-                            continue
-                        if tech not in mf:
+
+                    for fld in form.field_ids:
+                        tech = (fld.name or "").strip()
+                        if not tech or tech not in mf:
                             continue
 
                         v = data.get(tech)
-                        if v in (None, "", False):
+
+                        # Skip empty values
+                        if v is None or v == "" or v is False:
                             continue
-                        # ignore file blobs
+                        # Skip file upload placeholders
                         if isinstance(v, dict) and ("content" in v or "filename" in v):
                             continue
 
-                        field = mf[tech]
+                        target_field = mf[tech]
                         try:
-                            # basic conversions by field type
-                            if field.type in ("char", "text", "html"):
-                                vals[tech] = str(v)
-                            elif field.type == "boolean":
-                                vals[tech] = bool(v) if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")
-                            elif field.type == "integer":
-                                vals[tech] = int(v)
-                            elif field.type in ("float", "monetary"):
-                                vals[tech] = float(v)
-                            elif field.type in ("date", "datetime"):
-                                vals[tech] = v
-                            elif field.type == "selection":
-                                allowed = {k for (k, _lbl) in (field.selection or [])}
-                                if str(v) in allowed:
+                            if target_field.type in ("char", "text", "html"):
+                                # Lists (checkbox) -> comma-separated string
+                                if isinstance(v, list):
+                                    vals[tech] = ", ".join(str(x) for x in v if x != "")
+                                elif isinstance(v, dict):
+                                    vals[tech] = str(v.get("label") or v.get("value") or "")
+                                else:
                                     vals[tech] = str(v)
-                            elif field.type == "many2one":
-                                if str(v).isdigit():
-                                    vals[tech] = int(v)
-                            else:
-                                pass
+
+                            elif target_field.type == "boolean":
+                                if isinstance(v, bool):
+                                    vals[tech] = v
+                                else:
+                                    vals[tech] = str(v).lower() in ("1", "true", "yes", "on")
+
+                            elif target_field.type == "integer":
+                                vals[tech] = int(float(str(v).replace(",", "")))
+
+                            elif target_field.type in ("float", "monetary"):
+                                vals[tech] = float(str(v).replace(",", ""))
+
+                            elif target_field.type in ("date", "datetime"):
+                                vals[tech] = str(v) if v else False
+
+                            elif target_field.type == "selection":
+                                # field.selection can be a callable in Odoo 17+/18
+                                sel = target_field.selection
+                                if callable(sel):
+                                    try:
+                                        sel = sel(Model)
+                                    except Exception:
+                                        sel = []
+                                allowed = {k for k, _ in (sel or [])}
+                                str_v = str(v)
+                                if str_v in allowed:
+                                    vals[tech] = str_v
+
+                            elif target_field.type == "many2one":
+                                # Accept numeric ID (from DB-sourced select) or name
+                                str_v = str(v).strip()
+                                if str_v.isdigit():
+                                    vals[tech] = int(str_v)
+
+                            elif target_field.type in ("many2many", "one2many"):
+                                # Accept list of IDs or a single ID
+                                if isinstance(v, list):
+                                    ids = []
+                                    for item in v:
+                                        try:
+                                            ids.append(int(item))
+                                        except (ValueError, TypeError):
+                                            pass
+                                    if ids:
+                                        vals[tech] = [(6, 0, ids)]
+                                elif str(v).isdigit():
+                                    vals[tech] = [(6, 0, [int(v)])]
+
                         except Exception:
                             continue
 
-                    # If the target model has a required `name` (e.g., res.partner),
-                    # auto-fill it from common identifiers when not provided.
+                    # Auto-fill required `name` field (e.g. res.partner) from
+                    # common identifiers when not explicitly provided
                     if "name" in mf and not vals.get("name"):
-                        for k in ("email", "mobile", "phone"):
-                            if vals.get(k):
-                                vals["name"] = vals[k]
+                        for k in ("name", "email", "mobile", "phone"):
+                            candidate = data.get(k, "")
+                            if candidate and isinstance(candidate, str):
+                                vals["name"] = candidate
                                 break
 
-                    # Duplicate prevention: try to find an existing record by common identifiers
-                    existing = None
                     if vals:
-                        candidates = ["email", "mobile", "phone", "vat", "name"]
-                        for k in candidates:
-                            if k in vals and vals.get(k):
+                        # Duplicate prevention — search by unique identifiers
+                        existing = None
+                        for k in ("email", "mobile", "phone", "vat", "name"):
+                            if k in vals and vals[k]:
                                 try:
                                     existing = Model.search([(k, "=", vals[k])], limit=1)
                                 except Exception:
@@ -287,11 +320,24 @@ class SmartFormPublic(http.Controller):
                                 if existing:
                                     break
 
-                    if existing:
-                        target_res_id = existing.id
-                    elif vals:
-                        rec = Model.create(vals)
-                        target_res_id = rec.id
+                        if existing:
+                            # Update existing record with any new values
+                            try:
+                                existing.write(vals)
+                            except Exception as e:
+                                _logger.warning(
+                                    "Smart Form: could not update existing %s #%s: %s",
+                                    target_model, existing.id, e)
+                            target_res_id = existing.id
+                        else:
+                            try:
+                                rec = Model.create(vals)
+                                target_res_id = rec.id
+                            except Exception as e:
+                                _logger.error(
+                                    "Smart Form: could not create %s record. vals=%s error=%s",
+                                    target_model, vals, e)
+
         except Exception as e:
             _logger.exception("Smart Form: target model create/link failed: %s", e)
 

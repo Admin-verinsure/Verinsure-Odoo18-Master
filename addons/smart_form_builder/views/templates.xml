@@ -108,124 +108,244 @@
                     <button type="submit" class="btn btn-primary btn-lg">Submit</button>
                   </div>
 
-                  <!-- ✅ Inline Conditional Logic -->
+                  <!-- Inline Conditional Logic -->
                   <script type="text/javascript"><![CDATA[
                     (function(){
+                      // ── helpers ───────────────────────────────────────────
                       function safeRules(){
                         var el = document.getElementById("sfb-rules-json");
                         if(!el) return [];
                         try { return JSON.parse((el.textContent||"[]").trim()||"[]") || []; }
                         catch(e){ return []; }
                       }
+
+                      // All input/select/textarea elements for a field id
                       function inputNodes(fid){
                         return document.querySelectorAll(
-                          'input[data-field-id="'+fid+'"],select[data-field-id="'+fid+'"],textarea[data-field-id="'+fid+'"]'
+                          '[data-field-id="'+fid+'"]'
                         );
                       }
+
+                      // Wrapper div (.sfb-field) for a field id
                       function wrap(fid){
                         return document.querySelector('.sfb-field[data-field-id="'+fid+'"]');
                       }
+
+                      // Current value(s) of a field — returns string or array
                       function valueOf(fid){
                         var nodes = inputNodes(fid);
                         if(!nodes.length) return "";
                         var first = nodes[0];
-                        if(first.type==="radio"){
-                          for(var i=0;i<nodes.length;i++){ if(nodes[i].checked) return nodes[i].value||""; }
+                        var tag   = first.tagName.toLowerCase();
+
+                        if(tag === "select"){
+                          // Return BOTH the value AND the visible label so rules
+                          // written against either (ID or display text) work
+                          var selVal   = first.value || "";
+                          var selLabel = first.options && first.selectedIndex >= 0
+                            ? (first.options[first.selectedIndex].text || "").trim()
+                            : "";
+                          return [selVal, selLabel].filter(function(x){ return x !== ""; });
+                        }
+
+                        if(first.type === "radio"){
+                          for(var i=0;i<nodes.length;i++){
+                            if(nodes[i].checked) return nodes[i].value || "";
+                          }
                           return "";
                         }
-                        if(first.type==="checkbox"){
-                          var vals=[];
-                          for(var j=0;j<nodes.length;j++){ if(nodes[j].checked) vals.push(nodes[j].value||"true"); }
-                          return vals;
-                        }
-                        return first.value||"";
-                      }
-                      function num(x){
-                        try { return parseFloat(x); } catch(e){ return NaN; }
-                      }
-                      function compare(op,left,right){
-                        var r = (right==null?"":String(right)).trim();
-                        // numeric ops
-                        if(op===">"||op===">="||op==="<"||op==="<="){
-                          var ln = Array.isArray(left) ? NaN : num(left);
-                          var rn = num(r);
-                          if(isNaN(ln)||isNaN(rn)) return false;
-                          if(op===">") return ln>rn;
-                          if(op===">=") return ln>=rn;
-                          if(op==="<") return ln<rn;
-                          if(op==="<=") return ln<=rn;
-                        }
-                        // string ops
-                        var want = r.toLowerCase();
-                        var vals = Array.isArray(left) ? left.map(String) : [String(left||"")];
-                        vals = vals.map(function(v){return v.toLowerCase();});
 
-                        if(op==="contains") return vals.some(function(v){return v.indexOf(want)!==-1;});
-                        if(op==="!=") return vals.every(function(v){return v!==want;});
-                        if(op==="in"||op==="not in"){
-                          var wanted = want.split(",").map(function(s){return s.trim();}).filter(Boolean);
-                          var ok = vals.some(function(v){return wanted.indexOf(v)!==-1;});
-                          return op==="in"? ok : !ok;
+                        if(first.type === "checkbox"){
+                          var checked = [];
+                          for(var j=0;j<nodes.length;j++){
+                            if(nodes[j].checked) checked.push(nodes[j].value || "true");
+                          }
+                          return checked;
                         }
-                        // default '='
-                        return vals.some(function(v){return v===want;});
+
+                        return first.value || "";
                       }
 
-                      var rules = safeRules();
-                      if(!rules.length) return;
-
-                      // hide targets of "show" rules by default
-                      var targets = {};
-                      rules.forEach(function(r){ if(r.action==="show") targets[String(r.target)] = true; });
-                      Object.keys(targets).forEach(function(tid){
-                        var w = wrap(tid);
-                        if(w) w.style.display="none";
-                      });
-
-                      function apply(){
-                        rules.forEach(function(r){
-                          var trig = String(r.trigger);
-                          var targ = String(r.target);
-                          var ok = compare(r.op, valueOf(trig), r.value);
-
-                          var tw = wrap(targ);
-                          if(!tw) return;
-
-                          if(r.action==="show"){
-                            tw.style.display = ok ? "" : "none";
-                            if(ok){
-                              var trw = wrap(trig);
-                              if(trw && trw.nextElementSibling !== tw){
-                                trw.parentNode.insertBefore(tw, trw.nextElementSibling);
-                              }
-                            } else {
-                              // clear when hidden
-                              tw.querySelectorAll("input,select,textarea").forEach(function(i){
-                                if(i.type==="checkbox"||i.type==="radio") i.checked=false;
-                                else i.value="";
-                              });
-                            }
-                          } else if(r.action==="hide"){
-                            tw.style.display = ok ? "none" : "";
+                      // Clear all inputs inside a wrapper div
+                      function clearField(tw){
+                        tw.querySelectorAll("input,select,textarea").forEach(function(el){
+                          if(el.type === "checkbox" || el.type === "radio"){
+                            el.checked = false;
+                          } else {
+                            el.value = "";
                           }
                         });
                       }
 
-                      var form = document.getElementById("smart-form");
-                      if(!form) return;
-                      apply();
-
-                      var t=null;
-                      function onChange(){
-                        if(t) clearTimeout(t);
-                        t=setTimeout(apply, 30);
+                      // Set required attribute on inputs inside wrapper
+                      function setRequired(tw, required){
+                        tw.querySelectorAll("input,select,textarea").forEach(function(el){
+                          if(required){
+                            el.setAttribute("required","required");
+                          } else {
+                            el.removeAttribute("required");
+                          }
+                        });
                       }
-                      form.addEventListener("input", onChange, true);
-                      form.addEventListener("change", onChange, true);
+
+                      function num(x){
+                        var n = parseFloat(String(x).replace(",",""));
+                        return isNaN(n) ? NaN : n;
+                      }
+
+                      // Compare trigger value against rule value using operator
+                      // left = string | string[] (from valueOf)
+                      // right = rule.value string
+                      function compare(op, left, right){
+                        var r = (right == null ? "" : String(right)).trim();
+
+                        // Normalise left to array of strings
+                        var vals = Array.isArray(left)
+                          ? left.map(function(x){ return String(x||""); })
+                          : [String(left||"")];
+
+                        // Numeric operators
+                        if(op===">"||op===">="||op==="<"||op==="<="){
+                          var ln = Array.isArray(left) ? NaN : num(left);
+                          var rn = num(r);
+                          if(isNaN(ln)||isNaN(rn)) return false;
+                          if(op===">")  return ln > rn;
+                          if(op===">=") return ln >= rn;
+                          if(op==="<")  return ln < rn;
+                          if(op==="<=") return ln <= rn;
+                        }
+
+                        var want   = r.toLowerCase();
+                        var valsL  = vals.map(function(v){ return v.toLowerCase(); });
+
+                        if(op==="contains"){
+                          return valsL.some(function(v){ return v.indexOf(want) !== -1; });
+                        }
+                        if(op==="!="){
+                          if(!valsL.length) return want !== "";
+                          return valsL.every(function(v){ return v !== want; });
+                        }
+                        if(op==="in"||op==="not in"){
+                          var wanted = want.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+                          var ok = valsL.some(function(v){ return wanted.indexOf(v) !== -1; });
+                          return op==="in" ? ok : !ok;
+                        }
+                        // default "="
+                        if(want === "" && !valsL.filter(function(v){return v!=="";}).length) return true;
+                        return valsL.some(function(v){ return v === want; });
+                      }
+
+                      // ── init ──────────────────────────────────────────────
+                      var rules = safeRules();
+                      if(!rules.length) return;
+
+                      // Store original required state of every field
+                      // so unrequire can restore it correctly
+                      var originalRequired = {};
+                      document.querySelectorAll(".sfb-field").forEach(function(tw){
+                        var fid = tw.getAttribute("data-field-id");
+                        if(!fid) return;
+                        var inputs = tw.querySelectorAll("input,select,textarea");
+                        originalRequired[fid] = false;
+                        inputs.forEach(function(el){
+                          if(el.hasAttribute("required")) originalRequired[fid] = true;
+                        });
+                      });
+
+                      // Collect which fields are ONLY referenced by "show" rules
+                      // (and never by a "hide" rule) — hide these by default
+                      var showOnlyTargets = {};
+                      var hideTargets     = {};
+                      rules.forEach(function(r){
+                        if(r.action === "show") showOnlyTargets[String(r.target)] = true;
+                        if(r.action === "hide") hideTargets[String(r.target)]     = true;
+                      });
+                      Object.keys(showOnlyTargets).forEach(function(tid){
+                        if(!hideTargets[tid]){   // only hide-by-default if no "hide" rule also targets it
+                          var w = wrap(tid);
+                          if(w) w.style.display = "none";
+                        }
+                      });
+
+                      // ── apply: re-evaluate all rules ─────────────────────
+                      function apply(){
+                        // Group rules by target so we can resolve conflicts
+                        // (show wins over hide; last matching action wins within same type)
+                        var targetState = {};  // fid -> {display, required}
+
+                        rules.forEach(function(r){
+                          var trig = String(r.trigger);
+                          var targ = String(r.target);
+                          var ok   = compare(r.op, valueOf(trig), r.value);
+
+                          if(!targetState[targ]){
+                            targetState[targ] = { display: null, required: null };
+                          }
+                          var st = targetState[targ];
+
+                          if(r.action === "show"){
+                            // show rule matched → visible; not matched → hidden
+                            // Only set if no previous show/hide decision, or override
+                            if(st.display === null || st.display === "hide"){
+                              st.display = ok ? "show" : "hide";
+                            } else if(ok){
+                              st.display = "show";   // show always wins
+                            }
+                          } else if(r.action === "hide"){
+                            if(ok){
+                              st.display = "hide";   // explicit hide when matched
+                            } else if(st.display === null){
+                              st.display = "show";   // condition not met → keep visible
+                            }
+                          } else if(r.action === "require"){
+                            if(ok) st.required = true;
+                          } else if(r.action === "unrequire"){
+                            if(ok) st.required = false;
+                          }
+                        });
+
+                        // Apply resolved states
+                        Object.keys(targetState).forEach(function(targ){
+                          var st = targetState[targ];
+                          var tw = wrap(targ);
+                          if(!tw) return;
+
+                          // Visibility
+                          if(st.display === "show"){
+                            tw.style.display = "";
+                          } else if(st.display === "hide"){
+                            tw.style.display = "none";
+                            clearField(tw);   // clear hidden field values
+                          }
+
+                          // Required
+                          if(st.required === true){
+                            setRequired(tw, true);
+                          } else if(st.required === false){
+                            setRequired(tw, false);
+                          } else {
+                            // No require/unrequire rule matched — restore original
+                            setRequired(tw, originalRequired[targ] || false);
+                          }
+                        });
+                      }
+
+                      var formEl = document.getElementById("smart-form");
+                      if(!formEl) return;
+
+                      apply();   // run once on page load
+
+                      var debounce = null;
+                      function onChange(){
+                        if(debounce) clearTimeout(debounce);
+                        debounce = setTimeout(apply, 40);
+                      }
+                      formEl.addEventListener("input",  onChange, true);
+                      formEl.addEventListener("change", onChange, true);
                     })();
                   ]]></script>
 
-                  <!-- ✅ Branching on submit -->
+                  <!-- <!-- Branching on submit -->
                   <script type="text/javascript"><![CDATA[
                     (function(){
                       function collectAnswers(){

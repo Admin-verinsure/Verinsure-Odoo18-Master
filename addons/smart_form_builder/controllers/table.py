@@ -2,6 +2,7 @@ import json
 import csv
 import io
 import logging
+from io import BytesIO
 from odoo import http
 from odoo.http import request
 
@@ -119,7 +120,7 @@ class SmartFormTable(http.Controller):
 
         total = len(submissions)
         key_col = next((c for c in cols if c["is_key"]), None)
-        export_url = "/smart_form/table/%d/export.csv" % form.id
+        export_url = "/smart_form/table/%d/export.xlsx" % form.id
 
         html = r"""<!DOCTYPE html>
 <html lang="en">
@@ -343,7 +344,7 @@ class SmartFormTable(http.Controller):
   </div>
   <div class="topbar-right">
     <a href="%(export_url)s" class="btn btn-export">
-      <span>&#11123;</span> Export CSV
+      <span>&#11123;</span> Export Excel
     </a>
     <a href="javascript:history.back()" class="btn btn-back">
       <span>&#8592;</span> Back
@@ -403,35 +404,153 @@ class SmartFormTable(http.Controller):
             html, [("Content-Type", "text/html; charset=utf-8")]
         )
 
+    # ----------------------------------------------------------
+    # XLSX export  (opens perfectly in Excel — no ### date issue)
+    # ----------------------------------------------------------
     @http.route("/smart_form/table/<int:form_id>/export.csv", type="http", auth="user", website=False)
     def export_csv(self, form_id, **kw):
+        """Keep the /export.csv URL for backwards compat but now serves XLSX."""
+        return self._do_export(form_id, fmt="xlsx")
+
+    @http.route("/smart_form/table/<int:form_id>/export.xlsx", type="http", auth="user", website=False)
+    def export_xlsx(self, form_id, **kw):
+        return self._do_export(form_id, fmt="xlsx")
+
+    def _do_export(self, form_id, fmt="xlsx"):
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import (
+                PatternFill, Font, Alignment, Border, Side, numbers
+            )
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            return self._do_export_csv_fallback(form_id)
+
         form = self._get_form_and_check(form_id)
         if not form:
             return request.not_found()
 
-        cols = self._build_columns(form)
+        cols   = self._build_columns(form)
         submissions = request.env["smart.form.submission"].sudo().search(
             [("form_id", "=", form.id)], order="create_date desc"
         )
 
+        wb = Workbook()
+        ws = wb.active
+        ws.title = (form.name or "Submissions")[:31]   # Excel sheet name limit
+
+        # ── Styles ──────────────────────────────────────────────
+        header_fill   = PatternFill("solid", fgColor="4F46E5")   # indigo
+        key_fill      = PatternFill("solid", fgColor="7C3AED")   # purple for key col
+        header_font   = Font(bold=True, color="FFFFFF", size=10)
+        key_font      = Font(bold=True, color="FFFFFF", size=10)
+        date_font     = Font(color="6B7280", size=9)
+        key_cell_font = Font(bold=True, color="4F46E5", size=10)
+        normal_font   = Font(size=10)
+        center_align  = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left_align    = Alignment(horizontal="left",   vertical="center")
+        thin_side     = Side(style="thin", color="E5E7EB")
+        thin_border   = Border(left=thin_side, right=thin_side,
+                               top=thin_side, bottom=thin_side)
+        even_fill     = PatternFill("solid", fgColor="F8F9FF")
+        odd_fill      = PatternFill("solid", fgColor="FFFFFF")
+
+        # ── Header row ──────────────────────────────────────────
+        headers = ["Submitted On"] + [c["label"] for c in cols]
+        ws.row_dimensions[1].height = 36
+
+        for col_idx, label in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_idx, value=label)
+            is_key = (col_idx > 1 and cols[col_idx - 2]["is_key"])
+            cell.fill        = key_fill if is_key else header_fill
+            cell.font        = key_font if is_key else header_font
+            cell.alignment   = center_align
+            cell.border      = thin_border
+
+        # ── Data rows ───────────────────────────────────────────
+        for row_idx, sub in enumerate(submissions, start=2):
+            try:
+                data = json.loads(sub.data_json or "{}")
+            except Exception:
+                data = {}
+
+            row_fill = even_fill if row_idx % 2 == 0 else odd_fill
+            ws.row_dimensions[row_idx].height = 20
+
+            # Date column
+            dt_val = sub.create_date if sub.create_date else None
+            date_cell = ws.cell(row=row_idx, column=1, value=dt_val)
+            if dt_val:
+                date_cell.number_format = "DD/MM/YYYY HH:MM:SS"
+            date_cell.font      = date_font
+            date_cell.fill      = row_fill
+            date_cell.alignment = left_align
+            date_cell.border    = thin_border
+
+            # Field columns
+            for col_idx, c in enumerate(cols, start=2):
+                raw = data.get(c["key"], "")
+                val = self._cell_value(raw, c["ftype"])
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                cell.fill      = row_fill
+                cell.font      = key_cell_font if c["is_key"] else normal_font
+                cell.alignment = left_align
+                cell.border    = thin_border
+
+        # ── Column widths ────────────────────────────────────────
+        ws.column_dimensions[get_column_letter(1)].width = 20   # date
+
+        for col_idx, c in enumerate(cols, start=2):
+            label_len = len(c["label"])
+            # Width: enough for the label, capped between 12–35
+            width = max(12, min(35, label_len * 1.1 + 4))
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+        # ── Freeze top row + auto-filter ─────────────────────────
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+
+        # ── Write to bytes ───────────────────────────────────────
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        xlsx_bytes = buf.read()
+
+        filename = "submissions_%s.xlsx" % (form.name or str(form.id)).replace(" ", "_")
+        return request.make_response(
+            xlsx_bytes,
+            [
+                ("Content-Type",
+                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                ("Content-Disposition", 'attachment; filename="%s"' % filename),
+            ],
+        )
+
+    def _do_export_csv_fallback(self, form_id):
+        """Plain CSV fallback if openpyxl is unavailable."""
+        form = self._get_form_and_check(form_id)
+        if not form:
+            return request.not_found()
+        cols = self._build_columns(form)
+        submissions = request.env["smart.form.submission"].sudo().search(
+            [("form_id", "=", form.id)], order="create_date desc"
+        )
         output = io.StringIO()
-        writer = csv.writer(output)
+        import csv as _csv
+        writer = _csv.writer(output)
         writer.writerow(["Submitted On"] + [c["label"] for c in cols])
         for sub in submissions:
             try:
                 data = json.loads(sub.data_json or "{}")
             except Exception:
                 data = {}
-            dt = self._fmt_date(sub.create_date, "%d/%m/%Y %H:%M:%S")
-            writer.writerow([dt] + [
-                self._cell_value(data.get(c["key"], ""), c["ftype"]) for c in cols
-            ])
-
+            writer.writerow(
+                [self._fmt_date(sub.create_date)] +
+                [self._cell_value(data.get(c["key"], ""), c["ftype"]) for c in cols]
+            )
         filename = "submissions_%s.csv" % (form.name or str(form.id)).replace(" ", "_")
         return request.make_response(
             output.getvalue(),
-            [
-                ("Content-Type", "text/csv; charset=utf-8"),
-                ("Content-Disposition", 'attachment; filename="%s"' % filename),
-            ],
+            [("Content-Type", "text/csv; charset=utf-8"),
+             ("Content-Disposition", 'attachment; filename="%s"' % filename)],
         )
