@@ -12,17 +12,17 @@
                 <!-- Rules JSON (must not be escaped) -->
                 <script type="application/json" id="sfb-rules-json"><t t-out="rules_json or '[]'"/></script>
 
-                <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form">
+                <form action="/smart_form/submit" method="post" enctype="multipart/form-data" id="smart-form" style="display:flex;flex-direction:column;">
                   <input type="hidden" name="token" t-att-value="form.token"/>
 
                   <t t-foreach="form.field_ids" t-as="f">
                     <t t-if="f.field_type == 'subheading'">
-                      <div class="mt-4 mb-2">
+                      <div class="mt-4 mb-2" t-att-style="'order:' + str(f_index * 10)">
                         <h5 class="mb-0" t-esc="f.label"/>
                       </div>
                     </t>
                     <t t-else="">
-                      <div class="mb-3 sfb-field" t-att-data-field-id="f.id">
+                      <div class="mb-3 sfb-field" t-att-data-field-id="f.id" t-att-style="'order:' + str(f_index * 10)">
                         <label class="form-label">
                           <span t-esc="f.label"/>
                           <t t-if="f.required"><span class="text-danger">*</span></t>
@@ -104,7 +104,7 @@
                     </t>
                   </t>
 
-                  <div class="d-grid mt-4">
+                  <div class="d-grid mt-4" style="order:99999;">
                     <button type="submit" class="btn btn-primary btn-lg">Submit</button>
                   </div>
 
@@ -239,12 +239,13 @@
                       var rules = safeRules();
                       if(!rules.length) return;
 
-                      // Store original required state of every field
-                      // so unrequire can restore it correctly
+                      // Store original required state + original CSS order of every field
                       var originalRequired = {};
+                      var originalOrder = {};
                       document.querySelectorAll(".sfb-field").forEach(function(tw){
                         var fid = tw.getAttribute("data-field-id");
                         if(!fid) return;
+                        originalOrder[fid] = tw.style.order || "";
                         var inputs = tw.querySelectorAll("input,select,textarea");
                         originalRequired[fid] = false;
                         inputs.forEach(function(el){
@@ -291,6 +292,10 @@
                             } else if(ok){
                               st.display = "show";   // show always wins
                             }
+                            // Track which trigger caused the show so we can position below it
+                            if(ok){
+                              st.triggerEl = wrap(trig);
+                            }
                           } else if(r.action === "hide"){
                             if(ok){
                               st.display = "hide";   // explicit hide when matched
@@ -310,11 +315,19 @@
                           var tw = wrap(targ);
                           if(!tw) return;
 
-                          // Visibility
+                          // Visibility + position
                           if(st.display === "show"){
                             tw.style.display = "";
+                            // Place target field just below its trigger field
+                            var trigEl = st.triggerEl;
+                            if(trigEl){
+                              var trigOrder = parseInt(trigEl.style.order) || 0;
+                              tw.style.order = trigOrder + 1;
+                            }
                           } else if(st.display === "hide"){
                             tw.style.display = "none";
+                            // Restore original order when hidden
+                            tw.style.order = originalOrder[targ] || "";
                             clearField(tw);   // clear hidden field values
                           }
 
