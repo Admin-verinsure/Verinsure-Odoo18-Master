@@ -19,17 +19,50 @@ class SmartFormTable(http.Controller):
             return None
         return form
 
-    def _build_columns(self, form):
+    def _build_columns(self, form, submissions=None):
+        """Build ordered column list from form field definitions.
+        Also includes any extra keys found in submission data that are not
+        in field_ids (e.g. fields hidden by logic that still submitted data).
+        """
+        seen_keys = set()
         cols = []
+
+        # Primary: use form field definitions (preserves order + labels)
+        field_map = {}
         for f in form.field_ids:
             if f.field_type == "subheading":
                 continue
-            cols.append({
-                "key": f.name or ("field_%s" % f.id),
-                "label": f.label or f.name or ("field_%s" % f.id),
+            key = f.name or ("field_%s" % f.id)
+            seen_keys.add(key)
+            col = {
+                "key":    key,
+                "label":  f.label or key,
                 "is_key": f.is_key_field,
-                "ftype": f.field_type,
-            })
+                "ftype":  f.field_type,
+            }
+            cols.append(col)
+            field_map[key] = col
+
+        # Secondary: scan actual submission data for any extra keys
+        # (covers logic-hidden fields that still submitted data)
+        if submissions:
+            extra_keys = []
+            for sub in submissions:
+                try:
+                    data = json.loads(sub.data_json or "{}")
+                except Exception:
+                    continue
+                for k in data:
+                    if k not in seen_keys:
+                        seen_keys.add(k)
+                        extra_keys.append(k)
+            for key in extra_keys:
+                cols.append({
+                    "key":    key,
+                    "label":  key.replace("_", " ").title(),
+                    "is_key": False,
+                    "ftype":  "text",
+                })
         return cols
 
     def _fmt_date(self, dt, fmt="%d/%m/%Y %H:%M:%S"):
@@ -41,14 +74,24 @@ class SmartFormTable(http.Controller):
         except Exception:
             return str(dt)
 
-    def _cell_value(self, raw, ftype):
+    def _cell_value(self, raw, ftype, submission_id=None, escape=False):
+        """Convert a raw JSON value to display string or HTML.
+        If escape=True, returns plain text (for CSV/XLSX).
+        If submission_id is given, file fields get a clickable download link.
+        """
         if raw is None or raw == "":
             return ""
         if isinstance(raw, list):
             return ", ".join(str(v) for v in raw if v != "")
         if isinstance(raw, dict):
             return str(raw.get("label") or raw.get("value") or "")
-        return str(raw)
+        val = str(raw)
+        if not escape and ftype == "file" and val and submission_id:
+            import html as _html
+            safe = _html.escape(val)
+            url = "/smart_form/file/%d/%s" % (submission_id, safe)
+            return '<a href="%s" target="_blank" style="color:#4f46e5;">&#128206; %s</a>' % (url, safe)
+        return val
 
     @http.route("/smart_form/table/<int:form_id>", type="http", auth="user", website=False)
     def submission_table(self, form_id, **kw):
@@ -56,10 +99,10 @@ class SmartFormTable(http.Controller):
         if not form:
             return request.not_found()
 
-        cols = self._build_columns(form)
         submissions = request.env["smart.form.submission"].sudo().search(
             [("form_id", "=", form.id)], order="create_date desc"
         )
+        cols = self._build_columns(form, submissions)
 
         def esc(s):
             return (str(s)
@@ -105,12 +148,14 @@ class SmartFormTable(http.Controller):
             row += '<td class="cell-date">%s</td>' % esc(dt)
             for c in cols:
                 raw = data.get(c["key"], "")
-                val = self._cell_value(raw, c["ftype"])
+                val = self._cell_value(raw, c["ftype"], submission_id=sub.id)
                 empty_class = " cell-empty" if not val else ""
                 key_class = " cell-key" if c["is_key"] else ""
-                display = val if val else "—"
+                # val may contain HTML (file link) — don't double-escape it
+                display_html = val if val else "<span style='color:#d1d5db;'>—</span>"
+                raw_text = self._cell_value(raw, c["ftype"], escape=True)
                 row += '<td class="cell-field%s%s" title="%s">%s</td>' % (
-                    key_class, empty_class, esc(val), esc(display))
+                    key_class, empty_class, esc(raw_text), display_html)
             row += "</tr>"
             rows_html += row
 
@@ -407,6 +452,33 @@ class SmartFormTable(http.Controller):
     # ----------------------------------------------------------
     # XLSX export  (opens perfectly in Excel — no ### date issue)
     # ----------------------------------------------------------
+
+    # ----------------------------------------------------------
+    # File attachment download
+    # ----------------------------------------------------------
+    @http.route("/smart_form/file/<int:submission_id>/<string:filename>",
+                type="http", auth="user", website=False)
+    def download_file(self, submission_id, filename, **kw):
+        """Serve a file uploaded via a form field."""
+        attachment = request.env["ir.attachment"].sudo().search([
+            ("res_model", "=", "smart.form.submission"),
+            ("res_id",    "=", submission_id),
+            ("name",      "=", filename),
+        ], limit=1)
+        if not attachment:
+            return request.not_found()
+        import base64 as _b64
+        file_data = _b64.b64decode(attachment.datas or "")
+        mimetype = attachment.mimetype or "application/octet-stream"
+        return request.make_response(
+            file_data,
+            [
+                ("Content-Type", mimetype),
+                ("Content-Disposition", 'attachment; filename="%s"' % filename),
+                ("Content-Length", str(len(file_data))),
+            ],
+        )
+
     @http.route("/smart_form/table/<int:form_id>/export.csv", type="http", auth="user", website=False)
     def export_csv(self, form_id, **kw):
         """Keep the /export.csv URL for backwards compat but now serves XLSX."""
@@ -430,10 +502,10 @@ class SmartFormTable(http.Controller):
         if not form:
             return request.not_found()
 
-        cols   = self._build_columns(form)
         submissions = request.env["smart.form.submission"].sudo().search(
             [("form_id", "=", form.id)], order="create_date desc"
         )
+        cols   = self._build_columns(form, submissions)
 
         wb = Workbook()
         ws = wb.active
@@ -490,7 +562,7 @@ class SmartFormTable(http.Controller):
             # Field columns
             for col_idx, c in enumerate(cols, start=2):
                 raw = data.get(c["key"], "")
-                val = self._cell_value(raw, c["ftype"])
+                val = self._cell_value(raw, c["ftype"], escape=True)
                 cell = ws.cell(row=row_idx, column=col_idx, value=val)
                 cell.fill      = row_fill
                 cell.font      = key_cell_font if c["is_key"] else normal_font
