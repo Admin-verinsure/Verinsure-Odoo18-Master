@@ -4,6 +4,7 @@ import logging
 
 from odoo import http
 from odoo.http import request
+from markupsafe import Markup
 
 
 _logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class SmartFormPublic(http.Controller):
 
         return request.render("smart_form_builder.smart_form_page", {
             "form": form,
-            "rules_json": json.dumps(rules),
+            "rules_json": Markup(json.dumps(rules)),
         })
 
     @http.route("/smart_form/options/<int:field_id>", type="http", auth="public", website=True, csrf=False)
