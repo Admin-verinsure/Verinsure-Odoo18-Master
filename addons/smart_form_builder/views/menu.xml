@@ -23,18 +23,10 @@
   />
 
   <menuitem
-      id="menu_smart_form_data_table"
-      name="Submissions Table"
-      parent="menu_smart_form_root"
-      action="action_smart_form_data_table"
-      sequence="30"
-  />
-
-  <menuitem
       id="menu_smart_form_branch_rules"
       name="Branch Rules"
       parent="menu_smart_form_root"
       action="action_smart_form_branch_rules"
-      sequence="40"
+      sequence="30"
   />
 </odoo>

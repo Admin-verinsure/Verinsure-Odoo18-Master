@@ -11,17 +11,14 @@ _logger = logging.getLogger(__name__)
 class SmartFormTable(http.Controller):
 
     def _get_form_and_check(self, form_id):
-        """Return form if user is internal, else None."""
         form = request.env["smart.form"].sudo().browse(int(form_id))
         if not form.exists():
             return None
-        # Only allow internal (logged-in) users
         if request.env.user._is_public():
             return None
         return form
 
     def _build_columns(self, form):
-        """Return ordered list of {key, label, is_key} for all non-subheading fields."""
         cols = []
         for f in form.field_ids:
             if f.field_type == "subheading":
@@ -35,7 +32,6 @@ class SmartFormTable(http.Controller):
         return cols
 
     def _cell_value(self, raw, ftype):
-        """Convert raw JSON value to a clean display string."""
         if raw is None or raw == "":
             return ""
         if isinstance(raw, list):
@@ -44,13 +40,7 @@ class SmartFormTable(http.Controller):
             return str(raw.get("label") or raw.get("value") or "")
         return str(raw)
 
-    # ----------------------------------------------------------
-    # HTML table view
-    # ----------------------------------------------------------
-    @http.route(
-        "/smart_form/table/<int:form_id>",
-        type="http", auth="user", website=False
-    )
+    @http.route("/smart_form/table/<int:form_id>", type="http", auth="user", website=False)
     def submission_table(self, form_id, **kw):
         form = self._get_form_and_check(form_id)
         if not form:
@@ -66,191 +56,345 @@ class SmartFormTable(http.Controller):
                     .replace("&", "&amp;").replace("<", "&lt;")
                     .replace(">", "&gt;").replace('"', "&quot;"))
 
-        # Build header
-        th_date = '<th style="white-space:nowrap;">Submitted On</th>'
+        # Build header cells
+        th_date = '''<th class="col-date">
+            <div class="th-inner">
+                <span class="th-icon">&#128197;</span>
+                <span class="th-label">Submitted On</span>
+            </div>
+        </th>'''
+
         th_cols = ""
         for c in cols:
-            style = 'style="background:#5a67d8;white-space:nowrap;"' if c["is_key"] else ""
-            th_cols += "<th %s>%s</th>" % (style, esc(c["label"]))
+            icon = {
+                "email": "&#9993;", "phone": "&#128222;", "number": "&#35;",
+                "select": "&#9660;", "radio": "&#9673;", "checkbox": "&#9745;",
+                "file": "&#128206;", "textarea": "&#128195;",
+            }.get(c["ftype"], "&#9632;")
+            key_pip = '<span class="key-pip" title="Key field">K</span>' if c["is_key"] else ""
+            extra_class = " col-key" if c["is_key"] else ""
+            th_cols += '''<th class="col-field%s" title="%s">
+                <div class="th-inner">
+                    <span class="th-icon">%s</span>
+                    <span class="th-label">%s</span>
+                    %s
+                </div>
+            </th>''' % (extra_class, esc(c["label"]), icon, esc(c["label"]), key_pip)
 
-        # Build rows
+        # Build data rows
         rows_html = ""
-        for sub in submissions:
+        for i, sub in enumerate(submissions):
             try:
                 data = json.loads(sub.data_json or "{}")
             except Exception:
                 data = {}
 
-            dt = sub.create_date.strftime("%d/%m/%Y %H:%M:%S") if sub.create_date else ""
-            row = "<tr>"
-            row += "<td style='white-space:nowrap;color:#555;font-size:0.85rem;'>%s</td>" % esc(dt)
+            dt = sub.create_date.strftime("%d %b %Y, %H:%M") if sub.create_date else ""
+            row_class = "row-even" if i % 2 == 0 else "row-odd"
+            row = '<tr class="%s">' % row_class
+            row += '<td class="cell-date">%s</td>' % esc(dt)
             for c in cols:
                 raw = data.get(c["key"], "")
                 val = self._cell_value(raw, c["ftype"])
-                cell_style = "font-weight:600;color:#4c51bf;" if c["is_key"] else ""
-                row += "<td style='%s'>%s</td>" % (cell_style, esc(val))
+                empty_class = " cell-empty" if not val else ""
+                key_class = " cell-key" if c["is_key"] else ""
+                display = val if val else "—"
+                row += '<td class="cell-field%s%s" title="%s">%s</td>' % (
+                    key_class, empty_class, esc(val), esc(display))
             row += "</tr>"
             rows_html += row
 
-        no_data = ""
         if not submissions:
             span = len(cols) + 1
-            no_data = '<tr><td colspan="%d" style="text-align:center;color:#aaa;padding:32px;">No submissions yet.</td></tr>' % span
+            rows_html = '<tr><td colspan="%d" class="cell-empty-state">No submissions yet.</td></tr>' % span
 
-        col_count = len(cols) + 1  # +1 for date
+        total = len(submissions)
+        key_col = next((c for c in cols if c["is_key"]), None)
         export_url = "/smart_form/table/%d/export.csv" % form.id
 
-        html = """<!DOCTYPE html>
+        html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>%(form_name)s — Submissions Table</title>
+  <title>%(form_name)s — Submissions</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; background: #f4f5f7; color: #333; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .sfb-header {
-      background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
-      padding: 20px 32px;
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+      background: #f0f2f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background: linear-gradient(135deg, #4f46e5 0%%, #7c3aed 100%%);
+      padding: 0 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      height: 64px;
+      box-shadow: 0 2px 12px rgba(79,70,229,0.35);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    .sfb-header h1 {
-      color: #fff;
-      font-size: 1.25rem;
-      font-weight: 700;
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .topbar-icon {
+      width: 38px; height: 38px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
     }
-    .sfb-header .sfb-sub {
-      color: rgba(255,255,255,0.75);
-      font-size: 0.85rem;
-      margin-top: 2px;
-    }
-    .sfb-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+    .topbar-title { color: #fff; font-size: 1.05rem; font-weight: 700; }
+    .topbar-sub { color: rgba(255,255,255,0.65); font-size: 0.78rem; margin-top: 1px; }
+    .topbar-right { display: flex; gap: 10px; align-items: center; }
+
     .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 18px; border-radius: 6px; font-size: 0.875rem;
-      font-weight: 600; cursor: pointer; text-decoration: none; border: none;
-      transition: opacity 0.15s;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 16px; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; border: none;
+      transition: all 0.15s ease;
+      white-space: nowrap;
     }
-    .btn:hover { opacity: 0.88; }
     .btn-export {
-      background: #fff; color: #667eea;
+      background: #fff; color: #4f46e5;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
     }
+    .btn-export:hover { background: #f0f0ff; transform: translateY(-1px); }
     .btn-back {
       background: rgba(255,255,255,0.15); color: #fff;
-      border: 1px solid rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── STATS BAR ── */
+    .statsbar {
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px 18px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      font-size: 0.85rem;
+    }
+    .stat-icon { font-size: 1.1rem; }
+    .stat-label { color: #6b7280; }
+    .stat-value { font-weight: 700; color: #1a202c; margin-left: 4px; }
+    .stat-key-badge {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+      border-radius: 6px; padding: 3px 10px;
+      font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.03em;
     }
 
-    .sfb-wrap { padding: 24px 32px; overflow-x: auto; }
-
-    .sfb-meta {
-      display: flex; align-items: center; gap: 16px;
-      margin-bottom: 16px; font-size: 0.85rem; color: #666;
+    /* ── TABLE WRAPPER ── */
+    .table-wrap {
+      padding: 0 32px 32px;
+      overflow-x: auto;
     }
-    .sfb-badge {
-      background: #667eea; color: #fff;
-      border-radius: 12px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600;
-    }
-
-    table {
-      width: 100%%; border-collapse: collapse;
-      background: #fff; border-radius: 8px;
+    .table-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
       overflow: hidden;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-      min-width: %(min_width)s;
     }
-    thead tr {
-      background: #667eea;
+
+    /* ── TABLE ── */
+    table {
+      width: 100%%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    /* Header */
+    thead {
+      background: linear-gradient(135deg, #4f46e5 0%%, #6d28d9 100%%);
     }
     thead th {
-      padding: 11px 14px; text-align: left;
-      color: #fff; font-size: 0.78rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0;
+      vertical-align: bottom;
+      border-right: 1px solid rgba(255,255,255,0.12);
+      position: relative;
     }
-    tbody tr { border-bottom: 1px solid #eef0f3; transition: background 0.1s; }
-    tbody tr:hover { background: #f0f4ff; cursor: pointer; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody td { padding: 11px 14px; font-size: 0.9rem; vertical-align: top; }
+    thead th:last-child { border-right: none; }
 
-    .sfb-key-badge {
-      display: inline-block;
-      background: #e8eaff; color: #4c51bf;
-      border-radius: 4px; padding: 1px 7px;
-      font-size: 0.7rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.04em;
-      margin-left: 6px; vertical-align: middle;
+    .th-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 14px 14px 12px;
+      min-width: 110px;
+      max-width: 180px;
+    }
+    .th-icon {
+      font-size: 0.95rem;
+      opacity: 0.75;
+      line-height: 1;
+    }
+    .th-label {
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      line-height: 1.3;
+      word-break: break-word;
+      /* clamp to 2 lines max */
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .key-pip {
+      background: #fbbf24;
+      color: #1a202c;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
     }
 
-    @media (max-width: 700px) {
-      .sfb-header { padding: 14px 16px; flex-direction: column; align-items: flex-start; }
-      .sfb-wrap { padding: 12px 10px; }
+    /* Key column header */
+    th.col-key { background: rgba(251,191,36,0.18); }
+    th.col-date .th-inner { min-width: 130px; }
+
+    /* Body rows */
+    tbody tr { transition: background 0.1s; }
+    tbody tr.row-even { background: #fff; }
+    tbody tr.row-odd  { background: #f8f9ff; }
+    tbody tr:hover    { background: #eef0ff !important; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #e8eaf0;
+      border-right: 1px solid #f0f1f7;
+      color: #374151;
+      vertical-align: middle;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    tbody td:last-child { border-right: none; }
+
+    td.cell-date {
+      color: #6b7280;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    td.cell-key {
+      font-weight: 600;
+      color: #4f46e5;
+    }
+    td.cell-empty {
+      color: #d1d5db;
+      font-style: italic;
+    }
+    td.cell-empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .topbar { padding: 0 16px; }
+      .statsbar, .table-wrap { padding-left: 16px; padding-right: 16px; }
+      .topbar-sub { display: none; }
     }
   </style>
 </head>
 <body>
 
-<div class="sfb-header">
-  <div>
-    <h1>%(form_name)s</h1>
-    <div class="sfb-sub">Submissions Table</div>
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-icon">&#128203;</div>
+    <div>
+      <div class="topbar-title">%(form_name)s</div>
+      <div class="topbar-sub">Submissions Table</div>
+    </div>
   </div>
-  <div class="sfb-actions">
-    <a href="%(export_url)s" class="btn btn-export">&#11123; Export CSV</a>
-    <a href="javascript:history.back()" class="btn btn-back">&#8592; Back</a>
+  <div class="topbar-right">
+    <a href="%(export_url)s" class="btn btn-export">
+      <span>&#11123;</span> Export CSV
+    </a>
+    <a href="javascript:history.back()" class="btn btn-back">
+      <span>&#8592;</span> Back
+    </a>
   </div>
 </div>
 
-<div class="sfb-wrap">
-  <div class="sfb-meta">
-    <span><strong>%(total)s</strong> submission%(plural)s</span>
-    %(key_hint)s
+<!-- STATS BAR -->
+<div class="statsbar">
+  <div class="stat-card">
+    <span class="stat-icon">&#128203;</span>
+    <span class="stat-label">Total Submissions</span>
+    <span class="stat-value">%(total)s</span>
   </div>
+  <div class="stat-card">
+    <span class="stat-icon">&#9635;</span>
+    <span class="stat-label">Fields</span>
+    <span class="stat-value">%(col_count)s</span>
+  </div>
+  %(key_stat)s
+</div>
 
-  <table>
-    <thead>
-      <tr>
-        %(th_date)s
-        %(th_cols)s
-      </tr>
-    </thead>
-    <tbody>
-      %(rows_html)s%(no_data)s
-    </tbody>
-  </table>
+<!-- TABLE -->
+<div class="table-wrap">
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          %(th_date)s
+          %(th_cols)s
+        </tr>
+      </thead>
+      <tbody>
+        %(rows_html)s
+      </tbody>
+    </table>
+  </div>
 </div>
 
 </body>
 </html>""" % {
             "form_name": esc(form.name),
             "export_url": export_url,
-            "total": len(submissions),
-            "plural": "s" if len(submissions) != 1 else "",
-            "key_hint": (
-                '<span class="sfb-badge">Key: %s</span>' % esc(
-                    next((c["label"] for c in cols if c["is_key"]), ""))
-                if any(c["is_key"] for c in cols) else ""
-            ),
+            "total": total,
+            "col_count": len(cols),
+            "key_stat": (
+                '<div class="stat-card"><span class="stat-icon">&#128273;</span>'
+                '<span class="stat-label">Key Field</span>'
+                '<span class="stat-key-badge">%s</span></div>' % esc(key_col["label"])
+            ) if key_col else "",
             "th_date": th_date,
             "th_cols": th_cols,
             "rows_html": rows_html,
-            "no_data": no_data,
-            "min_width": "%dpx" % max(700, col_count * 160),
         }
 
         return request.make_response(
             html, [("Content-Type", "text/html; charset=utf-8")]
         )
 
-    # ----------------------------------------------------------
-    # CSV export
-    # ----------------------------------------------------------
-    @http.route(
-        "/smart_form/table/<int:form_id>/export.csv",
-        type="http", auth="user", website=False
-    )
+    @http.route("/smart_form/table/<int:form_id>/export.csv", type="http", auth="user", website=False)
     def export_csv(self, form_id, **kw):
         form = self._get_form_and_check(form_id)
         if not form:
@@ -263,30 +407,20 @@ class SmartFormTable(http.Controller):
 
         output = io.StringIO()
         writer = csv.writer(output)
-
-        # Header row
-        writer.writerow(
-            ["Submitted On"] + [c["label"] for c in cols]
-        )
-
-        # Data rows
+        writer.writerow(["Submitted On"] + [c["label"] for c in cols])
         for sub in submissions:
             try:
                 data = json.loads(sub.data_json or "{}")
             except Exception:
                 data = {}
             dt = sub.create_date.strftime("%d/%m/%Y %H:%M:%S") if sub.create_date else ""
-            row = [dt] + [
-                self._cell_value(data.get(c["key"], ""), c["ftype"])
-                for c in cols
-            ]
-            writer.writerow(row)
+            writer.writerow([dt] + [
+                self._cell_value(data.get(c["key"], ""), c["ftype"]) for c in cols
+            ])
 
-        csv_content = output.getvalue()
         filename = "submissions_%s.csv" % (form.name or str(form.id)).replace(" ", "_")
-
         return request.make_response(
-            csv_content,
+            output.getvalue(),
             [
                 ("Content-Type", "text/csv; charset=utf-8"),
                 ("Content-Disposition", 'attachment; filename="%s"' % filename),
