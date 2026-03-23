@@ -153,6 +153,15 @@ class SmartFormTable(http.Controller):
             row_class = "row-even" if i % 2 == 0 else "row-odd"
             row = '<tr class="%s">' % row_class
             row += '<td class="cell-date">%s</td>' % esc(dt)
+            # Chain link cell
+            if sub.session_token:
+                chain_url = "/smart_form/chain/%d" % sub.id
+                row += ('<td style="text-align:center;padding:8px;vertical-align:middle;">'
+                        '<a href="%s" title="View chain" '
+                        'style="color:#4f46e5;font-size:1.1rem;text-decoration:none;">&#128279;</a>'
+                        '</td>') % chain_url
+            else:
+                row += '<td style="text-align:center;color:#d1d5db;padding:8px;">&#8212;</td>'
             for c in cols:
                 raw = data.get(c["key"], "")
                 val = self._cell_value(raw, c["ftype"], submission_id=sub.id)
@@ -167,7 +176,7 @@ class SmartFormTable(http.Controller):
             rows_html += row
 
         if not submissions:
-            span = len(cols) + 1
+            span = len(cols) + 2  # +1 date +1 chain
             rows_html = '<tr><td colspan="%d" class="cell-empty-state">No submissions yet.</td></tr>' % span
 
         total = len(submissions)
@@ -465,6 +474,7 @@ class SmartFormTable(http.Controller):
                 '<span class="stat-key-badge">%s</span></div>' % esc(key_col["label"])
             ) if key_col else "",
             "th_date": th_date,
+            "th_chain": th_chain,
             "th_cols": th_cols,
             "rows_html": rows_html,
         }
