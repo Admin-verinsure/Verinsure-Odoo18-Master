@@ -11,6 +11,8 @@
         <field name="create_date" string="Submitted On" widget="datetime"/>
         <field name="form_id" string="Form"/>
         <field name="key_value" string="Key Value" optional="show"/>
+        <field name="chain_depth" string="Step" optional="show"/>
+        <field name="session_token" string="Chain ID" optional="hide"/>
         <field name="ip" string="IP" optional="show"/>
         <field name="user_agent" string="Browser" optional="hide"/>
       </list>
@@ -55,7 +57,7 @@
             <button name="action_view_chain" type="object"
                     string="&#128279; View Submission Chain"
                     class="btn-primary"
-                    invisible="not session_token or not child_submission_ids"/>
+                    invisible="not session_token"/>
           </header>
           <group>
             <group>
