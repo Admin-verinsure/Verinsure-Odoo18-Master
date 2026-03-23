@@ -1,35 +1,72 @@
 <odoo>
+
+  <!-- ============================================================
+       Standard submissions list (Submissions menu — all forms)
+  ============================================================ -->
   <record id="view_smart_form_submission_list" model="ir.ui.view">
     <field name="name">smart.form.submission.list</field>
     <field name="model">smart.form.submission</field>
     <field name="arch" type="xml">
-      <list>
-        <field name="create_date"/>
-        <field name="form_id"/>
-        <field name="ip"/>
-        <field name="user_agent"/>
-        <field name="target_model" readonly="1"/>
-        <field name="target_res_id" readonly="1"/>
+      <list default_order="create_date desc">
+        <field name="create_date" string="Submitted On" widget="datetime"/>
+        <field name="form_id" string="Form"/>
+        <field name="key_value" string="Key Value" optional="show"/>
+        <field name="ip" string="IP" optional="show"/>
+        <field name="user_agent" string="Browser" optional="hide"/>
+        <field name="target_model" readonly="1" optional="hide"/>
+        <field name="target_res_id" readonly="1" optional="hide"/>
       </list>
     </field>
   </record>
 
+  <!-- ============================================================
+       Submissions TABLE view — one form at a time, per-form columns
+       Opened from the "Submissions Table" menu (scoped by form via
+       action domain) or from action_view_submissions_table on form.
+       Rows are clickable → opens form detail view.
+       Export button available via Odoo's built-in list export (⚙ Action > Export).
+  ============================================================ -->
+  <record id="view_smart_form_submission_table_list" model="ir.ui.view">
+    <field name="name">smart.form.submission.table.list</field>
+    <field name="model">smart.form.submission</field>
+    <field name="arch" type="xml">
+      <list string="Submissions Table"
+            default_order="create_date desc"
+            export_xlsx="1"
+            multi_edit="0">
+        <field name="create_date" string="Submitted On" widget="datetime"/>
+        <field name="key_value" string="Key" decoration-bf="True"/>
+        <field name="form_id" string="Form" optional="hide"/>
+        <field name="ip" string="IP" optional="hide"/>
+        <field name="data_json" string="Raw Data" optional="hide"/>
+      </list>
+    </field>
+  </record>
+
+  <!-- ============================================================
+       Full submission detail (form view)
+       Opened when clicking any row in either list view.
+  ============================================================ -->
   <record id="view_smart_form_submission_form" model="ir.ui.view">
     <field name="name">smart.form.submission.form</field>
     <field name="model">smart.form.submission</field>
     <field name="arch" type="xml">
-      <form>
+      <form string="Submission Detail">
         <sheet>
           <group>
             <group>
               <field name="form_id" readonly="1"/>
-              <field name="create_date" readonly="1"/>
+              <field name="create_date" readonly="1" widget="datetime"/>
+              <field name="key_value" readonly="1" string="Key Value"
+                     invisible="not key_value"/>
             </group>
             <group>
               <field name="ip" readonly="1"/>
               <field name="user_agent" readonly="1"/>
-              <field name="target_model" readonly="1" invisible="not target_model"/>
-              <field name="target_res_id" readonly="1" invisible="not target_res_id"/>
+              <field name="target_model" readonly="1"
+                     invisible="not target_model"/>
+              <field name="target_res_id" readonly="1"
+                     invisible="not target_res_id"/>
             </group>
           </group>
 
@@ -42,4 +79,5 @@
       </form>
     </field>
   </record>
+
 </odoo>

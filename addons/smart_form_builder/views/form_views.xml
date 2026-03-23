@@ -7,8 +7,9 @@
         <field name="name"/>
         <field name="token"/>
         <field name="submission_count" string="Submissions"/>
+        <field name="key_field_label" string="Key Field" optional="show"/>
         <field name="active"/>
-              <field name="target_model_id" options="{'no_create': True}"/>
+        <field name="target_model_id" options="{'no_create': True}"/>
       </list>
     </field>
   </record>
@@ -27,22 +28,35 @@
           <group>
             <field name="name"/>
             <field name="active"/>
-              <field name="target_model_id" options="{'no_create': True}"/>
+            <field name="target_model_id" options="{'no_create': True}"/>
             <field name="token" readonly="1"/>
+            <field name="key_field_label" readonly="1" string="Key Field"
+                   invisible="not key_field_label"/>
           </group>
 
           <notebook>
             <page string="Fields">
               <field name="field_ids">
                 <list editable="bottom">
-                  <field name="sequence"/>
+                  <field name="sequence" widget="handle"/>
                   <field name="label"/>
                   <field name="field_type"/>
                   <field name="required"/>
-                  <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
-                  <button type="action" name="%(action_smart_form_select_config_wizard)d" string="Configure" class="btn-link" context="{'default_field_id': id}" invisible="field_type != 'select'"/>
+                  <field name="is_key_field" string="Key"
+                         invisible="field_type == 'subheading'"
+                         widget="boolean_toggle"/>
+                  <field name="option_source"
+                         invisible="field_type not in ('select','radio','checkbox')"/>
+                  <button type="action" name="%(action_smart_form_select_config_wizard)d"
+                          string="Configure" class="btn-link"
+                          context="{'default_field_id': id}"
+                          invisible="field_type != 'select'"/>
                 </list>
               </field>
+              <p class="text-muted">
+                Mark one field as <strong>Key</strong> — it labels each row in the
+                Submissions Table (e.g. Email or Name).
+              </p>
             </page>
 
             <page string="Branching">
@@ -75,13 +89,15 @@
 
             <page string="Submissions">
               <field name="submission_ids" readonly="1">
-                <list>
-                  <field name="create_date"/>
+                <list default_order="create_date desc">
+                  <field name="create_date" string="Submitted On" widget="datetime"/>
+                  <field name="key_value" string="Key Value"/>
                   <field name="ip"/>
-                  <field name="user_agent"/>
+                  <field name="user_agent" optional="hide"/>
                 </list>
               </field>
             </page>
+
           </notebook>
         </sheet>
       </form>

@@ -9,6 +9,8 @@
         <field name="label"/>
         <field name="field_type"/>
         <field name="required"/>
+        <field name="is_key_field" string="Key" widget="boolean_toggle"
+               invisible="field_type == 'subheading'"/>
         <field name="option_source" invisible="field_type not in ('select','radio','checkbox')"/>
       </list>
     </field>
@@ -34,6 +36,8 @@
             <field name="label"/>
             <field name="field_type"/>
             <field name="required"/>
+            <field name="is_key_field" string="Use as Key Field"
+                   invisible="field_type == 'subheading'"/>
           </group>
 
           <group string="Options" invisible="field_type not in ('select','radio','checkbox')">
