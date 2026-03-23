@@ -117,6 +117,13 @@ class SmartFormTable(http.Controller):
             </div>
         </th>'''
 
+        th_chain = '''<th class="col-field" title="Submission Chain" style="min-width:60px;width:60px;">
+            <div class="th-inner" style="min-width:auto;">
+                <span class="th-icon">&#128279;</span>
+                <span class="th-label">Chain</span>
+            </div>
+        </th>'''
+
         th_cols = ""
         for c in cols:
             icon = {
@@ -434,6 +441,7 @@ class SmartFormTable(http.Controller):
       <thead>
         <tr>
           %(th_date)s
+          %(th_chain)s
           %(th_cols)s
         </tr>
       </thead>
@@ -474,7 +482,7 @@ class SmartFormTable(http.Controller):
     # ----------------------------------------------------------
     @http.route("/smart_form/chain/<int:submission_id>", type="http", auth="user", website=False)
     def submission_chain(self, submission_id, **kw):
-        """Show all linked submissions for a branching chain."""
+        """Show all linked submissions in a branching chain."""
         sub = request.env["smart.form.submission"].sudo().browse(submission_id)
         if not sub.exists():
             return request.not_found()
@@ -486,7 +494,8 @@ class SmartFormTable(http.Controller):
                           .replace(">","&gt;").replace('"',"&quot;"))
 
         def fmt_val(val, ftype, sub_id):
-            if val is None or val == "": return "<span style='color:#ccc;'>—</span>"
+            if val is None or val == "":
+                return "<span style='color:#ccc;'>&#8212;</span>"
             if isinstance(val, list):
                 return ", ".join(esc(str(v)) for v in val if v)
             if isinstance(val, dict):
@@ -494,138 +503,130 @@ class SmartFormTable(http.Controller):
             s = str(val)
             if ftype == "file":
                 url = "/smart_form/file/%d/%s" % (sub_id, esc(s))
-                return '<a href="%s" target="_blank" style="color:#4f46e5;">&#128206; %s</a>' % (url, esc(s))
+                return "<a href='%s' target='_blank' style='color:#4f46e5;'>&#128206; %s</a>" % (url, esc(s))
             if ftype == "email":
-                return '<a href="mailto:%s" style="color:#4f46e5;">%s</a>' % (esc(s), esc(s))
+                return "<a href='mailto:%s' style='color:#4f46e5;'>%s</a>" % (esc(s), esc(s))
             if ftype == "phone":
-                return '<a href="tel:%s" style="color:#4f46e5;">%s</a>' % (esc(s), esc(s))
+                return "<a href='tel:%s' style='color:#4f46e5;'>%s</a>" % (esc(s), esc(s))
             return esc(s)
 
-        # Build one card per submission in chain
+        STEP_COLORS = ["#4f46e5", "#7c3aed", "#0891b2", "#059669", "#d97706"]
         cards_html = ""
+
         for idx, s in enumerate(chain):
             try:
                 data = json.loads(s.data_json or "{}")
             except Exception:
                 data = {}
 
-            # Build label/type maps from form fields
-            label_map = {}
-            type_map  = {}
+            label_map, type_map = {}, {}
             if s.form_id:
                 for f in s.form_id.field_ids:
                     k = f.name or ("field_%s" % f.id)
                     label_map[k] = f.label or k
                     type_map[k]  = f.field_type
 
-            known = [f.name or ("field_%s" % f.id)
-                     for f in s.form_id.field_ids if f.field_type != "subheading"] if s.form_id else []
+            known = ([f.name or ("field_%s" % f.id)
+                      for f in s.form_id.field_ids if f.field_type != "subheading"]
+                     if s.form_id else [])
             all_keys = known + [k for k in data if k not in known]
 
             rows = ""
             for i, key in enumerate(all_keys):
-                if key not in data: continue
-                bg    = "#fff" if i % 2 == 0 else "#f9fafb"
-                label = label_map.get(key, key.replace("_"," ").title())
-                val   = fmt_val(data[key], type_map.get(key,"text"), s.id)
+                if key not in data:
+                    continue
+                bg    = "#ffffff" if i % 2 == 0 else "#f9fafb"
+                label = label_map.get(key, key.replace("_", " ").title())
+                val   = fmt_val(data[key], type_map.get(key, "text"), s.id)
                 rows += (
-                    "<tr style='background:%s;border-bottom:1px solid #eef0f3;'>"
+                    "<tr style='background:" + bg + ";border-bottom:1px solid #eef0f3;'>"
                     "<td style='padding:9px 14px;font-weight:600;color:#374151;font-size:0.85rem;"
-                    "width:35%;white-space:nowrap;vertical-align:top;'>%s</td>"
-                    "<td style='padding:9px 14px;color:#1a202c;font-size:0.875rem;vertical-align:top;'>%s</td>"
+                    "width:35%;white-space:nowrap;vertical-align:top;'>" + esc(label) + "</td>"
+                    "<td style='padding:9px 14px;color:#1a202c;font-size:0.875rem;vertical-align:top;'>" + val + "</td>"
                     "</tr>"
-                ) % (bg, esc(label), val)
+                )
 
-            dt = s.create_date.strftime("%d %b %Y, %H:%M") if s.create_date else ""
-            step_color = ["#4f46e5","#7c3aed","#0891b2","#059669","#d97706"][idx % 5]
-            key_val = esc(s.key_value or "—")
+            color     = STEP_COLORS[idx % len(STEP_COLORS)]
+            dt        = s.create_date.strftime("%d %b %Y, %H:%M") if s.create_date else ""
+            form_name = esc(s.form_id.name if s.form_id else "Unknown Form")
+            key_badge = ""
+            if s.key_value:
+                key_badge = (
+                    "<span style='background:" + color + ";color:#fff;border-radius:5px;"
+                    "padding:1px 8px;font-size:0.72rem;font-weight:700;margin-left:6px;'>"
+                    + esc(s.key_value) + "</span>"
+                )
+            no_data_row = (
+                "<tr><td colspan='2' style='padding:16px;color:#aaa;text-align:center;'>No data</td></tr>"
+            )
 
-            cards_html += """
-            <div style="margin-bottom:28px;">
-              <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-                <div style="background:%(color)s;color:#fff;border-radius:50%;width:32px;height:32px;
-                            display:flex;align-items:center;justify-content:center;font-weight:700;
-                            font-size:0.9rem;flex-shrink:0;">%(step)s</div>
-                <div>
-                  <div style="font-weight:700;font-size:1rem;color:#1a202c;">%(form_name)s</div>
-                  <div style="font-size:0.8rem;color:#6b7280;">%(dt)s
-                    %(key_badge)s
-                  </div>
-                </div>
-              </div>
-              <div style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;
-                          box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-                <table style="width:100%;border-collapse:collapse;">
-                  <tbody>%(rows)s</tbody>
-                </table>
-              </div>
-            </div>CARD_SEPARATOR""" % {
-                "color":     step_color,
-                "step":      idx + 1,
-                "form_name": esc(s.form_id.name if s.form_id else "Unknown Form"),
-                "dt":        dt,
-                "key_badge": ('<span style="background:%s;color:#fff;border-radius:5px;'
-                              'padding:1px 8px;font-size:0.72rem;font-weight:700;margin-left:6px;">%s</span>'
-                              % (step_color, key_val)) if s.key_value else "",
-                "rows":      rows or "<tr><td colspan='2' style='padding:16px;color:#aaa;text-align:center;'>No data</td></tr>",
-            }
+            # Arrow connector between cards
+            if idx > 0:
+                cards_html += (
+                    "<div style='text-align:center;margin:4px 0 12px;font-size:1.4rem;color:#9ca3af;'>&#8595;</div>"
+                )
 
-        # Add step connector arrows between cards
-        if len(chain) > 1:
-            arrow = '<div style="text-align:center;margin:4px 0 12px;font-size:1.4rem;color:#9ca3af;">&#8595;</div>'
-            cards_html = arrow.join(cards_html.split('CARD_SEPARATOR'))
-        else:
-            cards_html = cards_html.replace('CARD_SEPARATOR', '')
+            cards_html += (
+                "<div style='margin-bottom:20px;'>"
+                  "<div style='display:flex;align-items:center;gap:12px;margin-bottom:10px;'>"
+                    "<div style='background:" + color + ";color:#fff;border-radius:50%;width:32px;height:32px;"
+                    "display:flex;align-items:center;justify-content:center;font-weight:700;"
+                    "font-size:0.9rem;flex-shrink:0;'>" + str(idx + 1) + "</div>"
+                    "<div>"
+                      "<div style='font-weight:700;font-size:1rem;color:#1a202c;'>" + form_name + "</div>"
+                      "<div style='font-size:0.8rem;color:#6b7280;'>" + esc(dt) + key_badge + "</div>"
+                    "</div>"
+                  "</div>"
+                  "<div style='border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;"
+                  "box-shadow:0 1px 4px rgba(0,0,0,0.06);'>"
+                    "<table style='width:100%;border-collapse:collapse;'>"
+                      "<tbody>" + (rows or no_data_row) + "</tbody>"
+                    "</table>"
+                  "</div>"
+                "</div>"
+            )
 
-        total = len(chain)
-        back_url = "javascript:history.back()"
+        total  = len(chain)
+        plural = "s" if total != 1 else ""
 
-        html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Submission Chain</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:#f0f2f8;color:#1a202c;min-height:100vh;}
-    .topbar{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:0 28px;height:60px;
-            display:flex;align-items:center;justify-content:space-between;
-            box-shadow:0 2px 10px rgba(79,70,229,0.3);position:sticky;top:0;z-index:100;}
-    .topbar-title{color:#fff;font-size:1rem;font-weight:700;}
-    .topbar-sub{color:rgba(255,255,255,0.65);font-size:0.78rem;margin-top:2px;}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:7px;
-         font-size:0.82rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;}
-    .btn-back{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);}
-    .btn-back:hover{background:rgba(255,255,255,0.25);}
-    .body-wrap{max-width:760px;margin:0 auto;padding:28px 20px 48px;}
-    .stat{background:#fff;border-radius:10px;padding:10px 18px;display:inline-flex;
-          align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,0.07);
-          font-size:0.85rem;margin-bottom:24px;}
-    .stat strong{font-weight:700;}
-  </style>
-</head>
-<body>
-<div class="topbar">
-  <div>
-    <div class="topbar-title">&#128279; Submission Chain</div>
-    <div class="topbar-sub">%(total)s form%(plural)s completed</div>
-  </div>
-  <a href="%(back_url)s" class="btn btn-back">&#8592; Back</a>
-</div>
-<div class="body-wrap">
-  <div class="stat">&#128203; <strong>%(total)s</strong> <span style="color:#6b7280;">form%(plural)s in this chain</span></div>
-  %(cards_html)s
-</div>
-</body>
-</html>""" % {
-            "total":      total,
-            "plural":     "s" if total != 1 else "",
-            "back_url":   back_url,
-            "cards_html": cards_html,
-        }
+        html = (
+            "<!DOCTYPE html>"
+            "<html lang='en'><head>"
+            "<meta charset='UTF-8'/>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1.0'/>"
+            "<title>Submission Chain</title>"
+            "<style>"
+            "*{box-sizing:border-box;margin:0;padding:0;}"
+            "body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:#f0f2f8;color:#1a202c;min-height:100vh;}"
+            ".topbar{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:0 28px;height:60px;"
+            "display:flex;align-items:center;justify-content:space-between;"
+            "box-shadow:0 2px 10px rgba(79,70,229,0.3);position:sticky;top:0;z-index:100;}"
+            ".topbar-title{color:#fff;font-size:1rem;font-weight:700;}"
+            ".topbar-sub{color:rgba(255,255,255,0.65);font-size:0.78rem;margin-top:2px;}"
+            ".btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:7px;"
+            "font-size:0.82rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;}"
+            ".btn-back{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);}"
+            ".body-wrap{max-width:760px;margin:0 auto;padding:28px 20px 48px;}"
+            ".stat{background:#fff;border-radius:10px;padding:10px 18px;display:inline-flex;"
+            "align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,0.07);"
+            "font-size:0.85rem;margin-bottom:24px;}"
+            "</style></head><body>"
+            "<div class='topbar'>"
+              "<div>"
+                "<div class='topbar-title'>&#128279; Submission Chain</div>"
+                "<div class='topbar-sub'>" + str(total) + " form" + plural + " completed</div>"
+              "</div>"
+              "<a href='javascript:history.back()' class='btn btn-back'>&#8592; Back</a>"
+            "</div>"
+            "<div class='body-wrap'>"
+              "<div class='stat'>&#128203; <strong>" + str(total) + "</strong>"
+              " <span style='color:#6b7280;'>form" + plural + " in this chain</span></div>"
+              + cards_html +
+            "</div>"
+            "</body></html>"
+        )
 
-        return request.make_response(html, [("Content-Type","text/html;charset=utf-8")])
+        return request.make_response(html, [("Content-Type", "text/html; charset=utf-8")])
 
     # ----------------------------------------------------------
     # File attachment download
@@ -679,7 +680,27 @@ class SmartFormTable(http.Controller):
         submissions = request.env["smart.form.submission"].sudo().search(
             [("form_id", "=", form.id)], order="create_date desc"
         )
-        cols   = self._build_columns(form, submissions)
+        cols = self._build_columns(form, submissions)
+
+        # Also collect columns from linked chain forms
+        chain_forms = {}  # form_id -> form record, ordered by chain_depth
+        for sub in submissions:
+            if sub.session_token:
+                chain_subs = request.env["smart.form.submission"].sudo().search(
+                    [("session_token", "=", sub.session_token),
+                     ("form_id", "!=", form.id)],
+                    order="chain_depth asc"
+                )
+                for cs in chain_subs:
+                    if cs.form_id.id not in chain_forms:
+                        chain_forms[cs.form_id.id] = cs.form_id
+
+        chain_cols = []  # list of (form_label_prefix, col_dict)
+        for fid, cf in chain_forms.items():
+            cf_subs = request.env["smart.form.submission"].sudo().search(
+                [("form_id", "=", fid)], limit=50)
+            for col in self._build_columns(cf, cf_subs):
+                chain_cols.append((cf.name, col))
 
         wb = Workbook()
         ws = wb.active
@@ -784,7 +805,11 @@ class SmartFormTable(http.Controller):
         output = io.StringIO()
         import csv as _csv
         writer = _csv.writer(output)
-        writer.writerow(["Submitted On"] + [c["label"] for c in cols])
+        writer.writerow(
+            ["Submitted On"] +
+            [c["label"] for c in cols] +
+            [("[%s] %s" % (form_prefix, c["label"])) for form_prefix, c in chain_cols]
+        )
         for sub in submissions:
             try:
                 data = json.loads(sub.data_json or "{}")
