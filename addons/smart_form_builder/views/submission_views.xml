@@ -13,8 +13,6 @@
         <field name="key_value" string="Key Value" optional="show"/>
         <field name="ip" string="IP" optional="show"/>
         <field name="user_agent" string="Browser" optional="hide"/>
-        <field name="target_model" readonly="1" optional="hide"/>
-        <field name="target_res_id" readonly="1" optional="hide"/>
       </list>
     </field>
   </record>
@@ -63,10 +61,6 @@
             <group>
               <field name="ip" readonly="1"/>
               <field name="user_agent" readonly="1"/>
-              <field name="target_model" readonly="1"
-                     invisible="not target_model"/>
-              <field name="target_res_id" readonly="1"
-                     invisible="not target_res_id"/>
             </group>
           </group>
 
