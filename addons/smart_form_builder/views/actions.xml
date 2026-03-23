@@ -24,19 +24,4 @@
     <field name="target">new</field>
     <field name="context">{'default_field_id': active_id}</field>
   </record>
-
-  <!--
-    Submissions Table action:
-    - view_id removed (not valid alongside view_mode list,form in Odoo 18)
-    - The table list view is registered separately and Odoo picks it up
-      because it has a lower priority (no inherit) than the default list
-    - Grouped by form_id by default
-  -->
-  <record id="action_smart_form_data_table" model="ir.actions.act_window">
-    <field name="name">Submissions Table</field>
-    <field name="res_model">smart.form.submission</field>
-    <field name="view_mode">list,form</field>
-    <field name="context">{'group_by': ['form_id']}</field>
-  </record>
-
 </odoo>
