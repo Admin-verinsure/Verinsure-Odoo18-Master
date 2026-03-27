@@ -2,7 +2,7 @@
 <odoo>
   <data noupdate="0">
 
-    
+    <!-- 1) Member-type selector – unchanged -->
     <template id="ldap_reset_password.signup_is_member" name="Choose Signup Type">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -11,23 +11,23 @@
           .simple-auth .sub { color: #6b7280; margin-bottom: 20px; }
           .simple-auth .btn { border-radius: 10px; }
         ]]></style>
-
         <div class="container">
           <div class="simple-auth">
             <h2 class="title text-primary">Are you a Rotary International Member?</h2>
             <p class="sub">Choose your signup type to continue.</p>
             <div class="d-flex justify-content-center gap-3 flex-wrap">
-              <a href="/web/signup" class="btn btn-dark px-5 py-2">Yes, I’m a Member</a>
-              <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2">No, I’m a Non-Member</a>
+              <a href="/web/signup"            class="btn btn-dark px-5 py-2">Yes, I'm a Member</a>
+              <a href="/web/signup_non_member" class="btn btn-outline-secondary px-5 py-2">No, I'm a Non-Member</a>
             </div>
           </div>
         </div>
       </t>
     </template>
 
-    <!-- 2) Member Signup – centered layout, minimal CSS/JS -->
+    <!-- 2) Member Signup + reCAPTCHA -->
     <template id="ldap_reset_password.signup" name="Rotary Member Signup">
       <t t-call="web.login_layout">
+        <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer"/>
         <style type="text/css"><![CDATA[
           .signup-wrap { max-width: 420px; margin: 60px auto; text-align: center; }
           .signup-wrap h3 { font-weight: 500; margin-bottom: 18px; font-size: 1.6rem; }
@@ -37,19 +37,19 @@
           .signup-actions { display:flex; align-items:center; gap:.5rem; justify-content:center; flex-wrap:wrap; margin-top:6px; }
           .signup-btn { background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:10px; padding:.65rem 1.4rem; transition:background .15s ease; }
           .signup-btn:hover { background:#1d4ed8; }
+          .signup-btn:disabled, .signup-btn[disabled] { background:#93c5fd; border-color:#93c5fd; cursor:not-allowed; }
           .login-hint { font-size:.92rem; color:#6b7280; }
           .login-hint a { color:#2563eb; text-decoration:none; }
           .login-hint a:hover { text-decoration:underline; }
+          .g-recaptcha { display:inline-block; margin-bottom:12px; }
         ]]></style>
 
         <div class="container">
           <div class="signup-wrap">
             <h3>Rotary Member Signup</h3>
-
             <t t-if="error">
               <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
             </t>
-
             <form method="post" action="/web/signup" class="oe_signup_form needs-validation" novalidate="novalidate">
               <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
@@ -58,33 +58,31 @@
                 <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
                        required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
-
               <div class="field">
                 <label>Last Name</label>
                 <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
                        required="required" autocomplete="family-name" t-att-value="last_name"/>
               </div>
-
               <div class="field">
                 <label>Email</label>
                 <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
                        required="required" autocomplete="email" t-att-value="email"/>
               </div>
-
               <div class="field">
                 <label>Rotary International Number</label>
-                <input type="text" name="rotary_id" class="form-control" placeholder="5–8 digit Rotary ID"
+                <input type="text" name="rotary_id" class="form-control" placeholder="5-8 digit Rotary ID"
                        required="required" t-att-value="rotary_id"/>
               </div>
 
               <div class="field">
                 <label>Program Type</label>
-                <select name="club_type" id="club_type" class="form-select" required="required">
+                <select name="program_type_id" id="program_type_id" class="form-select" required="required">
                   <option value="">-- Select Program Type --</option>
-                  <t t-set="club_types"
-                     t-value="(env['res.partner']._fields.get('club_type') and env['res.partner']._fields['club_type'].selection) or []"/>
-                  <t t-foreach="club_types" t-as="opt">
-                    <option t-att-value="opt[0]" t-att-selected="request.params.get('club_type') == opt[0]"><t t-esc="opt[1]"/></option>
+                  <t t-foreach="program_types" t-as="pt">
+                    <option t-att-value="pt.id"
+                            t-att-selected="(request.params.get('program_type_id') and int(request.params.get('program_type_id') or 0) == pt.id) or None">
+                      <t t-esc="pt.name"/>
+                    </option>
                   </t>
                 </select>
               </div>
@@ -92,23 +90,7 @@
               <div class="field">
                 <label>Club Name</label>
                 <select name="rotary_club_id" id="rotary_club_id" class="form-select" required="required">
-                  <t t-set="sel_program" t-value="request.params.get('club_type')"/>
-                  <t t-set="clubs"
-                     t-value="sel_program
-                              and env['res.partner'].sudo().search([('club_type', '=', sel_program), ('active', '=', True)], order='name')
-                              or env['res.partner'].browse([])"/>
-                  <t t-if="not sel_program">
-                    <option value="">-- Select Program Type first --</option>
-                  </t>
-                  <t t-if="sel_program and not clubs">
-                    <option value="">-- No clubs found for this program --</option>
-                  </t>
-                  <t t-foreach="clubs" t-as="c">
-                    <option t-att-value="c.id"
-                            t-att-selected="(request.params.get('rotary_club_id') and int(request.params.get('rotary_club_id') or 0) == c.id) or None">
-                      <t t-esc="c.club_name or c.name"/>
-                    </option>
-                  </t>
+                  <option value="">-- Select Program Type first --</option>
                 </select>
               </div>
 
@@ -117,7 +99,6 @@
                 <input type="password" name="password" id="m_password" class="form-control"
                        required="required" autocomplete="new-password"/>
               </div>
-
               <div class="field">
                 <label>Confirm Password</label>
                 <input type="password" name="confirm_password" id="m_confirm" class="form-control"
@@ -125,8 +106,27 @@
                 <div class="invalid-feedback" id="m_msg" style="display:none">Passwords do not match</div>
               </div>
 
+              <!-- reCAPTCHA widget – only rendered when keys are configured -->
+              <t t-if="recaptcha_site_key">
+                <div class="field text-center">
+                  <div class="g-recaptcha"
+                       t-att-data-sitekey="recaptcha_site_key"
+                       data-callback="rotaryOnCaptchaSuccess"
+                       data-expired-callback="rotaryOnCaptchaExpired"/>
+                </div>
+              </t>
+
               <div class="signup-actions">
-                <button type="submit" class="signup-btn">Sign up</button>
+                <!--
+                  disabled until CAPTCHA is solved (UX layer only).
+                  Backend always re-validates regardless of this state.
+                  When keys are not configured the button stays enabled
+                  so administrators can test the rest of the flow.
+                -->
+                <button type="submit" class="signup-btn" id="m_submit_btn"
+                        t-att-disabled="'disabled' if recaptcha_site_key else None">
+                  Sign up
+                </button>
                 <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
               </div>
             </form>
@@ -140,7 +140,6 @@
             var p = document.getElementById('m_password');
             var c = document.getElementById('m_confirm');
             var msg = document.getElementById('m_msg');
-
             function checkMatch() {
               if (p && c && p.value && c.value && p.value !== c.value) {
                 c.setCustomValidity('no-match');
@@ -152,20 +151,29 @@
             }
             if (p) p.addEventListener('input', checkMatch);
             if (c) c.addEventListener('input', checkMatch);
-
             form.addEventListener('submit', function (e) {
               checkMatch();
               if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
               form.classList.add('was-validated');
             }, false);
           })();
+
+          function rotaryOnCaptchaSuccess(token) {
+            var btn = document.getElementById('m_submit_btn');
+            if (btn) btn.removeAttribute('disabled');
+          }
+          function rotaryOnCaptchaExpired() {
+            var btn = document.getElementById('m_submit_btn');
+            if (btn) btn.setAttribute('disabled', 'disabled');
+          }
         ]]></script>
       </t>
     </template>
 
-    <!-- 3) Non-Member Signup – centered layout, same styles -->
+    <!-- 3) Non-Member Signup + reCAPTCHA -->
     <template id="ldap_reset_password.signup_non_member" name="Non-Member Signup">
       <t t-call="web.login_layout">
+        <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer"/>
         <style type="text/css"><![CDATA[
           .signup-wrap { max-width: 420px; margin: 60px auto; text-align: center; }
           .signup-wrap h3 { font-weight: 500; margin-bottom: 18px; font-size: 1.6rem; }
@@ -175,19 +183,19 @@
           .signup-actions { display:flex; align-items:center; gap:.5rem; justify-content:center; flex-wrap:wrap; margin-top:6px; }
           .signup-btn { background:#2563eb; color:#fff; border:1px solid #2563eb; border-radius:10px; padding:.65rem 1.4rem; transition:background .15s ease; }
           .signup-btn:hover { background:#1d4ed8; }
+          .signup-btn:disabled, .signup-btn[disabled] { background:#93c5fd; border-color:#93c5fd; cursor:not-allowed; }
           .login-hint { font-size:.92rem; color:#6b7280; }
           .login-hint a { color:#2563eb; text-decoration:none; }
           .login-hint a:hover { text-decoration:underline; }
+          .g-recaptcha { display:inline-block; margin-bottom:12px; }
         ]]></style>
 
         <div class="container">
           <div class="signup-wrap">
             <h3>Non-Member Signup</h3>
-
             <t t-if="error">
               <div class="alert alert-danger mb-3"><t t-esc="error"/></div>
             </t>
-
             <form method="post" action="/web/signup_non_member" class="oe_signup_form needs-validation" novalidate="novalidate">
               <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
@@ -196,25 +204,21 @@
                 <input type="text" name="first_name" class="form-control" placeholder="e.g. John"
                        required="required" autocomplete="given-name" t-att-value="first_name"/>
               </div>
-
               <div class="field">
                 <label>Last Name</label>
                 <input type="text" name="last_name" class="form-control" placeholder="e.g. Smith"
                        required="required" autocomplete="family-name" t-att-value="last_name"/>
               </div>
-
               <div class="field">
                 <label>Email</label>
                 <input type="email" name="email" class="form-control" placeholder="e.g. example@example.com"
                        required="required" autocomplete="email" t-att-value="email"/>
               </div>
-
               <div class="field">
                 <label>Password</label>
                 <input type="password" name="password" id="n_password" class="form-control"
                        required="required" autocomplete="new-password"/>
               </div>
-
               <div class="field">
                 <label>Confirm Password</label>
                 <input type="password" name="confirm_password" id="n_confirm" class="form-control"
@@ -222,8 +226,20 @@
                 <div class="invalid-feedback" id="n_msg" style="display:none">Passwords do not match</div>
               </div>
 
+              <t t-if="recaptcha_site_key">
+                <div class="field text-center">
+                  <div class="g-recaptcha"
+                       t-att-data-sitekey="recaptcha_site_key"
+                       data-callback="nmOnCaptchaSuccess"
+                       data-expired-callback="nmOnCaptchaExpired"/>
+                </div>
+              </t>
+
               <div class="signup-actions">
-                <button type="submit" class="signup-btn">Sign up</button>
+                <button type="submit" class="signup-btn" id="n_submit_btn"
+                        t-att-disabled="'disabled' if recaptcha_site_key else None">
+                  Sign up
+                </button>
                 <span class="login-hint">Already have an account? <a href="/web/login">Sign in</a></span>
               </div>
             </form>
@@ -237,7 +253,6 @@
             var p = document.getElementById('n_password');
             var c = document.getElementById('n_confirm');
             var msg = document.getElementById('n_msg');
-
             function checkMatch() {
               if (p && c && p.value && c.value && p.value !== c.value) {
                 c.setCustomValidity('no-match');
@@ -249,18 +264,26 @@
             }
             if (p) p.addEventListener('input', checkMatch);
             if (c) c.addEventListener('input', checkMatch);
-
             form.addEventListener('submit', function (e) {
               checkMatch();
               if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
               form.classList.add('was-validated');
             }, false);
           })();
+
+          function nmOnCaptchaSuccess(token) {
+            var btn = document.getElementById('n_submit_btn');
+            if (btn) btn.removeAttribute('disabled');
+          }
+          function nmOnCaptchaExpired() {
+            var btn = document.getElementById('n_submit_btn');
+            if (btn) btn.setAttribute('disabled', 'disabled');
+          }
         ]]></script>
       </t>
     </template>
 
-    <!-- 4) Thank You -->
+    <!-- 4) Thank You – unchanged -->
     <template id="ldap_reset_password.web_thanks" name="Signup Thank You">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -269,7 +292,7 @@
         <div class="container">
           <div class="simple-auth">
             <div class="alert alert-success fs-5 fw-semibold">
-              <i class="fa fa-check-circle me-2"></i><t t-esc="message"/>
+              <i class="fa fa-check-circle me-2"/><t t-esc="message"/>
             </div>
             <a href="/web/login" class="btn btn-dark mt-3 px-4 py-2">Go to Login</a>
           </div>
@@ -277,7 +300,7 @@
       </t>
     </template>
 
-    <!-- 5) Error -->
+    <!-- 5) Error – unchanged -->
     <template id="ldap_reset_password.web_error" name="Signup Error Page">
       <t t-call="web.login_layout">
         <style type="text/css"><![CDATA[
@@ -287,10 +310,10 @@
         <div class="container">
           <div class="simple-auth">
             <div class="alert alert-danger fs-5 fw-semibold">
-              <i class="fa fa-times-circle me-2"></i><t t-esc="message"/>
+              <i class="fa fa-times-circle me-2"/><t t-esc="message"/>
             </div>
-            <a href="/web/is_member" class="btn btn-secondary mt-3 me-2">Try Again</a>
-            <a href="/web/login" class="btn btn-outline-primary mt-3">Back to Login</a>
+            <a href="/web/is_member"  class="btn btn-secondary mt-3 me-2">Try Again</a>
+            <a href="/web/login"      class="btn btn-outline-primary mt-3">Back to Login</a>
           </div>
         </div>
       </t>
