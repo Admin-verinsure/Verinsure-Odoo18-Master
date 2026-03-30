@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="auth_signup_rewrite" inherit_id="auth_signup.fields">
+        <xpath expr="//div[@class='mb-3 field-confirm_password']" position="inside">
+        <t t-if="request.env['ir.config_parameter'].sudo().get_param('recaptcha_signup.enabled') == 'True'">
+        	<div style="margin-top:0.75rem;">
+		        <script src="https://www.google.com/recaptcha/api.js" async="1" defer="1"></script>
+			    <div class="g-recaptcha"
+		      	         t-att-data-sitekey="request.env['ir.config_parameter'].sudo().get_param('recaptcha_signup.public_key')"/>
+        	</div>
+        </t>
+        </xpath>
+    </template>
+</odoo>
