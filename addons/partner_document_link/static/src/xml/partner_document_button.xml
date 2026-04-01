@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- partner_document_button.xml
+     OWL templates for partner document button.
+     The stat button itself is declared in the view XML (res_partner_views.xml).
+     Add OWL templates here only if you create a custom OWL component.
+-->
+<templates>
+    <!-- Reserved for custom OWL component templates if needed -->
+</templates>

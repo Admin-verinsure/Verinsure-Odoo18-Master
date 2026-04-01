@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Inherit the standard res.partner form view (contacts/company)
+         and inject the Documents smart button in the stat buttons area.
+         Odoo 18 note: use <button> with type="object" inside
+         <div name="button_box"> which is the canonical stat-button zone.
+    ============================================================ -->
+
+    <record id="view_partner_form_document_button" model="ir.ui.view">
+        <field name="name">res.partner.form.document.button</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Target the existing button_box container -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+
+                <button
+                    name="action_open_documents"
+                    type="object"
+                    class="oe_stat_button o_partner_doc_btn"
+                    icon="fa-file-text-o"
+                    invisible="document_count == 0"
+                    groups="documents.group_documents_user"
+                >
+                    <field
+                        name="document_count"
+                        widget="statinfo"
+                        string="Documents"
+                    />
+                </button>
+
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Also inherit the simplified company form if it exists
+         (some installs have a dedicated company view).
+    ============================================================ -->
+
+    <record id="view_partner_form_company_document_button" model="ir.ui.view">
+        <field name="name">res.partner.form.company.document.button</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="active">False</field>   <!-- placeholder; real hook is above -->
+        <field name="arch" type="xml">
+            <data/>
+        </field>
+    </record>
+
+</odoo>
