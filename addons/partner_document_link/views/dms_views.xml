@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── dms.file form: add partner_id field ───────────────────────── -->
+    <record id="view_dms_file_form_partner" model="ir.ui.view">
+        <field name="name">dms.file.form.partner</field>
+        <field name="model">dms.file</field>
+        <field name="inherit_id" ref="dms.view_dms_file_form"/>
+        <field name="arch" type="xml">
+            <!-- Inject partner_id after the directory field -->
+            <xpath expr="//field[@name='directory_id']" position="after">
+                <field name="partner_id"
+                       options="{'no_create': True}"
+                       placeholder="Link to a Company or Contact…"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ── dms.file list: add partner_id column ──────────────────────── -->
+    <record id="view_dms_file_list_partner" model="ir.ui.view">
+        <field name="name">dms.file.list.partner</field>
+        <field name="model">dms.file</field>
+        <field name="inherit_id" ref="dms.view_dms_file_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='directory_id']" position="after">
+                <field name="partner_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ── dms.directory form: add partner_id field ──────────────────── -->
+    <record id="view_dms_directory_form_partner" model="ir.ui.view">
+        <field name="name">dms.directory.form.partner</field>
+        <field name="model">dms.directory</field>
+        <field name="inherit_id" ref="dms.view_dms_directory_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="after">
+                <field name="partner_id"
+                       options="{'no_create': True}"
+                       placeholder="Link to a Company or Contact…"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ── dms.directory list: add partner_id column ─────────────────── -->
+    <record id="view_dms_directory_list_partner" model="ir.ui.view">
+        <field name="name">dms.directory.list.partner</field>
+        <field name="model">dms.directory</field>
+        <field name="inherit_id" ref="dms.view_dms_directory_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="after">
+                <field name="partner_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
