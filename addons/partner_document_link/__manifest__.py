@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Partner Document Link',
+    'name': 'Partner Document Link (DMS)',
     'version': '18.0.1.0.0',
-    'summary': 'Link Documents to Companies & Contacts',
+    'summary': 'Smart button on Company/Contact to navigate to DMS files',
     'description': """
-        Adds a smart button on the res.partner (Company/Contact) form view
-        to navigate directly to related documents in the Documents module.
-        Supports filtering documents by partner (company or contact).
+        Adds a Documents smart button on the res.partner form view
+        (Company & Contact) linked to OCA DMS (dms.file / dms.directory).
+
+        Files are associated to a partner via the standard Odoo
+        res_model / res_id mechanism used by OCA DMS.
     """,
     'category': 'Documents',
     'author': 'Custom',
     'depends': [
         'base',
         'contacts',
-        'documents',          # Odoo Enterprise Documents module
+        'dms',          # OCA Document Management System
     ],
     'data': [
         'views/res_partner_views.xml',
     ],
     'assets': {
         'web.assets_backend': [
-            'partner_document_link/static/src/js/partner_document_button.js',
-            'partner_document_link/static/src/xml/partner_document_button.xml',
             'partner_document_link/static/src/css/partner_document_button.css',
         ],
     },

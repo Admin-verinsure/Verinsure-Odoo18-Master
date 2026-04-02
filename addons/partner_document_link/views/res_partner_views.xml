@@ -1,53 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ============================================================
-         Inherit the standard res.partner form view (contacts/company)
-         and inject the Documents smart button in the stat buttons area.
-         Odoo 18 note: use <button> with type="object" inside
-         <div name="button_box"> which is the canonical stat-button zone.
-    ============================================================ -->
+    <!--
+        Inherit the standard res.partner form view and add a DMS smart button.
 
-    <record id="view_partner_form_document_button" model="ir.ui.view">
-        <field name="name">res.partner.form.document.button</field>
+        Odoo 18 notes:
+        - Use invisible="..." inline expressions (attrs removed in v18)
+        - button type="object" calls a Python method on the model
+        - widget="statinfo" renders the count + label in stat-button style
+        - No security group restriction here so it works for all DMS setups;
+          add groups="dms.group_dms_user" if your DMS version has that group
+    -->
+
+    <record id="view_partner_form_dms_button" model="ir.ui.view">
+        <field name="name">res.partner.form.dms.button</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
 
-            <!-- Target the existing button_box container -->
             <xpath expr="//div[@name='button_box']" position="inside">
-
                 <button
-                    name="action_open_documents"
+                    name="action_open_dms_files"
                     type="object"
-                    class="oe_stat_button o_partner_doc_btn"
-                    icon="fa-file-text-o"
-                    invisible="document_count == 0"
-                    groups="documents.group_documents_user"
+                    class="oe_stat_button o_partner_dms_btn"
+                    icon="fa-folder-open-o"
                 >
                     <field
-                        name="document_count"
+                        name="dms_file_count"
                         widget="statinfo"
                         string="Documents"
                     />
                 </button>
-
             </xpath>
-        </field>
-    </record>
 
-    <!-- ============================================================
-         Also inherit the simplified company form if it exists
-         (some installs have a dedicated company view).
-    ============================================================ -->
-
-    <record id="view_partner_form_company_document_button" model="ir.ui.view">
-        <field name="name">res.partner.form.company.document.button</field>
-        <field name="model">res.partner</field>
-        <field name="inherit_id" ref="base.view_res_partner_filter"/>
-        <field name="active">False</field>   <!-- placeholder; real hook is above -->
-        <field name="arch" type="xml">
-            <data/>
         </field>
     </record>
 
