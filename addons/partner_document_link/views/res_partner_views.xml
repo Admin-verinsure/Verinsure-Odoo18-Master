@@ -2,23 +2,27 @@
 <odoo>
 
     <!--
-        Inherit the standard res.partner form view and add a DMS smart button.
+        ================================================================
+        Add DMS Documents smart button to res.partner (Company/Contact)
+        ================================================================
 
-        Odoo 18 notes:
-        - Use invisible="..." inline expressions (attrs removed in v18)
-        - button type="object" calls a Python method on the model
-        - widget="statinfo" renders the count + label in stat-button style
-        - No security group restriction here so it works for all DMS setups;
-          add groups="dms.group_dms_user" if your DMS version has that group
+        Odoo 18 XPath strategy:
+        - attrs={} is REMOVED in v18, use inline invisible="expr"
+        - Smart button area uses class "oe_button_box"
+        - TWO inherited views:
+            1. Targets oe_button_box when other modules (sale/account) create it
+            2. Fallback injects the button box before the name field always
+        - priority: lower number = applied first / higher priority
     -->
 
-    <record id="view_partner_form_dms_button" model="ir.ui.view">
-        <field name="name">res.partner.form.dms.button</field>
+    <!-- Primary: inject into EXISTING button box (when sale/account installed) -->
+    <record id="view_partner_form_dms_btn_primary" model="ir.ui.view">
+        <field name="name">res.partner.form.dms.btn.primary</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">16</field>
         <field name="arch" type="xml">
-
-            <xpath expr="//div[@name='button_box']" position="inside">
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
                 <button
                     name="action_open_dms_files"
                     type="object"
@@ -32,7 +36,33 @@
                     />
                 </button>
             </xpath>
+        </field>
+    </record>
 
+    <!-- Fallback: create button box before the name field (always present) -->
+    <record id="view_partner_form_dms_btn_fallback" model="ir.ui.view">
+        <field name="name">res.partner.form.dms.btn.fallback</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="before">
+                <div class="oe_button_box" name="button_box"
+                     invisible="not id">
+                    <button
+                        name="action_open_dms_files"
+                        type="object"
+                        class="oe_stat_button o_partner_dms_btn"
+                        icon="fa-folder-open-o"
+                    >
+                        <field
+                            name="dms_file_count"
+                            widget="statinfo"
+                            string="Documents"
+                        />
+                    </button>
+                </div>
+            </xpath>
         </field>
     </record>
 
