@@ -1,21 +1,14 @@
-/* partner_document_button.css
-   Custom styling for the Documents smart button on res.partner form.
-   Odoo 18 uses Bootstrap 5 + its own design tokens.
-*/
+/* partner_document_button.css — DMS smart button styling for Odoo 18 */
 
-/* Subtle highlight so the Documents button stands out */
-.o_partner_doc_btn {
-    /* Odoo 18 stat buttons already have consistent styling via .oe_stat_button.
-       Only override what you need. */
+.o_partner_dms_btn {
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.o_partner_doc_btn:hover {
+.o_partner_dms_btn:hover {
     background-color: rgba(var(--bs-primary-rgb), 0.08);
     box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.2);
 }
 
-/* Ensure the icon colour follows Odoo's primary accent */
-.o_partner_doc_btn .fa {
-    color: var(--o-action-color, #017e84);
+.o_partner_dms_btn .fa {
+    color: #e07b39;   /* warm folder-orange to match DMS icon aesthetics */
 }
