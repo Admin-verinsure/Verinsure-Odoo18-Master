@@ -10,7 +10,5 @@ class DmsFile(models.Model):
         string='Related Partner',
         index=True,
         tracking=True,
-        help='Link this document directly to a company or contact. '
-             'Once set, the document will appear on that partner\'s '
-             'Documents smart button.',
+        help='Explicitly link this file to a Company or Contact.',
     )

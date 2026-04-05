@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
     <!--
-        ================================================================
-        Add DMS Documents smart button to res.partner (Company/Contact)
-        ================================================================
+        Odoo 18 syntax rules used throughout:
+        ──────────────────────────────────────
+        • <tree> → <list>  (tree tag deprecated/removed in v18)
+        • attrs={}         → inline invisible="expr"  (attrs removed in v18)
+        • optional="show"  → NOT used on list columns (causes ParseError in v18
+                             when the parent list view tag is unknown)
+        • hasclass()       → used for class-based XPath (robust across versions)
 
-        Odoo 18 XPath strategy:
-        - attrs={} is REMOVED in v18, use inline invisible="expr"
-        - Smart button area uses class "oe_button_box"
-        - TWO inherited views:
-            1. Targets oe_button_box when other modules (sale/account) create it
-            2. Fallback injects the button box before the name field always
-        - priority: lower number = applied first / higher priority
+        TWO inherited views strategy:
+        1. Priority 16 — injects into existing oe_button_box (when Sale /
+           Accounting add their own buttons first).
+        2. Priority 100 — fallback that creates the button box before the
+           partner name field, which ALWAYS exists in base.view_partner_form.
     -->
 
-    <!-- Primary: inject into EXISTING button box (when sale/account installed) -->
+    <!-- ── Primary: existing oe_button_box ───────────────────────────── -->
     <record id="view_partner_form_dms_btn_primary" model="ir.ui.view">
         <field name="name">res.partner.form.dms.btn.primary</field>
         <field name="model">res.partner</field>
@@ -39,7 +40,7 @@
         </field>
     </record>
 
-    <!-- Fallback: create button box before the name field (always present) -->
+    <!-- ── Fallback: inject button box before name field ─────────────── -->
     <record id="view_partner_form_dms_btn_fallback" model="ir.ui.view">
         <field name="name">res.partner.form.dms.btn.fallback</field>
         <field name="model">res.partner</field>

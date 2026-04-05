@@ -1,14 +1,4 @@
-/* partner_document_button.css — DMS smart button styling for Odoo 18 */
-
-.o_partner_dms_btn {
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.o_partner_dms_btn:hover {
-    background-color: rgba(var(--bs-primary-rgb), 0.08);
-    box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.2);
-}
-
-.o_partner_dms_btn .fa {
-    color: #e07b39;   /* warm folder-orange to match DMS icon aesthetics */
-}
+/* partner_document_button.css — Odoo 18 */
+.o_partner_dms_btn { transition: background-color 0.15s ease, box-shadow 0.15s ease; }
+.o_partner_dms_btn:hover { background-color: rgba(var(--bs-primary-rgb), 0.08); box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.2); }
+.o_partner_dms_btn .fa { color: #e07b39; }

@@ -10,17 +10,8 @@ class ResPartner(models.Model):
         compute='_compute_dms_file_count',
     )
 
-    # ------------------------------------------------------------------ #
-    #  Helpers                                                             #
-    # ------------------------------------------------------------------ #
-
     def _get_all_related_partner_ids(self):
-        """
-        For a company  → itself + all child contacts.
-        For a contact  → only itself.
-        This ensures that a company's button shows files tagged to
-        any of its child contacts as well.
-        """
+        """Company → itself + all child contacts. Contact → itself only."""
         self.ensure_one()
         if self.is_company:
             children = self.env['res.partner'].search([
@@ -29,76 +20,53 @@ class ResPartner(models.Model):
             return (self | children).ids
         return self.ids
 
-    # ------------------------------------------------------------------ #
-    #  Computed field                                                      #
-    # ------------------------------------------------------------------ #
-
     def _compute_dms_file_count(self):
         """
-        Count DMS documents linked to this partner via the explicit
-        partner_id field we add to dms.file AND via partner_id on
-        dms.directory (all files inside a partner-linked folder count too).
-
-        Two sources are combined without double-counting:
-          1. Files where dms.file.partner_id = this partner
-          2. Files inside directories where dms.directory.partner_id = this partner
+        Count dms.file records linked to this partner via:
+          1. dms.file.partner_id  (direct file tag)
+          2. dms.directory.partner_id → files in those directories
+        Both sources are unioned (no double-count).
         """
         DmsFile = self.env['dms.file']
         DmsDirectory = self.env['dms.directory']
 
         for partner in self:
-            partner_ids = partner._get_all_related_partner_ids()
+            pids = partner._get_all_related_partner_ids()
 
-            # Source 1: files directly tagged to partner
-            direct_file_ids = DmsFile.search([
-                ('partner_id', 'in', partner_ids),
+            direct_ids = set(DmsFile.search([
+                ('partner_id', 'in', pids),
+            ]).ids)
+
+            dir_ids = DmsDirectory.search([
+                ('partner_id', 'in', pids),
             ]).ids
+            folder_ids = set(DmsFile.search([
+                ('directory_id', 'in', dir_ids),
+            ]).ids) if dir_ids else set()
 
-            # Source 2: files inside directories tagged to partner
-            linked_dir_ids = DmsDirectory.search([
-                ('partner_id', 'in', partner_ids),
-            ]).ids
-            folder_file_ids = DmsFile.search([
-                ('directory_id', 'in', linked_dir_ids),
-            ]).ids if linked_dir_ids else []
-
-            # Union (no duplicates)
-            all_file_ids = list(set(direct_file_ids + folder_file_ids))
-            partner.dms_file_count = len(all_file_ids)
-
-    # ------------------------------------------------------------------ #
-    #  Smart button action                                                 #
-    # ------------------------------------------------------------------ #
+            partner.dms_file_count = len(direct_ids | folder_ids)
 
     def action_open_dms_files(self):
         """
-        Open ONLY the files associated with this partner — never the
-        full DMS.
-
-        Domain logic (strictly scoped):
-          OR(
-            dms.file.partner_id IN [partner + children],
-            dms.file.directory_id IN [dirs where directory.partner_id IN ...]
-          )
-
-        Falls back to directory list if no files found yet, pre-filtered
-        and pre-defaulted so new uploads auto-link to this partner.
+        Open ONLY files belonging to this partner.
+        Falls back to directory view if no files exist yet.
         """
         self.ensure_one()
-        partner_ids = self._get_all_related_partner_ids()
+        pids = self._get_all_related_partner_ids()
 
-        # Collect directory IDs linked to this partner
-        linked_dir_ids = self.env['dms.directory'].search([
-            ('partner_id', 'in', partner_ids),
+        dir_ids = self.env['dms.directory'].search([
+            ('partner_id', 'in', pids),
         ]).ids
 
-        # Build OR domain — files either directly tagged OR inside tagged dirs
-        file_domain = ['|',
-            ('partner_id', 'in', partner_ids),
-            ('directory_id', 'in', linked_dir_ids) if linked_dir_ids else (
-                'id', '=', False   # always-false leaf when no dirs exist
-            ),
-        ]
+        # OR domain: files tagged directly OR inside a tagged directory
+        if dir_ids:
+            file_domain = [
+                '|',
+                ('partner_id', 'in', pids),
+                ('directory_id', 'in', dir_ids),
+            ]
+        else:
+            file_domain = [('partner_id', 'in', pids)]
 
         file_count = self.env['dms.file'].search_count(file_domain)
 
@@ -110,22 +78,17 @@ class ResPartner(models.Model):
                 'view_mode': 'list,form',
                 'domain': file_domain,
                 'context': {
-                    # Pre-fill partner when user creates a new file from here
                     'default_partner_id': self.id,
-                    'default_directory_id': linked_dir_ids[0] if linked_dir_ids else False,
+                    'default_directory_id': dir_ids[0] if dir_ids else False,
                 },
             }
 
-        # No files yet — open directory list scoped to this partner
-        # so user can create/upload into the right folder
-        dir_domain = [('partner_id', 'in', partner_ids)]
+        # No files yet — show (empty) directory list for this partner
         return {
             'type': 'ir.actions.act_window',
             'name': 'Document Folders – %s' % self.name,
             'res_model': 'dms.directory',
             'view_mode': 'list,form',
-            'domain': dir_domain,
-            'context': {
-                'default_partner_id': self.id,
-            },
+            'domain': [('partner_id', 'in', pids)],
+            'context': {'default_partner_id': self.id},
         }

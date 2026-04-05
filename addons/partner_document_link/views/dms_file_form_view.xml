@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Inherit dms.file FORM view only.
+
+        Odoo 18 rules applied:
+        - NO list/tree view inheritance (avoids fragile view-ID guessing)
+        - attrs={} removed → use inline invisible="expr"
+        - XPath targets the <form> root as a safe universal anchor,
+          then injects partner_id into a new <group> at the top of the form.
+
+        The ref "dms.view_dms_file_form" is the standard OCA DMS form view ID.
+        If this ref fails on your install, check Technical → Views for the
+        actual XML ID of the dms.file form view and update the ref below.
+    -->
+    <record id="view_dms_file_form_partner_id" model="ir.ui.view">
+        <field name="name">dms.file.form.partner.id</field>
+        <field name="model">dms.file</field>
+        <field name="inherit_id" ref="dms.view_dms_file_form"/>
+        <field name="arch" type="xml">
+            <!--
+                Insert partner_id after the directory_id field.
+                Both are core DMS form fields that always exist.
+            -->
+            <xpath expr="//field[@name='directory_id']" position="after">
+                <field name="partner_id" options="{'no_create': True}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
