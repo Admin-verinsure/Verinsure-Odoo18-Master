@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Inherit dms.directory FORM view only.
+
+        Same Odoo 18 rules as dms_file_form_view.xml.
+        Targets parent_id field which always exists in DMS directory forms.
+    -->
+    <record id="view_dms_directory_form_partner_id" model="ir.ui.view">
+        <field name="name">dms.directory.form.partner.id</field>
+        <field name="model">dms.directory</field>
+        <field name="inherit_id" ref="dms.view_dms_directory_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="after">
+                <field name="partner_id" options="{'no_create': True}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

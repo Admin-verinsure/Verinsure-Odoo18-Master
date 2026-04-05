@@ -10,7 +10,6 @@ class DmsDirectory(models.Model):
         string='Related Partner',
         index=True,
         tracking=True,
-        help='Link this folder directly to a company or contact. '
-             'All files inside this folder will also count toward '
-             'that partner\'s Documents smart button.',
+        help='Explicitly link this folder to a Company or Contact. '
+             'Files inside it will also count on that partner\'s smart button.',
     )
