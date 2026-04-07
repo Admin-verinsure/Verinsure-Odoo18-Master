@@ -1,0 +1,7 @@
+/* Customer Statement Wizard - Backend Styles */
+
+.o_form_view .alert-info {
+    background: linear-gradient(135deg, #e8f7f8 0%, #d0eef0 100%);
+    border-color: #017e84;
+    color: #015f63;
+}
