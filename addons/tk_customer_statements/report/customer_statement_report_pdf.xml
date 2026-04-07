@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!--    Template-->
+    <template id="customer_report_template">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <h4 style="text-align:center;">STATEMENT OF ACCOUNT</h4>
+                <table class="table table-borderless" style="margin-top:20px;">
+                    <tr>
+                        <td style="width:600px;">
+                            <p style=" line-height:2px;" t-if="partner_name">
+                                <t t-esc="partner_name"/>
+                            </p>
+                            <p style=" line-height:2px;" t-if="partner_street">
+                                <t t-esc="partner_street"/>
+                            </p>
+                            <p style=" line-height:2px;" t-if="partner_street2">
+                                <t t-esc="partner_street2"/>
+                            </p>
+                            <p style=" line-height:2px;" t-if="partner_city or partner_zip">
+                                <t t-if="partner_city" t-esc="partner_city"/>
+                                <t t-if="partner_zip" t-esc="partner_zip"/>
+                            </p>
+                            <p style=" line-height:2px;"  t-if="partner_state_id">
+                                <t t-esc="partner_state_id"/>
+                            </p>
+                            <p style=" line-height:2px;" t-if="partner_country_id">
+                                <t t-esc="partner_country_id"/>
+                            </p>
+                        </td>
+                        <td rowspan="6">
+                            <span>As of
+                                <t t-esc="today_date"/>
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+                <table style="border:solid 1px gainsboro;width:100%; table-layout: fixed;height:100%;margin-top:20px;">
+                    <thead>
+                        <tr style="height:40px;border-bottom:solid 2px black;">
+                            <td style="vertical-align: middle;text-align:center;">
+                                <strong>Invoice Date</strong>
+                            </td>
+                            <td style="vertical-align: middle;text-align:center;">
+                                <strong>Due Date</strong>
+                            </td>
+                            <td style="vertical-align: middle;text-align:center;">
+                                <strong>Invoice</strong>
+                            </td>
+                            <td style="vertical-align: middle;text-align:right;">
+                                <strong style="margin-right:5px;">Invoice Amount</strong>
+                            </td>
+                            <td style="vertical-align: middle;text-align:right;margin-right:10px;">
+                                <strong style="margin-right:5px;">Payment Amount</strong>
+                            </td>
+                            <td style="vertical-align: middle;text-align:right;margin-right:10px;">
+                                <strong style="margin-right:5px;">Balance Due</strong>
+                            </td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="docs" t-as="invoice">
+                            <tr style="height:40px;">
+                                <td style="vertical-align: middle;text-align:center;">
+                                    <span t-esc="invoice['invoice_date']"/>
+                                </td>
+                                <td style="vertical-align: middle;text-align:center;">
+                                    <span t-esc="invoice['due_date']"/>
+                                </td>
+                                <td style="vertical-align: middle;text-align:center;">
+                                    <span t-esc="invoice['invoice_id']"/>
+                                </td>
+                                <td style="text-align:right;vertical-align: middle;">
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="invoice['amount']"/>
+                                </td>
+                                <td style="text-align:right;vertical-align: middle;middle;">
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="invoice['payment_amount']"/>
+                                </td>
+                                <td style="text-align:right;vertical-align: middle;middle;">
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="invoice['balance_due']"/>
+                                </td>
+                            </tr>
+                        </t>
+                        <!-- Total row -->
+                        <tr style="height:40px;">
+                            <td colspan="3" style="text-align:right;vertical-align: middle;">
+                                <strong style="margin-right:5px;">Total</strong>
+                            </td>
+                            <td style="text-align:right;vertical-align: middle;">
+                                <strong>
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="total_amount"/>
+                                </strong>
+                            </td>
+                            <td style="text-align:right;vertical-align: middle;">
+                                <strong>
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="total_payment"/>
+                                </strong>
+                            </td>
+                            <td style="text-align:right;vertical-align: middle;">
+                                <strong>
+                                    <span t-esc="currency"/>
+                                    <span style="margin-right:5px;" t-esc="total_balance"/>
+                                </strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+    <!-- Report Action -->
+    <record id="customer_report_template_action" model="ir.actions.report">
+        <field name="name">Customer Statement Report</field>
+        <field name="model">customer.statement.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">tk_customer_statements.customer_report_template</field>
+        <field name="report_file">tk_customer_statements.customer_report_template</field>
+        <field name="binding_model_id" ref="model_customer_statement_wizard"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>
