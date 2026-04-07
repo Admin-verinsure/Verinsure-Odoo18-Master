@@ -9,61 +9,82 @@
         <field name="model">customer.statement.wizard</field>
         <field name="arch" type="xml">
             <form string="Customer Statement Report">
-                <div class="o_form_view">
 
-                    <!-- Header Banner -->
-                    <div class="alert alert-info mb-3" role="alert" style="border-left: 4px solid #017e84;">
-                        <strong>
-                            <i class="fa fa-file-text-o me-1"/>
-                            Customer Statement Report
-                        </strong>
-                        — Generate detailed account statements for one or multiple customers.
-                        You can export as PDF.
-                    </div>
-
-                    <group string="Date Range &amp; Company" col="4">
-                        <field name="date_from" widget="date" required="1"/>
-                        <field name="date_to" widget="date" required="1"/>
-                        <field name="company_id" options="{'no_create': True}"/>
-                        <field name="currency_id" options="{'no_create': True}"/>
-                    </group>
-
-                    <group string="Customer Selection">
-                        <field name="partner_ids"
-                               widget="many2many_tags"
-                               domain="[('customer_rank','&gt;',0)]"
-                               placeholder="Leave empty to include all customers..."
-                               options="{'no_create': True}"
-                               colspan="2"/>
-                    </group>
-
-                    <group string="Statement Options" col="4">
-                        <field name="statement_type" widget="radio"/>
-                        <field name="include_unreconciled"/>
-                        <field name="show_opening_balance"/>
-                        <field name="show_aging"/>
-                        <field name="group_by_currency"/>
-                    </group>
-
-                    <group string="Journal Filter">
-                        <field name="journal_ids"
-                               widget="many2many_tags"
-                               domain="[('type','in',['sale','general','cash','bank'])]"
-                               placeholder="Leave empty for all journals..."
-                               options="{'no_create': True}"
-                               colspan="2"/>
-                    </group>
-
-                    <!-- Aging Buckets - conditionally shown -->
-                    <group string="Aging Buckets (Days)" col="4"
-                           attrs="{'invisible': [('show_aging','=',False)]}">
-                        <field name="aging_bucket_1" string="Bucket 1 ≤ (days)"/>
-                        <field name="aging_bucket_2" string="Bucket 2 ≤ (days)"/>
-                        <field name="aging_bucket_3" string="Bucket 3 ≤ (days)"/>
-                        <field name="aging_bucket_4" string="Bucket 4 ≤ (days)"/>
-                    </group>
-
+                <!-- ── Header Banner ── -->
+                <div class="alert alert-info mb-3" role="alert"
+                     style="border-left:4px solid #017e84;">
+                    <strong>
+                        <i class="fa fa-file-text-o me-1"/>
+                        Customer Statement Report
+                    </strong>
+                    — Generate detailed account statements for one or multiple customers.
                 </div>
+
+                <!-- ── Quick Date Preset ── -->
+                <group string="Select Period">
+                    <field name="date_range_preset"
+                           widget="radio"
+                           options="{'horizontal': true}"
+                           colspan="2"/>
+                </group>
+
+                <!-- ── Custom Date Range — visible only when preset = custom ── -->
+                <group string="Custom Date Range"
+                       invisible="date_range_preset != 'custom'">
+                    <field name="date_from" widget="date" required="1"/>
+                    <field name="date_to"   widget="date" required="1"/>
+                </group>
+
+                <!-- ── Resolved dates read-only when preset is not custom ── -->
+                <group string="Period Dates"
+                       invisible="date_range_preset == 'custom'">
+                    <field name="date_from" widget="date" readonly="1"/>
+                    <field name="date_to"   widget="date" readonly="1"/>
+                </group>
+
+                <!-- ── Company and Currency ── -->
+                <group string="Company &amp; Currency" col="2">
+                    <field name="company_id" options="{'no_create': True}"/>
+                    <field name="currency_id" options="{'no_create': True}"/>
+                </group>
+
+                <!-- ── Customer Selection ── -->
+                <group string="Customer Selection">
+                    <field name="partner_ids"
+                           widget="many2many_tags"
+                           domain="[('customer_rank','&gt;',0)]"
+                           placeholder="Leave empty to include all customers..."
+                           options="{'no_create': True}"
+                           colspan="2"/>
+                </group>
+
+                <!-- ── Statement Options ── -->
+                <group string="Statement Options" col="4">
+                    <field name="statement_type" widget="radio"/>
+                    <field name="include_unreconciled"/>
+                    <field name="show_opening_balance"/>
+                    <field name="show_aging"/>
+                    <field name="group_by_currency"/>
+                </group>
+
+                <!-- ── Journal Filter ── -->
+                <group string="Journal Filter">
+                    <field name="journal_ids"
+                           widget="many2many_tags"
+                           domain="[('type','in',['sale','general','cash','bank'])]"
+                           placeholder="Leave empty for all journals..."
+                           options="{'no_create': True}"
+                           colspan="2"/>
+                </group>
+
+                <!-- ── Aging Buckets: Odoo 18 inline invisible (no attrs) ── -->
+                <group string="Aging Buckets (Days)" col="4"
+                       invisible="not show_aging">
+                    <field name="aging_bucket_1" string="Bucket 1 ≤ (days)"/>
+                    <field name="aging_bucket_2" string="Bucket 2 ≤ (days)"/>
+                    <field name="aging_bucket_3" string="Bucket 3 ≤ (days)"/>
+                    <field name="aging_bucket_4" string="Bucket 4 ≤ (days)"/>
+                </group>
 
                 <footer>
                     <button name="action_print_pdf"
