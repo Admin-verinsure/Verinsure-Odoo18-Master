@@ -2,12 +2,28 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 import json
 
 
 class CustomerStatementWizard(models.TransientModel):
     _name = 'customer.statement.wizard'
     _description = 'Customer Statement Report Wizard'
+
+    # ── Quick Date Range Preset ───────────────────────────────────
+    date_range_preset = fields.Selection([
+        ('custom',        'Custom Range'),
+        ('this_month',    'This Month'),
+        ('last_month',    'Last Month'),
+        ('this_quarter',  'This Quarter'),
+        ('last_quarter',  'Last Quarter'),
+        ('this_year',     'This Financial Year'),
+        ('last_year',     'Last Financial Year'),
+        ('last_30',       'Last 30 Days'),
+        ('last_60',       'Last 60 Days'),
+        ('last_90',       'Last 90 Days'),
+        ('last_180',      'Last 180 Days'),
+    ], string='Period', default='this_month', required=True)
 
     # ── Date Range ────────────────────────────────────────────────
     date_from = fields.Date(
@@ -20,6 +36,47 @@ class CustomerStatementWizard(models.TransientModel):
         required=True,
         default=fields.Date.today,
     )
+
+    @api.onchange('date_range_preset')
+    def _onchange_date_range_preset(self):
+        today = date.today()
+        preset = self.date_range_preset
+        if preset == 'custom':
+            return
+        elif preset == 'this_month':
+            self.date_from = today.replace(day=1)
+            self.date_to = today.replace(day=1) + relativedelta(months=1) - timedelta(days=1)
+        elif preset == 'last_month':
+            first = today.replace(day=1) - relativedelta(months=1)
+            self.date_from = first
+            self.date_to = first + relativedelta(months=1) - timedelta(days=1)
+        elif preset == 'this_quarter':
+            q = (today.month - 1) // 3
+            self.date_from = date(today.year, q * 3 + 1, 1)
+            self.date_to = self.date_from + relativedelta(months=3) - timedelta(days=1)
+        elif preset == 'last_quarter':
+            q = (today.month - 1) // 3
+            start = date(today.year, q * 3 + 1, 1) - relativedelta(months=3)
+            self.date_from = start
+            self.date_to = start + relativedelta(months=3) - timedelta(days=1)
+        elif preset == 'this_year':
+            self.date_from = date(today.year, 1, 1)
+            self.date_to = date(today.year, 12, 31)
+        elif preset == 'last_year':
+            self.date_from = date(today.year - 1, 1, 1)
+            self.date_to = date(today.year - 1, 12, 31)
+        elif preset == 'last_30':
+            self.date_from = today - timedelta(days=30)
+            self.date_to = today
+        elif preset == 'last_60':
+            self.date_from = today - timedelta(days=60)
+            self.date_to = today
+        elif preset == 'last_90':
+            self.date_from = today - timedelta(days=90)
+            self.date_to = today
+        elif preset == 'last_180':
+            self.date_from = today - timedelta(days=180)
+            self.date_to = today
 
     # ── Customer Selection ────────────────────────────────────────
     partner_ids = fields.Many2many(
