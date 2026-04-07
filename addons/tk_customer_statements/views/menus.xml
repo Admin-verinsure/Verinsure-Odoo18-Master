@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <menuitem id="menu_customer_statement"
+                  name="Customer Statement"
+                  parent="contacts.menu_contacts"
+                  action="customer_statement_report_wizard_action"
+                  groups="tk_customer_statements.customer_statement_group"
+                  sequence="2"
+        />
+    </data>
+</odoo>

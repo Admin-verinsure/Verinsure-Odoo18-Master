@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <!--views-->
+        <record id="customer_statement_report_wizard_view_form" model="ir.ui.view">
+            <field name="name">customer.statement.report.wizard.view.form</field>
+            <field name="model">customer.statement.wizard</field>
+            <field name="arch" type="xml">
+                <form>
+                    <group string="Dates">
+                        <group>
+                            <field name="start_date"/>
+                        </group>
+                        <group>
+                            <field name="end_date"/>
+                        </group>
+                    </group>
+                    <group string="Customer">
+                        <group>
+                            <field name="partner_id"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <div style="display: flex; justify-content: center; align-items: center;">
+                            <button name="customer_statements_pdf_report" string="PDF" type="object" class="oe_highlight"/>
+                            <span style="vertical-align: middle; margin: 0 5px;">or</span>
+                            <button name="customer_statements_excel_report" string="Excel" type="object" class="oe_highlight"/>
+                            <span style="margin: 0 5px;">or</span>
+                            <button special="cancel" string="Cancel" type="object" class="oe_highlight"/>
+                        </div>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <!--action-->
+        <record id="customer_statement_report_wizard_action" model="ir.actions.act_window">
+            <field name="name">Customer Statement</field>
+            <field name="res_model">customer.statement.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>
