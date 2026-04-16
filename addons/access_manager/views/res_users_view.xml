@@ -1,0 +1,12 @@
+<odoo>
+    <record id="view_users_form_inherit_clean" model="ir.ui.view">
+        <field name="name">res.users.form.clean.access</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='groups_id']" position="replace">
+                <field name="groups_id" widget="many2many_tags"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
