@@ -1,6 +1,6 @@
 {
     'name': 'Clean Access Manager',
-    'version': '1.0',
+    'version': '2.0',
     'summary': 'Simplified Role-Based Access Management',
     'author': 'Custom',
     'depends': ['base'],

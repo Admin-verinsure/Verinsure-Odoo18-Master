@@ -1,5 +1,5 @@
 <odoo>
-    <!-- Master Roles -->
+
     <record id="group_super_admin" model="res.groups">
         <field name="name">Super Admin</field>
         <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
@@ -13,8 +13,4 @@
         <field name="name">Employee</field>
     </record>
 
-    <!-- Attach to Admin -->
-    <record id="base.group_system" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('clean_access_manager.group_super_admin'))]"/>
-    </record>
 </odoo>
