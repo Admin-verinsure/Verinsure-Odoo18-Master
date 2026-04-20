@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Config Form View -->
+    <record id="view_auto_reconciliation_config_form" model="ir.ui.view">
+        <field name="name">auto.reconciliation.config.form</field>
+        <field name="model">auto.reconciliation.config</field>
+        <field name="arch" type="xml">
+            <form string="Reconciliation Configuration">
+                <header>
+                    <button name="action_open_wizard"
+                            string="Preview &amp; Reconcile"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-eye"/>
+                    <button name="action_run_now"
+                            string="Run Now (No Preview)"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-bolt"
+                            confirm="This will immediately reconcile all matched transactions. Continue?"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="company_id" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Reconciliation Types">
+                            <field name="enable_bank"/>
+                            <field name="enable_customer"/>
+                            <field name="enable_vendor"/>
+                            <field name="enable_intercompany"/>
+                        </group>
+                        <group string="Matching Rules">
+                            <field name="match_by_amount"/>
+                            <field name="match_by_partner"/>
+                            <field name="match_by_currency"/>
+                        </group>
+                    </group>
+                    <group string="Scheduler">
+                        <field name="cron_active"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Config List View -->
+    <record id="view_auto_reconciliation_config_list" model="ir.ui.view">
+        <field name="name">auto.reconciliation.config.list</field>
+        <field name="model">auto.reconciliation.config</field>
+        <field name="arch" type="xml">
+            <list string="Reconciliation Configurations">
+                <field name="company_id"/>
+                <field name="enable_bank"/>
+                <field name="enable_customer"/>
+                <field name="enable_vendor"/>
+                <field name="enable_intercompany"/>
+                <field name="cron_active"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Config Action -->
+    <record id="action_auto_reconciliation_config" model="ir.actions.act_window">
+        <field name="name">Reconciliation Configuration</field>
+        <field name="res_model">auto.reconciliation.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
