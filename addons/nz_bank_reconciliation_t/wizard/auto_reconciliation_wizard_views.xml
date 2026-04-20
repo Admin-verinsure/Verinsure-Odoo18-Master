@@ -5,6 +5,9 @@
         <field name="model">auto.reconciliation.wizard</field>
         <field name="arch" type="xml">
             <form string="Review Reconciliation Matches">
+                <!-- Hidden fields needed for invisible expressions -->
+                <field name="state" invisible="1"/>
+                <field name="skipped_count" invisible="1"/>
                 <sheet>
                     <div class="oe_title">
                         <h2>Review &amp; Confirm Reconciliation</h2>
@@ -20,7 +23,6 @@
                                    readonly="1"/>
                         </group>
                         <group>
-                            <!-- Shows skipped count after confirm if cron raced ahead -->
                             <field name="skipped_count"
                                    string="Skipped (reconciled by another process)"
                                    readonly="1"
