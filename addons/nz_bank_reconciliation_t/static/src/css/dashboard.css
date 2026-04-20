@@ -67,3 +67,25 @@
     text-overflow: ellipsis;
     max-width: 150px;
 }
+
+/* ── Akahu kanban card button fixes ── */
+
+/* Prevent Last Sync text from ever rendering vertically */
+.o_kanban_card_content small.text-muted,
+.o_kanban_card_manage_pane small.text-muted,
+div[name="bank_cash_buttons"] small {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    font-size: 0.72rem;
+    max-width: 100%;
+    writing-mode: horizontal-tb !important;
+}
+
+/* Keep Akahu buttons compact on narrow kanban cards */
+div[name="bank_cash_buttons"] .o_bank_statements_button {
+    font-size: 0.78rem;
+    padding: 3px 8px;
+    white-space: nowrap;
+}

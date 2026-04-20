@@ -2,7 +2,7 @@
 <odoo>
 
     <!-- ===================================================================
-         1. ACCOUNTING DASHBOARD — Kanban card buttons (unchanged from working version)
+         1. ACCOUNTING DASHBOARD — Kanban card buttons
          =================================================================== -->
     <record id="view_account_journal_dashboard_akahu" model="ir.ui.view">
         <field name="name">account.journal.dashboard.kanban.akahu</field>
@@ -17,48 +17,72 @@
                 <field name="akahu_bank_feeds_disabled"/>
             </xpath>
 
-            <!-- Add Akahu buttons in bank journal actions -->
+            <!--
+                Replace the entire bank_cash_buttons div content.
+                Using 'replace' on the div itself would remove native kanban
+                features. Instead we replace just the inner button block by
+                targeting the first button inside bank_cash_buttons so we can
+                inject our conditional set before it, then hide the native
+                "Configure Bank Account" button when Akahu is active to avoid
+                duplicates.
+
+                Strategy:
+                - When has_akahu = False  → show our "Configure Bank Account" button only
+                - When has_akahu = True   → show "Bank Account" (re-configure) + "Fetch Transactions"
+                  and hide Odoo's native configure button via t-if on our wrapper.
+
+                We inject BEFORE the native button block and use t-if to suppress
+                the native one when Akahu is configured.
+            -->
+
+            <!-- Inject our Akahu buttons BEFORE the native bank_cash_buttons content -->
             <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
 
-                <!-- Configure Bank Account button: shown when NO Akahu account is set up yet -->
-                <t t-if="!record.has_akahu.raw_value">
-                    <button name="action_configure_akahu_account"
-                            type="object"
-                            class="btn btn-primary">
-                        <i class="fa fa-bank me-1"/>
-                        Configure Bank Account
-                    </button>
-                </t>
-
-                <!-- Fetch Transactions + last-sync info: shown when Akahu IS configured -->
+                <!-- Wrapper: only renders when Akahu IS configured.
+                     When has_akahu is true, this replaces the need for the
+                     native "Configure Bank Account" button entirely. -->
                 <t t-if="record.has_akahu.raw_value">
-
-                    <!-- Re-configure button (secondary, always visible when configured) -->
                     <button name="action_configure_akahu_account"
                             type="object"
-                            class="btn btn-secondary"
+                            class="btn btn-secondary o_bank_statements_button"
                             title="Edit Akahu bank account configuration">
                         <i class="fa fa-cog me-1"/>
                         Bank Account
                     </button>
 
-                    <!-- Fetch Transactions button -->
                     <button name="action_fetch_akahu_transactions"
                             type="object"
-                            class="btn btn-primary">
+                            class="btn btn-primary o_bank_statements_button">
                         <i class="fa fa-refresh me-1"/>
                         Fetch Transactions
                     </button>
 
                     <t t-if="record.akahu_last_synced.raw_value">
-                        <span class="text-muted ms-2 small">
-                            Last Sync:
-                            <t t-esc="record.akahu_last_synced.value"/>
-                        </span>
+                        <small class="text-muted d-block mt-1 w-100">
+                            Last Sync: <t t-esc="record.akahu_last_synced.value"/>
+                        </small>
                     </t>
-
                 </t>
 
+            </xpath>
+
+            <!--
+                Hide the native "Configure Bank Account" button when Akahu is
+                active — it lives inside bank_cash_buttons as a t-if block
+                keyed on bank_account_id. We target it by its button name
+                attribute and set its container invisible when has_akahu is true.
+
+                In Odoo 18 the native button uses name="action_configure_bank_account"
+                or is wrapped in a <t t-if="..."> — we suppress the whole
+                bank_cash_buttons native content when Akahu is active by
+                overriding the outer div's t-if guard.
+
+                Simpler approach that always works: target the specific native
+                button by its action name and add our own t-if guard.
+            -->
+            <xpath expr="//div[@name='bank_cash_buttons']//button[@name='action_configure_bank_account']"
+                   position="attributes">
+                <attribute name="t-if">not record.has_akahu.raw_value</attribute>
             </xpath>
 
         </field>
@@ -66,9 +90,6 @@
 
     <!-- ===================================================================
          2. JOURNAL FORM — Akahu radio option + conditional banner
-         New: bank_statements_source now has 'Akahu (NZ Open Banking)' option
-         injected via _get_bank_statements_available_sources() override.
-         The banner appears below the radio group when Akahu is selected.
          =================================================================== -->
     <record id="view_account_journal_form_akahu_feeds" model="ir.ui.view">
         <field name="name">account.journal.form.akahu.feeds</field>
@@ -76,23 +97,10 @@
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
 
-            <!--
-                Inject akahu_bank_feeds_disabled as a hidden field so it can
-                drive visibility of the banner. Placed after bank_account_id
-                which is always present on bank journals.
-            -->
             <xpath expr="//field[@name='bank_account_id']" position="after">
                 <field name="akahu_bank_feeds_disabled" invisible="1"/>
             </xpath>
 
-            <!--
-                Place the Akahu info banner directly AFTER the bank_statements_source
-                radio widget. It is visible only when the user selects the
-                'Akahu (NZ Open Banking)' radio option.
-
-                Using bank_statements_source == 'akahu' directly (Odoo 18 expression
-                syntax) — no need to reference the computed field here.
-            -->
             <xpath expr="//field[@name='bank_statements_source']" position="after">
                 <div class="alert alert-info d-flex align-items-center mt-2 mb-0"
                      role="alert"
