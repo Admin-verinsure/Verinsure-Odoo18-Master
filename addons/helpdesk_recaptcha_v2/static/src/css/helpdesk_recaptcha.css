@@ -1,0 +1,54 @@
+/*
+ * helpdesk_recaptcha.css
+ * ──────────────────────
+ * All rules are scoped to #helpdesk_recaptcha_form so they never
+ * leak into Contact Us, Event Registration, or any other website form.
+ */
+
+/* ── Error alert ─────────────────────────────────────────────────────────── */
+
+#helpdesk_recaptcha_form #helpdesk_captcha_error {
+    border-left: 4px solid #dc3545;
+    border-radius: 0.375rem;    /* Bootstrap 5 standard radius */
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+}
+
+/* Shake animation when error appears – draws the user's eye without being
+   aggressive on accessibility (respects prefers-reduced-motion). */
+@keyframes hd-captcha-shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-5px); }
+    40%       { transform: translateX(5px); }
+    60%       { transform: translateX(-3px); }
+    80%       { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    #helpdesk_recaptcha_form #helpdesk_captcha_error:not(.d-none) {
+        animation: hd-captcha-shake 0.4s ease-in-out;
+    }
+}
+
+/* ── reCAPTCHA v3 badge ──────────────────────────────────────────────────── */
+
+/*
+ * Google renders a floating badge in the bottom-right corner for all
+ * pages using reCAPTCHA v3.  The badge is shown by default.
+ *
+ * If you want to hide it (e.g. for a cleaner form), uncomment the block
+ * below.  PER GOOGLE ToS YOU MUST then include this disclosure text
+ * visibly on the page:
+ *
+ *   "This site is protected by reCAPTCHA and the Google
+ *    Privacy Policy and Terms of Service apply."
+ *
+ * Add that text inside the form's QWeb template if you hide the badge.
+ */
+
+/*
+.grecaptcha-badge {
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+*/
