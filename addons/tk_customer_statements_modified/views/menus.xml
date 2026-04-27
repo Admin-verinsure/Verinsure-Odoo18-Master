@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
     <data>
-        <!-- Existing: Contacts menu -->
+        <!-- Contacts App menu — safe, original parent -->
         <menuitem id="menu_customer_statement"
                   name="Customer Statement"
                   parent="contacts.menu_contacts"
@@ -10,13 +10,46 @@
                   sequence="2"
         />
 
-        <!-- New: Accounting > Customers menu -->
+        <!--
+            Accounting > Customers menu.
+            The parent external ID differs across Odoo 18 installs/editions.
+            Run this query on your DB to confirm the right one, then uncomment:
+
+                SELECT im.id, imd.module, imd.name
+                FROM ir_ui_menu im
+                JOIN ir_model_data imd ON imd.res_id = im.id
+                    AND imd.model = 'ir.ui.menu'
+                WHERE im.complete_name ILIKE '%Accounting%Customer%'
+                   OR im.complete_name ILIKE '%Invoicing%Customer%'
+                ORDER BY im.complete_name;
+
+            Common values for Odoo 18:
+              - account.menu_finance_receivable        (Accounting edition)
+              - account.menu_invoicing_receivable      (Invoicing/lite edition)
+
+            Once confirmed, uncomment the correct block below:
+        -->
+
+        <!-- FOR ACCOUNTING MODULE: uncomment if query confirms account.menu_finance_receivable -->
+        <!--
         <menuitem id="menu_customer_statement_accounting"
                   name="Customer Statement"
-                  parent="account.menu_finance_receivables"
+                  parent="account.menu_finance_receivable"
                   action="customer_statement_report_wizard_action"
                   groups="tk_customer_statements.customer_statement_group"
                   sequence="99"
         />
+        -->
+
+        <!-- FOR INVOICING MODULE: uncomment if query confirms account.menu_invoicing_receivable -->
+        <!--
+        <menuitem id="menu_customer_statement_accounting"
+                  name="Customer Statement"
+                  parent="account.menu_invoicing_receivable"
+                  action="customer_statement_report_wizard_action"
+                  groups="tk_customer_statements.customer_statement_group"
+                  sequence="99"
+        />
+        -->
     </data>
 </odoo>
