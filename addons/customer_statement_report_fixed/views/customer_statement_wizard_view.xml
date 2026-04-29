@@ -5,16 +5,16 @@
         <field name="arch" type="xml">
             <form string="Customer Statement">
                 <group>
-                    <field name="partner_id" required="1"/>
+                    <field name="partner_id"/>
                     <field name="date_from"/>
                     <field name="date_to"/>
                     <field name="report_type"/>
                 </group>
                 <footer>
-                    <button name="action_generate" type="object" string="Generate" class="btn-primary"/>
+                    <button name="action_generate" type="object" string="Generate"/>
                     <button string="Cancel" special="cancel"/>
                 </footer>
-                <group>
+                <group invisible="not file_data">
                     <field name="file_name" invisible="1"/>
                     <field name="file_data" filename="file_name"/>
                 </group>
