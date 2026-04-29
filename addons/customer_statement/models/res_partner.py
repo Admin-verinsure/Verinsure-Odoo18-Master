@@ -10,5 +10,5 @@ class ResPartner(models.Model):
             'res_model': 'customer.statement.wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': {'default_partner_id': self.id},
+            'context': {'default_partner_id': self.id}
         }
