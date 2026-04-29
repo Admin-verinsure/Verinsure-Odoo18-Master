@@ -1,347 +1,310 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
-from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
-import json
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
+import io
+import base64
 
 
 class CustomerStatementWizard(models.TransientModel):
     _name = 'customer.statement.wizard'
-    _description = 'Customer Statement Report Wizard'
+    _description = 'Customer Statement Wizard'
 
-    # ── Quick Date Range Preset ───────────────────────────────────
-    date_range_preset = fields.Selection([
-        ('custom',        'Custom Range'),
-        ('this_month',    'This Month'),
-        ('last_month',    'Last Month'),
-        ('this_quarter',  'This Quarter'),
-        ('last_quarter',  'Last Quarter'),
-        ('this_year',     'This Financial Year'),
-        ('last_year',     'Last Financial Year'),
-        ('last_30',       'Last 30 Days'),
-        ('last_60',       'Last 60 Days'),
-        ('last_90',       'Last 90 Days'),
-        ('last_180',      'Last 180 Days'),
-    ], string='Period', default='this_month', required=True)
-
-    # ── Date Range ────────────────────────────────────────────────
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Customer',
+        required=True,
+        readonly=True,
+    )
     date_from = fields.Date(
         string='Date From',
         required=True,
-        default=lambda self: date.today().replace(day=1),
+        default=lambda self: fields.Date.today().replace(day=1),
     )
     date_to = fields.Date(
         string='Date To',
         required=True,
         default=fields.Date.today,
     )
-
-    @api.onchange('date_range_preset')
-    def _onchange_date_range_preset(self):
-        today = date.today()
-        preset = self.date_range_preset
-        if preset == 'custom':
-            return
-        elif preset == 'this_month':
-            self.date_from = today.replace(day=1)
-            self.date_to = today.replace(day=1) + relativedelta(months=1) - timedelta(days=1)
-        elif preset == 'last_month':
-            first = today.replace(day=1) - relativedelta(months=1)
-            self.date_from = first
-            self.date_to = first + relativedelta(months=1) - timedelta(days=1)
-        elif preset == 'this_quarter':
-            q = (today.month - 1) // 3
-            self.date_from = date(today.year, q * 3 + 1, 1)
-            self.date_to = self.date_from + relativedelta(months=3) - timedelta(days=1)
-        elif preset == 'last_quarter':
-            q = (today.month - 1) // 3
-            start = date(today.year, q * 3 + 1, 1) - relativedelta(months=3)
-            self.date_from = start
-            self.date_to = start + relativedelta(months=3) - timedelta(days=1)
-        elif preset == 'this_year':
-            self.date_from = date(today.year, 1, 1)
-            self.date_to = date(today.year, 12, 31)
-        elif preset == 'last_year':
-            self.date_from = date(today.year - 1, 1, 1)
-            self.date_to = date(today.year - 1, 12, 31)
-        elif preset == 'last_30':
-            self.date_from = today - timedelta(days=30)
-            self.date_to = today
-        elif preset == 'last_60':
-            self.date_from = today - timedelta(days=60)
-            self.date_to = today
-        elif preset == 'last_90':
-            self.date_from = today - timedelta(days=90)
-            self.date_to = today
-        elif preset == 'last_180':
-            self.date_from = today - timedelta(days=180)
-            self.date_to = today
-
-    # ── Customer Selection ────────────────────────────────────────
-    partner_ids = fields.Many2many(
-        'res.partner',
-        'customer_statement_partner_rel',
-        'wizard_id', 'partner_id',
-        string='Customers',
-        domain="[('customer_rank', '>', 0)]",
-    )
-
-    # ── Filters ───────────────────────────────────────────────────
-    journal_ids = fields.Many2many(
-        'account.journal',
-        'customer_statement_journal_rel',
-        'wizard_id', 'journal_id',
-        string='Journals',
-        domain="[('type', 'in', ['sale', 'general', 'cash', 'bank'])]",
+    report_type = fields.Selection(
+        selection=[
+            ('pdf', 'PDF'),
+            ('xlsx', 'Excel (XLSX)'),
+        ],
+        string='Report Type',
+        required=True,
+        default='pdf',
     )
     currency_id = fields.Many2one(
         'res.currency',
         string='Currency',
-        default=lambda self: self.env.company.currency_id,
-    )
-    company_id = fields.Many2one(
-        'res.company',
-        string='Company',
-        default=lambda self: self.env.company,
-        required=True,
+        related='partner_id.currency_id',
+        readonly=True,
     )
 
-    # ── Statement Options ─────────────────────────────────────────
-    include_unreconciled = fields.Boolean(
-        string='Include Unreconciled Only',
-        default=False,
-        help='Show only entries that are not fully reconciled',
-    )
-    show_aging = fields.Boolean(
-        string='Show Aging Analysis',
-        default=True,
-    )
-    show_opening_balance = fields.Boolean(
-        string='Show Opening Balance',
-        default=True,
-    )
-    group_by_currency = fields.Boolean(
-        string='Group by Currency',
-        default=False,
-    )
-    statement_type = fields.Selection([
-        ('detailed', 'Detailed Statement'),
-        ('summary', 'Summary Only'),
-        ('outstanding', 'Outstanding Items Only'),
-    ], string='Statement Type', default='detailed', required=True)
+    # ─────────────────────────────────────────────────────────────────────────
+    # CORE ACCOUNTING LOGIC
+    # ─────────────────────────────────────────────────────────────────────────
 
-    # ── Aging Buckets ─────────────────────────────────────────────
-    aging_bucket_1 = fields.Integer(string='Bucket 1 (days)', default=30)
-    aging_bucket_2 = fields.Integer(string='Bucket 2 (days)', default=60)
-    aging_bucket_3 = fields.Integer(string='Bucket 3 (days)', default=90)
-    aging_bucket_4 = fields.Integer(string='Bucket 4 (days)', default=120)
-
-    # ─────────────────────────────────────────────────────────────
-    @api.constrains('date_from', 'date_to')
-    def _check_dates(self):
-        for rec in self:
-            if rec.date_from > rec.date_to:
-                raise ValidationError(_("'Date From' must be earlier than 'Date To'."))
-
-    @api.onchange('company_id')
-    def _onchange_company_id(self):
-        self.currency_id = self.company_id.currency_id
-
-    # ── Core Data Computation ─────────────────────────────────────
-    def _get_partners(self):
-        if self.partner_ids:
-            return self.partner_ids
-        # If called from action menu with active records
-        active_ids = self.env.context.get('active_ids', [])
-        if active_ids:
-            return self.env['res.partner'].browse(active_ids)
-        return self.env['res.partner'].search([
-            ('customer_rank', '>', 0),
-            ('company_id', 'in', [False, self.company_id.id]),
+    def _get_all_moves(self):
+        """Fetch all posted invoices and credit notes for the partner."""
+        return self.env['account.move'].search([
+            ('partner_id', '=', self.partner_id.id),
+            ('state', '=', 'posted'),
+            ('move_type', 'in', ['out_invoice', 'out_refund']),
+            ('company_id', '=', self.env.company.id),
         ])
 
-    def _get_opening_balance(self, partner):
-        """Compute balance before date_from."""
-        domain = [
-            ('partner_id', '=', partner.id),
-            ('account_id.account_type', 'in', ['asset_receivable']),
-            ('company_id', '=', self.company_id.id),
-            ('date', '<', self.date_from),
-            ('move_id.state', '=', 'posted'),
-        ]
-        if self.currency_id != self.company_id.currency_id:
-            domain.append(('currency_id', '=', self.currency_id.id))
+    def _compute_statement_data(self):
+        """
+        Compute full statement data:
+          - opening_balance : sum of amount_total_signed before date_from
+          - lines           : list of dicts for period transactions
+          - closing_balance : opening + period sum
+        """
+        date_from = self.date_from
+        date_to = self.date_to
 
-        lines = self.env['account.move.line'].search(domain)
-        if self.currency_id != self.company_id.currency_id:
-            return sum(lines.mapped('amount_currency'))
-        return sum(lines.mapped('balance'))
+        all_moves = self._get_all_moves()
 
-    def _get_move_lines(self, partner):
-        """Get account move lines for the period."""
-        domain = [
-            ('partner_id', '=', partner.id),
-            ('account_id.account_type', 'in', ['asset_receivable']),
-            ('company_id', '=', self.company_id.id),
-            ('date', '>=', self.date_from),
-            ('date', '<=', self.date_to),
-            ('move_id.state', '=', 'posted'),
-        ]
-        if self.journal_ids:
-            domain.append(('journal_id', 'in', self.journal_ids.ids))
-        if self.currency_id != self.company_id.currency_id:
-            domain.append(('currency_id', '=', self.currency_id.id))
-        if self.include_unreconciled:
-            domain.append(('reconciled', '=', False))
+        # Split moves into opening-period and statement-period
+        opening_moves = all_moves.filtered(
+            lambda m: m.invoice_date and m.invoice_date < date_from
+        )
+        period_moves = all_moves.filtered(
+            lambda m: m.invoice_date
+            and date_from <= m.invoice_date <= date_to
+        )
 
-        lines = self.env['account.move.line'].search(domain, order='date asc, move_id asc')
-        result = []
-        running_balance = self._get_opening_balance(partner) if self.show_opening_balance else 0.0
+        # Opening balance: algebraic sum using amount_total_signed
+        # amount_total_signed is already signed:
+        #   out_invoice → positive
+        #   out_refund  → negative
+        opening_balance = sum(opening_moves.mapped('amount_total_signed'))
 
-        for line in lines:
-            if self.currency_id != self.company_id.currency_id:
-                debit = line.amount_currency if line.amount_currency > 0 else 0.0
-                credit = -line.amount_currency if line.amount_currency < 0 else 0.0
-            else:
-                debit = line.debit
-                credit = line.credit
+        # Sort period moves chronologically
+        period_moves_sorted = period_moves.sorted(
+            key=lambda m: (m.invoice_date, m.id)
+        )
 
-            running_balance += debit - credit
-            result.append({
-                'date': line.date,
-                'move_name': line.move_id.name,
-                'ref': line.move_id.ref or '',
-                'journal': line.journal_id.name,
-                'label': line.name or line.move_id.name,
-                'due_date': line.date_maturity or line.date,
+        # Build lines with running balance
+        lines = []
+        running_balance = opening_balance
+
+        for move in period_moves_sorted:
+            signed_amount = move.amount_total_signed  # +/- already applied
+            running_balance += signed_amount
+
+            # Debit column: invoice amount (positive transactions)
+            debit = move.amount_total if move.move_type == 'out_invoice' else 0.0
+            # Credit column: credit note amount (absolute value)
+            credit = move.amount_total if move.move_type == 'out_refund' else 0.0
+
+            lines.append({
+                'date': move.invoice_date,
+                'name': move.name,
+                'ref': move.ref or '',
+                'move_type': move.move_type,
+                'type_label': _('Invoice') if move.move_type == 'out_invoice' else _('Credit Note'),
                 'debit': debit,
                 'credit': credit,
                 'balance': running_balance,
-                'currency_symbol': self.currency_id.symbol,
-                'reconciled': line.reconciled,
-                'amount_residual': line.amount_residual if not self.currency_id != self.company_id.currency_id else line.amount_residual_currency,
-                'move_type': line.move_id.move_type,
-                'invoice_origin': line.move_id.invoice_origin or '',
+                'is_refund': move.move_type == 'out_refund',
+                'currency_symbol': move.currency_id.symbol or '',
             })
-        return result
 
-    def _get_aging_data(self, partner):
-        """Compute aging buckets for outstanding receivables."""
-        today = date.today()
-        domain = [
-            ('partner_id', '=', partner.id),
-            ('account_id.account_type', '=', 'asset_receivable'),
-            ('company_id', '=', self.company_id.id),
-            ('reconciled', '=', False),
-            ('move_id.state', '=', 'posted'),
-            ('date_maturity', '<=', self.date_to),
-        ]
-        lines = self.env['account.move.line'].search(domain)
-
-        b1, b2, b3, b4, b5 = 0.0, 0.0, 0.0, 0.0, 0.0
-        for line in lines:
-            due = line.date_maturity or line.date
-            days_overdue = (today - due).days if isinstance(due, date) else 0
-            residual = line.amount_residual if self.currency_id == self.company_id.currency_id else line.amount_residual_currency
-
-            if days_overdue <= 0:
-                b1 += residual
-            elif days_overdue <= self.aging_bucket_1:
-                b2 += residual
-            elif days_overdue <= self.aging_bucket_2:
-                b3 += residual
-            elif days_overdue <= self.aging_bucket_3:
-                b4 += residual
-            else:
-                b5 += residual
+        closing_balance = running_balance  # equals opening + sum(period signed)
 
         return {
-            'current': b1,
-            'bucket_1': b2,
-            'bucket_2': b3,
-            'bucket_3': b4,
-            'bucket_4_plus': b5,
-            'total': b1 + b2 + b3 + b4 + b5,
+            'partner': self.partner_id,
+            'date_from': date_from,
+            'date_to': date_to,
+            'opening_balance': opening_balance,
+            'lines': lines,
+            'closing_balance': closing_balance,
+            'currency': self.partner_id.currency_id or self.env.company.currency_id,
+            'company': self.env.company,
         }
 
-    def _get_statement_data(self):
-        """Build the full data payload for the report."""
-        partners = self._get_partners()
-        statements = []
+    # ─────────────────────────────────────────────────────────────────────────
+    # REPORT ACTIONS
+    # ─────────────────────────────────────────────────────────────────────────
 
-        for partner in partners:
-            opening_balance = self._get_opening_balance(partner) if self.show_opening_balance else 0.0
-            lines = self._get_move_lines(partner)
-            aging = self._get_aging_data(partner) if self.show_aging else {}
-
-            closing_balance = opening_balance
-            if lines:
-                closing_balance = lines[-1]['balance']
-            else:
-                closing_balance = opening_balance
-
-            total_debit = sum(l['debit'] for l in lines)
-            total_credit = sum(l['credit'] for l in lines)
-
-            if self.statement_type == 'outstanding':
-                lines = [l for l in lines if not l['reconciled']]
-
-            statements.append({
-                'partner': partner,
-                'partner_name': partner.name,
-                'partner_ref': partner.ref or '',
-                'partner_street': partner.street or '',
-                'partner_city': partner.city or '',
-                'partner_country': partner.country_id.name if partner.country_id else '',
-                'partner_vat': partner.vat or '',
-                'partner_phone': partner.phone or '',
-                'partner_email': partner.email or '',
-                'opening_balance': opening_balance,
-                'lines': lines,
-                'closing_balance': closing_balance,
-                'total_debit': total_debit,
-                'total_credit': total_credit,
-                'aging': aging,
-                'currency': self.currency_id,
-                'has_balance': abs(closing_balance) > 0.001,
-            })
-
-        # Filter out zero-balance partners for outstanding
-        if self.statement_type == 'outstanding':
-            statements = [s for s in statements if s['has_balance'] or s['lines']]
-
-        return statements
-
-    # ── Report Actions ────────────────────────────────────────────
-    def action_print_pdf(self):
-        """Generate PDF report."""
+    def action_generate_report(self):
         self.ensure_one()
-        data = {
-            'wizard_id': self.id,
-            'date_from': str(self.date_from),
-            'date_to': str(self.date_to),
-            'company_id': self.company_id.id,
-            'currency_id': self.currency_id.id,
-            'show_aging': self.show_aging,
-            'show_opening_balance': self.show_opening_balance,
-            'statement_type': self.statement_type,
-            'aging_bucket_1': self.aging_bucket_1,
-            'aging_bucket_2': self.aging_bucket_2,
-            'aging_bucket_3': self.aging_bucket_3,
-            'aging_bucket_4': self.aging_bucket_4,
-        }
+        if self.date_from > self.date_to:
+            raise UserError(_('Date From must be earlier than or equal to Date To.'))
+
+        if self.report_type == 'pdf':
+            return self._generate_pdf()
+        else:
+            return self._generate_xlsx()
+
+    def _generate_pdf(self):
+        """Return PDF report action."""
         return self.env.ref(
             'customer_statement_report.action_customer_statement_pdf'
-        ).report_action(self, data=data)
+        ).report_action(self)
 
-    def action_preview(self):
-        """Open HTML preview in browser."""
-        self.ensure_one()
-        return self.action_print_pdf()
+    def _generate_xlsx(self):
+        """Generate XLSX and return as downloadable attachment."""
+        data = self._compute_statement_data()
+        xlsx_data = self._build_xlsx(data)
 
-    # ── Called by Report Template ─────────────────────────────────
-    def get_report_data(self):
-        """Public method called by QWeb report template."""
-        self.ensure_one()
-        return self._get_statement_data()
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Customer_Statement_%s.xlsx' % self.partner_id.name,
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/web/content/%d?download=true' % attachment.id,
+            'target': 'self',
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # XLSX BUILDER
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _build_xlsx(self, data):
+        """Build XLSX workbook and return raw bytes."""
+        try:
+            import xlsxwriter
+        except ImportError:
+            raise UserError(_(
+                'xlsxwriter library is not installed. '
+                'Please install it: pip install xlsxwriter'
+            ))
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet('Customer Statement')
+
+        currency = data['currency']
+        currency_symbol = currency.symbol or ''
+
+        # ── Formats ──────────────────────────────────────────────────────────
+        fmt_title = workbook.add_format({
+            'bold': True, 'font_size': 16,
+            'font_color': '#1F4E79', 'align': 'left',
+        })
+        fmt_subtitle = workbook.add_format({
+            'font_size': 10, 'font_color': '#595959',
+        })
+        fmt_header = workbook.add_format({
+            'bold': True, 'font_size': 10,
+            'bg_color': '#1F4E79', 'font_color': '#FFFFFF',
+            'border': 1, 'align': 'center', 'valign': 'vcenter',
+        })
+        fmt_date = workbook.add_format({
+            'num_format': 'DD/MM/YYYY', 'border': 1, 'font_size': 10,
+        })
+        fmt_text = workbook.add_format({'border': 1, 'font_size': 10})
+        fmt_money = workbook.add_format({
+            'num_format': '#,##0.00', 'border': 1, 'font_size': 10,
+        })
+        fmt_money_red = workbook.add_format({
+            'num_format': '#,##0.00', 'border': 1,
+            'font_color': '#FF0000', 'font_size': 10,
+        })
+        fmt_balance_pos = workbook.add_format({
+            'num_format': '#,##0.00', 'border': 1,
+            'font_color': '#1F4E79', 'bold': True, 'font_size': 10,
+        })
+        fmt_balance_neg = workbook.add_format({
+            'num_format': '#,##0.00', 'border': 1,
+            'font_color': '#FF0000', 'bold': True, 'font_size': 10,
+        })
+        fmt_opening = workbook.add_format({
+            'bold': True, 'bg_color': '#D9E1F2', 'border': 1,
+            'num_format': '#,##0.00', 'font_size': 10,
+        })
+        fmt_opening_label = workbook.add_format({
+            'bold': True, 'bg_color': '#D9E1F2', 'border': 1, 'font_size': 10,
+        })
+        fmt_total = workbook.add_format({
+            'bold': True, 'bg_color': '#1F4E79', 'font_color': '#FFFFFF',
+            'border': 1, 'num_format': '#,##0.00', 'font_size': 11,
+        })
+        fmt_total_label = workbook.add_format({
+            'bold': True, 'bg_color': '#1F4E79', 'font_color': '#FFFFFF',
+            'border': 1, 'font_size': 11,
+        })
+
+        # ── Column Widths ─────────────────────────────────────────────────────
+        worksheet.set_column('A:A', 14)   # Date
+        worksheet.set_column('B:B', 22)   # Document No.
+        worksheet.set_column('C:C', 14)   # Type
+        worksheet.set_column('D:D', 14)   # Reference
+        worksheet.set_column('E:E', 15)   # Debit
+        worksheet.set_column('F:F', 15)   # Credit
+        worksheet.set_column('G:G', 18)   # Running Balance
+
+        # ── Header Section ────────────────────────────────────────────────────
+        worksheet.merge_range('A1:G1',
+            'CUSTOMER STATEMENT', fmt_title)
+        worksheet.merge_range('A2:G2',
+            data['partner'].name, fmt_subtitle)
+        worksheet.merge_range('A3:G3',
+            'Period: %s to %s' % (
+                data['date_from'].strftime('%d/%m/%Y'),
+                data['date_to'].strftime('%d/%m/%Y'),
+            ), fmt_subtitle)
+        worksheet.merge_range('A4:G4',
+            'Company: %s' % data['company'].name, fmt_subtitle)
+        worksheet.merge_range('A5:G5', '', fmt_subtitle)  # spacer
+
+        # ── Table Headers ─────────────────────────────────────────────────────
+        headers = ['Date', 'Document No.', 'Type', 'Reference',
+                   'Debit (%s)' % currency_symbol,
+                   'Credit (%s)' % currency_symbol,
+                   'Balance (%s)' % currency_symbol]
+        for col, header in enumerate(headers):
+            worksheet.write(5, col, header, fmt_header)
+        worksheet.set_row(5, 20)
+
+        # ── Opening Balance Row ───────────────────────────────────────────────
+        worksheet.merge_range('A7:D7', 'Opening Balance', fmt_opening_label)
+        worksheet.write(6, 4, '', fmt_opening)
+        worksheet.write(6, 5, '', fmt_opening)
+        worksheet.write(6, 6, data['opening_balance'], fmt_opening)
+
+        # ── Transaction Rows ──────────────────────────────────────────────────
+        row = 7
+        for line in data['lines']:
+            worksheet.write(row, 0, line['date'], fmt_date)
+            worksheet.write(row, 1, line['name'], fmt_text)
+            worksheet.write(row, 2, line['type_label'], fmt_text)
+            worksheet.write(row, 3, line['ref'], fmt_text)
+
+            if line['is_refund']:
+                worksheet.write(row, 4, 0.0, fmt_money)
+                worksheet.write(row, 5, line['credit'], fmt_money_red)
+            else:
+                worksheet.write(row, 4, line['debit'], fmt_money)
+                worksheet.write(row, 5, 0.0, fmt_money)
+
+            bal_fmt = fmt_balance_pos if line['balance'] >= 0 else fmt_balance_neg
+            worksheet.write(row, 6, line['balance'], bal_fmt)
+            row += 1
+
+        # ── Closing Balance / Total Row ───────────────────────────────────────
+        closing = data['closing_balance']
+        label = 'AMOUNT DUE' if closing >= 0 else 'CREDIT BALANCE'
+        worksheet.merge_range(row, 0, row, 3, label, fmt_total_label)
+        worksheet.write(row, 4, '', fmt_total)
+        worksheet.write(row, 5, '', fmt_total)
+        worksheet.write(row, 6, closing, fmt_total)
+        worksheet.set_row(row, 18)
+
+        workbook.close()
+        return output.getvalue()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # QWeb Data Provider (called by report action)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def get_report_values(self):
+        """Return data dict for the QWeb PDF template."""
+        return self._compute_statement_data()

@@ -1,102 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         Customer Statement Wizard Form View
-    ═══════════════════════════════════════════════════════════ -->
-    <record id="view_customer_statement_wizard_form" model="ir.ui.view">
+    <record id="customer_statement_wizard_view_form" model="ir.ui.view">
         <field name="name">customer.statement.wizard.form</field>
         <field name="model">customer.statement.wizard</field>
         <field name="arch" type="xml">
-            <form string="Customer Statement Report">
-
-                <!-- ── Header Banner ── -->
-                <div class="alert alert-info mb-3" role="alert"
-                     style="border-left:4px solid #017e84;">
-                    <strong>
-                        <i class="fa fa-file-text-o me-1"/>
-                        Customer Statement Report
-                    </strong>
-                    — Generate detailed account statements for one or multiple customers.
-                </div>
-
-                <!-- ── Quick Date Preset ── -->
-                <group string="Select Period">
-                    <field name="date_range_preset"
-                           widget="radio"
-                           options="{'horizontal': true}"
-                           colspan="2"/>
+            <form string="Customer Statement">
+                <group>
+                    <group>
+                        <field name="partner_id" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group>
+                        <field name="report_type" widget="radio"/>
+                    </group>
                 </group>
-
-                <!-- ── Custom Date Range — visible only when preset = custom ── -->
-                <group string="Custom Date Range"
-                       invisible="date_range_preset != 'custom'">
-                    <field name="date_from" widget="date" required="1"/>
-                    <field name="date_to"   widget="date" required="1"/>
+                <group string="Date Range">
+                    <group>
+                        <field name="date_from"/>
+                    </group>
+                    <group>
+                        <field name="date_to"/>
+                    </group>
                 </group>
-
-                <!-- ── Resolved dates read-only when preset is not custom ── -->
-                <group string="Period Dates"
-                       invisible="date_range_preset == 'custom'">
-                    <field name="date_from" widget="date" readonly="1"/>
-                    <field name="date_to"   widget="date" readonly="1"/>
-                </group>
-
-                <!-- ── Company and Currency ── -->
-                <group string="Company &amp; Currency" col="2">
-                    <field name="company_id" options="{'no_create': True}"/>
-                    <field name="currency_id" options="{'no_create': True}"/>
-                </group>
-
-                <!-- ── Customer Selection ── -->
-                <group string="Customer Selection">
-                    <field name="partner_ids"
-                           widget="many2many_tags"
-                           domain="[('customer_rank','&gt;',0)]"
-                           placeholder="Leave empty to include all customers..."
-                           options="{'no_create': True}"
-                           colspan="2"/>
-                </group>
-
-                <!-- ── Statement Options ── -->
-                <group string="Statement Options" col="4">
-                    <field name="statement_type" widget="radio"/>
-                    <field name="include_unreconciled"/>
-                    <field name="show_opening_balance"/>
-                    <field name="show_aging"/>
-                    <field name="group_by_currency"/>
-                </group>
-
-                <!-- ── Journal Filter ── -->
-                <group string="Journal Filter">
-                    <field name="journal_ids"
-                           widget="many2many_tags"
-                           domain="[('type','in',['sale','general','cash','bank'])]"
-                           placeholder="Leave empty for all journals..."
-                           options="{'no_create': True}"
-                           colspan="2"/>
-                </group>
-
-                <!-- ── Aging Buckets: Odoo 18 inline invisible (no attrs) ── -->
-                <group string="Aging Buckets (Days)" col="4"
-                       invisible="not show_aging">
-                    <field name="aging_bucket_1" string="Bucket 1 ≤ (days)"/>
-                    <field name="aging_bucket_2" string="Bucket 2 ≤ (days)"/>
-                    <field name="aging_bucket_3" string="Bucket 3 ≤ (days)"/>
-                    <field name="aging_bucket_4" string="Bucket 4 ≤ (days)"/>
-                </group>
-
                 <footer>
-                    <button name="action_print_pdf"
-                            string="Print PDF"
+                    <button name="action_generate_report"
+                            string="Generate Report"
                             type="object"
                             class="btn-primary"
-                            icon="fa-print"/>
-                    <button name="action_preview"
-                            string="Preview"
-                            type="object"
-                            class="btn-secondary"
-                            icon="fa-eye"/>
+                            data-hotkey="v"/>
                     <button string="Cancel"
                             class="btn-secondary"
                             special="cancel"/>
@@ -105,16 +37,13 @@
         </field>
     </record>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         Action to open the Wizard
-    ═══════════════════════════════════════════════════════════ -->
     <record id="action_customer_statement_wizard" model="ir.actions.act_window">
         <field name="name">Customer Statement</field>
         <field name="res_model">customer.statement.wizard</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_customer_statement_wizard_form"/>
+        <field name="view_id" ref="customer_statement_wizard_view_form"/>
         <field name="target">new</field>
-        <field name="context">{}</field>
+        <field name="context">{'default_partner_id': active_id}</field>
     </record>
 
 </odoo>
