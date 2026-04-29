@@ -1,8 +1,0 @@
-<odoo>
-    <report id="action_customer_statement_pdf"
-        model="customer.statement.wizard"
-        string="Customer Statement"
-        report_type="qweb-pdf"
-        name="customer_statement.statement_template"
-        file="customer_statement.statement_template"/>
-</odoo>

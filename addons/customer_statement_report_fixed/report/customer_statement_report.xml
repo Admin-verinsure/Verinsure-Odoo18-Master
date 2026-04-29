@@ -1,30 +1,35 @@
 <odoo>
-    <report
-        id="action_customer_statement_pdf"
+    <report id="action_customer_statement_pdf"
         model="customer.statement.wizard"
         string="Customer Statement"
         report_type="qweb-pdf"
-        name="customer_statement_report.customer_statement_template"
-    />
+        name="customer_statement_report.customer_statement_template"/>
 
     <template id="customer_statement_template">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
                 <t t-set="data" t-value="o._get_statement_data()"/>
+                <t t-set="company" t-value="o.env.company"/>
+
                 <div class="page">
-                    <h2>Customer Statement</h2>
+                    <div style="display:flex;justify-content:space-between;">
+                        <img t-if="company.logo" t-att-src="'data:image/png;base64,%s' % company.logo" style="max-height:80px;"/>
+                        <div style="text-align:right;">
+                            <b><t t-esc="company.name"/></b><br/>
+                            <t t-esc="company.street or ''"/><br/>
+                            <t t-esc="company.city or ''"/> <t t-esc="company.zip or ''"/><br/>
+                            <t t-esc="company.country_id.name or ''"/>
+                        </div>
+                    </div>
+
+                    <h2 style="text-align:center;">Customer Statement</h2>
+
                     <p><b>Customer:</b> <t t-esc="data['partner']"/></p>
-                    <p><b>Opening Balance:</b> <t t-esc="data['opening_balance']"/></p>
 
                     <table class="table table-sm">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Document</th>
-                                <th>Type</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
-                                <th>Balance</th>
+                                <th>Date</th><th>Doc</th><th>Type</th><th>Debit</th><th>Credit</th><th>Balance</th>
                             </tr>
                         </thead>
                         <tbody>
