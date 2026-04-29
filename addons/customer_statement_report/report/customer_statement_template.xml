@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+<template id="report_customer_statement_template">
+    <t t-call="web.html_container">
+        <t t-foreach="docs" t-as="wizard">
+            <t t-set="data" t-value="wizard.get_report_values()"/>
+            <t t-call="web.external_layout">
+                <div class="page">
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- HEADER                                               -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div class="row mb-4">
+                        <div class="col-8">
+                            <h2 style="color:#1F4E79; margin-bottom:4px;">
+                                CUSTOMER STATEMENT
+                            </h2>
+                            <h4 style="margin-top:0; color:#333;">
+                                <t t-esc="data['partner'].name"/>
+                            </h4>
+                            <t t-if="data['partner'].street">
+                                <div><t t-esc="data['partner'].street"/></div>
+                            </t>
+                            <t t-if="data['partner'].city or data['partner'].zip">
+                                <div>
+                                    <t t-esc="data['partner'].zip"/>&#160;
+                                    <t t-esc="data['partner'].city"/>
+                                </div>
+                            </t>
+                            <t t-if="data['partner'].country_id">
+                                <div><t t-esc="data['partner'].country_id.name"/></div>
+                            </t>
+                        </div>
+                        <div class="col-4 text-right">
+                            <table class="table table-sm" style="border:none;">
+                                <tr>
+                                    <td style="border:none; font-weight:bold;">Period From:</td>
+                                    <td style="border:none;">
+                                        <t t-esc="data['date_from']"
+                                           t-options='{"widget": "date"}'/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border:none; font-weight:bold;">Period To:</td>
+                                    <td style="border:none;">
+                                        <t t-esc="data['date_to']"
+                                           t-options='{"widget": "date"}'/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border:none; font-weight:bold;">Currency:</td>
+                                    <td style="border:none;">
+                                        <t t-esc="data['currency'].name"/>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <hr style="border-color:#1F4E79; border-width:2px;"/>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- TRANSACTIONS TABLE                                   -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <table class="table table-sm table-bordered"
+                           style="font-size:11px;">
+                        <thead>
+                            <tr style="background-color:#1F4E79; color:#FFFFFF;">
+                                <th>Date</th>
+                                <th>Document No.</th>
+                                <th>Reference</th>
+                                <th>Type</th>
+                                <th class="text-right">
+                                    Debit (<t t-esc="data['currency'].symbol"/>)
+                                </th>
+                                <th class="text-right">
+                                    Credit (<t t-esc="data['currency'].symbol"/>)
+                                </th>
+                                <th class="text-right">
+                                    Balance (<t t-esc="data['currency'].symbol"/>)
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            <!-- Opening Balance Row -->
+                            <tr style="background-color:#D9E1F2; font-weight:bold;">
+                                <td colspan="4">Opening Balance</td>
+                                <td class="text-right"></td>
+                                <td class="text-right"></td>
+                                <td class="text-right">
+                                    <t t-esc="data['opening_balance']"
+                                       t-options='{"widget": "monetary",
+                                                   "display_currency": data[&apos;currency&apos;]}'/>
+                                </td>
+                            </tr>
+
+                            <!-- Transaction Rows -->
+                            <t t-foreach="data['lines']" t-as="line">
+                                <tr t-att-style="'color:#CC0000;' if line['is_refund'] else ''">
+                                    <td>
+                                        <t t-esc="line['date']"
+                                           t-options='{"widget": "date"}'/>
+                                    </td>
+                                    <td>
+                                        <t t-esc="line['name']"/>
+                                    </td>
+                                    <td>
+                                        <t t-esc="line['ref']"/>
+                                    </td>
+                                    <td>
+                                        <t t-esc="line['type_label']"/>
+                                    </td>
+                                    <td class="text-right">
+                                        <t t-if="not line['is_refund']">
+                                            <t t-esc="line['debit']"
+                                               t-options='{"widget": "monetary",
+                                                           "display_currency": data[&apos;currency&apos;]}'/>
+                                        </t>
+                                        <t t-else="">—</t>
+                                    </td>
+                                    <td class="text-right">
+                                        <t t-if="line['is_refund']">
+                                            <t t-esc="line['credit']"
+                                               t-options='{"widget": "monetary",
+                                                           "display_currency": data[&apos;currency&apos;]}'/>
+                                        </t>
+                                        <t t-else="">—</t>
+                                    </td>
+                                    <td class="text-right">
+                                        <t t-esc="line['balance']"
+                                           t-options='{"widget": "monetary",
+                                                       "display_currency": data[&apos;currency&apos;]}'/>
+                                    </td>
+                                </tr>
+                            </t>
+
+                            <!-- Empty state -->
+                            <t t-if="not data['lines']">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted"
+                                        style="padding:20px;">
+                                        No transactions in the selected period.
+                                    </td>
+                                </tr>
+                            </t>
+
+                        </tbody>
+                    </table>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- CLOSING BALANCE SUMMARY                              -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div class="row mt-4">
+                        <div class="col-6 offset-6">
+                            <table class="table table-sm"
+                                   style="border:1px solid #1F4E79;">
+
+                                <tr style="background-color:#D9E1F2;">
+                                    <td style="font-weight:bold;">Opening Balance</td>
+                                    <td class="text-right">
+                                        <t t-esc="data['opening_balance']"
+                                           t-options='{"widget": "monetary",
+                                                       "display_currency": data[&apos;currency&apos;]}'/>
+                                    </td>
+                                </tr>
+
+                                <t t-foreach="data['lines']" t-as="line">
+                                    <t t-if="not line['is_refund']">
+                                        <tr>
+                                            <td style="padding-left:20px;">
+                                                Invoices
+                                            </td>
+                                            <td class="text-right">
+                                                +&#160;<t t-esc="line['debit']"
+                                                         t-options='{"widget": "monetary",
+                                                                     "display_currency": data[&apos;currency&apos;]}'/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </t>
+
+                                <t t-set="total_debit"
+                                   t-value="sum([l['debit'] for l in data['lines'] if not l['is_refund']])"/>
+                                <t t-set="total_credit"
+                                   t-value="sum([l['credit'] for l in data['lines'] if l['is_refund']])"/>
+
+                                <tr style="border-top: 1px solid #ccc;">
+                                    <td style="font-weight:bold; padding-left:20px;">
+                                        Total Invoiced
+                                    </td>
+                                    <td class="text-right" style="font-weight:bold;">
+                                        <t t-esc="total_debit"
+                                           t-options='{"widget": "monetary",
+                                                       "display_currency": data[&apos;currency&apos;]}'/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; padding-left:20px; color:#CC0000;">
+                                        Total Credit Notes
+                                    </td>
+                                    <td class="text-right" style="font-weight:bold; color:#CC0000;">
+                                        - <t t-esc="total_credit"
+                                             t-options='{"widget": "monetary",
+                                                         "display_currency": data[&apos;currency&apos;]}'/>
+                                    </td>
+                                </tr>
+
+                                <!-- Closing / Net Balance -->
+                                <tr t-att-style="
+                                    'background-color:#1F4E79; color:#FFFFFF; font-size:13px; font-weight:bold;'
+                                    if data['closing_balance'] >= 0 else
+                                    'background-color:#CC0000; color:#FFFFFF; font-size:13px; font-weight:bold;'
+                                ">
+                                    <td>
+                                        <t t-if="data['closing_balance'] >= 0">
+                                            AMOUNT DUE
+                                        </t>
+                                        <t t-else="">
+                                            CREDIT BALANCE
+                                        </t>
+                                    </td>
+                                    <td class="text-right">
+                                        <t t-esc="data['closing_balance']"
+                                           t-options='{"widget": "monetary",
+                                                       "display_currency": data[&apos;currency&apos;]}'/>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <!-- FOOTER NOTE                                          -->
+                    <!-- ═══════════════════════════════════════════════════ -->
+                    <div class="mt-4" style="font-size:10px; color:#888; border-top:1px solid #ccc; padding-top:8px;">
+                        <p>
+                            This statement was generated on
+                            <t t-esc="context_timestamp(datetime.datetime.now())"
+                               t-options='{"widget": "datetime"}'/>
+                            by <t t-esc="data['company'].name"/>.
+                            Please contact us if you have any queries regarding this statement.
+                        </p>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </t>
+</template>
+
+</odoo>
