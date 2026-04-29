@@ -9,7 +9,7 @@
                         type="object"
                         string="Customer Statement"
                         class="btn-primary"
-                        attrs="{'invisible': [('customer_rank', '=', 0)]}"/>
+                        invisible="customer_rank == 0"/>
             </header>
         </field>
     </record>
