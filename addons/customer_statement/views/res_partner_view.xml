@@ -4,12 +4,8 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
-            <header position="inside">
-                <button name="action_open_customer_statement"
-                        type="object"
-                        string="Customer Statement"
-                        class="btn-primary"
-                        invisible="customer_rank == 0"/>
+            <header>
+                <button name="action_open_statement" type="object" string="Customer Statement"/>
             </header>
         </field>
     </record>
