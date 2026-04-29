@@ -1,1 +1,1 @@
-from . import customer_statement_wizard
+from . import statement_wizard
