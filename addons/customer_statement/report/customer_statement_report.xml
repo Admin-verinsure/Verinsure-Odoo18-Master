@@ -1,0 +1,49 @@
+<odoo>
+    <report
+        id="action_customer_statement_pdf"
+        model="customer.statement.wizard"
+        string="Customer Statement"
+        report_type="qweb-pdf"
+        name="customer_statement_report.customer_statement_template"
+    />
+
+    <template id="customer_statement_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-set="data" t-value="o._get_statement_data()"/>
+                <div class="page">
+                    <h2>Customer Statement</h2>
+                    <p><b>Customer:</b> <t t-esc="data['partner']"/></p>
+                    <p><b>Opening Balance:</b> <t t-esc="data['opening_balance']"/></p>
+
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Document</th>
+                                <th>Type</th>
+                                <th>Debit</th>
+                                <th>Credit</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="data['lines']" t-as="l">
+                                <tr>
+                                    <td><t t-esc="l['date']"/></td>
+                                    <td><t t-esc="l['name']"/></td>
+                                    <td><t t-esc="l['type']"/></td>
+                                    <td><t t-esc="l['debit']"/></td>
+                                    <td style="color:red;"><t t-esc="l['credit']"/></td>
+                                    <td><t t-esc="l['balance']"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+
+                    <h3>Closing Balance: <t t-esc="data['closing_balance']"/></h3>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
