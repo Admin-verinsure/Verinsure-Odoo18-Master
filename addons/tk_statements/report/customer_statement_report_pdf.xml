@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-    <!-- ================================================================
-         QWeb PDF Template — Customer Statement
-         'company'      → real res.company recordset (used by web.external_layout)
-         'company_info' → plain dict with name/address/currency_symbol
-
-         IMPORTANT wkhtmltopdf notes:
-         - <thead> repeats on every page  → we use display:table-row-group to stop it
-         - <tfoot> repeats on every page  → replaced with a plain <tbody> row
-         ================================================================ -->
+    
     <template id="customer_report_template">
         <t t-call="web.html_container">
             <t t-call="web.external_layout">
@@ -45,7 +37,7 @@
                         font-size: 9.5px;
                     }
 
-                    /* Stop wkhtmltopdf from repeating <thead> on every page */
+
                     .cs-ledger thead {
                         display: table-row-group;
                     }
