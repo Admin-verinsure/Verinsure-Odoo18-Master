@@ -4,6 +4,10 @@
          QWeb PDF Template — Customer Statement
          'company'      → real res.company recordset (used by web.external_layout)
          'company_info' → plain dict with name/address/currency_symbol
+
+         IMPORTANT wkhtmltopdf notes:
+         - <thead> repeats on every page  → we use display:table-row-group to stop it
+         - <tfoot> repeats on every page  → replaced with a plain <tbody> row
          ================================================================ -->
     <template id="customer_report_template">
         <t t-call="web.html_container">
@@ -25,6 +29,7 @@
                         vertical-align: top;
                     }
                     .cs-meta-label { font-weight: 700; color: #444; }
+
                     .cs-opening-row td {
                         background: #D6E4F0;
                         font-weight: 700;
@@ -32,11 +37,17 @@
                         padding: 5px 8px;
                         border: 1px solid #A0BDD8;
                     }
+
                     .cs-ledger {
                         width: 100%;
                         border-collapse: collapse;
                         margin-top: 10px;
                         font-size: 9.5px;
+                    }
+
+                    /* Stop wkhtmltopdf from repeating <thead> on every page */
+                    .cs-ledger thead {
+                        display: table-row-group;
                     }
                     .cs-ledger thead tr {
                         background: #1F3864;
@@ -48,6 +59,7 @@
                         border: 1px solid #1F3864;
                         font-weight: 700;
                     }
+
                     .cs-ledger tbody tr:nth-child(odd)  { background: #F5F8FB; }
                     .cs-ledger tbody tr:nth-child(even) { background: #fff; }
                     .cs-ledger tbody td {
@@ -55,20 +67,24 @@
                         border: 1px solid #D0D0D0;
                         vertical-align: middle;
                     }
-                    .cs-ledger tfoot tr { background: #1F3864; color: #fff; }
-                    .cs-ledger tfoot td {
-                        padding: 6px 8px;
+
+                    /* Net balance row — plain tbody row styled to look like tfoot */
+                    .cs-ledger-total td {
+                        background: #1F3864;
+                        color: #fff;
                         font-weight: 700;
-                        font-size: 10px;
+                        font-size: 11px;
+                        padding: 6px 8px;
                         border: 1px solid #1F3864;
                     }
+
                     .txt-right  { text-align: right; }
                     .txt-center { text-align: center; }
                     .txt-left   { text-align: left; }
                     .type-invoice    { color: #375623; font-weight: 600; }
                     .type-creditnote { color: #C00000; font-weight: 600; }
                     .bal-negative    { color: #C00000; }
-                    .net-balance-cell { font-size: 11px; }
+                    .bal-negative-white { color: #FF6B6B; }
                 </style>
 
                 <!-- ── Report Title ── -->
@@ -119,6 +135,8 @@
                 </table>
 
                 <!-- ── Ledger table ── -->
+                <!-- NOTE: No <tfoot> — replaced with a tbody row so wkhtmltopdf
+                     does NOT repeat the NET BALANCE on every page break -->
                 <table class="cs-ledger">
                     <thead>
                         <tr>
@@ -172,19 +190,18 @@
                                 </td>
                             </tr>
                         </t>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="5" class="txt-right net-balance-cell">
-                                NET BALANCE DUE
-                                (<t t-out="company_info['currency_symbol']"/>)
+
+                        <!-- NET BALANCE row — plain tbody so it renders ONCE at the end only -->
+                        <tr class="cs-ledger-total">
+                            <td colspan="5" class="txt-right">
+                                NET BALANCE DUE (<t t-out="company_info['currency_symbol']"/>)
                             </td>
-                            <td class="txt-right net-balance-cell"
+                            <td class="txt-right"
                                 t-attf-style="#{net_balance &lt; 0 and 'color:#FF6B6B;' or ''}">
                                 <t t-out="'%.2f' % net_balance"/>
                             </td>
                         </tr>
-                    </tfoot>
+                    </tbody>
                 </table>
 
                 <!-- ── Footer note ── -->
