@@ -94,7 +94,7 @@ class CustomerStatementController(http.Controller):
             ws.column_dimensions[get_column_letter(i)].width = w
 
         # ---------- Row 1: Company name ----------
-        company = data['company']
+        company = data['company_info']
         ws.merge_cells('A1:F1')
         c = ws['A1']
         c.value = company['name']
