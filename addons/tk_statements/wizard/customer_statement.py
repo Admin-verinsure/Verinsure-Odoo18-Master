@@ -13,7 +13,7 @@ class CustomerStatementWizard(models.TransientModel):
     - Posted invoices (out_invoice) and credit notes (out_refund)
     - Running balance ledger
     - Opening balance (outstanding before start_date)
-    - Partial payment handling via amount_residual_signed
+    - Partial payment handling via amount_residual
     - PDF output (QWeb / external_layout)
     - Excel output (via controller route, no base64 URL payload)
     """
@@ -58,27 +58,12 @@ class CustomerStatementWizard(models.TransientModel):
 
     def _get_statement_data(self):
         """
-        Returns a dict with all data needed to render PDF or Excel:
+        Returns a dict with all data needed to render PDF or Excel.
 
-        {
-            'company': {'name': ..., 'address': ...},
-            'partner': {'name': ..., 'street': ..., ...},
-            'start_date': str,
-            'end_date': str,
-            'opening_balance': float,
-            'lines': [
-                {
-                    'date': date,
-                    'name': str,          # document number
-                    'move_type': str,     # out_invoice / out_refund
-                    'type_label': str,    # "Invoice" / "Credit Note"
-                    'debit': float|None,
-                    'credit': float|None,
-                    'running_balance': float,
-                }
-            ],
-            'net_balance': float,
-        }
+        IMPORTANT: the key 'company' holds the real res.company recordset
+        so that web.external_layout can access company.external_report_layout_id
+        and other ORM fields it needs.  Extra display fields (address, currency
+        symbol) are stored under 'company_info' as a plain dict.
         """
         self.ensure_one()
         self._check_dates()
@@ -98,42 +83,35 @@ class CustomerStatementWizard(models.TransientModel):
         for move in opening_moves:
             if move.move_type == 'out_invoice':
                 opening_balance += move.amount_residual
-            else:  # out_refund
+            else:
                 opening_balance -= move.amount_residual
 
         # ---- Period moves ----
-        period_domain = domain_base + [
-            ('invoice_date', '>=', self.start_date),
-            ('invoice_date', '<=', self.end_date),
-        ]
-        if not self.include_zero_balance:
-            # Still show all moves in the period regardless of residual,
-            # but allow the user to hide fully-settled ones if desired.
-            pass  # default: include all
-
         period_moves = self.env['account.move'].search(
-            period_domain,
+            domain_base + [
+                ('invoice_date', '>=', self.start_date),
+                ('invoice_date', '<=', self.end_date),
+            ],
             order='invoice_date asc, name asc',
         )
 
         lines = []
         running = opening_balance
         for move in period_moves:
-            residual = move.amount_residual  # always positive in Odoo
+            residual = move.amount_residual
             paid = move.amount_total - residual
 
             if move.move_type == 'out_invoice':
                 debit = move.amount_total
                 credit = paid if paid > 0 else None
-                running += residual          # add the outstanding portion
+                running += residual
                 type_label = "Invoice"
-            else:  # out_refund
+            else:
                 debit = None
                 credit = move.amount_total
-                running -= residual          # reduce the outstanding balance
+                running -= residual
                 type_label = "Credit Note"
 
-            # Skip fully paid if user opted out
             if not self.include_zero_balance and residual == 0:
                 continue
 
@@ -147,26 +125,30 @@ class CustomerStatementWizard(models.TransientModel):
                 'running_balance': round(running, 2),
             })
 
-        # ---- Company ----
-        company = self.env.company
+        # ---- Company recordset (required by web.external_layout) ----
+        company_rec = self.env.company
+
+        # ---- Company display info (plain dict for template & Excel) ----
         addr_parts = filter(None, [
-            company.street, company.street2,
-            company.city, company.zip,
-            company.state_id.name if company.state_id else None,
-            company.country_id.name if company.country_id else None,
+            company_rec.street, company_rec.street2,
+            company_rec.city, company_rec.zip,
+            company_rec.state_id.name if company_rec.state_id else None,
+            company_rec.country_id.name if company_rec.country_id else None,
         ])
-        company_address = ', '.join(addr_parts)
+        company_info = {
+            'name': company_rec.name,
+            'address': ', '.join(addr_parts),
+            'currency_symbol': company_rec.currency_id.symbol,
+        }
 
         # ---- Partner ----
         partner = self.partner_id
-        net_balance = round(running, 2)
 
         return {
-            'company': {
-                'name': company.name,
-                'address': company_address,
-                'currency_symbol': company.currency_id.symbol,
-            },
+            # 'company' MUST be the real recordset — web.external_layout needs it
+            'company': company_rec,
+            # plain dict for our own template variables and Excel
+            'company_info': company_info,
             'partner': {
                 'name': partner.name,
                 'street': partner.street or '',
@@ -180,7 +162,9 @@ class CustomerStatementWizard(models.TransientModel):
             'end_date': self.end_date.strftime('%d/%m/%Y'),
             'opening_balance': round(opening_balance, 2),
             'lines': lines,
-            'net_balance': net_balance,
+            'net_balance': round(running, 2),
+            # Required by Odoo's report engine
+            'docs': self,
         }
 
     # ------------------------------------------------------------------

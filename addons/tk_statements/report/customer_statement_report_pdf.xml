@@ -2,6 +2,8 @@
 <odoo>
     <!-- ================================================================
          QWeb PDF Template — Customer Statement
+         'company'      → real res.company recordset (used by web.external_layout)
+         'company_info' → plain dict with name/address/currency_symbol
          ================================================================ -->
     <template id="customer_report_template">
         <t t-call="web.html_container">
@@ -30,13 +32,18 @@
                         padding: 5px 8px;
                         border: 1px solid #A0BDD8;
                     }
-                    .cs-ledger { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5px; }
+                    .cs-ledger {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 10px;
+                        font-size: 9.5px;
+                    }
                     .cs-ledger thead tr {
                         background: #1F3864;
                         color: #fff;
                     }
                     .cs-ledger thead th {
-                        padding: 6px 6px;
+                        padding: 6px;
                         text-align: center;
                         border: 1px solid #1F3864;
                         font-weight: 700;
@@ -48,10 +55,7 @@
                         border: 1px solid #D0D0D0;
                         vertical-align: middle;
                     }
-                    .cs-ledger tfoot tr {
-                        background: #1F3864;
-                        color: #fff;
-                    }
+                    .cs-ledger tfoot tr { background: #1F3864; color: #fff; }
                     .cs-ledger tfoot td {
                         padding: 6px 8px;
                         font-weight: 700;
@@ -61,9 +65,9 @@
                     .txt-right  { text-align: right; }
                     .txt-center { text-align: center; }
                     .txt-left   { text-align: left; }
-                    .type-invoice     { color: #375623; font-weight: 600; }
-                    .type-creditnote  { color: #C00000; font-weight: 600; }
-                    .bal-negative     { color: #C00000; }
+                    .type-invoice    { color: #375623; font-weight: 600; }
+                    .type-creditnote { color: #C00000; font-weight: 600; }
+                    .bal-negative    { color: #C00000; }
                     .net-balance-cell { font-size: 11px; }
                 </style>
 
@@ -73,27 +77,27 @@
                 <!-- ── Header meta block ── -->
                 <table class="cs-meta-table" style="width:100%;margin-bottom:12px;">
                     <tr>
-                        <!-- Customer address block -->
+                        <!-- Customer address -->
                         <td style="width:55%;vertical-align:top;">
                             <strong style="font-size:11px;">
-                                <t t-esc="partner['name']"/>
+                                <t t-out="partner['name']"/>
                             </strong><br/>
                             <t t-if="partner['street']">
-                                <t t-esc="partner['street']"/><br/>
+                                <t t-out="partner['street']"/><br/>
                             </t>
                             <t t-if="partner['street2']">
-                                <t t-esc="partner['street2']"/><br/>
+                                <t t-out="partner['street2']"/><br/>
                             </t>
                             <t t-if="partner['city'] or partner['zip']">
-                                <t t-esc="partner['city']"/>
+                                <t t-out="partner['city']"/>
                                 <t t-if="partner['city'] and partner['zip']">, </t>
-                                <t t-esc="partner['zip']"/><br/>
+                                <t t-out="partner['zip']"/><br/>
                             </t>
                             <t t-if="partner['state']">
-                                <t t-esc="partner['state']"/><br/>
+                                <t t-out="partner['state']"/><br/>
                             </t>
                             <t t-if="partner['country']">
-                                <t t-esc="partner['country']"/>
+                                <t t-out="partner['country']"/>
                             </t>
                         </td>
                         <!-- Statement meta -->
@@ -102,12 +106,12 @@
                                 <tr>
                                     <td class="cs-meta-label">Period:</td>
                                     <td>
-                                        <t t-esc="start_date"/> — <t t-esc="end_date"/>
+                                        <t t-out="start_date"/> — <t t-out="end_date"/>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="cs-meta-label">Currency:</td>
-                                    <td><t t-esc="company['currency_symbol']"/></td>
+                                    <td><t t-out="company_info['currency_symbol']"/></td>
                                 </tr>
                             </table>
                         </td>
@@ -129,9 +133,11 @@
                     <tbody>
                         <!-- Opening Balance row -->
                         <tr class="cs-opening-row">
-                            <td colspan="5" class="txt-left">Opening Balance (before period)</td>
+                            <td colspan="5" class="txt-left">
+                                Opening Balance (before period)
+                            </td>
                             <td class="txt-right">
-                                <t t-esc="'%.2f' % opening_balance"/>
+                                <t t-out="'%.2f' % opening_balance"/>
                             </td>
                         </tr>
 
@@ -139,30 +145,29 @@
                         <t t-foreach="lines" t-as="line">
                             <tr>
                                 <td class="txt-center">
-                                    <t t-esc="line['date']"/>
+                                    <t t-out="line['date']"/>
                                 </td>
                                 <td class="txt-left">
-                                    <t t-esc="line['name']"/>
+                                    <t t-out="line['name']"/>
                                 </td>
                                 <td class="txt-center">
-                                    <span t-attf-class="
-                                        #{line['move_type'] == 'out_invoice' and 'type-invoice' or 'type-creditnote'}">
-                                        <t t-esc="line['type_label']"/>
+                                    <span t-attf-class="#{line['move_type'] == 'out_invoice' and 'type-invoice' or 'type-creditnote'}">
+                                        <t t-out="line['type_label']"/>
                                     </span>
                                 </td>
                                 <td class="txt-right">
                                     <t t-if="line['debit']">
-                                        <t t-esc="'%.2f' % line['debit']"/>
+                                        <t t-out="'%.2f' % line['debit']"/>
                                     </t>
                                 </td>
                                 <td class="txt-right" style="color:#C00000;">
                                     <t t-if="line['credit']">
-                                        <t t-esc="'%.2f' % line['credit']"/>
+                                        <t t-out="'%.2f' % line['credit']"/>
                                     </t>
                                 </td>
                                 <td class="txt-right">
                                     <span t-attf-class="#{line['running_balance'] &lt; 0 and 'bal-negative' or ''}">
-                                        <t t-esc="'%.2f' % line['running_balance']"/>
+                                        <t t-out="'%.2f' % line['running_balance']"/>
                                     </span>
                                 </td>
                             </tr>
@@ -171,11 +176,12 @@
                     <tfoot>
                         <tr>
                             <td colspan="5" class="txt-right net-balance-cell">
-                                NET BALANCE DUE (<t t-esc="company['currency_symbol']"/>)
+                                NET BALANCE DUE
+                                (<t t-out="company_info['currency_symbol']"/>)
                             </td>
                             <td class="txt-right net-balance-cell"
                                 t-attf-style="#{net_balance &lt; 0 and 'color:#FF6B6B;' or ''}">
-                                <t t-esc="'%.2f' % net_balance"/>
+                                <t t-out="'%.2f' % net_balance"/>
                             </td>
                         </tr>
                     </tfoot>
@@ -184,8 +190,8 @@
                 <!-- ── Footer note ── -->
                 <p style="font-size:8px;color:#888;margin-top:14px;text-align:center;">
                     This statement reflects all posted invoices and credit notes
-                    for the selected period. Debit = Invoice amount; Credit = Credit note amount.
-                    Balance shown is the net outstanding payable.
+                    for the selected period. Debit = Invoice amount outstanding;
+                    Credit = Credit note amount. Balance shown is the net payable.
                 </p>
 
             </t>
