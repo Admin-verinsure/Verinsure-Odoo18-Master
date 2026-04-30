@@ -193,7 +193,7 @@ class CustomerStatementWizard(models.TransientModel):
         self._check_dates()
         data = {'wizard_id': self.id}
         return self.env.ref(
-            'tk_customer_statements.customer_report_template_action'
+            'tk_statements.customer_report_template_action'
         ).report_action(self, data=data)
 
     def customer_statements_excel_report(self):

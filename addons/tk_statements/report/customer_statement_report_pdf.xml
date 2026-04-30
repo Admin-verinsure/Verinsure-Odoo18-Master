@@ -197,8 +197,8 @@
         <field name="name">Customer Statement Report</field>
         <field name="model">customer.statement.wizard</field>
         <field name="report_type">qweb-pdf</field>
-        <field name="report_name">tk_customer_statements.customer_report_template</field>
-        <field name="report_file">tk_customer_statements.customer_report_template</field>
+        <field name="report_name">tk_statements.customer_report_template</field>
+        <field name="report_file">tk_statements.customer_report_template</field>
         <field name="binding_model_id" ref="model_customer_statement_wizard"/>
         <field name="binding_type">report</field>
     </record>

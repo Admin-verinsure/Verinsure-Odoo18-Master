@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_customer_statement_wizard,access_customer_statement_wizard,model_customer_statement_wizard,tk_statements.customer_statement_group,1,1,1,1

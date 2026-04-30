@@ -5,7 +5,7 @@
                   name="Customer Statement"
                   parent="contacts.menu_contacts"
                   action="customer_statement_report_wizard_action"
-                  groups="tk_customer_statements.customer_statement_group"
+                  groups="tk_statements.customer_statement_group"
                   sequence="2"
         />
     </data>

@@ -8,7 +8,7 @@ class CustomerStatementPDFReport(models.AbstractModel):
     _get_statement_data() helper.  All business logic lives in the wizard;
     this class only fetches and forwards the data.
     """
-    _name = 'report.tk_customer_statements.customer_report_template'
+    _name = 'report.tk_statements.customer_report_template'
     _description = 'Customer Statement PDF Report'
 
     @api.model
