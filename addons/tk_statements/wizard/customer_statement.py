@@ -46,7 +46,83 @@ class CustomerStatementWizard(models.TransientModel):
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
-
+    def action_print_customer_ledger(self):
+        self.ensure_one()
+    
+        partner = self.partner_id
+        date_from = self.start_date
+        date_to = self.end_date
+    
+        # -----------------------------
+        # Get all moves (invoices + credit notes)
+        # -----------------------------
+        moves = self.env['account.move'].search([
+            ('partner_id', '=', partner.id),
+            ('move_type', 'in', ['out_invoice', 'out_refund']),
+            ('state', '=', 'posted'),
+            ('invoice_date', '<=', date_to),
+        ], order='invoice_date asc')
+    
+        # -----------------------------
+        # Opening Balance (before start date)
+        # -----------------------------
+        opening_balance = 0.0
+    
+        for move in moves.filtered(lambda m: m.invoice_date < date_from):
+            if move.move_type == 'out_invoice':
+                opening_balance += move.amount_residual
+            elif move.move_type == 'out_refund':
+                opening_balance -= move.amount_residual
+    
+        # -----------------------------
+        # Ledger Lines
+        # -----------------------------
+        lines = []
+        running_balance = opening_balance
+    
+        for move in moves.filtered(lambda m: date_from <= m.invoice_date <= date_to):
+    
+            if move.move_type == 'out_invoice':
+                debit = move.amount_total
+                credit = 0.0
+                type_label = 'Invoice'
+    
+            elif move.move_type == 'out_refund':
+                debit = 0.0
+                credit = move.amount_total
+                type_label = 'Credit Note'
+    
+            else:
+                continue
+    
+            running_balance += (debit - credit)
+    
+            lines.append({
+                'date': move.invoice_date.strftime('%Y-%m-%d') if move.invoice_date else '',
+                'name': move.name,
+                'type': type_label,
+                'debit': debit,
+                'credit': credit,
+                'balance': running_balance,
+            })
+    
+        # -----------------------------
+        # Net Balance
+        # -----------------------------
+        net_balance = running_balance
+    
+        # -----------------------------
+        # Send data to QWeb
+        # -----------------------------
+        data = {
+            'lines': lines,
+            'opening_balance': opening_balance,
+            'net_balance': net_balance,
+        }
+    
+        return self.env.ref(
+            'tk_customer_statements.action_custom_customer_ledger'
+        ).report_action(self, data=data)
     def _check_dates(self):
         self.ensure_one()
         if self.start_date > self.end_date:
