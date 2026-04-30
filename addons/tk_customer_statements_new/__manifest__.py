@@ -2,11 +2,12 @@
 {
     'name': 'Customer Statement Report | Customer Statement Aging',
     'description': """
-            Customer Statement Report
+            Customer Statement Report with Running Balance, Opening Balance,
+            Credit Notes, Partial Payments, PDF and Excel export.
     """,
     'summary': 'Customer Statement Report',
-    'version': '1.0',
-    'category': 'Customer',
+    'version': '2.0',
+    'category': 'Accounting',
     'author': 'TechKhedut Inc.',
     'company': 'TechKhedut Inc.',
     'maintainer': 'TechKhedut Inc.',
@@ -14,6 +15,7 @@
     'depends': [
         'contacts',
         'account',
+        'web',
     ],
     'data': [
         # Security
