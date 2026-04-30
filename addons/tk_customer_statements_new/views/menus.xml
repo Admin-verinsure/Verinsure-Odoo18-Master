@@ -3,10 +3,10 @@
     <data>
         <menuitem id="menu_customer_statement"
                   name="Customer Statement"
-                  parent="account.menu_finance_receivables"
+                  parent="contacts.menu_contacts"
                   action="customer_statement_report_wizard_action"
                   groups="tk_customer_statements.customer_statement_group"
-                  sequence="99"
+                  sequence="2"
         />
     </data>
 </odoo>
