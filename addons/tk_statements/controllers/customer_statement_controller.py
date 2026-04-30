@@ -1,273 +1,234 @@
 # -*- coding: utf-8 -*-
 import io
-import json
-from datetime import date, datetime
+from datetime import date
 
 from odoo import http
 from odoo.http import request, content_disposition
-from odoo.exceptions import AccessError
 
 
 class CustomerStatementController(http.Controller):
     """
-    HTTP controller for serving the Customer Statement Excel report.
-    Uses a POST route with JSON payload to avoid 414 URI Too Long errors
-    that occur when passing large data in URL query strings.
+    HTTP controller for serving the Customer Statement Excel (.xlsx) report.
+
+    Route: GET /customer_statement/excel?wizard_id=<int>
+
+    Why GET (not POST)?
+    -------------------
+    Odoo's ir.actions.act_url opens a URL in the browser via a plain
+    anchor/redirect — the browser always uses GET for these.  wizard_id
+    is a single small integer so there is zero risk of a 414 error.
+    The heavy data (invoice lines, formatting) is computed server-side
+    by loading the wizard record; nothing large travels in the URL.
     """
 
     @http.route(
         '/customer_statement/excel',
         type='http',
         auth='user',
-        methods=['POST'],
-        csrf=True,
+        methods=['GET'],
+        csrf=False,
+        save_session=False,
     )
-    def download_excel(self, **kwargs):
+    def download_excel(self, wizard_id=None, **kwargs):
         """
-        Generate and stream the Excel (.xlsx) customer statement report.
-
-        Expects POST body fields:
-            wizard_id (int): ID of the customer.statement.wizard record.
-
-        The wizard record holds start_date, end_date, partner_id.
-        We re-fetch statement data from the wizard's helper so there is
-        a single source of truth for the business logic.
+        Build and stream the Excel workbook for the given wizard record.
         """
+        # ── Validate wizard_id ──────────────────────────────────────────
         try:
-            wizard_id = int(kwargs.get('wizard_id', 0))
+            wizard_id = int(wizard_id or 0)
+            if not wizard_id:
+                raise ValueError
         except (ValueError, TypeError):
-            return request.make_response(
-                'Invalid wizard_id', status=400
-            )
+            return request.make_response('Invalid or missing wizard_id', status=400)
 
         wizard = request.env['customer.statement.wizard'].browse(wizard_id)
         if not wizard.exists():
-            return request.make_response('Wizard not found', status=404)
+            return request.make_response('Wizard record not found', status=404)
 
-        # Build report data using the shared helper
+        # ── Fetch statement data (single source of truth) ───────────────
         data = wizard._get_statement_data()
 
-        # --- Build workbook with openpyxl ---
+        # ── Build workbook ──────────────────────────────────────────────
         try:
             import openpyxl
-            from openpyxl.styles import (
-                Font, Alignment, PatternFill, Border, Side, numbers
-            )
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
             from openpyxl.utils import get_column_letter
         except ImportError:
             return request.make_response(
-                'openpyxl is required. Install it via: pip install openpyxl',
-                status=500,
+                'openpyxl not installed. Run: pip install openpyxl', status=500
             )
 
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Customer Statement"
 
-        # ---------- Styles ----------
-        DARK_BLUE = "1F3864"
-        MID_BLUE  = "2E75B6"
+        # ── Colour palette ──────────────────────────────────────────────
+        DARK_BLUE  = "1F3864"
+        MID_BLUE   = "2E75B6"
         LIGHT_BLUE = "D6E4F0"
         LIGHT_GREY = "F2F2F2"
-        RED_FONT   = "C00000"
-        GREEN_FONT = "375623"
+        RED        = "C00000"
+        GREEN      = "375623"
 
-        def _font(bold=False, size=10, color="000000", italic=False):
-            return Font(bold=bold, size=size, color=color, italic=italic)
+        # ── Style helpers ───────────────────────────────────────────────
+        def fnt(bold=False, size=10, color="000000", italic=False):
+            return Font(bold=bold, size=size, color=color, italic=italic, name="Calibri")
 
-        def _fill(hex_color):
+        def fill(hex_color):
             return PatternFill("solid", fgColor=hex_color)
 
-        def _align(h="left", v="center", wrap=False):
+        def aln(h="left", v="center", wrap=False):
             return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
 
-        def _border(style="thin"):
+        def bdr(style="thin"):
             s = Side(style=style)
             return Border(left=s, right=s, top=s, bottom=s)
 
-        def _num_fmt(ws_cell, fmt='#,##0.00'):
-            ws_cell.number_format = fmt
+        def num(cell, fmt="#,##0.00"):
+            cell.number_format = fmt
 
-        # ---------- Column widths ----------
-        col_widths = [16, 22, 18, 16, 16, 18]
-        for i, w in enumerate(col_widths, 1):
+        # ── Column widths ───────────────────────────────────────────────
+        for i, w in enumerate([16, 24, 16, 16, 16, 18], 1):
             ws.column_dimensions[get_column_letter(i)].width = w
 
-        # ---------- Row 1: Company name ----------
-        company = data['company_info']
-        ws.merge_cells('A1:F1')
-        c = ws['A1']
-        c.value = company['name']
-        c.font = _font(bold=True, size=14, color="FFFFFF")
-        c.fill = _fill(DARK_BLUE)
-        c.alignment = _align("center")
+        # ── Row 1 — Company name ────────────────────────────────────────
+        company_info = data['company_info']
+        ws.merge_cells("A1:F1")
+        c = ws["A1"]
+        c.value      = company_info['name']
+        c.font       = fnt(bold=True, size=14, color="FFFFFF")
+        c.fill       = fill(DARK_BLUE)
+        c.alignment  = aln("center")
         ws.row_dimensions[1].height = 28
 
-        # ---------- Row 2: Company address ----------
-        ws.merge_cells('A2:F2')
-        c = ws['A2']
-        c.value = company['address']
-        c.font = _font(size=9, color="FFFFFF", italic=True)
-        c.fill = _fill(MID_BLUE)
-        c.alignment = _align("center")
+        # ── Row 2 — Company address ─────────────────────────────────────
+        ws.merge_cells("A2:F2")
+        c = ws["A2"]
+        c.value     = company_info['address']
+        c.font      = fnt(size=9, color="FFFFFF", italic=True)
+        c.fill      = fill(MID_BLUE)
+        c.alignment = aln("center")
         ws.row_dimensions[2].height = 16
 
-        # ---------- Row 3: blank ----------
+        # ── Row 3 — spacer ──────────────────────────────────────────────
         ws.row_dimensions[3].height = 6
 
-        # ---------- Row 4: Statement title + customer block ----------
-        ws.merge_cells('A4:C5')
-        c = ws['A4']
-        c.value = "STATEMENT OF ACCOUNT"
-        c.font = _font(bold=True, size=13)
-        c.alignment = _align("left", "center")
+        # ── Rows 4-6 — Statement meta ───────────────────────────────────
+        ws.merge_cells("A4:C5")
+        c = ws["A4"]; c.value = "STATEMENT OF ACCOUNT"
+        c.font = fnt(bold=True, size=13); c.alignment = aln("left", "center")
 
-        ws['D4'].value = "Customer:"
-        ws['D4'].font = _font(bold=True, size=10)
-        ws['D4'].alignment = _align("right")
+        def meta_label(row, col, text):
+            c = ws.cell(row=row, column=col, value=text)
+            c.font = fnt(bold=True); c.alignment = aln("right")
 
-        ws.merge_cells('E4:F4')
-        c = ws['E4']
-        c.value = data['partner']['name']
-        c.font = _font(bold=True, size=10)
-        c.alignment = _align("left")
+        def meta_value(row, col_start, col_end, text):
+            ws.merge_cells(
+                start_row=row, start_column=col_start,
+                end_row=row,   end_column=col_end
+            )
+            c = ws.cell(row=row, column=col_start, value=text)
+            c.font = fnt(); c.alignment = aln("left")
 
-        ws['D5'].value = "Period:"
-        ws['D5'].font = _font(bold=True, size=10)
-        ws['D5'].alignment = _align("right")
+        meta_label(4, 4, "Customer:")
+        meta_value(4, 5, 6, data['partner']['name'])
+        meta_label(5, 4, "Period:")
+        meta_value(5, 5, 6, f"{data['start_date']}  →  {data['end_date']}")
+        meta_label(6, 4, "As of:")
+        meta_value(6, 5, 6, date.today().strftime("%d/%m/%Y"))
+        for r in [4, 5, 6]:
+            ws.row_dimensions[r].height = 18
 
-        ws.merge_cells('E5:F5')
-        c = ws['E5']
-        c.value = f"{data['start_date']}  →  {data['end_date']}"
-        c.font = _font(size=10)
-        c.alignment = _align("left")
-
-        ws['D6'].value = "As of:"
-        ws['D6'].font = _font(bold=True, size=10)
-        ws['D6'].alignment = _align("right")
-
-        ws.merge_cells('E6:F6')
-        c = ws['E6']
-        c.value = date.today().strftime("%d/%m/%Y")
-        c.font = _font(size=10)
-        c.alignment = _align("left")
-
-        ws.row_dimensions[4].height = 18
-        ws.row_dimensions[5].height = 18
-        ws.row_dimensions[6].height = 18
-
-        # ---------- Row 7: blank ----------
+        # ── Row 7 — spacer ──────────────────────────────────────────────
         ws.row_dimensions[7].height = 6
 
-        # ---------- Row 8: Opening balance ----------
-        ws.merge_cells('A8:E8')
-        c = ws['A8']
-        c.value = "Opening Balance (before period)"
-        c.font = _font(bold=True, size=10, color=DARK_BLUE)
-        c.fill = _fill(LIGHT_BLUE)
-        c.alignment = _align("left")
-        c.border = _border()
+        # ── Row 8 — Opening balance ─────────────────────────────────────
+        ws.merge_cells("A8:E8")
+        c = ws["A8"]
+        c.value     = "Opening Balance (before period)"
+        c.font      = fnt(bold=True, color=DARK_BLUE)
+        c.fill      = fill(LIGHT_BLUE); c.border = bdr()
+        c.alignment = aln("left")
 
-        ob_cell = ws['F8']
-        ob_cell.value = data['opening_balance']
-        ob_cell.font = _font(bold=True, size=10, color=DARK_BLUE)
-        ob_cell.fill = _fill(LIGHT_BLUE)
-        ob_cell.alignment = _align("right")
-        ob_cell.border = _border()
-        _num_fmt(ob_cell)
+        ob = ws["F8"]
+        ob.value     = data['opening_balance']
+        ob.font      = fnt(bold=True, color=DARK_BLUE)
+        ob.fill      = fill(LIGHT_BLUE); ob.border = bdr()
+        ob.alignment = aln("right")
+        num(ob)
         ws.row_dimensions[8].height = 18
 
-        # ---------- Row 9: Header ----------
-        headers = ["Date", "Document No.", "Type", "Debit", "Credit", "Balance"]
-        for col, hdr in enumerate(headers, 1):
+        # ── Row 9 — Header ──────────────────────────────────────────────
+        for col, hdr in enumerate(
+            ["Date", "Document No.", "Type", "Debit", "Credit", "Balance"], 1
+        ):
             c = ws.cell(row=9, column=col, value=hdr)
-            c.font = _font(bold=True, size=10, color="FFFFFF")
-            c.fill = _fill(DARK_BLUE)
-            c.alignment = _align("center")
-            c.border = _border()
+            c.font = fnt(bold=True, color="FFFFFF")
+            c.fill = fill(DARK_BLUE); c.border = bdr()
+            c.alignment = aln("center")
         ws.row_dimensions[9].height = 20
 
-        # ---------- Data rows ----------
+        # ── Data rows ───────────────────────────────────────────────────
         row = 10
         for i, line in enumerate(data['lines']):
-            fill = _fill(LIGHT_GREY) if i % 2 == 0 else _fill("FFFFFF")
-            border = _border()
-
-            # Date
-            c = ws.cell(row=row, column=1, value=line['date'])
-            c.font = _font(size=10)
-            c.fill = fill; c.border = border
-            c.alignment = _align("center")
-
-            # Doc number
-            c = ws.cell(row=row, column=2, value=line['name'])
-            c.font = _font(size=10)
-            c.fill = fill; c.border = border
-            c.alignment = _align("left")
-
-            # Type
-            c = ws.cell(row=row, column=3, value=line['type_label'])
+            bg = fill(LIGHT_GREY) if i % 2 == 0 else fill("FFFFFF")
             is_cn = line['move_type'] == 'out_refund'
-            c.font = _font(size=10, color=(RED_FONT if is_cn else GREEN_FONT))
-            c.fill = fill; c.border = border
-            c.alignment = _align("center")
 
-            # Debit
-            c = ws.cell(row=row, column=4, value=line['debit'] or '')
-            c.font = _font(size=10)
-            c.fill = fill; c.border = border
-            c.alignment = _align("right")
+            def cell(col, value, h="left", bold=False, color="000000"):
+                c = ws.cell(row=row, column=col, value=value)
+                c.font = fnt(bold=bold, color=color)
+                c.fill = bg; c.border = bdr(); c.alignment = aln(h)
+                return c
+
+            cell(1, line['date'],       h="center")
+            cell(2, line['name'],       h="left")
+            cell(3, line['type_label'], h="center",
+                 color=(RED if is_cn else GREEN))
+
             if line['debit']:
-                _num_fmt(c)
+                c = cell(4, line['debit'], h="right"); num(c)
+            else:
+                cell(4, "", h="right")
 
-            # Credit
-            c = ws.cell(row=row, column=5, value=line['credit'] or '')
-            c.font = _font(size=10, color=RED_FONT if line['credit'] else "000000")
-            c.fill = fill; c.border = border
-            c.alignment = _align("right")
             if line['credit']:
-                _num_fmt(c)
+                c = cell(5, line['credit'], h="right", color=RED); num(c)
+            else:
+                cell(5, "", h="right")
 
-            # Running balance
             bal = line['running_balance']
-            c = ws.cell(row=row, column=6, value=bal)
-            c.font = _font(size=10, bold=True,
-                           color=(RED_FONT if bal < 0 else "000000"))
-            c.fill = fill; c.border = border
-            c.alignment = _align("right")
-            _num_fmt(c)
+            c = cell(6, bal, h="right", bold=True,
+                     color=(RED if bal < 0 else "000000"))
+            num(c)
 
             ws.row_dimensions[row].height = 17
             row += 1
 
-        # ---------- Closing balance row ----------
-        ws.row_dimensions[row].height = 22
-        ws.merge_cells(f'A{row}:E{row}')
+        # ── Closing / net balance row ────────────────────────────────────
+        ws.merge_cells(f"A{row}:E{row}")
         c = ws.cell(row=row, column=1, value="NET BALANCE DUE")
-        c.font = _font(bold=True, size=11, color="FFFFFF")
-        c.fill = _fill(DARK_BLUE)
-        c.alignment = _align("right")
-        c.border = _border()
+        c.font = fnt(bold=True, size=11, color="FFFFFF")
+        c.fill = fill(DARK_BLUE); c.border = bdr()
+        c.alignment = aln("right")
 
         nb = data['net_balance']
         c = ws.cell(row=row, column=6, value=nb)
-        c.font = _font(bold=True, size=11,
-                       color=(RED_FONT if nb < 0 else "FFFFFF"))
-        c.fill = _fill(DARK_BLUE)
-        c.alignment = _align("right")
-        c.border = _border()
-        _num_fmt(c)
+        c.font = fnt(bold=True, size=11,
+                     color=("FF6B6B" if nb < 0 else "FFFFFF"))
+        c.fill = fill(DARK_BLUE); c.border = bdr()
+        c.alignment = aln("right")
+        num(c)
+        ws.row_dimensions[row].height = 22
 
-        # Freeze panes below header
-        ws.freeze_panes = 'A10'
+        # Freeze header rows
+        ws.freeze_panes = "A10"
 
-        # ---------- Stream response ----------
+        # ── Stream ──────────────────────────────────────────────────────
         stream = io.BytesIO()
         wb.save(stream)
         stream.seek(0)
 
-        partner_name = data['partner']['name'].replace(' ', '_')
-        filename = f"Customer_Statement_{partner_name}_{date.today()}.xlsx"
+        partner_slug = data['partner']['name'].replace(' ', '_')
+        filename = f"Customer_Statement_{partner_slug}_{date.today()}.xlsx"
 
         return request.make_response(
             stream.read(),
@@ -276,5 +237,5 @@ class CustomerStatementController(http.Controller):
                  'application/vnd.openxmlformats-officedocument'
                  '.spreadsheetml.sheet'),
                 ('Content-Disposition', content_disposition(filename)),
-            ]
+            ],
         )
