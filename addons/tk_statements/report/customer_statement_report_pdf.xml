@@ -119,7 +119,7 @@
                                 </tr>
                                 <tr>
                                     <td class="cs-meta-label">Currency:</td>
-                                    <td><t t-out="company_info['currency_symbol']"/></td>
+                                    <td><h6>Newzealand Dollar</h6><t t-out="company_info['currency_symbol']"/></td>
                                 </tr>
                             </table>
                         </td>
