@@ -117,10 +117,14 @@
                                         <t t-out="start_date"/> — <t t-out="end_date"/>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td class="cs-meta-label">Currency:</td>
-                                    <td><h6>Newzealand Dollar</h6><t t-out="company_info['currency_symbol']"/></td>
-                                </tr>
+                                                            <tr>
+                                <td class="cs-meta-label">Currency:</td>
+                                <td>
+                                    <span class="currency-text">
+                                        Newzealand Dollar <t t-out="company_info['currency_symbol']"/>
+                                    </span>
+                                </td>
+                            </tr>
                             </table>
                         </td>
                     </tr>
