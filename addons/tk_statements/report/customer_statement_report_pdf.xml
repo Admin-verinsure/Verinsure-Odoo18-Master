@@ -121,9 +121,9 @@
     <td class="cs-meta-label">Currency:</td>
     <td>
         <span class="currency-text">
-            <t t-out="company_info['currency_name']"/>
-            <t t-out="company_info['currency_symbol']"/>
-        </span>
+    <t t-out="company.currency_id.name"/>
+    <t t-out="company.currency_id.symbol"/>
+</span>
     </td>
 </tr>
                             </table>
