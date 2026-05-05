@@ -96,11 +96,11 @@ class AutoReconciliationDashboard extends Component {
     }
 
     onOpenLogs() {
-        this.action.doAction("nz_bank_reconciliation.action_auto_reconciliation_log");
+        this.action.doAction("nz_bank_recon_v2.action_auto_reconciliation_log");
     }
 
     onOpenConfig() {
-        this.action.doAction("nz_bank_reconciliation.action_auto_reconciliation_config");
+        this.action.doAction("nz_bank_recon_v2.action_auto_reconciliation_config");
     }
 
     _formatDate(dateStr) {

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- Client action for the OWL dashboard -->
-    <record id="action_auto_reconciliation_dashboard" model="ir.actions.client">
-        <field name="name">Reconciliation Dashboard</field>
-        <field name="tag">auto_reconciliation_dashboard</field>
-    </record>
-</odoo>
