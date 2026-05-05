@@ -5,7 +5,7 @@ import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onWillStart } from "@odoo/owl";
 
 class AutoReconciliationDashboard extends Component {
-    static template = "auto_reconciliation.Dashboard";
+    static template = "auto_reconciliation_dashboard";
 
     setup() {
         this.orm = useService("orm");
