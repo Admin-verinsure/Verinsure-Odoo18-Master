@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Parent group under Accounting > Configuration -->
+    <menuitem id="menu_nz_bank_recon_config_root"
+              name="NZ Bank Reconciliation"
+              parent="account.menu_finance_configuration"
+              sequence="50"
+              groups="account.group_account_manager"/>
+
+    <!-- Dashboard -->
+    <menuitem id="menu_nz_bank_recon_dashboard"
+              name="Reconciliation Dashboard"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_auto_reconciliation_dashboard"
+              sequence="1"/>
+
+    <!-- Akahu Bank Accounts -->
+    <menuitem id="menu_nz_bank_recon_accounts"
+              name="Akahu Bank Accounts"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_akahu_account"
+              sequence="2"/>
+
+    <!-- Akahu API Credentials -->
+    <menuitem id="menu_nz_bank_recon_credentials"
+              name="Akahu API Credentials"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_akahu_credential"
+              sequence="3"
+              groups="account.group_account_manager"/>
+
+    <!-- Reconciliation Settings -->
+    <menuitem id="menu_nz_bank_recon_recon_config"
+              name="Reconciliation Settings"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_auto_reconciliation_config"
+              sequence="4"
+              groups="account.group_account_manager"/>
+
+    <!-- Inter-company Mappings -->
+    <menuitem id="menu_nz_bank_recon_ic_mappings"
+              name="Inter-company Mappings"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_akahu_company_mapping"
+              sequence="5"
+              groups="account.group_account_manager"/>
+
+    <!-- Reconciliation Logs -->
+    <menuitem id="menu_nz_bank_recon_recon_logs"
+              name="Reconciliation Logs"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_auto_reconciliation_log"
+              sequence="6"/>
+
+    <!-- Akahu Sync Logs -->
+    <menuitem id="menu_nz_bank_recon_sync_logs"
+              name="Akahu Sync Logs"
+              parent="menu_nz_bank_recon_config_root"
+              action="action_akahu_sync_log"
+              sequence="7"
+              groups="account.group_account_manager"/>
+
+</odoo>

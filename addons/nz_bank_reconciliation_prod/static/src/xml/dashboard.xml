@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <t t-name="auto_reconciliation.Dashboard">
+        <div class="o_auto_reconciliation_dashboard">
+
+            <!-- Header -->
+            <div class="ar-header d-flex align-items-center justify-content-between mb-4 px-4 py-3 bg-white border-bottom">
+                <h2 class="mb-0">
+                    <i class="fa fa-refresh me-2 text-primary"/>
+                    Auto Reconciliation Dashboard
+                </h2>
+                <div>
+                    <button class="btn btn-outline-primary me-2" t-on-click="onOpenLogs">
+                        <i class="fa fa-list me-1"/> View Logs
+                    </button>
+                    <button class="btn btn-primary" t-on-click="onOpenConfig">
+                        <i class="fa fa-cog me-1"/> Configuration
+                    </button>
+                </div>
+            </div>
+
+            <div class="container-fluid px-4">
+
+                <!-- Loading State -->
+                <t t-if="state.loading">
+                    <div class="d-flex justify-content-center align-items-center" style="height:200px">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="!state.loading">
+
+                    <!-- KPI Cards -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="ar-kpi-icon bg-primary-subtle rounded-circle mx-auto mb-2">
+                                        <i class="fa fa-play-circle fa-2x text-primary"/>
+                                    </div>
+                                    <h3 class="fw-bold mb-0" t-esc="state.stats.total_runs"/>
+                                    <small class="text-muted">Total Runs</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="ar-kpi-icon bg-success-subtle rounded-circle mx-auto mb-2">
+                                        <i class="fa fa-check-circle fa-2x text-success"/>
+                                    </div>
+                                    <h3 class="fw-bold mb-0" t-esc="state.stats.total_matched"/>
+                                    <small class="text-muted">Total Matches</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="ar-kpi-icon bg-info-subtle rounded-circle mx-auto mb-2">
+                                        <i class="fa fa-university fa-2x text-info"/>
+                                    </div>
+                                    <h3 class="fw-bold mb-0" t-esc="state.stats.bank_matched"/>
+                                    <small class="text-muted">Bank Matches</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="ar-kpi-icon bg-warning-subtle rounded-circle mx-auto mb-2">
+                                        <i class="fa fa-exchange fa-2x text-warning"/>
+                                    </div>
+                                    <h3 class="fw-bold mb-0" t-esc="state.stats.intercompany_matched"/>
+                                    <small class="text-muted">Inter-company Matches</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Match breakdown by type -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white fw-bold">
+                                    Match Breakdown by Type
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-4">
+                                            <div class="ar-stat-box p-3 rounded bg-light">
+                                                <i class="fa fa-file-text text-success mb-2 fa-lg"/>
+                                                <h5 t-esc="state.stats.customer_matched"/>
+                                                <small>Customer Payments</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="ar-stat-box p-3 rounded bg-light">
+                                                <i class="fa fa-shopping-cart text-danger mb-2 fa-lg"/>
+                                                <h5 t-esc="state.stats.vendor_matched"/>
+                                                <small>Vendor Payments</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="ar-stat-box p-3 rounded bg-light">
+                                                <i class="fa fa-bank text-info mb-2 fa-lg"/>
+                                                <h5 t-esc="state.stats.bank_matched"/>
+                                                <small>Bank Statements</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Companies & Quick Actions -->
+                    <div class="row g-3 mb-4" t-if="state.companies.length">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white fw-bold">
+                                    Companies — Quick Run
+                                </div>
+                                <div class="card-body p-0">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Company</th>
+                                                <th>Cron Active</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="state.companies" t-as="config" t-key="config.id">
+                                                <tr>
+                                                    <td t-esc="config.company_id[1]"/>
+                                                    <td>
+                                                        <span t-att-class="config.cron_active ? 'badge bg-success' : 'badge bg-secondary'">
+                                                            <t t-esc="config.cron_active ? 'Active' : 'Inactive'"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button class="btn btn-sm btn-outline-primary"
+                                                                t-on-click="() => this.onRunNow(config.company_id[0])">
+                                                            <i class="fa fa-bolt me-1"/> Run Now
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Logs -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white fw-bold d-flex justify-content-between">
+                                    Recent Reconciliation Runs
+                                    <button class="btn btn-sm btn-link" t-on-click="onOpenLogs">View All</button>
+                                </div>
+                                <div class="card-body p-0">
+                                    <t t-if="!state.recentLogs.length">
+                                        <div class="text-center text-muted py-4">
+                                            No reconciliation runs yet.
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Reference</th>
+                                                    <th>Company</th>
+                                                    <th>Triggered By</th>
+                                                    <th>Total Matches</th>
+                                                    <th>Status</th>
+                                                    <th>Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-foreach="state.recentLogs" t-as="log" t-key="log.id">
+                                                    <tr>
+                                                        <td t-esc="log.name"/>
+                                                        <td t-esc="log.company_id[1]"/>
+                                                        <td>
+                                                            <span t-att-class="log.triggered_by === 'cron' ? 'badge bg-info' : 'badge bg-secondary'">
+                                                                <t t-esc="log.triggered_by === 'cron' ? 'Scheduled' : 'Manual'"/>
+                                                            </span>
+                                                        </td>
+                                                        <td t-esc="log.total_matched"/>
+                                                        <td>
+                                                            <span t-att-class="_stateClass(log.state)">
+                                                                <t t-esc="log.state"/>
+                                                            </span>
+                                                        </td>
+                                                        <td t-esc="_formatDate(log.create_date)"/>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>
