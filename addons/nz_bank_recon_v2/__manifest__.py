@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'NZ Bank Reconciliation (Akahu)',
+    'name': 'NZ Bank Reconciliation V2 (Akahu)',
     'version': '18.0.1.0.0',
     'category': 'Accounting/Accounting',
     'summary': 'Akahu NZ open banking sync + automatic multi-type reconciliation for Odoo 18',
@@ -59,9 +59,9 @@ UX
     ],
     'assets': {
         'web.assets_backend': [
-            'nz_bank_reconciliation/static/src/css/dashboard.css',
-            'nz_bank_reconciliation/static/src/xml/dashboard.xml',
-            'nz_bank_reconciliation/static/src/js/dashboard.js',
+            'nz_bank_recon_v2/static/src/css/dashboard.css',
+            'nz_bank_recon_v2/static/src/xml/dashboard.xml',
+            'nz_bank_recon_v2/static/src/js/dashboard.js',
         ],
     },
     'installable': True,
