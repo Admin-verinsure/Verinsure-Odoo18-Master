@@ -14,53 +14,30 @@
                 <field name="akahu_bank_feeds_disabled"/>
             </xpath>
 
-            <!-- Replace the entire bank_cash_buttons div content -->
-            <xpath expr="//div[@name='bank_cash_buttons']" position="replace">
-                <div name="bank_cash_buttons">
-
-                    <!-- When NO Akahu account: show standard Configure button -->
-                    <t t-if="!record.has_akahu.raw_value">
-                        <button name="action_open_reconcile" type="object"
-                                class="btn btn-primary"
-                                t-if="record.nb_lines_in_waiting_state.raw_value">
-                            Reconcile <t t-esc="record.nb_lines_in_waiting_state.value"/> Items
-                        </button>
-                        <button name="action_configure_akahu_account"
-                                type="object"
-                                class="btn btn-primary">
-                            <i class="fa fa-bank me-1"/>
-                            Configure Bank Account
-                        </button>
+            <!-- Inject Akahu buttons inside bank_cash_buttons.
+                 Only renders when this journal has an Akahu account configured.
+                 The native Odoo buttons remain untouched alongside these. -->
+            <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
+                <t t-if="record.has_akahu.raw_value">
+                    <button name="action_configure_akahu_account"
+                            type="object"
+                            class="btn btn-secondary o_bank_statements_button"
+                            title="Edit Akahu bank account configuration">
+                        <i class="fa fa-cog me-1"/>
+                        Akahu Account
+                    </button>
+                    <button name="action_fetch_akahu_transactions"
+                            type="object"
+                            class="btn btn-primary o_bank_statements_button">
+                        <i class="fa fa-refresh me-1"/>
+                        Fetch Transactions
+                    </button>
+                    <t t-if="record.akahu_last_synced.raw_value">
+                        <span class="text-muted ms-2 small">
+                            Last Sync: <t t-esc="record.akahu_last_synced.value"/>
+                        </span>
                     </t>
-
-                    <!-- When Akahu IS configured: show Fetch + reconfigure -->
-                    <t t-if="record.has_akahu.raw_value">
-                        <button name="action_open_reconcile" type="object"
-                                class="btn btn-primary"
-                                t-if="record.nb_lines_in_waiting_state.raw_value">
-                            Reconcile <t t-esc="record.nb_lines_in_waiting_state.value"/> Items
-                        </button>
-                        <button name="action_configure_akahu_account"
-                                type="object"
-                                class="btn btn-secondary"
-                                title="Edit Akahu bank account configuration">
-                            <i class="fa fa-cog me-1"/>
-                            Bank Account
-                        </button>
-                        <button name="action_fetch_akahu_transactions"
-                                type="object"
-                                class="btn btn-primary">
-                            <i class="fa fa-refresh me-1"/>
-                            Fetch Transactions
-                        </button>
-                        <t t-if="record.akahu_last_synced.raw_value">
-                            <span class="text-muted ms-2 small">
-                                Last Sync: <t t-esc="record.akahu_last_synced.value"/>
-                            </span>
-                        </t>
-                    </t>
-
-                </div>
+                </t>
             </xpath>
 
         </field>
@@ -82,7 +59,7 @@
                     <i class="fa fa-plug fa-lg me-3"/>
                     <div>
                         <strong>Akahu Bank Feed Active.</strong>
-                        Transactions are fetched automatically via the Akahu (NZ Open Banking) integration.
+                        Transactions are fetched automatically via Akahu (NZ Open Banking).
                     </div>
                 </div>
             </xpath>
