@@ -9,4 +9,16 @@
         <field name='interval_number'>1</field>
         <field name='interval_type'>days</field>
     </record>
+
+    <!--  Cron Job: Automatic Subscription Billing  -->
+    <record id="auto_subscription_billing_cron" model="ir.cron">
+        <field name="name">Auto Subscription Billing</field>
+        <field name="model_id" ref="model_subscription_package"/>
+        <field name="state">code</field>
+        <field name="code">model.run_auto_subscription_billing()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
 </odoo>
