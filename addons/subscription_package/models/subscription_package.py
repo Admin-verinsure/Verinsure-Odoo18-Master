@@ -582,7 +582,7 @@ class SubscriptionPackage(models.Model):
                 sale_order.action_confirm()
 
                 # Step 2: Generate invoice from the confirmed sale order
-                invoices = sale_order._create_invoices(final=False)
+                invoices = sale_order._create_invoices()
                 if not invoices:
                     raise UserError(
                         _("Invoice generation returned no records for "
