@@ -132,7 +132,8 @@ class SubscriptionPackage(models.Model):
     stage_category = fields.Selection(related='stage_id.category',
                                       help="The category associated with "
                                            "the current stage of the record. ",
-                                      store=True)
+                                      store=True,
+                                      depends=['stage_id', 'stage_id.category'])
     invoice_mode = fields.Selection(related="plan_id.invoice_mode",
                                     help="The invoice mode "
                                          "associated with the plan.")
@@ -188,20 +189,19 @@ class SubscriptionPackage(models.Model):
             rec.current_stage = rec.env['subscription.package.stage'].search(
                 [('id', '=', rec.stage_id.id)]).category
 
-    @api.depends('start_date')
+    @api.depends('start_date', 'plan_id', 'plan_id.renewal_time')
     def _compute_next_invoice_date(self):
-        """The compute function is the next invoice date for subscription
-        packages based on the start date and renewal time."""
-        for sub in self.env['subscription.package'].search([]):
-            if sub.start_date:
+        """Compute the next invoice date based on start_date + plan renewal_time."""
+        for sub in self:
+            if sub.start_date and sub.plan_id.renewal_time:
                 sub.next_invoice_date = sub.start_date + relativedelta(
                     days=sub.plan_id.renewal_time)
+            else:
+                sub.next_invoice_date = False
 
     def _inverse_next_invoice_date(self):
-        """Inverse function for next invoice date"""
-        for sub in self.env['subscription.package'].search([]):
-            if sub.start_date:
-                return
+        """Inverse: allow manual override of next_invoice_date."""
+        pass  # manual writes accepted as-is
 
     def button_invoice_count(self):
         """ It displays invoice based on subscription package """
@@ -519,10 +519,30 @@ class SubscriptionPackage(models.Model):
           5. Advances next_invoice_date by one billing cycle.
           6. Posts a chatter message with the outcome.
 
-        Failures on individual subscriptions are caught and logged so one bad
-        record does not abort the entire batch.
+        Failures on individual subscriptions are caught via savepoint so one
+        bad record does not abort the entire batch.
         """
+        import logging
+        _logger = logging.getLogger(__name__)
+
         today = fields.Date.today()
+
+        # Repair stale stage_category values in the DB.
+        # stored related fields can be NULL or wrong if records were written
+        # before the field was added or if the ORM missed a trigger.
+        self.env.cr.execute("""
+            UPDATE subscription_package sp
+            SET stage_category = sps.category
+            FROM subscription_package_stage sps
+            WHERE sp.stage_id = sps.id
+              AND (sp.stage_category IS DISTINCT FROM sps.category)
+        """)
+
+        # Flush all pending ORM writes so that stored fields (stage_category,
+        # next_invoice_date) are up-to-date in the DB before we search.
+        self.env.flush_all()
+        # Invalidate cache so the ORM re-reads the just-repaired DB values.
+        self.env.invalidate_all()
 
         due_subscriptions = self.env['subscription.package'].search([
             ('stage_category', '=', 'progress'),
@@ -530,40 +550,68 @@ class SubscriptionPackage(models.Model):
             ('is_closed', '=', False),
         ])
 
+        _logger.info(
+            "Auto-billing: found %d due subscription(s) for %s",
+            len(due_subscriptions), today)
+
         billed_count = 0
         skipped_count = 0
+        failed_count = 0
 
         for sub in due_subscriptions:
+            savepoint_name = 'sub_billing_%d' % sub.id
+            self.env.cr.execute('SAVEPOINT "%s"' % savepoint_name)
             try:
                 # Guard: skip subscriptions with no billable products
                 if not sub.product_line_ids:
+                    _logger.warning(
+                        "Auto-billing skipped [%s]: no product lines.", sub.name)
                     sub.message_post(
                         body=_("<b>Auto-billing skipped:</b> No product lines "
                                "configured on this subscription."))
                     skipped_count += 1
+                    self.env.cr.execute(
+                        'RELEASE SAVEPOINT "%s"' % savepoint_name)
                     continue
 
                 # Guard: skip subscriptions with no partner
                 if not sub.partner_id:
+                    _logger.warning(
+                        "Auto-billing skipped [%s]: no customer.", sub.name)
                     sub.message_post(
                         body=_("<b>Auto-billing skipped:</b> No customer set "
                                "on this subscription."))
                     skipped_count += 1
+                    self.env.cr.execute(
+                        'RELEASE SAVEPOINT "%s"' % savepoint_name)
                     continue
 
                 billing_date = sub.next_invoice_date or today
 
-                # Idempotency: skip if invoice already posted for this period
+                # Idempotency: skip if invoice already exists for this period
                 if sub._is_duplicate_invoice_exists(billing_date):
+                    _logger.info(
+                        "Auto-billing skipped [%s]: invoice already exists "
+                        "for %s.", sub.name, billing_date)
                     sub.message_post(
                         body=_("<b>Auto-billing skipped:</b> Invoice already "
                                "exists for billing date %s.") % billing_date)
                     skipped_count += 1
+                    self.env.cr.execute(
+                        'RELEASE SAVEPOINT "%s"' % savepoint_name)
                     continue
 
                 order_lines = sub._get_billing_order_lines()
                 if not order_lines:
+                    _logger.warning(
+                        "Auto-billing skipped [%s]: _get_billing_order_lines "
+                        "returned empty.", sub.name)
+                    sub.message_post(
+                        body=_("<b>Auto-billing skipped:</b> No valid order "
+                               "lines could be built from product lines."))
                     skipped_count += 1
+                    self.env.cr.execute(
+                        'RELEASE SAVEPOINT "%s"' % savepoint_name)
                     continue
 
                 # Step 1: Create and confirm Sale Order
@@ -613,22 +661,38 @@ class SubscriptionPackage(models.Model):
                     ) % (billing_date, sale_order.name,
                          ', '.join(invoices.mapped('name')), next_date))
 
+                self.env.cr.execute('RELEASE SAVEPOINT "%s"' % savepoint_name)
                 billed_count += 1
+                _logger.info(
+                    "Auto-billing succeeded [%s]: invoice(s) %s, next date %s.",
+                    sub.name, ', '.join(invoices.mapped('name')), next_date)
 
             except Exception as exc:
-                # Roll back this subscription's changes so the batch continues
-                self.env.cr.rollback()
-                # Re-acquire the environment after rollback
-                sub = self.env['subscription.package'].browse(sub.id)
-                sub.message_post(
-                    body=_(
-                        "<b>Auto-billing failed</b> on %s.<br/>"
-                        "<i>Error: %s</i><br/>"
-                        "Please review and bill manually if required."
-                    ) % (today, str(exc)))
+                # Roll back only this subscription via savepoint
+                self.env.cr.execute(
+                    'ROLLBACK TO SAVEPOINT "%s"' % savepoint_name)
+                self.env.cr.execute(
+                    'RELEASE SAVEPOINT "%s"' % savepoint_name)
+                failed_count += 1
+                _logger.exception(
+                    "Auto-billing FAILED for subscription id=%d name=%s: %s",
+                    sub.id, sub.name, exc)
+                # Post failure note (new env so the rolled-back cache is fresh)
+                try:
+                    self.env['subscription.package'].browse(sub.id).message_post(
+                        body=_(
+                            "<b>Auto-billing failed</b> on %s.<br/>"
+                            "<i>Error: %s</i><br/>"
+                            "Please review and bill manually if required."
+                        ) % (today, str(exc)))
+                except Exception:
+                    pass  # Don't let a chatter failure hide the original error
 
-        return {
+        result = {
             'billed': billed_count,
             'skipped': skipped_count,
+            'failed': failed_count,
             'total': len(due_subscriptions),
         }
+        _logger.info("Auto-billing finished: %s", result)
+        return result
