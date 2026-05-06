@@ -507,128 +507,102 @@ class SubscriptionPackage(models.Model):
         ]) > 0
 
     def run_auto_subscription_billing(self):
-        """Automated billing cron entry point.
+    today = fields.Date.today()
 
-        Finds all active (in-progress) subscriptions whose next_invoice_date
-        has arrived, then for each one:
-          1. Skips if no product lines are configured.
-          2. Skips if a non-cancelled invoice already exists for that date
-             (idempotency guard).
-          3. Creates and confirms a Sale Order.
-          4. Generates and posts the invoice via _create_invoices().
-          5. Advances next_invoice_date by one billing cycle.
-          6. Posts a chatter message with the outcome.
+    due_subscriptions = self.search([
+        ('stage_category', '=', 'progress'),
+        ('next_invoice_date', '<=', today),
+        ('is_closed', '=', False),
+    ])
 
-        Failures on individual subscriptions are caught and logged so one bad
-        record does not abort the entire batch.
-        """
-        today = fields.Date.today()
+    billed_count = 0
+    skipped_count = 0
 
-        due_subscriptions = self.env['subscription.package'].search([
-            ('stage_category', '=', 'progress'),
-            ('next_invoice_date', '<=', today),
-            ('is_closed', '=', False),
-        ])
+    for sub in due_subscriptions:
 
-        billed_count = 0
-        skipped_count = 0
+        # --- VALIDATIONS ---
+        if not sub.product_line_ids:
+            sub.message_post(body="Auto-billing skipped: No product lines.")
+            skipped_count += 1
+            continue
 
-        for sub in due_subscriptions:
-            try:
-                # Guard: skip subscriptions with no billable products
-                if not sub.product_line_ids:
-                    sub.message_post(
-                        body=_("<b>Auto-billing skipped:</b> No product lines "
-                               "configured on this subscription."))
-                    skipped_count += 1
-                    continue
+        if not sub.partner_id:
+            sub.message_post(body="Auto-billing skipped: No customer.")
+            skipped_count += 1
+            continue
 
-                # Guard: skip subscriptions with no partner
-                if not sub.partner_id:
-                    sub.message_post(
-                        body=_("<b>Auto-billing skipped:</b> No customer set "
-                               "on this subscription."))
-                    skipped_count += 1
-                    continue
+        billing_date = sub.next_invoice_date or today
 
-                billing_date = sub.next_invoice_date or today
+        if sub._is_duplicate_invoice_exists(billing_date):
+            sub.message_post(body=f"Skipped: Invoice already exists for {billing_date}")
+            skipped_count += 1
+            continue
 
-                # Idempotency: skip if invoice already posted for this period
-                if sub._is_duplicate_invoice_exists(billing_date):
-                    sub.message_post(
-                        body=_("<b>Auto-billing skipped:</b> Invoice already "
-                               "exists for billing date %s.") % billing_date)
-                    skipped_count += 1
-                    continue
+        order_lines = sub._get_billing_order_lines()
+        if not order_lines:
+            sub.message_post(body="Skipped: No valid order lines.")
+            skipped_count += 1
+            continue
 
-                order_lines = sub._get_billing_order_lines()
-                if not order_lines:
-                    skipped_count += 1
-                    continue
+        # --- MAIN FLOW ---
+        try:
+            # Create SO
+            sale_order = self.env['sale.order'].sudo().create({
+                'partner_id': sub.partner_id.id,
+                'partner_invoice_id': sub.partner_id.id,
+                'partner_shipping_id': sub.partner_id.id,
+                'is_subscription': True,
+                'subscription_id': sub.id,
+                'company_id': sub.company_id.id,
+                'user_id': sub.user_id.id or self.env.uid,
+                'analytic_account_id': sub.analytic_account_id.id or False,
+                'order_line': order_lines,
+            })
 
-                # Step 1: Create and confirm Sale Order
-                sale_order = self.env['sale.order'].with_user(
-                    SUPERUSER_ID).create({
-                    'partner_id': sub.partner_id.id,
-                    'partner_invoice_id': sub.partner_id.id,
-                    'partner_shipping_id': sub.partner_id.id,
-                    'is_subscription': True,
-                    'subscription_id': sub.id,
-                    'company_id': sub.company_id.id,
-                    'user_id': sub.user_id.id or self.env.uid,
-                    'analytic_account_id': sub.analytic_account_id.id or False,
-                    'order_line': order_lines,
-                })
-                sale_order.action_confirm()
+            sale_order.action_confirm()
 
-                # Step 2: Generate invoice from the confirmed sale order
-                invoices = sale_order._create_invoices()
-                if not invoices:
-                    raise UserError(
-                        _("Invoice generation returned no records for "
-                          "subscription %s.") % sub.name)
+            # 🔥 IMPORTANT FIX
+            invoices = sale_order._create_invoices()
 
-                # Step 3: Stamp invoice with subscription reference and post
-                invoices.write({
-                    'subscription_id': sub.id,
-                    'is_subscription': True,
-                    'invoice_date': billing_date,
-                })
-                invoices.action_post()
+            if not invoices:
+                raise UserError(f"No invoice created for {sub.name}")
 
-                # Step 4: Advance the billing cycle
-                next_date = sub._compute_next_billing_date()
-                sub.write({
-                    'sale_order_id': sale_order.id,
-                    'next_invoice_date': next_date,
-                    'start_date': billing_date,
-                    'is_to_renew': False,
-                })
+            invoices.write({
+                'subscription_id': sub.id,
+                'is_subscription': True,
+                'invoice_date': billing_date,
+            })
 
-                sub.message_post(
-                    body=_(
-                        "<b>Auto-billing completed</b> for period <b>%s</b>.<br/>"
-                        "Sale Order: <b>%s</b> | Invoice: <b>%s</b> | "
-                        "Next billing date: <b>%s</b>"
-                    ) % (billing_date, sale_order.name,
-                         ', '.join(invoices.mapped('name')), next_date))
+            invoices.action_post()
 
-                billed_count += 1
+            # Update next billing
+            next_date = sub._compute_next_billing_date()
 
-            except Exception as exc:
-                # Roll back this subscription's changes so the batch continues
-                self.env.cr.rollback()
-                # Re-acquire the environment after rollback
-                sub = self.env['subscription.package'].browse(sub.id)
-                sub.message_post(
-                    body=_(
-                        "<b>Auto-billing failed</b> on %s.<br/>"
-                        "<i>Error: %s</i><br/>"
-                        "Please review and bill manually if required."
-                    ) % (today, str(exc)))
+            sub.write({
+                'sale_order_id': sale_order.id,
+                'next_invoice_date': next_date,
+                'start_date': billing_date,
+                'is_to_renew': False,
+            })
 
-        return {
-            'billed': billed_count,
-            'skipped': skipped_count,
-            'total': len(due_subscriptions),
-        }
+            sub.message_post(
+                body=f"""
+                Auto-billing completed<br/>
+                SO: {sale_order.name}<br/>
+                Invoice: {', '.join(invoices.mapped('name'))}<br/>
+                Next Date: {next_date}
+                """
+            )
+
+            billed_count += 1
+
+        except Exception as e:
+            # 🔥 KEY FIX: DO NOT SILENTLY IGNORE
+            sub.message_post(body=f"Auto-billing failed: {str(e)}")
+            raise   # <-- THIS IS CRITICAL (you were missing this)
+
+    return {
+        'billed': billed_count,
+        'skipped': skipped_count,
+        'total': len(due_subscriptions),
+    }
