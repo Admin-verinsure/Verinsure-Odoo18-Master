@@ -536,7 +536,7 @@ class SubscriptionPackage(models.Model):
         today = fields.Date.today()
 
         # Repair stale stage_category values in the DB.
-        # stored related fields can be NULL or wrong if records were written
+        # Stored related fields can be NULL or wrong if records were written
         # before the field was added or if the ORM missed a trigger.
         self.env.cr.execute("""
             UPDATE subscription_package sp
@@ -623,6 +623,8 @@ class SubscriptionPackage(models.Model):
                     continue
 
                 # Step 1: Create and confirm Sale Order
+                # Note: analytic_account_id intentionally excluded —
+                # not available on sale.order in this installation.
                 sale_order = self.env['sale.order'].with_user(
                     SUPERUSER_ID).create({
                     'partner_id': sub.partner_id.id,
@@ -632,7 +634,6 @@ class SubscriptionPackage(models.Model):
                     'subscription_id': sub.id,
                     'company_id': sub.company_id.id,
                     'user_id': sub.user_id.id or self.env.uid,
-                    'analytic_account_id': sub.analytic_account_id.id or False,
                     'order_line': order_lines,
                 })
                 sale_order.action_confirm()
