@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--  Cron Job: To check close date  -->
+
+    <!-- Cron Job: To check close date -->
     <record id="close_limit_cron" model="ir.cron">
         <field name="name">Check Close Limit</field>
         <field name="model_id" ref="model_subscription_package"/>
         <field name="state">code</field>
         <field name="code">model.close_limit_cron()</field>
-        <field name='interval_number'>1</field>
-        <field name='interval_type'>days</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
     </record>
 
-    <!--  Cron Job: Automatic Subscription Billing  -->
+    <!-- Cron Job: Automatic Subscription Billing -->
     <record id="auto_subscription_billing_cron" model="ir.cron">
         <field name="name">Auto Subscription Billing</field>
         <field name="model_id" ref="model_subscription_package"/>
@@ -18,7 +21,8 @@
         <field name="code">model.run_auto_subscription_billing()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
+        <field name="user_id" ref="base.user_root"/>
         <field name="active" eval="True"/>
     </record>
+
 </odoo>
