@@ -472,17 +472,25 @@ class SubscriptionPackage(models.Model):
 
     def _get_billing_order_lines(self):
         """Build sale order line values from subscription product lines.
-        Returns a list of (0, 0, vals) tuples ready for order_line field."""
+        Returns a list of (0, 0, vals) tuples ready for order_line field.
+        Taxes are filtered to the subscription's company to avoid cross-company
+        UserError during sale order creation."""
+        self.ensure_one()
         order_lines = []
+        company = self.company_id or self.env.company
         for line in self.product_line_ids:
             if not line.product_id:
                 continue
+            # Keep only taxes that belong to this company (or are shared/global)
+            company_taxes = line.tax_ids.filtered(
+                lambda t: not t.company_id or t.company_id == company
+            )
             order_lines.append((0, 0, {
                 'product_id': line.product_id.id,
                 'product_uom_qty': line.product_qty,
                 'price_unit': line.unit_price,
                 'discount': line.discount,
-                'tax_id': [(6, 0, line.tax_ids.ids)],
+                'tax_id': [(6, 0, company_taxes.ids)],
             }))
         return order_lines
 
