@@ -53,8 +53,8 @@ class SaleOrder(models.Model):
     @api.depends('subscription_id')
     def _compute_reference_code(self):
         """ It displays subscription reference code """
-        self.sub_reference = self.env['subscription.package'].search(
-            [('id', '=', int(self.subscription_id.id))]).reference_code
+        for rec in self:
+            rec.sub_reference = rec.subscription_id.reference_code or False
 
     def action_confirm(self):
         """ It Changed the stage, to renew, start date for subscription
@@ -75,13 +75,10 @@ class SaleOrder(models.Model):
     def _compute_subscription_count(self):
         """the compute function the count of
         subscriptions associated with the sale order."""
-        subscription_count = self.env[
-            'subscription.package'].sudo().search_count(
-            [('sale_order_id', '=', self.id)])
-        if subscription_count > 0:
-            self.subscription_count = subscription_count
-        else:
-            self.subscription_count = 0
+        for rec in self:
+            count = rec.env['subscription.package'].sudo().search_count(
+                [('sale_order_id', '=', rec.id)])
+            rec.subscription_count = count
 
     def button_subscription(self):
         """Open the subscription packages associated with the sale order."""
