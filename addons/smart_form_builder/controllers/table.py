@@ -605,7 +605,7 @@ class SmartFormTable(http.Controller):
 
         total  = len(chain)
         plural = "s" if total != 1 else ""
-
+        back_url = request.httprequest.referrer or '/web'
         html = (
             "<!DOCTYPE html>"
             "<html lang='en'><head>"
@@ -633,7 +633,7 @@ class SmartFormTable(http.Controller):
                 "<div class='topbar-title'>&#128279; Submission Chain</div>"
                 "<div class='topbar-sub'>" + str(total) + " form" + plural + " completed</div>"
               "</div>"
-              "<a href='javascript:history.back()' class='btn btn-back'>&#8592; Back</a>"
+              "<a href='" + back_url + "' class='btn btn-back'>&#8592; Back</a>"
             "</div>"
             "<div class='body-wrap'>"
               "<div class='stat'>&#128203; <strong>" + str(total) + "</strong>"
