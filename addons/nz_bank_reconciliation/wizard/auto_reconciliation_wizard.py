@@ -14,31 +14,39 @@ class AutoReconciliationWizard(models.TransientModel):
     company_id = fields.Many2one('res.company', string='Company', required=True)
     total_preview_count = fields.Integer(string='Total Matches Found', readonly=True)
     match_summary = fields.Text(string='Raw Match Data')
-    # CRITICAL FIX 3: Stores exact ID pairs captured at preview time.
+    # Stores exact ID pairs captured at preview time.
     # confirm() applies only these — engine never re-runs from scratch.
     match_pairs_json = fields.Text(string='Match Pairs JSON')
     line_ids = fields.One2many(
         'auto.reconciliation.wizard.line', 'wizard_id',
-        string='Match Lines', compute='_compute_line_ids', store=False,
+        string='Match Lines', compute='_compute_line_ids', store=True,
     )
     state = fields.Selection([
         ('preview', 'Preview'), ('confirmed', 'Confirmed'),
     ], default='preview')
     skipped_count = fields.Integer(string='Skipped', readonly=True, default=0)
+    selected_count = fields.Integer(
+        string='Selected', compute='_compute_selected_count',
+    )
+
+    @api.depends('line_ids.selected')
+    def _compute_selected_count(self):
+        for rec in self:
+            rec.selected_count = sum(1 for l in rec.line_ids if l.selected)
 
     @api.depends('match_summary')
     def _compute_line_ids(self):
         for rec in self:
             if not rec.match_summary:
-                rec.line_ids = []
+                rec.line_ids = [(5, 0, 0)]
                 continue
             try:
                 matches = json.loads(rec.match_summary)
             except Exception:
-                rec.line_ids = []
+                rec.line_ids = [(5, 0, 0)]
                 continue
-            lines = []
-            for match in matches:
+            lines = [(5, 0, 0)]  # delete existing before recreating
+            for idx, match in enumerate(matches):
                 rtype = match.get('type', '')
                 if rtype == 'bank_statement':
                     label = 'Bank: %s ↔ %s' % (match.get('statement_line_name', ''), match.get('move_line_name', ''))
@@ -58,23 +66,37 @@ class AutoReconciliationWizard(models.TransientModel):
                     'description': label,
                     'amount': match.get('amount', 0.0),
                     'partner_name': match.get('partner', match.get('company_from', '')),
+                    'pair_index': idx,  # links this display line back to its pair in match_pairs_json
                     'selected': True,
                 }))
             rec.line_ids = lines
 
     def action_confirm(self):
         """
-        CRITICAL FIX 3: Apply only the specific ID pairs from preview time.
-        Re-validates each record is still unreconciled before applying.
-        Items reconciled in the meantime (e.g. by cron) are safely skipped.
+        Apply only the specific ID pairs from preview time that the user
+        has left selected (selected=True).  Each record is re-validated as
+        still unreconciled before applying — items reconciled in the
+        meantime (e.g. by cron) are safely skipped.
         """
         self.ensure_one()
         if not self.match_pairs_json:
             raise UserError(_('No preview data found. Please close and run Preview again.'))
         try:
-            pairs = json.loads(self.match_pairs_json)
+            all_pairs = json.loads(self.match_pairs_json)
         except Exception:
             raise UserError(_('Preview data is corrupt. Please close and run Preview again.'))
+
+        # BUG FIX: Only process pairs whose wizard line is still selected.
+        selected_indices = {
+            line.pair_index for line in self.line_ids if line.selected
+        }
+        pairs = [
+            p for i, p in enumerate(all_pairs)
+            if i in selected_indices
+        ]
+
+        if not pairs:
+            raise UserError(_('No matches selected. Please select at least one match to apply.'))
 
         applied = 0
         skipped = 0
@@ -128,9 +150,12 @@ class AutoReconciliationWizard(models.TransientModel):
                 skipped += 1
 
         self.write({'state': 'confirmed', 'skipped_count': skipped})
-        msg = _('%d match(es) applied for %s.%s') % (
-            applied, self.company_id.name,
-            _(' %d skipped (already reconciled).') % skipped if skipped else ''
+        deselected = len(all_pairs) - len(pairs)
+        msg = _('%d match(es) applied for %s.%s%s') % (
+            applied,
+            self.company_id.name,
+            _(' %d skipped (already reconciled).') % skipped if skipped else '',
+            _(' %d deselected by user (not applied).') % deselected if deselected else '',
         )
         return {
             'type': 'ir.actions.client',
@@ -138,7 +163,7 @@ class AutoReconciliationWizard(models.TransientModel):
             'params': {
                 'title': _('Reconciliation Applied'),
                 'message': msg,
-                'type': 'warning' if skipped else 'success',
+                'type': 'warning' if (skipped or deselected) else 'success',
                 'sticky': bool(skipped),
             }
         }
@@ -151,8 +176,11 @@ class AutoReconciliationWizardLine(models.TransientModel):
     _name = 'auto.reconciliation.wizard.line'
     _description = 'Auto Reconciliation Wizard Line'
 
-    wizard_id = fields.Many2one('auto.reconciliation.wizard', string='Wizard')
+    wizard_id = fields.Many2one('auto.reconciliation.wizard', string='Wizard', ondelete='cascade')
     selected = fields.Boolean(string='Include', default=True)
+    # Zero-based index into match_pairs_json — links this display row back to
+    # its reconciliation pair so action_confirm() can filter by selection.
+    pair_index = fields.Integer(string='Pair Index', default=0)
     reconciliation_type = fields.Selection([
         ('bank_statement', 'Bank Statement'),
         ('customer_payment', 'Customer Payment'),

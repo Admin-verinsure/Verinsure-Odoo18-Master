@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- ===================================================================
+         1. ACCOUNTING DASHBOARD — Kanban card buttons (unchanged from working version)
+         =================================================================== -->
     <record id="view_account_journal_dashboard_akahu" model="ir.ui.view">
         <field name="name">account.journal.dashboard.kanban.akahu</field>
         <field name="model">account.journal</field>
@@ -14,11 +17,23 @@
                 <field name="akahu_bank_feeds_disabled"/>
             </xpath>
 
-            <!-- Only inject when Akahu IS configured on this journal.
-                 When has_akahu is False we inject nothing — the native Odoo
-                 Configure Bank Account button already handles that case. -->
+            <!-- Add Akahu buttons in bank journal actions -->
             <xpath expr="//div[@name='bank_cash_buttons']" position="inside">
+
+                <!-- Configure Bank Account button: shown when NO Akahu account is set up yet -->
+                <t t-if="!record.has_akahu.raw_value">
+                    <button name="action_configure_akahu_account"
+                            type="object"
+                            class="btn btn-primary">
+                        <i class="fa fa-bank me-1"/>
+                        Configure Bank Account
+                    </button>
+                </t>
+
+                <!-- Fetch Transactions + last-sync info: shown when Akahu IS configured -->
                 <t t-if="record.has_akahu.raw_value">
+
+                    <!-- Re-configure button (secondary, always visible when configured) -->
                     <button name="action_configure_akahu_account"
                             type="object"
                             class="btn btn-secondary"
@@ -26,31 +41,42 @@
                         <i class="fa fa-cog me-1"/>
                         Bank Account
                     </button>
+
+                    <!-- Fetch Transactions button -->
                     <button name="action_fetch_akahu_transactions"
                             type="object"
                             class="btn btn-primary">
                         <i class="fa fa-refresh me-1"/>
                         Fetch Transactions
                     </button>
+
                     <t t-if="record.akahu_last_synced.raw_value">
                         <span class="text-muted ms-2 small">
-                            Last Sync: <t t-esc="record.akahu_last_synced.value"/>
+                            Last Sync:
+                            <t t-esc="record.akahu_last_synced.value"/>
                         </span>
                     </t>
+
                 </t>
+
             </xpath>
 
         </field>
     </record>
 
+    <!-- ===================================================================
+         2. JOURNAL FORM — Akahu radio option + conditional banner
+         =================================================================== -->
     <record id="view_account_journal_form_akahu_feeds" model="ir.ui.view">
         <field name="name">account.journal.form.akahu.feeds</field>
         <field name="model">account.journal</field>
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
+
             <xpath expr="//field[@name='bank_account_id']" position="after">
                 <field name="akahu_bank_feeds_disabled" invisible="1"/>
             </xpath>
+
             <xpath expr="//field[@name='bank_statements_source']" position="after">
                 <div class="alert alert-info d-flex align-items-center mt-2 mb-0"
                      role="alert"
@@ -63,6 +89,7 @@
                     </div>
                 </div>
             </xpath>
+
         </field>
     </record>
 

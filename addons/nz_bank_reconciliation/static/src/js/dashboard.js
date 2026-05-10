@@ -35,7 +35,7 @@ class AutoReconciliationDashboard extends Component {
     async _loadData() {
         this.state.loading = true;
         try {
-            // Load recent logs
+            // Load recent logs (last 10 only — for the activity table)
             const logs = await this.orm.searchRead(
                 "auto.reconciliation.log",
                 [],
@@ -49,19 +49,22 @@ class AutoReconciliationDashboard extends Component {
             );
             this.state.recentLogs = logs;
 
-            // Aggregate stats
-            const allLogs = await this.orm.searchRead(
+            // BUG FIX: Aggregate stats via a single server-side SQL SUM query.
+            // The previous approach fetched ALL log records to the browser and
+            // used client-side reduce(), which caused browser hangs after
+            // months of daily cron runs (1 record/company/day × years = thousands).
+            const stats = await this.orm.call(
                 "auto.reconciliation.log",
-                [["state", "=", "done"]],
-                ["bank_matched", "customer_matched", "vendor_matched", "intercompany_matched", "total_matched"]
+                "get_dashboard_stats",
+                [],
+                {}
             );
-
-            this.state.stats.total_runs = allLogs.length;
-            this.state.stats.total_matched = allLogs.reduce((s, l) => s + l.total_matched, 0);
-            this.state.stats.bank_matched = allLogs.reduce((s, l) => s + l.bank_matched, 0);
-            this.state.stats.customer_matched = allLogs.reduce((s, l) => s + l.customer_matched, 0);
-            this.state.stats.vendor_matched = allLogs.reduce((s, l) => s + l.vendor_matched, 0);
-            this.state.stats.intercompany_matched = allLogs.reduce((s, l) => s + l.intercompany_matched, 0);
+            this.state.stats.total_runs             = stats.total_runs;
+            this.state.stats.total_matched          = stats.total_matched;
+            this.state.stats.bank_matched           = stats.bank_matched;
+            this.state.stats.customer_matched       = stats.customer_matched;
+            this.state.stats.vendor_matched         = stats.vendor_matched;
+            this.state.stats.intercompany_matched   = stats.intercompany_matched;
 
             // Load companies with configs
             const configs = await this.orm.searchRead(

@@ -22,28 +22,33 @@
                         <field name="total_preview_count"
                                string="Total Matches Found"
                                readonly="1"/>
+                        <field name="selected_count"
+                               string="Selected to Apply"
+                               readonly="1"/>
                     </group>
 
                     <notebook>
                         <page string="Matched Transactions">
-                            <field name="line_ids" readonly="1">
-                                <list>
-                                    <field name="selected"/>
+                            <field name="line_ids">
+                                <list editable="bottom"
+                                      decoration-muted="not selected">
+                                    <field name="selected" string="✓"/>
                                     <field name="reconciliation_type" widget="badge"
                                         decoration-info="reconciliation_type == 'bank_statement'"
                                         decoration-success="reconciliation_type == 'customer_payment'"
                                         decoration-warning="reconciliation_type == 'vendor_payment'"
                                         decoration-danger="reconciliation_type == 'intercompany'"/>
-                                    <field name="description"/>
-                                    <field name="partner_name"/>
-                                    <field name="amount" widget="monetary"/>
+                                    <field name="description" readonly="1"/>
+                                    <field name="partner_name" readonly="1"/>
+                                    <field name="amount" widget="monetary" readonly="1"/>
+                                    <field name="pair_index" column_invisible="1"/>
                                 </list>
                             </field>
                         </page>
                     </notebook>
 
                     <div class="alert alert-info" role="alert">
-                        <i class="fa fa-info-circle"/> Review the matches above. Click <strong>Confirm &amp; Reconcile</strong> to apply them, or <strong>Cancel</strong> to go back.
+                        <i class="fa fa-info-circle"/> Uncheck any matches you do not want to apply, then click <strong>Confirm &amp; Reconcile</strong>. Only checked rows will be processed. This action cannot be undone easily.
                     </div>
                 </sheet>
                 <footer>
