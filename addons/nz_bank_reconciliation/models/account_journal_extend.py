@@ -192,45 +192,22 @@ class AccountJournalAkahuExtend(models.Model):
                 }
 
         # ── Step 2: Auto-reconcile immediately for affected companies ──────────
-        # RISK-03 FIX: Previously this called run_all(company_ids=...) which
-        # reconciles EVERY unreconciled line in the company — including lines
-        # from other journals that have nothing to do with this fetch. This can
-        # be very expensive on large databases and is unexpected UX for a button
-        # that says "Fetch Transactions" for one journal.
-        #
-        # Fix: pass journal_ids so the reconciliation engine only touches lines
-        # belonging to the journals that were actually synced in this call.
-        # The run_all() signature already accepts journal_ids; if it doesn't on
-        # an older version we fall back gracefully to company-scoped behaviour.
+        # RISK-03 FIX: Pass the specific journal IDs that were synced so the
+        # reconciliation engine only touches lines from those journals, not every
+        # unreconciled line in the company. run_all() now accepts journal_ids.
         total_reconciled = 0
         if total_imported > 0 and company_ids_synced:
             try:
-                # Collect the journal IDs that were synced in this call
                 synced_journal_ids = list({
                     acc.journal_id.id
                     for acc in active_accounts
                     if acc.journal_id
                 })
-                import inspect
-                run_all_sig = inspect.signature(recon_engine.run_all)
-                if 'journal_ids' in run_all_sig.parameters:
-                    recon_results = recon_engine.run_all(
-                        company_ids=list(company_ids_synced),
-                        journal_ids=synced_journal_ids,
-                        preview_mode=False,
-                    )
-                else:
-                    # Older version of the engine — fall back to company scope
-                    # and log a warning so it's visible in maintenance
-                    _logger.warning(
-                        'RISK-03: auto.reconciliation.engine.run_all() does not '
-                        'accept journal_ids — reconciliation will cover the whole '
-                        'company. Upgrade the engine to scope per-journal.'
-                    )
-                    recon_results = recon_engine.run_all(
-                        company_ids=list(company_ids_synced),
-                        preview_mode=False,
-                    )
+                recon_results = recon_engine.run_all(
+                    company_ids=list(company_ids_synced),
+                    journal_ids=synced_journal_ids,
+                    preview_mode=False,
+                )
                 for company_id, result in recon_results.items():
                     if 'error' not in result:
                         total_reconciled += sum(

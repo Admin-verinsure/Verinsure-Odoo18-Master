@@ -86,6 +86,15 @@ class AkahuAccount(models.Model):
         help='Akahu pagination cursor. Used internally — do not edit.',
     )
 
+    _sql_constraints = [
+        (
+            'journal_unique',
+            'UNIQUE(journal_id)',
+            'Each Odoo journal can only be linked to one Akahu bank account. '
+            'Please choose a different journal or edit the existing account.',
+        ),
+    ]
+
     # ── Computed ──────────────────────────────────────────────────────────────
     @api.depends('bank_name', 'akahu_account_name', 'akahu_formatted_account')
     def _compute_name(self):

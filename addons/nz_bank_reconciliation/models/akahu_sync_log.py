@@ -42,6 +42,12 @@ class AkahuSyncLog(models.Model):
     @api.depends('akahu_account_id', 'create_date')
     def _compute_name(self):
         for rec in self:
+            # Guard: create_date is False on unsaved records. Without this,
+            # strftime() raises AttributeError and store=True writes a broken
+            # value before the post-save recompute can correct it.
+            if not rec.create_date:
+                rec.name = False
+                continue
             acc = rec.akahu_account_id.name if rec.akahu_account_id else 'All'
-            ts = rec.create_date.strftime('%Y%m%d-%H%M%S') if rec.create_date else ''
+            ts = rec.create_date.strftime('%Y%m%d-%H%M%S')
             rec.name = 'SYNC/%s/%s' % (acc, ts)

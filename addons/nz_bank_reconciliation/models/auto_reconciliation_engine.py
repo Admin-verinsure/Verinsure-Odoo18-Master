@@ -25,7 +25,18 @@ class AutoReconciliationEngine(models.Model):
     _description = 'Auto Reconciliation Engine'
 
     @api.model
-    def run_all(self, company_ids=None, preview_mode=False, triggered_by='manual'):
+    def run_all(self, company_ids=None, journal_ids=None, preview_mode=False, triggered_by='manual'):
+        """
+        Run all enabled reconciliation passes.
+
+        :param company_ids: list of res.company IDs to process (None = all companies)
+        :param journal_ids: list of account.journal IDs to restrict bank-statement
+                            reconciliation to (None = all journals in the company).
+                            Used by action_fetch_akahu_transactions to avoid running
+                            a company-wide reconciliation when only one journal changed.
+        :param preview_mode: if True, collect matches but do not apply them
+        :param triggered_by: 'manual' or 'cron' (written to the audit log)
+        """
         if not company_ids:
             companies = self.env['res.company'].sudo().search([])
         else:
@@ -35,7 +46,11 @@ class AutoReconciliationEngine(models.Model):
         for company in companies:
             _logger.info("Auto Reconciliation: Processing company %s", company.name)
             try:
-                results = self._process_company(company, preview_mode=preview_mode)
+                results = self._process_company(
+                    company,
+                    preview_mode=preview_mode,
+                    journal_ids=journal_ids,
+                )
                 all_results[company.id] = results
             except Exception as e:
                 _logger.error("Auto Reconciliation failed for %s: %s", company.name, str(e))
@@ -45,48 +60,48 @@ class AutoReconciliationEngine(models.Model):
             self._create_log_entries(all_results, triggered_by=triggered_by)
         return all_results
 
-    def _process_company(self, company, preview_mode=False):
+    def _process_company(self, company, preview_mode=False, journal_ids=None):
         config = self.env['auto.reconciliation.config'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
         ], limit=1)
-        # BUG FIX 2: Pass config into each reconcile method so match_by_amount,
-        # match_by_partner, and match_by_currency flags are actually honoured.
-        # Previously the flags existed on the config model but were never read
-        # by the engine, making the UI checkboxes completely non-functional.
-        def run(fn, flag):
+        def run(fn, flag, **kw):
             if config and not getattr(config, flag):
                 return {'matched': [], 'matched_count': 0}
-            return fn(company, preview_mode, config=config)
+            return fn(company, preview_mode, config=config, **kw)
         return {
             'company_name': company.name,
             'company_id': company.id,
-            'bank_statement':   run(self._reconcile_bank_statements,  'enable_bank'),
+            # journal_ids only applies to bank statement reconciliation — customer/vendor
+            # payments and intercompany are not journal-scoped in the same way.
+            'bank_statement':   run(self._reconcile_bank_statements,  'enable_bank',  journal_ids=journal_ids),
             'customer_payment': run(self._reconcile_customer_payments, 'enable_customer'),
             'vendor_payment':   run(self._reconcile_vendor_payments,   'enable_vendor'),
             'intercompany':     run(self._reconcile_intercompany,      'enable_intercompany'),
         }
 
     # ── BANK STATEMENTS ───────────────────────────────────────────────────────
-    def _reconcile_bank_statements(self, company, preview_mode=False, config=None):
-        # BUG FIX 2: Read match_by_partner and match_by_currency from config.
+    def _reconcile_bank_statements(self, company, preview_mode=False, config=None, journal_ids=None):
         match_by_partner = not config or config.match_by_partner
         match_by_currency = not config or config.match_by_currency
-        # H4 FIX: match_by_amount was previously ignored — the engine always
-        # filtered by amount regardless of this flag.  When False, amount
-        # filtering is skipped so broader partner/reference-only matches are
-        # possible (useful for partial-payment workflows).  The secondary
-        # float_compare guard is also skipped for consistency.
         match_by_amount = not config or config.match_by_amount
         matched = []
         unmatched_count = 0
         BankLine = self.env['account.bank.statement.line'].sudo()
         MoveLine = self.env['account.move.line'].sudo()
 
-        stmt_lines = BankLine.search([
+        stmt_domain = [
             ('company_id', '=', company.id),
             ('is_reconciled', '=', False),
             ('journal_id.type', 'in', ['bank', 'cash']),
-        ])
+        ]
+        # RISK-03 FIX: If specific journal IDs were supplied (e.g. from a
+        # per-journal "Fetch & Reconcile" button), restrict to those journals
+        # only. This prevents a single-journal fetch from triggering expensive
+        # company-wide reconciliation.
+        if journal_ids:
+            stmt_domain.append(('journal_id', 'in', journal_ids))
+
+        stmt_lines = BankLine.search(stmt_domain)
 
         for stmt_line in stmt_lines:
             company_currency = company.currency_id
