@@ -30,8 +30,8 @@ UX
 - Unified dashboard: Akahu account health + reconciliation stats
 - Full audit log for both sync and reconciliation runs
     """,
-    'author': 'Your Company',
-    'website': 'https://www.yourcompany.com',
+    'author': 'Not4Profit',
+    'website': 'https://not4profit.online',
     'depends': [
         'account',
         'base_setup',
@@ -68,4 +68,5 @@ UX
     'application': True,
     'auto_install': False,
     'license': 'LGPL-3',
+    'external_dependencies': {'python': ['requests']},
 }
