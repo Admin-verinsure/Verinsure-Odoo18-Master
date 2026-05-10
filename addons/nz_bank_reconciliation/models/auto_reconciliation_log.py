@@ -41,9 +41,18 @@ class AutoReconciliationLog(models.Model):
     @api.depends('company_id', 'create_date')
     def _compute_name(self):
         for rec in self:
+            # BUG FIX 4: create_date is False/None for unsaved records.
+            # Previously this produced 'REC/<company>/' which got stored by
+            # store=True before the post-save recompute could correct it.
+            # Now we skip writing until both values are available, so the
+            # stored name is always either a valid reference or blank (for
+            # the brief window before first save — normal Odoo behaviour).
+            if not rec.create_date:
+                rec.name = False
+                continue
             rec.name = 'REC/%s/%s' % (
                 rec.company_id.name if rec.company_id else '',
-                rec.create_date.strftime('%Y%m%d%H%M%S') if rec.create_date else '',
+                rec.create_date.strftime('%Y%m%d%H%M%S'),
             )
 
     def action_view_dashboard(self):
