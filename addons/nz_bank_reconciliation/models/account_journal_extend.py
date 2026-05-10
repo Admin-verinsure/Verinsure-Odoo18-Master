@@ -52,8 +52,27 @@ class AccountJournalAkahuExtend(models.Model):
                  _AccountJournal__get_bank_statements_available_sources)
         Other modules (account_accountant etc.) override the private one.
         We must use the mangled name to properly call super() and extend the list.
+
+        RISK-04 FIX: If Odoo renames this private method in a future patch this
+        override silently becomes a no-op (the new Odoo method is never called,
+        Akahu disappears from the dropdown, but nothing crashes). We add a
+        defensive check in _get_bank_statements_available_sources (the stable
+        public API) as a fallback so the Akahu option always appears regardless
+        of the private method's name in a given Odoo patch level.
         """
         sources = super()._AccountJournal__get_bank_statements_available_sources()
+        akahu_option = ('akahu', 'Akahu (NZ Open Banking)')
+        if akahu_option not in sources:
+            sources.append(akahu_option)
+        return sources
+
+    def _get_bank_statements_available_sources(self):
+        """
+        RISK-04 FIX: Stable public fallback. If the private mangled override
+        above stops being called due to an Odoo rename, this public method
+        ensures the Akahu option still appears in the dropdown.
+        """
+        sources = super()._get_bank_statements_available_sources()
         akahu_option = ('akahu', 'Akahu (NZ Open Banking)')
         if akahu_option not in sources:
             sources.append(akahu_option)
@@ -173,15 +192,45 @@ class AccountJournalAkahuExtend(models.Model):
                 }
 
         # ── Step 2: Auto-reconcile immediately for affected companies ──────────
-        # Only run if we actually imported something new — no point reconciling
-        # if nothing changed.
+        # RISK-03 FIX: Previously this called run_all(company_ids=...) which
+        # reconciles EVERY unreconciled line in the company — including lines
+        # from other journals that have nothing to do with this fetch. This can
+        # be very expensive on large databases and is unexpected UX for a button
+        # that says "Fetch Transactions" for one journal.
+        #
+        # Fix: pass journal_ids so the reconciliation engine only touches lines
+        # belonging to the journals that were actually synced in this call.
+        # The run_all() signature already accepts journal_ids; if it doesn't on
+        # an older version we fall back gracefully to company-scoped behaviour.
         total_reconciled = 0
         if total_imported > 0 and company_ids_synced:
             try:
-                recon_results = recon_engine.run_all(
-                    company_ids=list(company_ids_synced),
-                    preview_mode=False,
-                )
+                # Collect the journal IDs that were synced in this call
+                synced_journal_ids = list({
+                    acc.journal_id.id
+                    for acc in active_accounts
+                    if acc.journal_id
+                })
+                import inspect
+                run_all_sig = inspect.signature(recon_engine.run_all)
+                if 'journal_ids' in run_all_sig.parameters:
+                    recon_results = recon_engine.run_all(
+                        company_ids=list(company_ids_synced),
+                        journal_ids=synced_journal_ids,
+                        preview_mode=False,
+                    )
+                else:
+                    # Older version of the engine — fall back to company scope
+                    # and log a warning so it's visible in maintenance
+                    _logger.warning(
+                        'RISK-03: auto.reconciliation.engine.run_all() does not '
+                        'accept journal_ids — reconciliation will cover the whole '
+                        'company. Upgrade the engine to scope per-journal.'
+                    )
+                    recon_results = recon_engine.run_all(
+                        company_ids=list(company_ids_synced),
+                        preview_mode=False,
+                    )
                 for company_id, result in recon_results.items():
                     if 'error' not in result:
                         total_reconciled += sum(

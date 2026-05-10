@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import time
 import requests
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
@@ -7,6 +8,11 @@ from odoo.exceptions import UserError, ValidationError
 _logger = logging.getLogger(__name__)
 
 AKAHU_BASE_URL = 'https://api.akahu.io/v1'
+
+# RISK-01 FIX: Retry configuration for HTTP 429 (rate-limit) responses.
+# Without this, a single rate-limit hit permanently fails the whole sync run.
+_MAX_RETRIES = 4
+_RETRY_BACKOFF = [1, 2, 4, 8]  # seconds between attempts
 
 
 class AkahuCredential(models.Model):
@@ -76,38 +82,61 @@ class AkahuCredential(models.Model):
         Generic GET against the Akahu API.
         Raises UserError on non-2xx responses.
         Returns parsed JSON body.
+
+        RISK-01 FIX: Retries up to _MAX_RETRIES times on HTTP 429 (rate-limit)
+        with exponential backoff. Previously, a single 429 permanently failed
+        the entire sync run.
         """
         self.ensure_one()
         url = '%s%s' % (AKAHU_BASE_URL, path)
-        try:
-            resp = requests.get(
-                url,
-                headers=self._get_headers(user_token),
-                params=params or {},
-                timeout=30,
-            )
-        except requests.exceptions.RequestException as e:
-            raise UserError(_('Akahu API connection failed: %s') % str(e))
 
-        if resp.status_code == 401:
-            raise UserError(_(
-                'Akahu authentication failed (401). '
-                'Check your App Token and User Token.'
-            ))
-        if resp.status_code == 403:
-            raise UserError(_(
-                'Akahu permission denied (403). '
-                'Your app may be missing required scopes.'
-            ))
-        if resp.status_code >= 400:
-            raise UserError(_(
-                'Akahu API error %s: %s'
-            ) % (resp.status_code, resp.text[:200]))
+        for attempt in range(_MAX_RETRIES):
+            try:
+                resp = requests.get(
+                    url,
+                    headers=self._get_headers(user_token),
+                    params=params or {},
+                    timeout=30,
+                )
+            except requests.exceptions.RequestException as e:
+                raise UserError(_('Akahu API connection failed: %s') % str(e))
 
-        data = resp.json()
-        if not data.get('success'):
-            raise UserError(_('Akahu returned success=false: %s') % str(data))
-        return data
+            if resp.status_code == 429:
+                # Honour Retry-After header if present; fall back to backoff table
+                retry_after = int(resp.headers.get('Retry-After', _RETRY_BACKOFF[attempt]))
+                _logger.warning(
+                    'Akahu API rate-limited (429) on %s. '
+                    'Waiting %ds before retry %d/%d.',
+                    path, retry_after, attempt + 1, _MAX_RETRIES,
+                )
+                time.sleep(retry_after)
+                continue  # retry
+
+            if resp.status_code == 401:
+                raise UserError(_(
+                    'Akahu authentication failed (401). '
+                    'Check your App Token and User Token.'
+                ))
+            if resp.status_code == 403:
+                raise UserError(_(
+                    'Akahu permission denied (403). '
+                    'Your app may be missing required scopes.'
+                ))
+            if resp.status_code >= 400:
+                raise UserError(_(
+                    'Akahu API error %s: %s'
+                ) % (resp.status_code, resp.text[:200]))
+
+            data = resp.json()
+            if not data.get('success'):
+                raise UserError(_('Akahu returned success=false: %s') % str(data))
+            return data
+
+        # All retries exhausted
+        raise UserError(_(
+            'Akahu API rate limit exceeded for %s after %d retries. '
+            'The sync run will be retried on the next cron schedule.'
+        ) % (path, _MAX_RETRIES))
 
     # -------------------------------------------------------------------------
     # TEST CONNECTION
