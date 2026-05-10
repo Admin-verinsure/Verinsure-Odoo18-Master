@@ -13,20 +13,23 @@ class AutoReconciliationWizard(models.TransientModel):
 
     company_id = fields.Many2one('res.company', string='Company', required=True)
     total_preview_count = fields.Integer(string='Total Matches Found', readonly=True)
+    # match_summary kept for reference/display only — actual apply logic uses match_pairs_json
     match_summary = fields.Text(string='Raw Match Data')
     # Stores exact ID pairs captured at preview time.
     # confirm() applies only these — engine never re-runs from scratch.
     match_pairs_json = fields.Text(string='Match Pairs JSON')
+
+    # CRITICAL FIX: line_ids must NOT be a computed field.
+    # A computed One2many with no inverse= raises "Field is not stored and cannot
+    # be inversed" the moment the user unchecks a row — making the entire
+    # preview/select/confirm workflow non-functional.
+    # Fix: plain writable One2many. Lines are created explicitly in
+    # action_open_wizard() by the config model after the wizard record is saved.
     line_ids = fields.One2many(
         'auto.reconciliation.wizard.line', 'wizard_id',
-        string='Match Lines', compute='_compute_line_ids',
-        # RISK-05 FIX: store=True on a computed One2many of a TransientModel
-        # causes Odoo to write the related records to the DB on every recompute
-        # (i.e. every time match_summary changes) — creating orphaned rows in
-        # the transient table. TransientModel data is ephemeral; storing computed
-        # relation data there is both wasteful and incorrect. Removed store=True
-        # so the field stays purely in-memory for the lifetime of the wizard.
+        string='Match Lines',
     )
+
     state = fields.Selection([
         ('preview', 'Preview'), ('confirmed', 'Confirmed'),
     ], default='preview')
@@ -36,58 +39,10 @@ class AutoReconciliationWizard(models.TransientModel):
         compute='_compute_selected_count',
     )
 
-    @api.depends('match_summary')
+    @api.depends('line_ids', 'line_ids.selected')
     def _compute_selected_count(self):
-        # line_ids is a non-stored computed field so we cannot depend on
-        # line_ids.selected directly — Odoo won't track changes on records
-        # that don't exist in the ORM cache between requests. Instead we
-        # query the TransientModel table directly for this wizard's lines.
-        WizardLine = self.env['auto.reconciliation.wizard.line'].sudo()
         for rec in self:
-            if not rec.id:
-                rec.selected_count = 0
-                continue
-            rec.selected_count = WizardLine.search_count([
-                ('wizard_id', '=', rec.id),
-                ('selected', '=', True),
-            ])
-
-    @api.depends('match_summary')
-    def _compute_line_ids(self):
-        for rec in self:
-            if not rec.match_summary:
-                rec.line_ids = [(5, 0, 0)]
-                continue
-            try:
-                matches = json.loads(rec.match_summary)
-            except Exception:
-                rec.line_ids = [(5, 0, 0)]
-                continue
-            lines = [(5, 0, 0)]  # delete existing before recreating
-            for idx, match in enumerate(matches):
-                rtype = match.get('type', '')
-                if rtype == 'bank_statement':
-                    label = 'Bank: %s ↔ %s' % (match.get('statement_line_name', ''), match.get('move_line_name', ''))
-                elif rtype == 'customer_payment':
-                    label = 'Customer: %s ↔ %s' % (match.get('payment_name', ''), match.get('invoice_name', ''))
-                elif rtype == 'vendor_payment':
-                    label = 'Vendor: %s ↔ %s' % (match.get('payment_name', ''), match.get('bill_name', ''))
-                elif rtype == 'intercompany':
-                    label = 'IC: %s (%s) ↔ %s (%s)' % (
-                        match.get('line_name', ''), match.get('company_from', ''),
-                        match.get('counterpart_line_name', ''), match.get('company_to', ''),
-                    )
-                else:
-                    label = 'Unknown'
-                lines.append((0, 0, {
-                    'reconciliation_type': rtype,
-                    'description': label,
-                    'amount': match.get('amount', 0.0),
-                    'partner_name': match.get('partner', match.get('company_from', '')),
-                    'pair_index': idx,  # links this display line back to its pair in match_pairs_json
-                    'selected': True,
-                }))
-            rec.line_ids = lines
+            rec.selected_count = sum(1 for l in rec.line_ids if l.selected)
 
     def action_confirm(self):
         """
@@ -104,7 +59,7 @@ class AutoReconciliationWizard(models.TransientModel):
         except Exception:
             raise UserError(_('Preview data is corrupt. Please close and run Preview again.'))
 
-        # BUG FIX: Only process pairs whose wizard line is still selected.
+        # Only process pairs whose wizard line is still selected.
         selected_indices = {
             line.pair_index for line in self.line_ids if line.selected
         }
@@ -119,10 +74,6 @@ class AutoReconciliationWizard(models.TransientModel):
         applied = 0
         skipped = 0
         engine = self.env['auto.reconciliation.engine']
-        # C4 FIX: Use sudo() on all browse calls.  Without it, multi-company ORM
-        # record rules return empty recordsets for records in other companies,
-        # so .exists() returns False and every cross-company pair silently
-        # increments the skipped counter with no error message to the user.
         BankLine = self.env['account.bank.statement.line'].sudo()
         MoveLine = self.env['account.move.line'].sudo()
         Payment = self.env['account.payment'].sudo()
@@ -165,8 +116,6 @@ class AutoReconciliationWizard(models.TransientModel):
                         skipped += 1; continue
                     if not counterpart.exists() or counterpart.reconciled:
                         skipped += 1; continue
-                    # BUG FIX 5: Re-fetch both IDs through a single sudo env
-                    # so cross-company ORM record rules don't block reconcile().
                     self.env['account.move.line'].sudo().browse(
                         [line.id, counterpart.id]
                     ).reconcile()
