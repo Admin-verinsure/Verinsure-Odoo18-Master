@@ -22,24 +22,58 @@ class AutoReconciliationConfig(models.Model):
     match_by_currency = fields.Boolean(string='Match by Currency', default=True)
     cron_active = fields.Boolean(string='Enable Scheduled Run', default=True)
 
+    # BUG FIX: Prevent duplicate configs per company — the engine uses limit=1
+    # so a second active config would be silently ignored, causing confusing
+    # behaviour where toggling a reconciliation type appears to have no effect.
+    _sql_constraints = [
+        (
+            'company_unique',
+            'UNIQUE(company_id)',
+            'Only one reconciliation configuration per company is allowed. '
+            'Please edit the existing configuration instead of creating a new one.',
+        ),
+    ]
+
     def action_run_now(self):
         self.ensure_one()
         engine = self.env['auto.reconciliation.engine']
-        engine.run_all(company_ids=[self.company_id.id], preview_mode=False, triggered_by='manual')
+        results = engine.run_all(
+            company_ids=[self.company_id.id],
+            preview_mode=False,
+            triggered_by='manual',
+        )
+        # BUG FIX: Report actual match count instead of a generic "finished" message.
+        company_res = results.get(self.company_id.id, {})
+        total = sum(
+            company_res.get(k, {}).get('matched_count', 0)
+            for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
+        )
+        if 'error' in company_res:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Reconciliation Error'),
+                    'message': company_res['error'],
+                    'type': 'danger', 'sticky': True,
+                }
+            }
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Auto Reconciliation Complete'),
-                'message': _('Reconciliation finished for %s.') % self.company_id.name,
-                'type': 'success', 'sticky': False,
+                'message': _('%d match(es) applied for %s.') % (total, self.company_id.name)
+                           if total else _('No new matches found for %s.') % self.company_id.name,
+                'type': 'success' if total else 'info',
+                'sticky': False,
             }
         }
 
     def action_open_wizard(self):
         """
-        CRITICAL FIX 3: Store exact matched ID pairs as JSON so confirm()
-        applies only those specific records — engine never re-runs from scratch.
+        Store exact matched ID pairs as JSON so confirm() applies only those
+        specific records — engine never re-runs from scratch.
         """
         self.ensure_one()
         engine = self.env['auto.reconciliation.engine']

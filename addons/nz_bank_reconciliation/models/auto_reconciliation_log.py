@@ -51,3 +51,35 @@ class AutoReconciliationLog(models.Model):
             'type': 'ir.actions.client',
             'tag': 'auto_reconciliation_dashboard',
         }
+
+    @api.model
+    def get_dashboard_stats(self):
+        """
+        BUG FIX: Return pre-aggregated stats via a single SQL SUM query instead
+        of fetching every log record to the browser for client-side reduce().
+        Without this fix, the JS dashboard would load thousands of records after
+        a year of daily cron runs, causing browser hangs.
+
+        Returns a dict with total_runs + per-type lifetime totals.
+        """
+        self.env.cr.execute("""
+            SELECT
+                COUNT(*)                    AS total_runs,
+                COALESCE(SUM(total_matched), 0)         AS total_matched,
+                COALESCE(SUM(bank_matched), 0)          AS bank_matched,
+                COALESCE(SUM(customer_matched), 0)      AS customer_matched,
+                COALESCE(SUM(vendor_matched), 0)        AS vendor_matched,
+                COALESCE(SUM(intercompany_matched), 0)  AS intercompany_matched
+            FROM auto_reconciliation_log
+            WHERE state = 'done'
+              AND company_id IN %s
+        """, (tuple(self.env.companies.ids),))
+        row = self.env.cr.dictfetchone()
+        return {
+            'total_runs':            int(row['total_runs']),
+            'total_matched':         int(row['total_matched']),
+            'bank_matched':          int(row['bank_matched']),
+            'customer_matched':      int(row['customer_matched']),
+            'vendor_matched':        int(row['vendor_matched']),
+            'intercompany_matched':  int(row['intercompany_matched']),
+        }
