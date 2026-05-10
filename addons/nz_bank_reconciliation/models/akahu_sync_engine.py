@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 import logging
+import time
 from datetime import datetime, timezone
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+
+# BUG-01 FIX: Hard cap on paginated fetches. If Akahu ever returns a circular
+# cursor or never sends a terminal page, the cron worker would hang forever.
+# 500 pages × ~100 tx/page = 50 000 transactions — safely above any real account.
+MAX_PAGES = 500
 
 _logger = logging.getLogger(__name__)
 
@@ -88,6 +94,15 @@ class AkahuSyncEngine(models.Model):
         page_count = 0
 
         while True:
+            # BUG-01 FIX: Guard against infinite loops caused by a circular
+            # cursor or an API that never sends a terminal page.
+            if page_count >= MAX_PAGES:
+                raise UserError(_(
+                    'Akahu sync for account %s aborted: exceeded %d page limit. '
+                    'This may indicate a circular cursor from the Akahu API. '
+                    'Contact support if this persists.'
+                ) % (akahu_account.name, MAX_PAGES))
+
             page_count += 1
             _logger.info(
                 'Akahu sync: fetching page %d for account %s (cursor: %s)',
@@ -201,7 +216,13 @@ class AkahuSyncEngine(models.Model):
         count = 0
 
         for tx in transactions:
-            savepoint = 'akahu_tx_%s' % (tx.get('_id', 'unknown').replace('-', '_'))
+            # RISK-02 FIX: Savepoint names go directly into SQL without
+            # parameter binding. Sanitize by keeping only alphanumeric chars
+            # and underscores — Akahu IDs are currently alphanumeric but the
+            # format is not formally guaranteed.
+            raw_id = (tx.get('_id') or 'unknown')
+            safe_id = ''.join(c if c.isalnum() else '_' for c in raw_id)
+            savepoint = 'akahu_tx_%s' % safe_id[:50]  # also cap length
             try:
                 self.env.cr.execute('SAVEPOINT %s' % savepoint)
                 line_vals = self._map_transaction_to_statement_line(tx, akahu_account)
@@ -259,11 +280,18 @@ class AkahuSyncEngine(models.Model):
             'payment_ref': payment_ref[:255],
             'amount': amount,
             'partner_name': meta.get('other_account') or False,
-            'transaction_type': tx.get('type') or False,
             'company_id': akahu_account.company_id.id,
             # Odoo 18 native deduplication field — prefix with 'akahu-' to namespace it
             'unique_import_id': 'akahu-%s' % tx_id,
         }
+
+        # BUG-03 FIX: `transaction_type` only exists in Odoo Enterprise
+        # (account_accountant module). Writing it on Community raises an
+        # immediate KeyError / ValueError that crashes every transaction import.
+        # Conditionally include it only when the field is actually present.
+        BankLine = self.env['account.bank.statement.line']
+        if 'transaction_type' in BankLine._fields:
+            vals['transaction_type'] = tx.get('type') or False
 
         # Multi-currency: ASB returns conversion details for foreign card transactions
         # tx.meta.conversion = {"amount": -42.50, "currency": "USD", "rate": 0.6516}

@@ -64,13 +64,21 @@ class AutoReconciliationLog(models.Model):
     @api.model
     def get_dashboard_stats(self):
         """
-        BUG FIX: Return pre-aggregated stats via a single SQL SUM query instead
-        of fetching every log record to the browser for client-side reduce().
-        Without this fix, the JS dashboard would load thousands of records after
-        a year of daily cron runs, causing browser hangs.
+        Return pre-aggregated stats via a single SQL SUM query instead of
+        fetching every log record to the browser for client-side reduce().
+        Without this, the JS dashboard loads thousands of records after a
+        year of daily cron runs, causing browser hangs.
+
+        BUG-02 FIX: `tuple(self.env.companies.ids)` is `()` on a fresh
+        install or in test context, producing invalid SQL:
+          WHERE company_id IN ()   -- PostgreSQL SyntaxError
+        Fix: fall back to `(0,)` — a sentinel that matches no real company,
+        so the query safely returns zero rows instead of crashing.
 
         Returns a dict with total_runs + per-type lifetime totals.
         """
+        # BUG-02 FIX: Guard against empty tuple → invalid SQL.
+        company_ids = tuple(self.env.companies.ids) or (0,)
         self.env.cr.execute("""
             SELECT
                 COUNT(*)                    AS total_runs,
@@ -82,7 +90,7 @@ class AutoReconciliationLog(models.Model):
             FROM auto_reconciliation_log
             WHERE state = 'done'
               AND company_id IN %s
-        """, (tuple(self.env.companies.ids),))
+        """, (company_ids,))
         row = self.env.cr.dictfetchone()
         return {
             'total_runs':            int(row['total_runs']),

@@ -19,7 +19,13 @@ class AutoReconciliationWizard(models.TransientModel):
     match_pairs_json = fields.Text(string='Match Pairs JSON')
     line_ids = fields.One2many(
         'auto.reconciliation.wizard.line', 'wizard_id',
-        string='Match Lines', compute='_compute_line_ids', store=True,
+        string='Match Lines', compute='_compute_line_ids',
+        # RISK-05 FIX: store=True on a computed One2many of a TransientModel
+        # causes Odoo to write the related records to the DB on every recompute
+        # (i.e. every time match_summary changes) — creating orphaned rows in
+        # the transient table. TransientModel data is ephemeral; storing computed
+        # relation data there is both wasteful and incorrect. Removed store=True
+        # so the field stays purely in-memory for the lifetime of the wizard.
     )
     state = fields.Selection([
         ('preview', 'Preview'), ('confirmed', 'Confirmed'),
