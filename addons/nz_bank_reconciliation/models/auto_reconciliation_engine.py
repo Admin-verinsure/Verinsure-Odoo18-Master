@@ -2,12 +2,22 @@
 import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from odoo.tools import float_compare, float_round
 
 _logger = logging.getLogger(__name__)
 
-# FIX 5: Payroll account codes to EXCLUDE from auto-reconciliation
-# Adjust these to match your actual NZ chart of accounts
 PAYROLL_ACCOUNT_CODES = ['820', '825', '830', '835', '840', '9500', '9510', '9520']
+
+# CRITICAL FIX 1: Tolerance constant for float-safe amount comparisons.
+# IEEE 754 floats can differ by tiny fractions — exact '=' on monetary fields
+# silently misses valid matches like 1500.10 stored as 1500.0999999...
+AMOUNT_TOLERANCE = 0.001
+MONETARY_PRECISION = 2
+
+
+def _amounts_match(a, b):
+    """Safe monetary comparison using Odoo's float_compare."""
+    return float_compare(a, b, precision_digits=MONETARY_PRECISION) == 0
 
 
 class AutoReconciliationEngine(models.Model):
@@ -15,7 +25,7 @@ class AutoReconciliationEngine(models.Model):
     _description = 'Auto Reconciliation Engine'
 
     @api.model
-    def run_all(self, company_ids=None, preview_mode=False):
+    def run_all(self, company_ids=None, preview_mode=False, triggered_by='manual'):
         if not company_ids:
             companies = self.env['res.company'].sudo().search([])
         else:
@@ -32,7 +42,7 @@ class AutoReconciliationEngine(models.Model):
                 all_results[company.id] = {'error': str(e)}
 
         if not preview_mode:
-            self._create_log_entries(all_results)
+            self._create_log_entries(all_results, triggered_by=triggered_by)
         return all_results
 
     def _process_company(self, company, preview_mode=False):
@@ -43,13 +53,13 @@ class AutoReconciliationEngine(models.Model):
         return {
             'company_name': company.name,
             'company_id': company.id,
-            'bank_statement':   run(self._reconcile_bank_statements,   'enable_bank'),
-            'customer_payment': run(self._reconcile_customer_payments,  'enable_customer'),
-            'vendor_payment':   run(self._reconcile_vendor_payments,    'enable_vendor'),
-            'intercompany':     run(self._reconcile_intercompany,       'enable_intercompany'),
+            'bank_statement':   run(self._reconcile_bank_statements,  'enable_bank'),
+            'customer_payment': run(self._reconcile_customer_payments, 'enable_customer'),
+            'vendor_payment':   run(self._reconcile_vendor_payments,   'enable_vendor'),
+            'intercompany':     run(self._reconcile_intercompany,      'enable_intercompany'),
         }
 
-    # ── FIX 1 + 2 + 3 + 5: Bank Statements ───────────────────────────────────
+    # ── BANK STATEMENTS ───────────────────────────────────────────────────────
     def _reconcile_bank_statements(self, company, preview_mode=False):
         matched = []
         unmatched_count = 0
@@ -75,19 +85,45 @@ class AutoReconciliationEngine(models.Model):
                 ('reconciled', '=', False),
                 ('parent_state', '=', 'posted'),
                 ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
-                ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+                ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
             ]
-            # FIX 2: currency-aware matching
+
+            # CRITICAL FIX 1: Tolerance range replaces exact float equality.
             if is_foreign:
                 sign = 1 if stmt_line.amount >= 0 else -1
-                domain += [('currency_id', '=', stmt_currency.id), ('amount_currency', '=', sign * match_amount)]
+                signed = sign * match_amount
+                domain += [
+                    ('currency_id', '=', stmt_currency.id),
+                    ('amount_currency', '>=', signed - AMOUNT_TOLERANCE),
+                    ('amount_currency', '<=', signed + AMOUNT_TOLERANCE),
+                ]
             else:
                 if stmt_line.amount > 0:
-                    domain.append(('debit', '=', match_amount))
+                    domain += [
+                        ('debit', '>=', match_amount - AMOUNT_TOLERANCE),
+                        ('debit', '<=', match_amount + AMOUNT_TOLERANCE),
+                    ]
                 else:
-                    domain.append(('credit', '=', match_amount))
+                    domain += [
+                        ('credit', '>=', match_amount - AMOUNT_TOLERANCE),
+                        ('credit', '<=', match_amount + AMOUNT_TOLERANCE),
+                    ]
 
             candidates = MoveLine.search(domain, limit=1)
+
+            # Secondary guard: confirm with float_compare before accepting
+            if candidates:
+                cand = candidates[0]
+                if is_foreign:
+                    confirmed = _amounts_match(abs(cand.amount_currency), match_amount)
+                else:
+                    confirmed = _amounts_match(
+                        cand.debit if stmt_line.amount > 0 else cand.credit,
+                        match_amount
+                    )
+                if not confirmed:
+                    candidates = candidates.browse([])
+
             if candidates:
                 matched.append({
                     'type': 'bank_statement',
@@ -108,21 +144,55 @@ class AutoReconciliationEngine(models.Model):
         return {'matched': matched, 'matched_count': len(matched), 'unmatched_count': unmatched_count}
 
     def _apply_bank_reconciliation_community(self, stmt_line, move_line):
-        """FIX 1: Community-compatible — uses move_line.reconcile() not stmt_line.reconcile()"""
+        """
+        CRITICAL FIX 2: Correct suspense account fallback.
+
+        Original bug: fallback used `l.id != move_line.id` to exclude the
+        external move line. But move_line is on a different account.move
+        entirely — its id never appears in stmt_line.move_id.line_ids, so
+        the condition was always True and grabbed any unreconciled line
+        (including the bank account line itself), corrupting journal entries.
+
+        Fix: target the journal's suspense_account_id explicitly.
+        """
         try:
+            # Primary: receivable/payable line on the statement move
             stmt_move_lines = stmt_line.move_id.line_ids.filtered(
-                lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable') and not l.reconciled
+                lambda l: l.account_id.account_type in (
+                    'asset_receivable', 'liability_payable'
+                ) and not l.reconciled
             )
             if stmt_move_lines:
                 (stmt_move_lines[0] | move_line).reconcile()
-            else:
-                suspense = stmt_line.move_id.line_ids.filtered(lambda l: not l.reconciled and l.id != move_line.id)
-                if suspense:
-                    (suspense[0] | move_line).reconcile()
-        except Exception as e:
-            _logger.warning("Bank recon (Community) failed for stmt_line %s: %s", stmt_line.id, str(e))
+                return
 
-    # ── FIX 2 + 5: Customer Payments ─────────────────────────────────────────
+            # CRITICAL FIX 2: Use journal's configured suspense account
+            suspense_account = stmt_line.journal_id.suspense_account_id
+            if suspense_account:
+                suspense_lines = stmt_line.move_id.line_ids.filtered(
+                    lambda l: l.account_id.id == suspense_account.id and not l.reconciled
+                )
+                if suspense_lines:
+                    (suspense_lines[0] | move_line).reconcile()
+                    return
+
+            # Last resort: current asset/liability line
+            fallback = stmt_line.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in (
+                    'asset_current', 'liability_current'
+                ) and not l.reconciled
+            )
+            if fallback:
+                (fallback[0] | move_line).reconcile()
+            else:
+                _logger.warning(
+                    "Bank recon: no suitable line on stmt_line %s to reconcile against move_line %s",
+                    stmt_line.id, move_line.id
+                )
+        except Exception as e:
+            _logger.warning("Bank recon failed for stmt_line %s: %s", stmt_line.id, str(e))
+
+    # ── CUSTOMER PAYMENTS ─────────────────────────────────────────────────────
     def _reconcile_customer_payments(self, company, preview_mode=False):
         matched = []
         Payment = self.env['account.payment'].sudo()
@@ -132,13 +202,19 @@ class AutoReconciliationEngine(models.Model):
             ('company_id', '=', company.id), ('state', '=', 'posted'),
             ('payment_type', '=', 'inbound'), ('reconciled_invoice_ids', '=', False),
         ]):
+            # CRITICAL FIX 1: Tolerance range instead of exact float equality
+            amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
             invoices = Move.search([
                 ('company_id', '=', company.id), ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
-                ('amount_residual', '=', payment.amount),
+                ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
+                ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
                 ('currency_id', '=', payment.currency_id.id),
                 ('partner_id', '=', payment.partner_id.id),
             ], limit=1)
+            if invoices and not _amounts_match(invoices[0].amount_residual, amt):
+                invoices = invoices.browse([])
+
             if invoices:
                 matched.append({
                     'type': 'customer_payment', 'payment_id': payment.id,
@@ -151,7 +227,7 @@ class AutoReconciliationEngine(models.Model):
                     self._apply_ar_reconciliation(payment, invoices[0], 'asset_receivable')
         return {'matched': matched, 'matched_count': len(matched)}
 
-    # ── FIX 2 + 5: Vendor Payments ───────────────────────────────────────────
+    # ── VENDOR PAYMENTS ───────────────────────────────────────────────────────
     def _reconcile_vendor_payments(self, company, preview_mode=False):
         matched = []
         Payment = self.env['account.payment'].sudo()
@@ -160,16 +236,22 @@ class AutoReconciliationEngine(models.Model):
         for payment in Payment.search([
             ('company_id', '=', company.id), ('state', '=', 'posted'),
             ('payment_type', '=', 'outbound'), ('reconciled_bill_ids', '=', False),
-            ('journal_id.name', 'not ilike', 'payroll'),  # FIX 5
+            ('journal_id.name', 'not ilike', 'payroll'),
         ]):
+            # CRITICAL FIX 1: Tolerance range instead of exact float equality
+            amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
             bills = Move.search([
                 ('company_id', '=', company.id), ('move_type', '=', 'in_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
-                ('amount_residual', '=', payment.amount),
+                ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
+                ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
                 ('currency_id', '=', payment.currency_id.id),
                 ('partner_id', '=', payment.partner_id.id),
-                ('invoice_line_ids.account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+                ('invoice_line_ids.account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
             ], limit=1)
+            if bills and not _amounts_match(bills[0].amount_residual, amt):
+                bills = bills.browse([])
+
             if bills:
                 matched.append({
                     'type': 'vendor_payment', 'payment_id': payment.id,
@@ -184,24 +266,26 @@ class AutoReconciliationEngine(models.Model):
 
     def _apply_ar_reconciliation(self, payment, move, account_type):
         try:
-            p_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == account_type and not l.reconciled)
-            m_lines = move.line_ids.filtered(lambda l: l.account_id.account_type == account_type and not l.reconciled)
+            p_lines = payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type == account_type and not l.reconciled
+            )
+            m_lines = move.line_ids.filtered(
+                lambda l: l.account_id.account_type == account_type and not l.reconciled
+            )
             if p_lines and m_lines:
                 (p_lines[0] | m_lines[0]).reconcile()
         except Exception as e:
-            _logger.warning("Payment/invoice reconciliation failed for payment %s: %s", payment.id, str(e))
+            _logger.warning("AR reconciliation failed for payment %s: %s", payment.id, str(e))
 
-    # ── FIX 4: Inter-company with explicit mapping ────────────────────────────
+    # ── INTER-COMPANY ─────────────────────────────────────────────────────────
     def _reconcile_intercompany(self, company, preview_mode=False):
         matched = []
         MoveLine = self.env['account.move.line'].sudo()
 
-        # FIX 4: Use explicit mapping table
         mappings = self.env['akahu.company.mapping'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
         ])
         if not mappings:
-            _logger.info("IC reconciliation skipped for %s: no mappings set up.", company.name)
             return {'matched': [], 'matched_count': 0}
 
         partner_to_company = {m.partner_id.id: m.counterpart_company_id.id for m in mappings}
@@ -210,7 +294,7 @@ class AutoReconciliationEngine(models.Model):
             ('company_id', '=', company.id), ('reconciled', '=', False),
             ('parent_state', '=', 'posted'),
             ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
-            ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),  # FIX 5
+            ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
             ('partner_id', 'in', list(partner_to_company.keys())),
         ])
 
@@ -224,15 +308,29 @@ class AutoReconciliationEngine(models.Model):
                 ('parent_state', '=', 'posted'),
                 ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
             ]
-            # FIX 2: currency-aware IC matching
+            # CRITICAL FIX 1: Tolerance range for IC matching
             if line.currency_id and line.currency_id != company.currency_id:
-                domain += [('currency_id', '=', line.currency_id.id), ('amount_currency', '=', -line.amount_currency)]
-                domain.append(('account_id.account_type', '=', 'liability_payable' if line.debit > 0 else 'asset_receivable'))
+                target = -line.amount_currency
+                domain += [
+                    ('currency_id', '=', line.currency_id.id),
+                    ('amount_currency', '>=', target - AMOUNT_TOLERANCE),
+                    ('amount_currency', '<=', target + AMOUNT_TOLERANCE),
+                    ('account_id.account_type', '=',
+                     'liability_payable' if line.debit > 0 else 'asset_receivable'),
+                ]
             else:
                 if line.debit > 0:
-                    domain += [('credit', '=', line.debit), ('account_id.account_type', '=', 'liability_payable')]
+                    domain += [
+                        ('credit', '>=', line.debit - AMOUNT_TOLERANCE),
+                        ('credit', '<=', line.debit + AMOUNT_TOLERANCE),
+                        ('account_id.account_type', '=', 'liability_payable'),
+                    ]
                 else:
-                    domain += [('debit', '=', line.credit), ('account_id.account_type', '=', 'asset_receivable')]
+                    domain += [
+                        ('debit', '>=', line.credit - AMOUNT_TOLERANCE),
+                        ('debit', '<=', line.credit + AMOUNT_TOLERANCE),
+                        ('account_id.account_type', '=', 'asset_receivable'),
+                    ]
 
             counterpart = MoveLine.search(domain, limit=1)
             if counterpart:
@@ -240,7 +338,8 @@ class AutoReconciliationEngine(models.Model):
                 line_currency = line.currency_id or company.currency_id
                 matched.append({
                     'type': 'intercompany', 'line_id': line.id, 'line_name': line.name,
-                    'counterpart_line_id': counterpart.id, 'counterpart_line_name': counterpart.name,
+                    'counterpart_line_id': counterpart.id,
+                    'counterpart_line_name': counterpart.name,
                     'amount': abs(line.amount_currency if line.currency_id else (line.debit or line.credit)),
                     'currency': line_currency.name,
                     'company_from': company.name, 'company_to': cc_name,
@@ -253,13 +352,21 @@ class AutoReconciliationEngine(models.Model):
 
         return {'matched': matched, 'matched_count': len(matched)}
 
-    def _create_log_entries(self, all_results):
+    # ── LOGGING ───────────────────────────────────────────────────────────────
+    def _create_log_entries(self, all_results, triggered_by='manual'):
         Log = self.env['auto.reconciliation.log'].sudo()
         for company_id, result in all_results.items():
             if 'error' in result:
-                Log.create({'company_id': company_id, 'state': 'failed', 'notes': result['error'], 'total_matched': 0})
+                Log.create({
+                    'company_id': company_id, 'state': 'failed',
+                    'notes': result['error'], 'total_matched': 0,
+                    'triggered_by': triggered_by,
+                })
                 continue
-            total = sum(result.get(k, {}).get('matched_count', 0) for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany'])
+            total = sum(
+                result.get(k, {}).get('matched_count', 0)
+                for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
+            )
             Log.create({
                 'company_id': company_id,
                 'bank_matched': result.get('bank_statement', {}).get('matched_count', 0),
@@ -267,10 +374,11 @@ class AutoReconciliationEngine(models.Model):
                 'vendor_matched': result.get('vendor_payment', {}).get('matched_count', 0),
                 'intercompany_matched': result.get('intercompany', {}).get('matched_count', 0),
                 'total_matched': total, 'state': 'done',
+                'triggered_by': triggered_by,
             })
 
     @api.model
     def cron_run_auto_reconciliation(self):
         _logger.info("Auto Reconciliation Cron: Starting")
-        self.run_all()
+        self.run_all(triggered_by='cron')
         _logger.info("Auto Reconciliation Cron: Completed")
