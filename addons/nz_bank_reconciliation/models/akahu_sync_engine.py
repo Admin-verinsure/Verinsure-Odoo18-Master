@@ -77,7 +77,14 @@ class AkahuSyncEngine(models.Model):
         if akahu_account.sync_cursor:
             params['cursor'] = akahu_account.sync_cursor
 
-        last_cursor = None
+        # BUG FIX 1: Use two separate variables:
+        #   next_cursor  — the pagination pointer passed to params for the next page.
+        #   final_cursor — the 'current' value from the LAST page's response.
+        # Previously last_cursor was overwritten with next_cursor on every
+        # intermediate page, so after a multi-page fetch the saved sync_cursor
+        # pointed PAST the final page that was actually fetched, causing
+        # transactions to be skipped on the next cron run.
+        final_cursor = None
         page_count = 0
 
         while True:
@@ -100,11 +107,13 @@ class AkahuSyncEngine(models.Model):
             next_cursor = cursor.get('next') if cursor else None
 
             if not next_cursor:
-                last_cursor = cursor.get('current') if cursor else None
+                # Terminal page: capture 'current' as the bookmark for next sync.
+                final_cursor = cursor.get('current') if cursor else None
                 break
             else:
+                # Intermediate page: advance the request pointer but do NOT
+                # update final_cursor — we only want the terminal page's value.
                 params['cursor'] = next_cursor
-                last_cursor = next_cursor
 
         _logger.info(
             'Akahu sync: fetched %d transactions across %d page(s) for %s',
@@ -131,7 +140,10 @@ class AkahuSyncEngine(models.Model):
         # ── Update account metadata ────────────────────────────────────────────
         akahu_account.write({
             'last_synced': fields.Datetime.now(),
-            'sync_cursor': last_cursor or akahu_account.sync_cursor,
+            # BUG FIX 1: Use final_cursor (terminal page's 'current') not a
+            # mid-pagination 'next' value. Falls back to existing cursor if
+            # Akahu returned no cursor at all (e.g. empty account).
+            'sync_cursor': final_cursor or akahu_account.sync_cursor,
         })
 
         # ── Write sync log ─────────────────────────────────────────────────────
@@ -248,15 +260,35 @@ class AkahuSyncEngine(models.Model):
     # ── Credit card journal routing ────────────────────────────────────────────
     CARD_TX_TYPES = {'CARD', 'EFTPOS', 'CREDIT_CARD'}
 
+    # BUG FIX 6: Credit-card journal routing used `('name', 'ilike', 'credit')`
+    # which matches any journal whose name contains the substring "credit" —
+    # e.g. "Letters of Credit", "Accredited Partners" — silently routing card
+    # transactions into the wrong journal with no warning.
+    #
+    # Fix: match on the journal's short code instead of its display name.
+    # Standard NZ Odoo setups use codes like 'CC', 'VISA', 'AMEX', 'EFTPOS'
+    # for credit/charge card journals.  The list is configurable below.
+    # If none of these codes exist the method falls back to the account's
+    # own journal (same safe behaviour as before).
+    CREDIT_CARD_JOURNAL_CODES = {'CC', 'VISA', 'AMEX', 'MC', 'EFTPOS', 'CCARD'}
+
     def _resolve_journal(self, tx, akahu_account):
         """Route CARD/EFTPOS transactions to a credit card journal if one exists."""
         tx_type = (tx.get('type') or '').upper()
         if tx_type in self.CARD_TX_TYPES:
+            # BUG FIX 6: Match on journal code, not on a substring of the name.
             cc_journal = self.env['account.journal'].sudo().search([
                 ('company_id', '=', akahu_account.company_id.id),
                 ('type', '=', 'bank'),
-                ('name', 'ilike', 'credit'),
+                ('code', 'in', list(self.CREDIT_CARD_JOURNAL_CODES)),
             ], limit=1)
             if cc_journal:
                 return cc_journal
+            _logger.debug(
+                'Akahu: CARD transaction for %s but no credit-card journal found '
+                '(codes checked: %s) — using default journal %s.',
+                akahu_account.name,
+                self.CREDIT_CARD_JOURNAL_CODES,
+                akahu_account.journal_id.code,
+            )
         return akahu_account.journal_id

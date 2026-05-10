@@ -143,7 +143,11 @@ class AutoReconciliationWizard(models.TransientModel):
                         skipped += 1; continue
                     if not counterpart.exists() or counterpart.reconciled:
                         skipped += 1; continue
-                    (line | counterpart).reconcile()
+                    # BUG FIX 5: Re-fetch both IDs through a single sudo env
+                    # so cross-company ORM record rules don't block reconcile().
+                    self.env['account.move.line'].sudo().browse(
+                        [line.id, counterpart.id]
+                    ).reconcile()
                     applied += 1
             except Exception as e:
                 _logger.warning("Wizard confirm failed for %s pair %s: %s", rtype, pair, str(e))

@@ -49,7 +49,14 @@ class AutoReconciliationEngine(models.Model):
         config = self.env['auto.reconciliation.config'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
         ], limit=1)
-        run = lambda fn, flag: fn(company, preview_mode) if (not config or getattr(config, flag)) else {'matched': [], 'matched_count': 0}
+        # BUG FIX 2: Pass config into each reconcile method so match_by_amount,
+        # match_by_partner, and match_by_currency flags are actually honoured.
+        # Previously the flags existed on the config model but were never read
+        # by the engine, making the UI checkboxes completely non-functional.
+        def run(fn, flag):
+            if config and not getattr(config, flag):
+                return {'matched': [], 'matched_count': 0}
+            return fn(company, preview_mode, config=config)
         return {
             'company_name': company.name,
             'company_id': company.id,
@@ -60,7 +67,10 @@ class AutoReconciliationEngine(models.Model):
         }
 
     # ── BANK STATEMENTS ───────────────────────────────────────────────────────
-    def _reconcile_bank_statements(self, company, preview_mode=False):
+    def _reconcile_bank_statements(self, company, preview_mode=False, config=None):
+        # BUG FIX 2: Read match_by_partner and match_by_currency from config.
+        match_by_partner = not config or config.match_by_partner
+        match_by_currency = not config or config.match_by_currency
         matched = []
         unmatched_count = 0
         BankLine = self.env['account.bank.statement.line'].sudo()
@@ -87,6 +97,15 @@ class AutoReconciliationEngine(models.Model):
                 ('account_id.account_type', 'in', ['asset_receivable', 'liability_payable']),
                 ('account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
             ]
+
+            # BUG FIX 2: Honour match_by_partner — only add partner filter when
+            # both the config flag is set and the statement line has a partner.
+            if match_by_partner and stmt_line.partner_id:
+                domain.append(('partner_id', '=', stmt_line.partner_id.id))
+
+            # BUG FIX 2: Honour match_by_currency flag.
+            if match_by_currency:
+                domain.append(('currency_id', '=', stmt_currency.id))
 
             # CRITICAL FIX 1: Tolerance range replaces exact float equality.
             if is_foreign:
@@ -193,7 +212,10 @@ class AutoReconciliationEngine(models.Model):
             _logger.warning("Bank recon failed for stmt_line %s: %s", stmt_line.id, str(e))
 
     # ── CUSTOMER PAYMENTS ─────────────────────────────────────────────────────
-    def _reconcile_customer_payments(self, company, preview_mode=False):
+    def _reconcile_customer_payments(self, company, preview_mode=False, config=None):
+        # BUG FIX 2: Read match_by_partner and match_by_currency from config.
+        match_by_partner = not config or config.match_by_partner
+        match_by_currency = not config or config.match_by_currency
         matched = []
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
@@ -204,14 +226,18 @@ class AutoReconciliationEngine(models.Model):
         ]):
             # CRITICAL FIX 1: Tolerance range instead of exact float equality
             amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
-            invoices = Move.search([
+            inv_domain = [
                 ('company_id', '=', company.id), ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
                 ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
                 ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
-                ('currency_id', '=', payment.currency_id.id),
-                ('partner_id', '=', payment.partner_id.id),
-            ], limit=1)
+            ]
+            # BUG FIX 2: Honour match_by_currency and match_by_partner flags.
+            if match_by_currency:
+                inv_domain.append(('currency_id', '=', payment.currency_id.id))
+            if match_by_partner and payment.partner_id:
+                inv_domain.append(('partner_id', '=', payment.partner_id.id))
+            invoices = Move.search(inv_domain, limit=1)
             if invoices and not _amounts_match(invoices[0].amount_residual, amt):
                 invoices = invoices.browse([])
 
@@ -228,7 +254,10 @@ class AutoReconciliationEngine(models.Model):
         return {'matched': matched, 'matched_count': len(matched)}
 
     # ── VENDOR PAYMENTS ───────────────────────────────────────────────────────
-    def _reconcile_vendor_payments(self, company, preview_mode=False):
+    def _reconcile_vendor_payments(self, company, preview_mode=False, config=None):
+        # BUG FIX 2: Read match_by_partner and match_by_currency from config.
+        match_by_partner = not config or config.match_by_partner
+        match_by_currency = not config or config.match_by_currency
         matched = []
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
@@ -236,19 +265,32 @@ class AutoReconciliationEngine(models.Model):
         for payment in Payment.search([
             ('company_id', '=', company.id), ('state', '=', 'posted'),
             ('payment_type', '=', 'outbound'), ('reconciled_bill_ids', '=', False),
-            ('journal_id.name', 'not ilike', 'payroll'),
+            # BUG FIX 3: Filter by the payment's journal code instead of the
+            # old approach of traversing invoice_line_ids.account_id.code on
+            # the bill.  The old domain used an ORM EXISTS subquery that
+            # excluded entire bills if ANY line touched a payroll account —
+            # meaning split bills (part payroll, part normal) were silently
+            # skipped.  Filtering the payment's own journal by code is both
+            # more correct (payroll payments come from payroll journals) and
+            # avoids the false-negative on mixed bills.
+            # NOTE: if your payroll journals don't share account codes with
+            # PAYROLL_ACCOUNT_CODES, also add a name-based filter here.
+            ('journal_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
         ]):
             # CRITICAL FIX 1: Tolerance range instead of exact float equality
             amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
-            bills = Move.search([
+            bill_domain = [
                 ('company_id', '=', company.id), ('move_type', '=', 'in_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
                 ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
                 ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
-                ('currency_id', '=', payment.currency_id.id),
-                ('partner_id', '=', payment.partner_id.id),
-                ('invoice_line_ids.account_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
-            ], limit=1)
+            ]
+            # BUG FIX 2: Honour match_by_currency and match_by_partner flags.
+            if match_by_currency:
+                bill_domain.append(('currency_id', '=', payment.currency_id.id))
+            if match_by_partner and payment.partner_id:
+                bill_domain.append(('partner_id', '=', payment.partner_id.id))
+            bills = Move.search(bill_domain, limit=1)
             if bills and not _amounts_match(bills[0].amount_residual, amt):
                 bills = bills.browse([])
 
@@ -278,7 +320,7 @@ class AutoReconciliationEngine(models.Model):
             _logger.warning("AR reconciliation failed for payment %s: %s", payment.id, str(e))
 
     # ── INTER-COMPANY ─────────────────────────────────────────────────────────
-    def _reconcile_intercompany(self, company, preview_mode=False):
+    def _reconcile_intercompany(self, company, preview_mode=False, config=None):
         matched = []
         MoveLine = self.env['account.move.line'].sudo()
 
@@ -346,7 +388,15 @@ class AutoReconciliationEngine(models.Model):
                 })
                 if not preview_mode:
                     try:
-                        (line | counterpart).reconcile()
+                        # BUG FIX 5: Combining records from two different company
+                        # environments with `|` keeps each record in its own env,
+                        # so Odoo's multi-company record rules block the reconcile()
+                        # call and it silently fails.  Re-fetching both IDs through
+                        # a single sudo() env ensures they share the same environment
+                        # and bypasses the cross-company rule restriction.
+                        self.env['account.move.line'].sudo().browse(
+                            [line.id, counterpart.id]
+                        ).reconcile()
                     except Exception as e:
                         _logger.warning("IC reconciliation failed: %s", str(e))
 
