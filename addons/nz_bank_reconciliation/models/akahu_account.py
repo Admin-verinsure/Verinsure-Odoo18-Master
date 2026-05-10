@@ -58,7 +58,9 @@ class AkahuAccount(models.Model):
         string='User Access Token',
         required=True,
         password=True,
-        help='The Akahu User Access Token (user_token_...) for this bank account.',
+        groups='base.group_erp_manager',
+        help='The Akahu User Access Token (user_token_...) for this bank account. '
+             'Visible to ERP Managers only — never sent to regular users.',
     )
     akahu_account_id = fields.Char(
         string='Akahu Account ID',

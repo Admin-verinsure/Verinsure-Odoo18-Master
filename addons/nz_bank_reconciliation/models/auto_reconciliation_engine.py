@@ -71,6 +71,12 @@ class AutoReconciliationEngine(models.Model):
         # BUG FIX 2: Read match_by_partner and match_by_currency from config.
         match_by_partner = not config or config.match_by_partner
         match_by_currency = not config or config.match_by_currency
+        # H4 FIX: match_by_amount was previously ignored — the engine always
+        # filtered by amount regardless of this flag.  When False, amount
+        # filtering is skipped so broader partner/reference-only matches are
+        # possible (useful for partial-payment workflows).  The secondary
+        # float_compare guard is also skipped for consistency.
+        match_by_amount = not config or config.match_by_amount
         matched = []
         unmatched_count = 0
         BankLine = self.env['account.bank.statement.line'].sudo()
@@ -107,31 +113,38 @@ class AutoReconciliationEngine(models.Model):
             if match_by_currency:
                 domain.append(('currency_id', '=', stmt_currency.id))
 
+            # H4 FIX: Only add amount filters when match_by_amount is enabled.
             # CRITICAL FIX 1: Tolerance range replaces exact float equality.
-            if is_foreign:
-                sign = 1 if stmt_line.amount >= 0 else -1
-                signed = sign * match_amount
-                domain += [
-                    ('currency_id', '=', stmt_currency.id),
-                    ('amount_currency', '>=', signed - AMOUNT_TOLERANCE),
-                    ('amount_currency', '<=', signed + AMOUNT_TOLERANCE),
-                ]
-            else:
-                if stmt_line.amount > 0:
+            if match_by_amount:
+                if is_foreign:
+                    sign = 1 if stmt_line.amount >= 0 else -1
+                    signed = sign * match_amount
                     domain += [
-                        ('debit', '>=', match_amount - AMOUNT_TOLERANCE),
-                        ('debit', '<=', match_amount + AMOUNT_TOLERANCE),
+                        ('currency_id', '=', stmt_currency.id),
+                        ('amount_currency', '>=', signed - AMOUNT_TOLERANCE),
+                        ('amount_currency', '<=', signed + AMOUNT_TOLERANCE),
                     ]
                 else:
-                    domain += [
-                        ('credit', '>=', match_amount - AMOUNT_TOLERANCE),
-                        ('credit', '<=', match_amount + AMOUNT_TOLERANCE),
-                    ]
+                    if stmt_line.amount > 0:
+                        domain += [
+                            ('debit', '>=', match_amount - AMOUNT_TOLERANCE),
+                            ('debit', '<=', match_amount + AMOUNT_TOLERANCE),
+                        ]
+                    else:
+                        domain += [
+                            ('credit', '>=', match_amount - AMOUNT_TOLERANCE),
+                            ('credit', '<=', match_amount + AMOUNT_TOLERANCE),
+                        ]
 
-            candidates = MoveLine.search(domain, limit=1)
+            # H1 FIX: Add explicit order so that when multiple journal entries
+            # match the same amount, the oldest (earliest date, lowest id) is
+            # always preferred.  Without this PostgreSQL returns rows in physical
+            # heap order which varies between vacuums and autovacuums.
+            candidates = MoveLine.search(domain, limit=1, order='date asc, id asc')
 
-            # Secondary guard: confirm with float_compare before accepting
-            if candidates:
+            # Secondary guard: confirm with float_compare before accepting.
+            # Only runs when amount matching is active.
+            if match_by_amount and candidates:
                 cand = candidates[0]
                 if is_foreign:
                     confirmed = _amounts_match(abs(cand.amount_currency), match_amount)
@@ -216,6 +229,8 @@ class AutoReconciliationEngine(models.Model):
         # BUG FIX 2: Read match_by_partner and match_by_currency from config.
         match_by_partner = not config or config.match_by_partner
         match_by_currency = not config or config.match_by_currency
+        # H4 FIX: honour match_by_amount flag.
+        match_by_amount = not config or config.match_by_amount
         matched = []
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
@@ -224,21 +239,25 @@ class AutoReconciliationEngine(models.Model):
             ('company_id', '=', company.id), ('state', '=', 'posted'),
             ('payment_type', '=', 'inbound'), ('reconciled_invoice_ids', '=', False),
         ]):
-            # CRITICAL FIX 1: Tolerance range instead of exact float equality
             amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
             inv_domain = [
                 ('company_id', '=', company.id), ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
-                ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
-                ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
             ]
+            # H4 FIX: Only add amount range when match_by_amount is enabled.
+            if match_by_amount:
+                # CRITICAL FIX 1: Tolerance range instead of exact float equality
+                inv_domain += [
+                    ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
+                    ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
+                ]
             # BUG FIX 2: Honour match_by_currency and match_by_partner flags.
             if match_by_currency:
                 inv_domain.append(('currency_id', '=', payment.currency_id.id))
             if match_by_partner and payment.partner_id:
                 inv_domain.append(('partner_id', '=', payment.partner_id.id))
-            invoices = Move.search(inv_domain, limit=1)
-            if invoices and not _amounts_match(invoices[0].amount_residual, amt):
+            invoices = Move.search(inv_domain, limit=1, order='invoice_date asc, id asc')
+            if match_by_amount and invoices and not _amounts_match(invoices[0].amount_residual, amt):
                 invoices = invoices.browse([])
 
             if invoices:
@@ -258,6 +277,8 @@ class AutoReconciliationEngine(models.Model):
         # BUG FIX 2: Read match_by_partner and match_by_currency from config.
         match_by_partner = not config or config.match_by_partner
         match_by_currency = not config or config.match_by_currency
+        # H4 FIX: honour match_by_amount flag.
+        match_by_amount = not config or config.match_by_amount
         matched = []
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
@@ -265,33 +286,27 @@ class AutoReconciliationEngine(models.Model):
         for payment in Payment.search([
             ('company_id', '=', company.id), ('state', '=', 'posted'),
             ('payment_type', '=', 'outbound'), ('reconciled_bill_ids', '=', False),
-            # BUG FIX 3: Filter by the payment's journal code instead of the
-            # old approach of traversing invoice_line_ids.account_id.code on
-            # the bill.  The old domain used an ORM EXISTS subquery that
-            # excluded entire bills if ANY line touched a payroll account —
-            # meaning split bills (part payroll, part normal) were silently
-            # skipped.  Filtering the payment's own journal by code is both
-            # more correct (payroll payments come from payroll journals) and
-            # avoids the false-negative on mixed bills.
-            # NOTE: if your payroll journals don't share account codes with
-            # PAYROLL_ACCOUNT_CODES, also add a name-based filter here.
             ('journal_id.code', 'not in', PAYROLL_ACCOUNT_CODES),
         ]):
-            # CRITICAL FIX 1: Tolerance range instead of exact float equality
             amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
             bill_domain = [
                 ('company_id', '=', company.id), ('move_type', '=', 'in_invoice'),
                 ('state', '=', 'posted'), ('payment_state', 'in', ['not_paid', 'partial']),
-                ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
-                ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
             ]
+            # H4 FIX: Only add amount range when match_by_amount is enabled.
+            if match_by_amount:
+                # CRITICAL FIX 1: Tolerance range instead of exact float equality
+                bill_domain += [
+                    ('amount_residual', '>=', amt - AMOUNT_TOLERANCE),
+                    ('amount_residual', '<=', amt + AMOUNT_TOLERANCE),
+                ]
             # BUG FIX 2: Honour match_by_currency and match_by_partner flags.
             if match_by_currency:
                 bill_domain.append(('currency_id', '=', payment.currency_id.id))
             if match_by_partner and payment.partner_id:
                 bill_domain.append(('partner_id', '=', payment.partner_id.id))
-            bills = Move.search(bill_domain, limit=1)
-            if bills and not _amounts_match(bills[0].amount_residual, amt):
+            bills = Move.search(bill_domain, limit=1, order='invoice_date asc, id asc')
+            if match_by_amount and bills and not _amounts_match(bills[0].amount_residual, amt):
                 bills = bills.browse([])
 
             if bills:
@@ -374,7 +389,8 @@ class AutoReconciliationEngine(models.Model):
                         ('account_id.account_type', '=', 'asset_receivable'),
                     ]
 
-            counterpart = MoveLine.search(domain, limit=1)
+            # H1 FIX: deterministic ordering — oldest matching entry preferred.
+            counterpart = MoveLine.search(domain, limit=1, order='date asc, id asc')
             if counterpart:
                 cc_name = self.env['res.company'].browse(cc_id).name
                 line_currency = line.currency_id or company.currency_id
