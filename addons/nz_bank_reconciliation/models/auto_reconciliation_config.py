@@ -72,8 +72,12 @@ class AutoReconciliationConfig(models.Model):
 
     def action_open_wizard(self):
         """
-        Store exact matched ID pairs as JSON so confirm() applies only those
-        specific records — engine never re-runs from scratch.
+        Run reconciliation in preview mode, build the wizard with one line per
+        match, and open it for the user to review and deselect before confirming.
+
+        Lines are created explicitly via create() after the wizard is saved —
+        NOT via a computed field — so Odoo can write back to them when the user
+        unchecks a row in the editable list.
         """
         self.ensure_one()
         engine = self.env['auto.reconciliation.engine']
@@ -119,6 +123,36 @@ class AutoReconciliationConfig(models.Model):
             'match_pairs_json': json.dumps(id_pairs),
             'total_preview_count': len(all_matches),
         })
+
+        # Build display lines explicitly so the list is writable (users can
+        # uncheck rows). A computed One2many with no inverse= would raise
+        # "Field is not stored and cannot be inversed" on every checkbox click.
+        WizardLine = self.env['auto.reconciliation.wizard.line']
+        for idx, match in enumerate(all_matches):
+            rtype = match.get('type', '')
+            if rtype == 'bank_statement':
+                label = 'Bank: %s ↔ %s' % (match.get('statement_line_name', ''), match.get('move_line_name', ''))
+            elif rtype == 'customer_payment':
+                label = 'Customer: %s ↔ %s' % (match.get('payment_name', ''), match.get('invoice_name', ''))
+            elif rtype == 'vendor_payment':
+                label = 'Vendor: %s ↔ %s' % (match.get('payment_name', ''), match.get('bill_name', ''))
+            elif rtype == 'intercompany':
+                label = 'IC: %s (%s) ↔ %s (%s)' % (
+                    match.get('line_name', ''), match.get('company_from', ''),
+                    match.get('counterpart_line_name', ''), match.get('company_to', ''),
+                )
+            else:
+                label = 'Unknown'
+            WizardLine.create({
+                'wizard_id': wizard.id,
+                'reconciliation_type': rtype,
+                'description': label,
+                'amount': match.get('amount', 0.0),
+                'partner_name': match.get('partner', match.get('company_from', '')),
+                'pair_index': idx,
+                'selected': True,
+            })
+
         return {
             'type': 'ir.actions.act_window',
             'name': _('Review Reconciliation Matches'),
