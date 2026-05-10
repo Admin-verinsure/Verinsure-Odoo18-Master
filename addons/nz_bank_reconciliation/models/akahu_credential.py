@@ -30,13 +30,17 @@ class AkahuCredential(models.Model):
     app_token = fields.Char(
         string='App Token',
         required=True,
-        help='Your Akahu App Token (starts with app_token_...)',
+        groups='base.group_erp_manager',
+        help='Your Akahu App Token (starts with app_token_...). '
+             'Visible to ERP Managers only — never sent to regular users.',
     )
     app_secret = fields.Char(
         string='App Secret',
         required=True,
         password=True,
-        help='Your Akahu App Secret. Never share this.',
+        groups='base.group_erp_manager',
+        help='Your Akahu App Secret. Never share this. '
+             'Visible to ERP Managers only — never sent to regular users.',
     )
     active = fields.Boolean(default=True)
     connection_status = fields.Selection([

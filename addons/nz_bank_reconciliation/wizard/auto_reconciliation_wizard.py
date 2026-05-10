@@ -101,6 +101,10 @@ class AutoReconciliationWizard(models.TransientModel):
         applied = 0
         skipped = 0
         engine = self.env['auto.reconciliation.engine']
+        # C4 FIX: Use sudo() on all browse calls.  Without it, multi-company ORM
+        # record rules return empty recordsets for records in other companies,
+        # so .exists() returns False and every cross-company pair silently
+        # increments the skipped counter with no error message to the user.
         BankLine = self.env['account.bank.statement.line'].sudo()
         MoveLine = self.env['account.move.line'].sudo()
         Payment = self.env['account.payment'].sudo()

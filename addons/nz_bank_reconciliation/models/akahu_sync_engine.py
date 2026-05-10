@@ -163,7 +163,19 @@ class AkahuSyncEngine(models.Model):
         """
         Odoo 18 uses unique_import_id for deduplication — a native column
         on account_bank_statement_line. We store the Akahu _id there directly.
+
+        C2 FIX: If the calling user cannot read this journal (multi-company
+        access rules) journal.id resolves to False, which turns the WHERE clause
+        into `journal_id = False`, matching nothing — so every transaction looks
+        new and gets re-imported on every cron run.  We raise explicitly so the
+        caller's error handler can log it rather than silently duplicating data.
         """
+        if not journal.id:
+            raise UserError(_(
+                'Cannot deduplicate transactions: journal is not readable '
+                'by the current user. Ensure the sync runs with sudo() or '
+                'that the user has access to the journal.'
+            ))
         self.env.cr.execute("""
             SELECT unique_import_id FROM account_bank_statement_line
             WHERE journal_id = %s
@@ -177,18 +189,29 @@ class AkahuSyncEngine(models.Model):
         """
         Create account.bank.statement.line records for each transaction.
         Returns count of lines created.
+
+        C3 FIX: Each create() is wrapped in an explicit SAVEPOINT so that a
+        DB constraint failure (e.g. malformed unique_import_id, bad date) only
+        aborts that single row.  Without savepoints, a mid-batch IntegrityError
+        leaves the transaction in a broken state — subsequent ORM calls raise
+        "InternalError: current transaction is aborted" and sync_cursor still
+        gets updated, permanently losing those transactions.
         """
         BankLine = self.env['account.bank.statement.line'].sudo()
         count = 0
 
         for tx in transactions:
+            savepoint = 'akahu_tx_%s' % (tx.get('_id', 'unknown').replace('-', '_'))
             try:
+                self.env.cr.execute('SAVEPOINT %s' % savepoint)
                 line_vals = self._map_transaction_to_statement_line(tx, akahu_account)
                 BankLine.create(line_vals)
+                self.env.cr.execute('RELEASE SAVEPOINT %s' % savepoint)
                 count += 1
             except Exception as e:
+                self.env.cr.execute('ROLLBACK TO SAVEPOINT %s' % savepoint)
                 _logger.warning(
-                    'Failed to create statement line for tx %s: %s',
+                    'Failed to create statement line for tx %s (savepoint rolled back): %s',
                     tx.get('_id'), str(e)
                 )
 
