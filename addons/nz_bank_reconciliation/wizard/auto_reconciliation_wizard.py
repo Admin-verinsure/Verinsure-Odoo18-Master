@@ -32,13 +32,25 @@ class AutoReconciliationWizard(models.TransientModel):
     ], default='preview')
     skipped_count = fields.Integer(string='Skipped', readonly=True, default=0)
     selected_count = fields.Integer(
-        string='Selected', compute='_compute_selected_count',
+        string='Selected',
+        compute='_compute_selected_count',
     )
 
-    @api.depends('line_ids.selected')
+    @api.depends('match_summary')
     def _compute_selected_count(self):
+        # line_ids is a non-stored computed field so we cannot depend on
+        # line_ids.selected directly — Odoo won't track changes on records
+        # that don't exist in the ORM cache between requests. Instead we
+        # query the TransientModel table directly for this wizard's lines.
+        WizardLine = self.env['auto.reconciliation.wizard.line'].sudo()
         for rec in self:
-            rec.selected_count = sum(1 for l in rec.line_ids if l.selected)
+            if not rec.id:
+                rec.selected_count = 0
+                continue
+            rec.selected_count = WizardLine.search_count([
+                ('wizard_id', '=', rec.id),
+                ('selected', '=', True),
+            ])
 
     @api.depends('match_summary')
     def _compute_line_ids(self):
