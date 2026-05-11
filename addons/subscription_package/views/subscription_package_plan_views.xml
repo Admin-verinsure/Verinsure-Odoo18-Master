@@ -89,6 +89,8 @@
                             <field name="days_to_end" invisible="1"/>
                             <field name="invoice_mode" string="Create Invoice"
                                    widget="radio" required="True"/>
+                            <field name="send_invoice_email"
+                                   invisible="invoice_mode == 'manual'"/>
                             <field name="short_code"/>
                             <field name="journal_id"/>
                             <field name="company_id"/>

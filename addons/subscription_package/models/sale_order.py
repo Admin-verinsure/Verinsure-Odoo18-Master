@@ -48,18 +48,20 @@ class SaleOrder(models.Model):
                     'is_subscription': True,
                     'subscription_id': vals.get('subscription_id'),
                 })
-            return super().create(vals)
+        # FIX: return is now OUTSIDE the loop so all records in a
+        # batch create are processed, not just the first one.
+        return super().create(vals_list)
 
     @api.depends('subscription_id')
     def _compute_reference_code(self):
         """ It displays subscription reference code """
         for rec in self:
-            rec.sub_reference = rec.subscription_id.reference_code or False
+            rec.sub_reference = self.env['subscription.package'].search(
+                [('id', '=', int(rec.subscription_id.id))]).reference_code
 
     def action_confirm(self):
         """ It Changed the stage, to renew, start date for subscription
         package based on sale order confirm """
-
         res = super().action_confirm()
         sale_order = self.subscription_id.sale_order_id
         so_state = self.search([('id', '=', sale_order.id)]).state
@@ -73,12 +75,12 @@ class SaleOrder(models.Model):
 
     @api.depends('subscription_count')
     def _compute_subscription_count(self):
-        """the compute function the count of
-        subscriptions associated with the sale order."""
+        """Compute count of subscriptions associated with the sale order."""
         for rec in self:
-            count = rec.env['subscription.package'].sudo().search_count(
+            subscription_count = self.env[
+                'subscription.package'].sudo().search_count(
                 [('sale_order_id', '=', rec.id)])
-            rec.subscription_count = count
+            rec.subscription_count = subscription_count if subscription_count > 0 else 0
 
     def button_subscription(self):
         """Open the subscription packages associated with the sale order."""
@@ -96,8 +98,20 @@ class SaleOrder(models.Model):
         }
 
     def _action_confirm(self):
-        """the function used to Confrim the sale order and
-        create subscriptions for subscription products"""
+        """Confirm the sale order and create subscriptions for subscription
+        products.
+
+        FIX: If this SO was created by the auto-billing cron it already carries
+        a subscription_id, so we must NOT create another draft subscription.
+        The original guard (subscription_count != 1) failed for auto-billing
+        SOs because each new SO has 0 linked subscriptions, causing a ghost
+        draft subscription to be created on every billing cycle.
+        """
+        # Guard: SO created by auto-billing already belongs to an existing
+        # subscription — skip new subscription creation entirely.
+        if self.is_subscription and self.subscription_id:
+            return super()._action_confirm()
+
         if self.subscription_count != 1:
             if self.order_line:
                 for line in self.order_line:

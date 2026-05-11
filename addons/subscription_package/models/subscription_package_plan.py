@@ -28,10 +28,9 @@ class SubscriptionPackagePlan(models.Model):
 
     name = fields.Char(string='Plan Name', required=True,
                        help='The name of the subscription plan.')
-    renewal_value = fields.Char(string='Renewal',
-                                help='A descriptive value indicating the '
-                                     'renewal status or details for the '
-                                     'subscription plan.')
+    renewal_value = fields.Integer(string='Renewal',
+                                   default=1,
+                                   help='The number of periods between renewals.')
     renewal_period = fields.Selection([('days', 'Day(s)'),
                                        ('weeks', 'Week(s)'),
                                        ('months', 'Month(s)'),
@@ -40,12 +39,11 @@ class SubscriptionPackagePlan(models.Model):
                                       help='Select the unit of time for the '
                                            'renewal period of the '
                                            'subscription plan.')
-    renewal_time = fields.Integer(string='Renewal Time Interval',
+    renewal_time = fields.Integer(string='Renewal Time Interval (days)',
                                   compute='_compute_renewal_time',
                                   store=True,
                                   help='The computed renewal time interval '
-                                       'for the subscription plan, based on '
-                                       'the selected renewal period.')
+                                       'in days for the subscription plan.')
     limit_choice = fields.Selection([('ones', 'Ones'),
                                      ('manual', 'Until Closed Manually'),
                                      ('custom', 'Custom')],
@@ -54,6 +52,7 @@ class SubscriptionPackagePlan(models.Model):
                                          'subscription plan, specifying how '
                                          'long it will be active.')
     limit_count = fields.Integer(string='Custom Renewal Limit',
+                                 default=1,
                                  help='Specify the custom renewal limit for '
                                       'the subscription plan. This field is '
                                       'relevant when the "Limit Choice" is '
@@ -68,6 +67,11 @@ class SubscriptionPackagePlan(models.Model):
                                          'subscription plan, specifying '
                                          'whether invoices are generated '
                                          'manually or in draft state.')
+    send_invoice_email = fields.Boolean(
+        string='Auto-send Invoice by Email',
+        default=True,
+        help='When enabled, the auto-billing cron will email the posted '
+             'invoice to the customer automatically after each billing cycle.')
     journal_id = fields.Many2one('account.journal', string='Journal',
                                  domain="[('type', '=', 'sale')]")
     company_id = fields.Many2one('res.company', string='Company', store=True,
@@ -82,45 +86,53 @@ class SubscriptionPackagePlan(models.Model):
     @api.depends('product_count')
     def _compute_product_count(self):
         """ Calculate product count based on subscription plan """
-        self.product_count = self.env['product.product'].search_count(
-            [('subscription_plan_id', '=', self.id)])
+        for rec in self:
+            rec.product_count = self.env['product.product'].search_count(
+                [('subscription_plan_id', '=', rec.id)])
 
     @api.depends('subscription_count')
     def _compute_subscription_count(self):
         """ Calculate subscription count based on subscription plan """
-        self.subscription_count = self.env[
-            'subscription.package'].search_count([('plan_id', '=', self.id)])
+        for rec in self:
+            rec.subscription_count = self.env[
+                'subscription.package'].search_count(
+                [('plan_id', '=', rec.id)])
 
     @api.depends('renewal_value', 'renewal_period')
     def _compute_renewal_time(self):
-        """ This method calculate renewal time based on renewal value """
+        """Calculate renewal time in days based on renewal value and period.
+
+        FIX: renewal_value is now an Integer field (was Char), eliminating
+        the int() cast that crashed on non-numeric input. Negative/zero values
+        are clamped to 1.
+        """
         for rec in self:
-            if int(rec.renewal_value) == 0 or int(rec.renewal_value) < 0:
-                rec.renewal_value = 1
+            value = max(rec.renewal_value or 1, 1)
             if rec.renewal_period == 'days':
-                rec.renewal_time = int(rec.renewal_value)
+                rec.renewal_time = value
             elif rec.renewal_period == 'weeks':
-                rec.renewal_time = int(rec.renewal_value) * 7
+                rec.renewal_time = value * 7
             elif rec.renewal_period == 'months':
-                rec.renewal_time = int(rec.renewal_value) * 28
+                rec.renewal_time = value * 30
             elif rec.renewal_period == 'years':
-                rec.renewal_time = int(rec.renewal_value) * 364
+                rec.renewal_time = value * 365
+            else:
+                rec.renewal_time = value
             if rec.name:
                 rec.short_code = str(rec.name[0:3]).upper()
 
-    @api.depends('renewal_time', 'limit_count')
+    @api.depends('renewal_time', 'limit_count', 'limit_choice')
     def _compute_days_to_end(self):
         """ This method calculate days to end for subscription plan based on
         limit count """
         for rec in self:
-            if rec.limit_count == 0 or rec.limit_count < 0:
-                rec.limit_count = 1
             if rec.limit_choice == 'ones':
                 rec.days_to_end = rec.renewal_time
-            if rec.limit_choice == 'manual':
-                rec.days_to_end = False
-            if rec.limit_choice == 'custom':
-                rec.days_to_end = rec.renewal_time * rec.limit_count
+            elif rec.limit_choice == 'manual':
+                rec.days_to_end = 0
+            elif rec.limit_choice == 'custom':
+                count = max(rec.limit_count or 1, 1)
+                rec.days_to_end = rec.renewal_time * count
 
     def button_product_count(self):
         """ It displays products based on subscription plan """
