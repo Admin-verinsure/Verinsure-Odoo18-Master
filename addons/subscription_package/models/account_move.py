@@ -23,7 +23,7 @@ from odoo import api, fields, models
 
 
 class AccountMove(models.Model):
-    """Inherited sale order model"""
+    """Inherited account move model"""
     _inherit = "account.move"
 
     is_subscription = fields.Boolean(string='Is Subscription', default=False,
@@ -34,13 +34,23 @@ class AccountMove(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """ It displays subscription in account move """
+        """Link invoice to subscription via sale order origin.
+
+        FIX: Added guard so that if subscription_id is already present in vals
+        (set by the auto-billing cron), we skip the lookup entirely. This
+        prevents the two write paths from conflicting with each other.
+        """
         for rec in vals_list:
+            # Skip if subscription_id already set (e.g. by auto-billing cron)
+            if rec.get('subscription_id'):
+                continue
             so_id = self.env['sale.order'].search(
                 [('name', '=', rec.get('invoice_origin'))])
-            if so_id.is_subscription is True:
-                so_id.subscription_id.start_date = so_id.subscription_id.next_invoice_date
-                new_vals_list = [{'is_subscription': True,
-                                  'subscription_id': so_id.subscription_id.id}]
-                vals_list[0].update(new_vals_list[0])
+            if so_id.is_subscription:
+                so_id.subscription_id.start_date = (
+                    so_id.subscription_id.next_invoice_date)
+                rec.update({
+                    'is_subscription': True,
+                    'subscription_id': so_id.subscription_id.id,
+                })
         return super().create(vals_list)
