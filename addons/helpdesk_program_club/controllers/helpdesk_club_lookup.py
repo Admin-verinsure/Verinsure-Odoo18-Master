@@ -5,20 +5,16 @@ from odoo.http import request
 
 class HelpdeskClubLookup(http.Controller):
     """
-    Two public JSON endpoints used by the frontend JS:
+    Standalone JSON endpoints — no dependency on signup_club_type.
 
       POST /helpdesk/program_types
-        → returns [{"key": "rotary", "label": "Rotary"}, …]
-          (the same selection pairs as res.partner.club_type)
+        → [{"id": 1, "name": "Rotary"}, …]  from helpdesk.program.type
 
       POST /helpdesk/clubs_by_program
-        → params: { club_type: "rotary" }
-        → returns [{"id": 42, "name": "Rotary Club XYZ"}, …]
+        → params: { program_type_id: 1 }
+        → [{"id": 42, "name": "Rotary Club XYZ"}, …]  from res.partner
     """
 
-    # ------------------------------------------------------------------
-    # Endpoint 1 – Program Type list (drives the first dropdown)
-    # ------------------------------------------------------------------
     @http.route(
         "/helpdesk/program_types",
         type="json",
@@ -27,17 +23,13 @@ class HelpdeskClubLookup(http.Controller):
         website=True,
     )
     def helpdesk_program_types(self, **kw):
-        field = request.env["res.partner"]._fields.get("club_type")
-        if not field:
-            return []
-        sel = field.selection
-        if callable(sel):
-            sel = sel(request.env["res.partner"])
-        return [{"key": k, "label": v} for k, v in (sel or [])]
+        types = request.env["helpdesk.program.type"].sudo().search_read(
+            [("active", "=", True)],
+            ["id", "name"],
+            order="name",
+        )
+        return types  # [{id, name}, …]
 
-    # ------------------------------------------------------------------
-    # Endpoint 2 – Club list filtered by selected Program Type
-    # ------------------------------------------------------------------
     @http.route(
         "/helpdesk/clubs_by_program",
         type="json",
@@ -45,12 +37,16 @@ class HelpdeskClubLookup(http.Controller):
         csrf=False,
         website=True,
     )
-    def helpdesk_clubs_by_program(self, club_type=None, search="", **kw):
-        if not club_type:
+    def helpdesk_clubs_by_program(self, program_type_id=None, search="", **kw):
+        if not program_type_id:
+            return []
+        try:
+            pt_id = int(program_type_id)
+        except (TypeError, ValueError):
             return []
 
         domain = [
-            ("club_type", "=", club_type),
+            ("helpdesk_program_type_id", "=", pt_id),
             ("active", "=", True),
         ]
         if search and search.strip():

@@ -1,98 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-  <!--
-    ═══════════════════════════════════════════════════════════════════
-    IMPORTANT – Template inherit_id depends on odoo_website_helpdesk.
-
-    Common template IDs used by this third-party module:
-      odoo_website_helpdesk.helpdesk_ticket_form
-      odoo_website_helpdesk.website_helpdesk_ticket_form
-      odoo_website_helpdesk.ticket_submit_form
-
-    If installation fails with "template not found", open Odoo backend:
-      Settings → Technical → User Interface → Views
-      Search for "helpdesk" filtered to Website type views
-      Find the one rendering /web/helpdesk or /helpdesk/new
-      Copy its XML ID and replace the inherit_id below.
-    ═══════════════════════════════════════════════════════════════════
-
-    We inject two fields BEFORE the submit button.
-    The xpath targets the first <div> containing a submit/button element.
-  -->
-
-  <template
-    id="helpdesk_ticket_program_club_fields"
-    inherit_id="odoo_website_helpdesk.helpdesk_ticket_form"
-    name="Helpdesk – Program Type and Club Name">
-
-    <!--
-      Strategy: insert our two form groups just before the submit button.
-      odoo_website_helpdesk typically wraps the submit in:
-        <div class="text-center"> or <div class="col-12 text-center">
-      We use position="before" on the first button[@type="submit"] so
-      this works regardless of the surrounding div class.
-    -->
-    <xpath expr="//button[@type='submit']" position="before">
-
-      <!-- ── Program Type ───────────────────────────────────────── -->
-      <div class="mb-3">
-        <label for="helpdesk_program_type" class="form-label fw-semibold">
-          Program Type <span class="text-danger">*</span>
-        </label>
-        <select
-          id="helpdesk_program_type"
-          name="program_type"
-          class="form-select"
-          required="required">
-          <option value="">-- Select Program Type --</option>
-          <!--
-            Server-side fallback options (rendered at page load).
-            JS will also populate these on DOMContentLoaded via /helpdesk/program_types.
-          -->
-          <t t-set="club_types"
-             t-value="(env['res.partner']._fields.get('club_type') and
-                       env['res.partner']._fields['club_type'].selection) or []"/>
-          <t t-foreach="club_types" t-as="opt">
-            <option t-att-value="opt[0]"><t t-esc="opt[1]"/></option>
-          </t>
-        </select>
-      </div>
-
-      <!-- ── Club Name ─────────────────────────────────────────── -->
-      <div class="mb-3" id="helpdesk_club_wrap">
-        <label for="helpdesk_club_id" class="form-label fw-semibold">
-          Club Name <span class="text-danger">*</span>
-        </label>
-        <!--
-          JS injects a search <input> above this <select> automatically.
-          name="ticket_club_id" matches the field on helpdesk.ticket model.
-        -->
-        <select
-          id="helpdesk_club_id"
-          name="ticket_club_id"
-          class="form-select"
-          required="required">
-          <option value="">-- Select Program Type first --</option>
-        </select>
-      </div>
-
-    </xpath>
-  </template>
-
-
-  <!--
-    Backend form view – show the two fields in the ticket form
-    so helpdesk agents can see / edit them.
-  -->
+  <!-- Backend ticket form — show Program Type and Club fields for agents -->
   <record id="helpdesk_ticket_view_form_program_club" model="ir.ui.view">
     <field name="name">helpdesk.ticket.form.program.club</field>
     <field name="model">helpdesk.ticket</field>
     <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
     <field name="arch" type="xml">
       <xpath expr="//field[@name='team_id']" position="after">
-        <field name="program_type" optional="show"/>
-        <field name="ticket_club_id" optional="show"/>
+        <field name="hd_program_type_id" optional="show"/>
+        <field name="hd_club_id" optional="show"/>
+      </xpath>
+    </field>
+  </record>
+
+  <!-- res.partner form — let admin assign a program type to a club/partner -->
+  <record id="res_partner_view_form_program_type" model="ir.ui.view">
+    <field name="name">res.partner.form.helpdesk.program.type</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.view_partner_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='category_id']" position="after">
+        <field name="helpdesk_program_type_id" optional="show"/>
       </xpath>
     </field>
   </record>

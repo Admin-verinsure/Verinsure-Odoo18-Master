@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_helpdesk_program_type_public,helpdesk.program.type public read,model_helpdesk_program_type,,1,0,0,0
+access_helpdesk_program_type_user,helpdesk.program.type user,model_helpdesk_program_type,base.group_user,1,1,1,1
+access_helpdesk_program_type_manager,helpdesk.program.type manager,model_helpdesk_program_type,helpdesk.group_helpdesk_manager,1,1,1,1
