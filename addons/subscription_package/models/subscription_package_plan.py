@@ -61,12 +61,12 @@ class SubscriptionPackagePlan(models.Model):
                                  compute='_compute_days_to_end', store=True,
                                  help="Subscription ending date")
     invoice_mode = fields.Selection([('manual', 'Manually'),
-                                     ('draft_invoice', 'Draft')],
+                                     ('draft_invoice', 'Auto (Post & Send)')],
                                     default='draft_invoice',
                                     help='Select the invoice mode for the '
                                          'subscription plan, specifying '
                                          'whether invoices are generated '
-                                         'manually or in draft state.')
+                                         'manually or posted and sent automatically.')
     send_invoice_email = fields.Boolean(
         string='Auto-send Invoice by Email',
         default=True,
@@ -83,16 +83,22 @@ class SubscriptionPackagePlan(models.Model):
     subscription_count = fields.Integer(string='Subscriptions',
                                         compute='_compute_subscription_count')
 
-    @api.depends('product_count')
     def _compute_product_count(self):
-        """ Calculate product count based on subscription plan """
+        """Calculate product count based on subscription plan.
+
+        FIX: Removed @api.depends('product_count') — a field cannot depend on
+        itself. Added 'for rec in self' for correct batch handling.
+        """
         for rec in self:
             rec.product_count = self.env['product.product'].search_count(
                 [('subscription_plan_id', '=', rec.id)])
 
-    @api.depends('subscription_count')
     def _compute_subscription_count(self):
-        """ Calculate subscription count based on subscription plan """
+        """Calculate subscription count based on subscription plan.
+
+        FIX: Removed @api.depends('subscription_count') — a field cannot
+        depend on itself. Added 'for rec in self' for correct batch handling.
+        """
         for rec in self:
             rec.subscription_count = self.env[
                 'subscription.package'].search_count(
@@ -102,9 +108,11 @@ class SubscriptionPackagePlan(models.Model):
     def _compute_renewal_time(self):
         """Calculate renewal time in days based on renewal value and period.
 
-        FIX: renewal_value is now an Integer field (was Char), eliminating
-        the int() cast that crashed on non-numeric input. Negative/zero values
-        are clamped to 1.
+        FIX: renewal_value is now an Integer field (was Char), eliminating the
+        int() cast that crashed on non-numeric input. Negative/zero values are
+        clamped to 1. Approximate day counts kept for renewal_time (used only
+        for initial next_invoice_date); subsequent billing cycles use the
+        calendar-aware _compute_next_billing_date() with relativedelta.
         """
         for rec in self:
             value = max(rec.renewal_value or 1, 1)
@@ -123,8 +131,11 @@ class SubscriptionPackagePlan(models.Model):
 
     @api.depends('renewal_time', 'limit_count', 'limit_choice')
     def _compute_days_to_end(self):
-        """ This method calculate days to end for subscription plan based on
-        limit count """
+        """Calculate days to end for subscription plan based on limit count.
+
+        FIX: Added limit_choice to depends. Changed if/if/if → if/elif/elif
+        so only one branch executes. Clamped limit_count to minimum of 1.
+        """
         for rec in self:
             if rec.limit_choice == 'ones':
                 rec.days_to_end = rec.renewal_time

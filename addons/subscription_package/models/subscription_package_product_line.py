@@ -79,20 +79,26 @@ class SubscriptionPackageProductLine(models.Model):
     @api.depends('product_qty', 'unit_price', 'discount', 'tax_ids',
                  'currency_id')
     def _compute_total_amount(self):
-        """ Calculate subtotal amount of product line """
+        """ Calculate subtotal amount of product line.
+
+        FIX: Replaced line.write({...}) with direct field assignment.
+        Calling write() inside a compute method triggers re-computation
+        loops and transaction integrity errors in Odoo 17/18. Direct
+        assignment is the correct pattern for compute methods.
+        """
         for line in self:
             price = line.unit_price * (1 - (line.discount or 0.0) / 100.0)
-            taxes = line.tax_ids._origin.compute_all(price,
-                                                     line.subscription_id._origin.currency_id,
-                                                     line.product_qty,
-                                                     product=line.product_id,
-                                                     partner=line.subscription_id._origin.partner_id)
-            line.write({
-                'price_tax': sum(
-                    t.get('amount', 0.0) for t in taxes.get('taxes', [])),
-                'price_total': taxes['total_included'],
-                'total_amount': taxes['total_excluded'],
-            })
+            taxes = line.tax_ids._origin.compute_all(
+                price,
+                line.subscription_id._origin.currency_id,
+                line.product_qty,
+                product=line.product_id,
+                partner=line.subscription_id._origin.partner_id,
+            )
+            line.price_tax = sum(
+                t.get('amount', 0.0) for t in taxes.get('taxes', []))
+            line.price_total = taxes['total_included']
+            line.total_amount = taxes['total_excluded']
 
     def _valid_field_parameter(self, field, name):
         if name == 'ondelete':

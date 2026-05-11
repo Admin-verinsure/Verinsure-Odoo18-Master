@@ -2,10 +2,9 @@
 <odoo>
     <!--
         Cron Job: Check Close Limit and Send Renewal Alerts.
-        FIX: Added numbercall=-1 so this cron runs indefinitely and does
-        not deactivate itself after a single execution (Odoo default is 1).
-        Invoice creation has been removed from this cron — it is now handled
-        exclusively by run_auto_subscription_billing below.
+        NOTE: numbercall was removed in Odoo 17+; crons run indefinitely
+        by default. Invoice creation is handled exclusively by
+        run_auto_subscription_billing below.
     -->
     <record id="close_limit_cron" model="ir.cron">
         <field name="name">Check Close Limit</field>
@@ -14,7 +13,6 @@
         <field name="code">model.close_limit_cron()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active" eval="True"/>
     </record>
 
@@ -31,7 +29,6 @@
         <field name="code">model.run_auto_subscription_billing()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active" eval="True"/>
     </record>
 </odoo>
