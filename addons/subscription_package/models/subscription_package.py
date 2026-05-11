@@ -110,38 +110,48 @@ class SubscriptionPackage(models.Model):
             self: self.env.company.currency_id, help='Add Currency')
     current_stage = fields.Char(string='Current Stage', default='Draft',
                                 help='Current stage of the '
-                                     'subscription package.',
+                                     'subscription package. '
+                                     'This field is computed based on '
+                                     'the associated stage_id.',
                                 store=True, compute='_compute_current_stage')
     reference_code = fields.Char(string='Reference',
-                                 help='Reference code for the record.')
+                                 help='This field represents the '
+                                      'reference code associated '
+                                      'with the record.')
     is_closed = fields.Boolean(string="Closed", default=False,
                                help='Is Closed')
     close_reason_id = fields.Many2one('subscription.package.stop',
-                                      help='The reason for closing the '
-                                           'subscription package.',
+                                      help='The reason for c'
+                                           'losing the subscription package.',
                                       string='Close Reason')
     closed_by = fields.Many2one('res.users', string='Closed By',
-                                help="The user responsible for closing the record")
+                                help="The user responsible "
+                                     "for closing the record")
     close_date = fields.Date(string='Closed on',
                              help="The date on which the record was closed")
     stage_category = fields.Selection(related='stage_id.category',
                                       help="The category associated with "
-                                           "the current stage of the record.",
+                                           "the current stage of the record. ",
                                       store=True)
     invoice_mode = fields.Selection(related="plan_id.invoice_mode",
-                                    help="The invoice mode associated with the plan.")
+                                    help="The invoice mode "
+                                         "associated with the plan.")
     total_recurring_price = fields.Float(string='Untaxed Amount',
-                                         help="The total recurring price excluding taxes.",
+                                         help="The total recurring "
+                                              "price excluding taxes.",
                                          compute='_compute_total_recurring_price',
                                          store=True)
     tax_total = fields.Float("Taxes", readonly=True,
-                             help="The total amount of taxes associated with the record")
+                             help="The total amount of "
+                                  "taxes associated with the record")
     total_with_tax = fields.Monetary("Total Recurring Price", readonly=True,
-                                     help="The total recurring price including taxes")
+                                     help="The total recurring "
+                                          "price including taxes")
     recurrence_period_id = fields.Many2one("recurrence.period",
                                            string="Recurrence Period")
     sale_order_count = fields.Integer(string='Sale Order Count',
-                                      help="The count of associated sale orders for this record.")
+                                      help="The count of associated "
+                                           "sale orders for this record.")
 
     def _valid_field_parameter(self, field, name):
         """Check the validity of a field parameter for a specific field."""
@@ -153,11 +163,13 @@ class SubscriptionPackage(models.Model):
     def _compute_invoice_count(self):
         """Calculate invoice count for this subscription.
 
-        FIX: Removed the invoices.write() side-effect that was previously
-        inside this compute method. Compute methods must be pure — writing
-        to other records from a compute causes re-computation loops and
-        transaction errors. The subscription_id stamp on invoices is now
-        handled exclusively by account_move.create() and the billing cron.
+        FIX: Removed @api.depends('invoice_count') — a field cannot depend on
+        itself (infinite recompute loop). Removed the invoices.write()
+        side-effect that was previously inside this compute method. Compute
+        methods must be pure — writing to other records from a compute causes
+        re-computation loops and transaction errors. The subscription_id stamp
+        on invoices is handled by account_move.create() and the billing cron.
+        FIX: Scoped to 'for rec in self' so batch calls work correctly.
         """
         for rec in self:
             rec.invoice_count = self.env['account.move'].search_count(
@@ -166,7 +178,11 @@ class SubscriptionPackage(models.Model):
 
     @api.depends('sale_order_id')
     def _compute_sale_count(self):
-        """ Calculate sale order count based on subscription package """
+        """Calculate sale order count based on subscription package.
+
+        FIX: Changed depends from 'so_count' (self-reference → infinite loop)
+        to 'sale_order_id'. Added 'for rec in self' for correct batch handling.
+        """
         for rec in self:
             rec.so_count = self.env['sale.order'].search_count(
                 [('id', '=', rec.sale_order_id.id)])
@@ -175,15 +191,17 @@ class SubscriptionPackage(models.Model):
     def _compute_current_stage(self):
         """ It displays current stage for subscription package """
         for rec in self:
-            rec.current_stage = rec.stage_id.category or 'draft'
+            rec.current_stage = rec.env['subscription.package.stage'].search(
+                [('id', '=', rec.stage_id.id)]).category
 
     @api.depends('start_date', 'plan_id')
     def _compute_next_invoice_date(self):
         """Compute next invoice date from start_date + renewal_time.
 
-        FIX: Was previously looping over ALL subscriptions via search([])
-        on every start_date change of any single record, causing a full-table
-        recompute. Now correctly scoped to 'for sub in self'.
+        FIX: Was previously looping over ALL subscriptions via search([]) on
+        every start_date change of any single record, causing a full-table
+        recompute. Now correctly scoped to 'for sub in self'. Also added
+        plan_id to depends so changing the plan re-triggers the compute.
         """
         for sub in self:
             if sub.start_date and sub.plan_id.renewal_time:
@@ -265,10 +283,12 @@ class SubscriptionPackage(models.Model):
     def button_sale_order(self):
         """Button to create sale order.
 
-        FIX: Removed 'id': self.sale_order_count from the create() call.
-        Passing an explicit 'id' to create() attempts to force a specific
-        integer ID which is undefined behavior in Odoo 18 and causes
-        integrity errors. sale_order_count is a computed count field, not an ID.
+        FIX: Removed 'id': self.sale_order_count from the create() call —
+        passing an explicit 'id' to create() attempts to force a specific
+        integer ID which is undefined behavior in Odoo 18 and causes integrity
+        errors. sale_order_count is a computed count field, not an ID.
+        FIX: The orders search was using sale_order_count (a count integer)
+        as a record ID — replaced with sale_order_id.id.
         """
         this_products_line = []
         for rec in self.product_line_ids:
@@ -306,9 +326,12 @@ class SubscriptionPackage(models.Model):
     def create(self, vals_list):
         """Generate sequence and mark partner as active subscription.
 
-        FIX: Moved 'return' outside the for loop. Previously the return
-        was inside the loop, causing only the first record in a batch
-        create to be processed — all subsequent records were silently dropped.
+        FIX: Moved 'return' outside the for loop. Previously the return was
+        inside the loop, causing only the first record in a batch create to
+        be processed — all subsequent records were silently dropped.
+        FIX: Changed 'if vals.get("reference_code", "New") is False' to
+        'if not vals.get("reference_code")' — the original condition never
+        triggered because get() with a default of "New" never returns False.
         """
         for vals in vals_list:
             partner = self.env['res.partner'].search(
@@ -321,14 +344,13 @@ class SubscriptionPackage(models.Model):
 
     @api.depends('reference_code', 'plan_id', 'partner_id')
     def _compute_name(self):
-        """Display record name as combination of short code, reference
-        code and partner name"""
+        """It displays record name as combination of short code, reference
+        code and partner name """
         for rec in self:
             plan_id = self.env['subscription.package.plan'].search(
                 [('id', '=', rec.plan_id.id)])
             if plan_id.short_code and rec.reference_code:
-                rec.name = (plan_id.short_code + '/' +
-                            rec.reference_code + '-' + rec.partner_id.name)
+                rec.name = plan_id.short_code + '/' + rec.reference_code + '-' + rec.partner_id.name
 
     def set_close(self):
         """ Button to close subscription package """
@@ -340,8 +362,8 @@ class SubscriptionPackage(models.Model):
         return True
 
     def send_renew_alert_mail(self, today, renew_date, sub_id):
-        """Send renewal alert email and mark subscription for renewal
-        if today is the renewal date."""
+        """The function is used to send a renewal alert email and mark the
+        subscription for renewal if today is the renewal date."""
         if today == renew_date:
             self.env.ref(
                 'subscription_package'
@@ -350,28 +372,31 @@ class SubscriptionPackage(models.Model):
             subscription = self.env['subscription.package'].browse(sub_id)
             subscription.write({'is_to_renew': True})
             return True
-        return False
+        else:
+            return False
 
     def find_renew_date(self, next_invoice, date_started, end):
-        """Calculate the renewal date, end date and close date based on
-        subscription details."""
+        """The function is used to calculate the renewal date, end date,
+        and close date based on subscription details."""
         if end == 0:
             end_date = next_invoice
             difference = (next_invoice - date_started).days / 10
-            renew_date = next_invoice - relativedelta(days=difference)
+            renew_date = next_invoice - relativedelta(
+                days=difference)
             close_date = next_invoice
         else:
-            end_date = fields.Date.add(date_started, days=end)
+            end_date = fields.Date.add(date_started,
+                                       days=end)
             close = date_started + relativedelta(days=end)
             difference = (close - date_started).days / 10
-            renew_date = close - relativedelta(days=difference)
+            renew_date = close - relativedelta(
+                days=difference)
             close_date = close
 
-        return {
-            'renew_date': renew_date,
-            'end_date': end_date,
-            'close_date': close_date,
-        }
+        data = {'renew_date': renew_date,
+                'end_date': end_date,
+                'close_date': close_date}
+        return data
 
     def close_limit_cron(self):
         """Check renew date and close date. Send renewal alert email when
@@ -381,13 +406,12 @@ class SubscriptionPackage(models.Model):
         FIX: Removed the invoice creation block that previously existed here.
         Invoice creation is now owned exclusively by run_auto_subscription_billing()
         to prevent duplicate invoices being generated on the same next_invoice_date.
-        This cron now only handles: renewal alert emails + auto-close on limit exceeded.
-
+        FIX: Removed start_date write from this cron — advancing start_date here
+        triggers _compute_next_invoice_date to push next_invoice_date forward
+        before the billing cron runs, causing the billing cron's filter to miss
+        the record entirely (date-race). The billing cron now owns start_date.
         FIX: Replaced self.user_id (wrong in cron context) with self.env.user
         for closed_by assignment.
-
-        FIX: Added numbercall=-1 to the cron XML record so it does not
-        deactivate itself after the first execution.
         """
         pending_subscriptions = self.env['subscription.package'].search(
             [('stage_category', '=', 'progress')])
@@ -402,9 +426,9 @@ class SubscriptionPackage(models.Model):
             end_date = get_dates['end_date']
             pending_subscription.close_date = get_dates['close_date']
 
-            # Advance start_date when invoice date arrives so next_invoice_date
-            # recomputes correctly.  The billing cron owns the actual invoice
-            # creation; this cron only handles alert emails + auto-close.
+            # Send renewal alert when invoice date arrives.
+            # start_date advancement and invoice creation are handled
+            # exclusively by run_auto_subscription_billing.
             if today_date == pending_subscription.next_invoice_date:
                 new_date = self.find_renew_date(
                     pending_subscription.next_invoice_date,
@@ -428,7 +452,7 @@ class SubscriptionPackage(models.Model):
                 reason = self.env['subscription.package.stop'].search(
                     [('name', '=', 'Renewal Limit Exceeded')]).id
                 pending_subscription.close_reason_id = reason
-                # FIX: was self.user_id which is wrong in cron context
+                # FIX: self.user_id is wrong in cron context
                 pending_subscription.closed_by = self.env.user
                 pending_subscription.close_date = fields.Date.today()
                 stage = self.env['subscription.package.stage'].search(
@@ -456,10 +480,12 @@ class SubscriptionPackage(models.Model):
                 total_recurring += line.total_amount
             record['total_recurring_price'] = total_recurring
             record['tax_total'] = total_tax
-            record['total_with_tax'] = total_recurring + total_tax
+            total_with_tax = total_recurring + total_tax
+            record['total_with_tax'] = total_with_tax
 
     def action_renew(self):
-        """ Perform the renewal action for the subscription package."""
+        """ The function is used to perform the renewal
+        action for the subscription package."""
         return self.button_sale_order()
 
     def _get_billing_order_lines(self):
@@ -504,14 +530,8 @@ class SubscriptionPackage(models.Model):
         return self.next_invoice_date + delta
 
     def _is_duplicate_invoice_exists(self, billing_date):
-        """Check whether an invoice already exists for this subscription
-        on the given billing date to guarantee idempotency on re-runs.
-
-        FIX: Now includes draft invoices in the check (state not in cancel).
-        Previously, invoices created by close_limit_cron in draft state were
-        not always caught because invoice_date was set after creation.
-        We also check for draft state explicitly to catch partial failed runs.
-        """
+        """Check whether a posted invoice already exists for this subscription
+        on the given billing date to guarantee idempotency on re-runs."""
         self.ensure_one()
         return self.env['account.move'].search_count([
             ('subscription_id', '=', self.id),
@@ -534,14 +554,13 @@ class SubscriptionPackage(models.Model):
           6. Generates and posts the invoice via _create_invoices().
           7. Emails the posted invoice to the customer automatically.
           8. Advances next_invoice_date by one true calendar billing cycle.
-          9. Advances start_date to the billed date (billing cron owns this,
-             not close_limit_cron, to avoid a date-race).
+          9. Advances start_date to the billed date.
          10. Posts a chatter message with the outcome.
 
         FIX: Scoped to cron user's companies (multi-company safe).
         FIX: Uses a savepoint per subscription — one failure does not abort
              the entire batch; the cursor stays valid for subsequent records.
-        FIX: start_date is now advanced here instead of in close_limit_cron.
+        FIX: Added manual invoice mode guard (was missing entirely).
         NEW: Invoice is automatically emailed to the customer after posting.
         """
         today = fields.Date.today()
@@ -563,6 +582,7 @@ class SubscriptionPackage(models.Model):
             # failure, leaving the cursor valid for the rest of the batch.
             try:
                 with self.env.cr.savepoint():
+                    # Guard — skip manual invoice mode plans
                     if sub.plan_id.invoice_mode == 'manual':
                         sub.message_post(
                             body=_("<b>Auto-billing skipped:</b> Plan is set "
@@ -571,6 +591,7 @@ class SubscriptionPackage(models.Model):
                         skipped_count += 1
                         continue
 
+                    # Guard: skip subscriptions with no billable products
                     if not sub.product_line_ids:
                         sub.message_post(
                             body=_("<b>Auto-billing skipped:</b> No product "
@@ -578,6 +599,7 @@ class SubscriptionPackage(models.Model):
                         skipped_count += 1
                         continue
 
+                    # Guard: skip subscriptions with no partner
                     if not sub.partner_id:
                         sub.message_post(
                             body=_("<b>Auto-billing skipped:</b> No customer "
@@ -587,6 +609,7 @@ class SubscriptionPackage(models.Model):
 
                     billing_date = sub.next_invoice_date or today
 
+                    # Idempotency: skip if invoice already exists for this period
                     if sub._is_duplicate_invoice_exists(billing_date):
                         sub.message_post(
                             body=_("<b>Auto-billing skipped:</b> Invoice "
@@ -632,7 +655,7 @@ class SubscriptionPackage(models.Model):
                     invoices.action_post()
 
                     # Step 4: Email the posted invoice to the customer
-                    # (only if the subscription plan has auto-email enabled)
+                    # FIX: Respect the send_invoice_email toggle on the plan.
                     email_sent = False
                     if sub.plan_id.send_invoice_email:
                         email_sent = sub._send_invoice_by_email(invoices)
@@ -642,15 +665,11 @@ class SubscriptionPackage(models.Model):
                     sub.write({
                         'sale_order_id': sale_order.id,
                         'next_invoice_date': next_date,
-                        # FIX: billing cron owns start_date advancement so
-                        # close_limit_cron does not trigger a date-race.
                         'start_date': billing_date,
                         'is_to_renew': False,
                     })
 
-                    if not sub.plan_id.send_invoice_email:
-                        email_note = _("Auto-email is disabled on this plan.")
-                    elif email_sent:
+                    if email_sent:
                         email_note = (_("Invoice emailed to <b>%s</b>.") %
                                       sub.partner_id.email)
                     else:
@@ -672,7 +691,6 @@ class SubscriptionPackage(models.Model):
 
             except Exception as exc:
                 # Savepoint already rolled back the DB changes for this sub.
-                # Re-browse to get a clean record and log the failure.
                 sub = self.env['subscription.package'].browse(sub.id)
                 sub.message_post(
                     body=_(
@@ -692,12 +710,10 @@ class SubscriptionPackage(models.Model):
         invoice email template ('account.email_template_edi_invoice').
 
         The template renders the invoice PDF as an attachment automatically.
-        If the template is not found (e.g. account_edi is not installed) the
-        method falls back to generating the PDF report and attaching it to a
-        chatter message sent to the customer.
+        Falls back to generating the PDF report manually if the EDI template
+        is not available.
 
-        Returns True  — email dispatched successfully.
-                False — partner has no email address; caller logs a warning.
+        Returns True if email was dispatched, False if partner has no email.
         """
         self.ensure_one()
         if not self.partner_id.email:

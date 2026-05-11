@@ -41,27 +41,35 @@ class SaleOrder(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """ It displays subscription in sale order """
+        """It displays subscription in sale order.
+
+        FIX: return is now OUTSIDE the loop so all records in a batch create
+        are processed, not just the first one.
+        """
         for vals in vals_list:
             if vals.get('is_subscription'):
                 vals.update({
                     'is_subscription': True,
                     'subscription_id': vals.get('subscription_id'),
                 })
-        # FIX: return is now OUTSIDE the loop so all records in a
-        # batch create are processed, not just the first one.
         return super().create(vals_list)
 
     @api.depends('subscription_id')
     def _compute_reference_code(self):
-        """ It displays subscription reference code """
+        """It displays subscription reference code.
+
+        FIX: Added 'for rec in self' for correct batch handling.
+        FIX: Removed int() cast on subscription_id.id — Many2one .id is
+        already an int or False; int(False) raises TypeError.
+        """
         for rec in self:
             rec.sub_reference = self.env['subscription.package'].search(
-                [('id', '=', int(rec.subscription_id.id))]).reference_code
+                [('id', '=', rec.subscription_id.id)]).reference_code
 
     def action_confirm(self):
         """ It Changed the stage, to renew, start date for subscription
         package based on sale order confirm """
+
         res = super().action_confirm()
         sale_order = self.subscription_id.sale_order_id
         so_state = self.search([('id', '=', sale_order.id)]).state
@@ -73,9 +81,13 @@ class SaleOrder(models.Model):
             self.subscription_id.write(values)
         return res
 
-    @api.depends('subscription_count')
     def _compute_subscription_count(self):
-        """Compute count of subscriptions associated with the sale order."""
+        """Compute count of subscriptions associated with the sale order.
+
+        FIX: Removed @api.depends('subscription_count') — a field cannot
+        depend on itself (infinite recompute loop).
+        FIX: Added 'for rec in self' for correct batch handling.
+        """
         for rec in self:
             subscription_count = self.env[
                 'subscription.package'].sudo().search_count(

@@ -23,7 +23,7 @@ from odoo import api, fields, models
 
 
 class AccountMove(models.Model):
-    """Inherited account move model"""
+    """Inherited sale order model"""
     _inherit = "account.move"
 
     is_subscription = fields.Boolean(string='Is Subscription', default=False,
@@ -39,6 +39,8 @@ class AccountMove(models.Model):
         FIX: Added guard so that if subscription_id is already present in vals
         (set by the auto-billing cron), we skip the lookup entirely. This
         prevents the two write paths from conflicting with each other.
+        FIX: Was updating vals_list[0] unconditionally instead of the current
+        rec — broken for any batch create beyond the first record.
         """
         for rec in vals_list:
             # Skip if subscription_id already set (e.g. by auto-billing cron)
