@@ -5,8 +5,8 @@
     "author": "Custom",
     "depends": [
         "helpdesk",
-        "website_helpdesk",
-        "signup_club_type",          # reuses res.partner club_type + rotary_org_id
+        "odoo_website_helpdesk",
+        "signup_club_type",
     ],
     "data": [
         "views/helpdesk_ticket_form.xml",
