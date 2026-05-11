@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!--
+    Inject "Program Type" and "Club Name" dropdowns into the default
+    Odoo 18 Helpdesk website form (website_helpdesk.ticket_submit_form).
+
+    Both <select> elements are left empty on page load.
+    helpdesk_club_picker.js fills them via JSON-RPC after the page loads.
+
+    The hidden <input name="program_type"> and <input name="club_id"> carry
+    the selected values when the form is submitted so the controller can
+    write them onto the helpdesk.ticket record.
+  -->
+
+  <template
+    id="helpdesk_ticket_program_club_fields"
+    inherit_id="website_helpdesk.ticket_submit_form"
+    name="Helpdesk – Program Type &amp; Club Name">
+
+    <!--
+      Odoo 18 helpdesk form wraps each field in a <div class="mb-3"> (Bootstrap 5).
+      We insert our two blocks BEFORE the submit button row.
+      Adjust the xpath if your theme uses a different structure.
+    -->
+    <xpath expr="//div[hasclass('s_website_form_submit')]" position="before">
+
+      <!-- ── Field 1: Program Type ─────────────────────────────────── -->
+      <div class="mb-3 s_website_form_field">
+        <label for="helpdesk_program_type" class="col-form-label">
+          Program Type
+          <span class="s_website_form_mark"> *</span>
+        </label>
+        <select
+          id="helpdesk_program_type"
+          name="program_type"
+          class="form-select"
+          required="required">
+          <option value="">-- Select Program Type --</option>
+          <!--
+            Options are populated dynamically by JS (helpdesk_club_picker.js).
+            Server-side fallback: render selection from res.partner.club_type.
+          -->
+          <t t-set="club_types"
+             t-value="(env['res.partner']._fields.get('club_type') and
+                       env['res.partner']._fields['club_type'].selection) or []"/>
+          <t t-foreach="club_types" t-as="opt">
+            <option t-att-value="opt[0]">
+              <t t-esc="opt[1]"/>
+            </option>
+          </t>
+        </select>
+      </div>
+
+      <!-- ── Field 2: Club Name ────────────────────────────────────── -->
+      <div class="mb-3 s_website_form_field" id="helpdesk_club_wrap">
+        <label for="helpdesk_club_id" class="col-form-label">
+          Club Name
+          <span class="s_website_form_mark"> *</span>
+        </label>
+        <!--
+          The search <input> is injected here by JS (above the <select>).
+          It filters the dropdown client-side without extra network calls.
+        -->
+        <select
+          id="helpdesk_club_id"
+          name="ticket_club_id"
+          class="form-select"
+          required="required">
+          <option value="">-- Select Program Type first --</option>
+        </select>
+      </div>
+
+    </xpath>
+  </template>
+
+
+  <!--
+    Helpdesk ticket BACKEND form view — show the two new fields
+    in the "Other Info" tab so agents can also set / change them.
+  -->
+  <record id="helpdesk_ticket_view_form_program_club" model="ir.ui.view">
+    <field name="name">helpdesk.ticket.form.program.club</field>
+    <field name="model">helpdesk.ticket</field>
+    <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+    <field name="arch" type="xml">
+      <!-- Insert after the "team_id" field in the main form -->
+      <xpath expr="//field[@name='team_id']" position="after">
+        <field name="program_type" optional="show"/>
+        <field name="ticket_club_id" optional="show"/>
+      </xpath>
+    </field>
+  </record>
+
+</odoo>
