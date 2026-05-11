@@ -633,8 +633,6 @@ class SubscriptionPackage(models.Model):
                         'subscription_id': sub.id,
                         'company_id': sub.company_id.id,
                         'user_id': sub.user_id.id or self.env.uid,
-                        'analytic_account_id': (
-                            sub.analytic_account_id.id or False),
                         'order_line': order_lines,
                     })
                     sale_order.action_confirm()
