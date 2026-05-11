@@ -1,14 +1,15 @@
 {
     "name": "Helpdesk – Program Type & Club Fields",
     "version": "18.0.1.0.0",
-    "summary": "Adds Program Type and Club Name dropdowns (DB-driven, dynamic) to the Helpdesk website form",
+    "summary": "Standalone: adds Program Type and Club Name dropdowns to the Helpdesk website form",
     "author": "Custom",
     "depends": [
         "helpdesk",
-        "odoo_website_helpdesk",
-        "signup_club_type",
+        "website",
     ],
     "data": [
+        "security/ir.model.access.csv",
+        "views/program_type_menu.xml",
         "views/helpdesk_ticket_form.xml",
     ],
     "assets": {

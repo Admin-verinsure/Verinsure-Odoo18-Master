@@ -1,185 +1,217 @@
 /** @odoo-module **/
 /**
- * helpdesk_club_picker.js
+ * helpdesk_club_picker.js  — fully standalone
  *
- * Adds dynamic Program Type + Club Name behaviour to the Odoo 18
- * default Helpdesk website form (/helpdesk/new or embedded form).
+ * Injects Program Type + Club Name dropdowns into the Odoo 18
+ * s_website_form-based helpdesk page via DOM manipulation.
+ * No QWeb template inheritance needed.
  *
- * Behaviour:
- *  1. On page load: populate Program Type dropdown from DB via JSON-RPC.
- *  2. When user selects a Program Type: fetch matching clubs and fill
- *     the Club Name dropdown.
- *  3. Club Name dropdown has a live search box above it that filters
- *     results client-side (and re-fetches if list is large).
+ * Endpoints (standalone, no signup_club_type dependency):
+ *   POST /helpdesk/program_types     → [{id, name}, …]
+ *   POST /helpdesk/clubs_by_program  → [{id, name}, …]  (filtered by program_type_id)
  */
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
+// ─── RPC ─────────────────────────────────────────────────────────────────────
 function rpc(route, params = {}) {
-  return fetch(route, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify({ jsonrpc: "2.0", method: "call", id: 1, params }),
-  })
-    .then((r) => r.json())
-    .then((d) => {
-      if (d.error) throw new Error(d.error.data?.message || "RPC error");
-      return d.result;
+    return fetch(route, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ jsonrpc: "2.0", method: "call", id: 1, params }),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) throw new Error(d.error.data?.message || "RPC error");
+        return d.result;
     });
 }
 
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  Object.entries(attrs).forEach(([k, v]) => {
-    if (k === "class") node.className = v;
-    else if (k.startsWith("on"))
-      node.addEventListener(k.slice(2), v);
-    else node.setAttribute(k, v);
-  });
-  children.forEach((c) =>
-    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c)
-  );
-  return node;
+// ─── DOM helpers ─────────────────────────────────────────────────────────────
+function makeOption(value, text) {
+    const o = document.createElement("option");
+    o.value = value ?? "";
+    o.textContent = text ?? "";
+    return o;
 }
 
-function optionEl(value, text) {
-  const o = document.createElement("option");
-  o.value = value ?? "";
-  o.textContent = text ?? "";
-  return o;
+function makeSelect(id, name) {
+    const s = document.createElement("select");
+    s.id = id;
+    s.name = name;
+    s.className = "form-select s_website_form_input";
+    s.required = true;
+    return s;
 }
 
-// ─── state ──────────────────────────────────────────────────────────────────
+function makeFormRow(labelText, ...inputEls) {
+    const wrap = document.createElement("div");
+    wrap.className = "mb-3 s_website_form_field s_website_form_custom s_website_form_required";
+    wrap.style.display = "flex";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.alignItems = "center";
 
-let allClubs = [];   // full list for current program type (for client search)
+    const lbl = document.createElement("label");
+    lbl.className = "col-form-label s_website_form_label";
+    lbl.style.width = "200px";
+    lbl.style.minWidth = "200px";
+    lbl.innerHTML = `${labelText} <span class="s_website_form_mark">*</span>`;
 
-// ─── Club dropdown helpers ───────────────────────────────────────────────────
+    const col = document.createElement("div");
+    col.className = "col-lg";
+    inputEls.forEach(el => col.appendChild(el));
 
-function renderClubs(clubSel, clubs) {
-  clubSel.replaceChildren(
-    ...clubs.map((c) => optionEl(String(c.id), c.name))
-  );
+    wrap.appendChild(lbl);
+    wrap.appendChild(col);
+    return wrap;
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allClubs = [];
+
+// ─── Club loading ─────────────────────────────────────────────────────────────
+async function loadClubs(programTypeId, clubSel, searchInp) {
+    allClubs = [];
+    clubSel.replaceChildren(makeOption("", "-- Select Program Type first --"));
+    if (searchInp) searchInp.value = "";
+
+    if (!programTypeId) return;
+
+    clubSel.replaceChildren(makeOption("", "Loading…"));
+
+    try {
+        const clubs = await rpc("/helpdesk/clubs_by_program", {
+            program_type_id: parseInt(programTypeId),
+        });
+        allClubs = clubs || [];
+
+        if (!allClubs.length) {
+            clubSel.replaceChildren(makeOption("", "-- No clubs found for this program --"));
+            return;
+        }
+        clubSel.replaceChildren(
+            makeOption("", "-- Select Club --"),
+            ...allClubs.map(c => makeOption(String(c.id), c.name))
+        );
+    } catch (e) {
+        console.error("[helpdesk_club_picker] club fetch:", e);
+        clubSel.replaceChildren(makeOption("", "-- Error loading clubs --"));
+    }
 }
 
 function filterClubs(clubSel, query) {
-  const q = query.toLowerCase().trim();
-  const filtered = q
-    ? allClubs.filter((c) => c.name.toLowerCase().includes(q))
-    : allClubs;
-
-  if (!filtered.length) {
-    clubSel.replaceChildren(optionEl("", "-- No results --"));
-  } else {
-    renderClubs(clubSel, filtered);
-  }
+    const q = query.toLowerCase().trim();
+    const list = q ? allClubs.filter(c => c.name.toLowerCase().includes(q)) : allClubs;
+    clubSel.replaceChildren(
+        makeOption("", list.length ? "-- Select Club --" : "-- No results --"),
+        ...list.map(c => makeOption(String(c.id), c.name))
+    );
 }
 
-async function loadClubs(programType, clubSel, searchInput) {
-  if (!programType) {
-    allClubs = [];
-    clubSel.replaceChildren(optionEl("", "-- Select Program Type first --"));
-    if (searchInput) searchInput.value = "";
-    return;
-  }
+// ─── Program Type loading ─────────────────────────────────────────────────────
+async function loadProgramTypes(typeSel) {
+    typeSel.replaceChildren(makeOption("", "Loading…"));
+    try {
+        const types = await rpc("/helpdesk/program_types");
+        if (!types || !types.length) {
+            typeSel.replaceChildren(makeOption("", "-- No program types found --"));
+            console.warn("[helpdesk_club_picker] No program types in DB. Add some via Helpdesk > Configuration > Program Types.");
+            return;
+        }
+        typeSel.replaceChildren(
+            makeOption("", "-- Select Program Type --"),
+            ...types.map(t => makeOption(String(t.id), t.name))
+        );
+    } catch (e) {
+        console.error("[helpdesk_club_picker] program type fetch:", e);
+        typeSel.replaceChildren(makeOption("", "-- Error loading program types --"));
+    }
+}
 
-  clubSel.replaceChildren(optionEl("", "Loading…"));
-  if (searchInput) searchInput.value = "";
+// ─── Find the helpdesk form on page ──────────────────────────────────────────
+function findHelpdeskForm() {
+    // 1. Explicit data-model attribute (most reliable)
+    let form = document.querySelector('form[data-model="helpdesk.ticket"]');
+    if (form) return form;
 
-  try {
-    const clubs = await rpc("/helpdesk/clubs_by_program", {
-      club_type: programType,
-    });
-    allClubs = clubs || [];
-
-    if (!allClubs.length) {
-      clubSel.replaceChildren(
-        optionEl("", "-- No clubs found for this program --")
-      );
-      return;
+    // 2. s_website_form section whose form action contains "helpdesk"
+    for (const sec of document.querySelectorAll("section.s_website_form")) {
+        const f = sec.querySelector("form");
+        if (f && (f.action || "").toLowerCase().includes("helpdesk")) return f;
     }
 
-    // Blank first option so user must actively choose
-    clubSel.replaceChildren(
-      optionEl("", "-- Select Club --"),
-      ...allClubs.map((c) => optionEl(String(c.id), c.name))
+    // 3. Any s_website_form on a /helpdesk/* page
+    if (window.location.pathname.toLowerCase().includes("helpdesk")) {
+        const f = document.querySelector("section.s_website_form form");
+        if (f) return f;
+    }
+
+    return null;
+}
+
+// ─── Find where to insert (just before submit button row) ─────────────────────
+function findInsertBefore(form) {
+    const btn = form.querySelector("button[type='submit'], .s_website_form_submit");
+    if (!btn) return null;
+    // Walk up to the direct child of form
+    let el = btn;
+    while (el && el.parentElement !== form) el = el.parentElement;
+    return el || btn;
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+async function injectFields() {
+    if (document.getElementById("hd_program_type_id")) return; // already injected
+
+    const form = findHelpdeskForm();
+    if (!form) {
+        console.warn("[helpdesk_club_picker] Helpdesk form not found on this page.");
+        return;
+    }
+
+    const insertBefore = findInsertBefore(form);
+    if (!insertBefore) {
+        console.warn("[helpdesk_club_picker] Submit button not found — appending to form.");
+    }
+
+    // ── Program Type ──────────────────────────────────────────────────────
+    const typeSel = makeSelect("hd_program_type_id", "hd_program_type_id");
+    const typeRow = makeFormRow("Program Type", typeSel);
+
+    // ── Club Name (search + select) ───────────────────────────────────────
+    const searchInp = document.createElement("input");
+    searchInp.type = "text";
+    searchInp.className = "form-control mb-1";
+    searchInp.placeholder = "Search club…";
+    searchInp.autocomplete = "off";
+    searchInp.addEventListener("input", () => filterClubs(clubSel, searchInp.value));
+
+    const clubSel = makeSelect("hd_club_id", "hd_club_id");
+    clubSel.replaceChildren(makeOption("", "-- Select Program Type first --"));
+    const clubRow = makeFormRow("Club Name", searchInp, clubSel);
+
+    // ── Inject ────────────────────────────────────────────────────────────
+    if (insertBefore) {
+        form.insertBefore(typeRow, insertBefore);
+        form.insertBefore(clubRow, insertBefore);
+    } else {
+        form.appendChild(typeRow);
+        form.appendChild(clubRow);
+    }
+
+    // ── Wire up events ────────────────────────────────────────────────────
+    typeSel.addEventListener("change", ev =>
+        loadClubs(ev.target.value, clubSel, searchInp)
     );
-  } catch (e) {
-    console.error("Helpdesk club fetch error:", e);
-    clubSel.replaceChildren(optionEl("", "-- Error loading clubs --"));
-  }
+
+    // ── Load data ─────────────────────────────────────────────────────────
+    await loadProgramTypes(typeSel);
+
+    console.log("[helpdesk_club_picker] Fields injected successfully.");
 }
 
-// ─── Program Type dropdown ───────────────────────────────────────────────────
-
-async function loadProgramTypes(typeSel) {
-  try {
-    const types = await rpc("/helpdesk/program_types");
-    if (!types || !types.length) return;
-
-    typeSel.replaceChildren(
-      optionEl("", "-- Select Program Type --"),
-      ...types.map((t) => optionEl(t.key, t.label))
-    );
-  } catch (e) {
-    console.error("Helpdesk program type fetch error:", e);
-  }
-}
-
-// ─── Search input injection ──────────────────────────────────────────────────
-
-function injectSearchBox(clubWrap, clubSel) {
-  const searchInput = el("input", {
-    type: "text",
-    class: "form-control form-control-sm mb-1",
-    placeholder: "Search club…",
-    autocomplete: "off",
-    id: "club_search",
-  });
-
-  searchInput.addEventListener("input", () =>
-    filterClubs(clubSel, searchInput.value)
-  );
-
-  // Insert search box just before the <select>
-  clubWrap.insertBefore(searchInput, clubSel);
-  return searchInput;
-}
-
-// ─── Bootstrap ──────────────────────────────────────────────────────────────
-
-async function init() {
-  // ── Locate the Helpdesk form fields ──────────────────────────────────────
-  // Odoo 18 helpdesk website form uses name attributes on inputs/selects.
-  // We look for our injected select names (set via XML template override).
-  const typeSel  = document.getElementById("helpdesk_program_type");
-  const clubSel  = document.getElementById("helpdesk_club_id");
-
-  if (!typeSel || !clubSel) return;   // not on a helpdesk form page
-
-  const clubWrap = clubSel.parentElement;
-
-  // Inject search box above the Club select
-  const searchInput = injectSearchBox(clubWrap, clubSel);
-
-  // Load program types from DB
-  await loadProgramTypes(typeSel);
-
-  // If there's already a value (e.g. form re-render after validation error),
-  // pre-load clubs for that program type
-  if (typeSel.value) {
-    await loadClubs(typeSel.value, clubSel, searchInput);
-  }
-
-  // React to Program Type changes
-  typeSel.addEventListener("change", (ev) =>
-    loadClubs(ev.target.value, clubSel, searchInput)
-  );
-}
-
-// Run after DOM is ready
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", injectFields);
 } else {
-  init();
+    injectFields();
 }

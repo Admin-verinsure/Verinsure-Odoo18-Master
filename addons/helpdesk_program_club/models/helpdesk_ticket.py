@@ -2,62 +2,57 @@
 from odoo import api, fields, models
 
 
+class ResPartner(models.Model):
+    """
+    Add a program type link to res.partner so clubs can be
+    associated with a program type independently of signup_club_type.
+    """
+    _inherit = "res.partner"
+
+    helpdesk_program_type_id = fields.Many2one(
+        comodel_name="helpdesk.program.type",
+        string="Program Type (Helpdesk)",
+        index=True,
+        ondelete="set null",
+    )
+
+
 class HelpdeskTicket(models.Model):
     """
     Extend helpdesk.ticket with:
-      - program_type   : Selection mirroring res.partner.club_type
-      - ticket_club_id : Many2one to the matching res.partner club record
-
-    The website form POSTs these as plain string fields.
-    We override create() so that even if the third-party controller
-    passes them as strings (club_type key + partner id), they are
-    coerced and written correctly.
+      - hd_program_type_id : Many2one to helpdesk.program.type
+      - hd_club_id         : Many2one to res.partner (filtered by program type)
     """
     _inherit = "helpdesk.ticket"
 
-    # ── Field 1: Program Type ────────────────────────────────────────────
-    program_type = fields.Selection(
-        selection=lambda self: self._get_club_type_selection(),
+    hd_program_type_id = fields.Many2one(
+        comodel_name="helpdesk.program.type",
         string="Program Type",
         tracking=True,
         index=True,
+        ondelete="set null",
     )
 
-    # ── Field 2: Club Name ───────────────────────────────────────────────
-    ticket_club_id = fields.Many2one(
+    hd_club_id = fields.Many2one(
         comodel_name="res.partner",
         string="Club Name",
-        domain="[('club_type', '=', program_type), ('active', '=', True)]",
+        domain="[('helpdesk_program_type_id', '=', hd_program_type_id), ('active', '=', True)]",
         tracking=True,
         ondelete="set null",
     )
 
-    # ── Helper ───────────────────────────────────────────────────────────
-    def _get_club_type_selection(self):
-        """Reuse the same selection list as res.partner.club_type."""
-        field = self.env["res.partner"]._fields.get("club_type")
-        if not field:
-            return []
-        sel = field.selection
-        if callable(sel):
-            return sel(self.env["res.partner"])
-        return sel or []
-
-    # ── create() hook – coerce website form string values ────────────────
     @api.model_create_multi
     def create(self, vals_list):
+        """
+        Coerce string values that arrive from the HTML form POST.
+        The s_website_form snippet sends all values as strings.
+        """
         for vals in vals_list:
-            # ticket_club_id may arrive as a string "42" from the HTML form
-            raw_club = vals.get("ticket_club_id")
-            if isinstance(raw_club, str):
-                try:
-                    vals["ticket_club_id"] = int(raw_club) if raw_club.strip() else False
-                except (ValueError, AttributeError):
-                    vals["ticket_club_id"] = False
-
-            # program_type should already be a string key, but sanitise
-            raw_type = vals.get("program_type")
-            if raw_type == "":
-                vals["program_type"] = False
-
+            for key in ("hd_program_type_id", "hd_club_id"):
+                raw = vals.get(key)
+                if isinstance(raw, str):
+                    try:
+                        vals[key] = int(raw) if raw.strip() else False
+                    except (ValueError, AttributeError):
+                        vals[key] = False
         return super().create(vals_list)
