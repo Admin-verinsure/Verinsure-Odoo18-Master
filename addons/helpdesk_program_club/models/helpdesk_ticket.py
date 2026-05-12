@@ -1,58 +1,34 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
-
-
-class ResPartner(models.Model):
-    """
-    Add a program type link to res.partner so clubs can be
-    associated with a program type independently of signup_club_type.
-    """
-    _inherit = "res.partner"
-
-    helpdesk_program_type_id = fields.Many2one(
-        comodel_name="helpdesk.program.type",
-        string="Program Type (Helpdesk)",
-        index=True,
-        ondelete="set null",
-    )
+from odoo import models, fields
 
 
 class HelpdeskTicket(models.Model):
     """
-    Extend helpdesk.ticket with:
-      - hd_program_type_id : Many2one to helpdesk.program.type
-      - hd_club_id         : Many2one to res.partner (filtered by program type)
+    Extend helpdesk.ticket with two custom fields:
+      - program_type  : stores the club_type selection key (e.g. 'rotary', 'interact')
+                        as a plain Char so it survives even if res.partner selection
+                        changes later.
+      - club_id       : Many2one to res.partner – the specific club the submitter
+                        belongs to.
+
+    Both fields are written by the website form controller override and are
+    shown in the backend ticket form via helpdesk_ticket_fields.xml.
     """
-    _inherit = "helpdesk.ticket"
+    _inherit = 'helpdesk.ticket'
 
-    hd_program_type_id = fields.Many2one(
-        comodel_name="helpdesk.program.type",
-        string="Program Type",
-        tracking=True,
-        index=True,
-        ondelete="set null",
+    program_type = fields.Char(
+        string='Program Type',
+        help='Program type selected by the submitter on the website form.',
     )
 
-    hd_club_id = fields.Many2one(
-        comodel_name="res.partner",
-        string="Club Name",
-        domain="[('helpdesk_program_type_id', '=', hd_program_type_id), ('active', '=', True)]",
-        tracking=True,
-        ondelete="set null",
+    club_id = fields.Many2one(
+        comodel_name='res.partner',
+        string='Club',
+        ondelete='set null',
+        help='Club selected by the submitter on the website form.',
     )
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        """
-        Coerce string values that arrive from the HTML form POST.
-        The s_website_form snippet sends all values as strings.
-        """
-        for vals in vals_list:
-            for key in ("hd_program_type_id", "hd_club_id"):
-                raw = vals.get(key)
-                if isinstance(raw, str):
-                    try:
-                        vals[key] = int(raw) if raw.strip() else False
-                    except (ValueError, AttributeError):
-                        vals[key] = False
-        return super().create(vals_list)
+    # ── Email template helper ────────────────────────────────────────────────
+    # The default website_helpdesk mail template uses ticket.description.
+    # We surface program_type and club_id there automatically by appending
+    # to description in the controller, so no template override is needed.

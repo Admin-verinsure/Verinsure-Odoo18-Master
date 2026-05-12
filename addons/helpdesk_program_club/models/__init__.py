@@ -1,2 +1,2 @@
-from . import program_type
+# -*- coding: utf-8 -*-
 from . import helpdesk_ticket

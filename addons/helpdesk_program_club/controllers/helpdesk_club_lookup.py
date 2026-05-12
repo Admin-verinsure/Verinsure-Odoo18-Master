@@ -1,61 +1,55 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import http
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 
 class HelpdeskClubLookup(http.Controller):
     """
-    Standalone JSON endpoints — no dependency on signup_club_type.
+    Public JSON endpoint that returns the list of active clubs
+    filtered by a given club_type (Program Type) value.
 
-      POST /helpdesk/program_types
-        → [{"id": 1, "name": "Rotary"}, …]  from helpdesk.program.type
+    Called by helpdesk_club_fill.js whenever the user changes
+    the Program Type <select> on the helpdesk webform.
 
-      POST /helpdesk/clubs_by_program
-        → params: { program_type_id: 1 }
-        → [{"id": 42, "name": "Rotary Club XYZ"}, …]  from res.partner
+    Route: POST /helpdesk/clubs_by_type
+    Payload (JSON-RPC 2.0):
+        { "params": { "club_type": "<selection_key>" } }
+    Response:
+        [ { "id": 123, "name": "Club Name" }, … ]
     """
 
     @http.route(
-        "/helpdesk/program_types",
-        type="json",
-        auth="public",
+        '/helpdesk/clubs_by_type',
+        type='json',
+        auth='public',
         csrf=False,
         website=True,
     )
-    def helpdesk_program_types(self, **kw):
-        types = request.env["helpdesk.program.type"].sudo().search_read(
-            [("active", "=", True)],
-            ["id", "name"],
-            order="name",
-        )
-        return types  # [{id, name}, …]
-
-    @http.route(
-        "/helpdesk/clubs_by_program",
-        type="json",
-        auth="public",
-        csrf=False,
-        website=True,
-    )
-    def helpdesk_clubs_by_program(self, program_type_id=None, search="", **kw):
-        if not program_type_id:
-            return []
-        try:
-            pt_id = int(program_type_id)
-        except (TypeError, ValueError):
+    def clubs_by_type(self, club_type=None, **kw):
+        if not club_type:
+            _logger.warning("helpdesk clubs_by_type: no club_type received")
             return []
 
         domain = [
-            ("helpdesk_program_type_id", "=", pt_id),
-            ("active", "=", True),
+            ('club_type', '=', club_type),
+            ('active', '=', True),
         ]
-        if search and search.strip():
-            domain.append(("name", "ilike", search.strip()))
 
-        partners = request.env["res.partner"].sudo().search_read(
-            domain,
-            ["id", "name"],
-            order="name",
-            limit=100,
-        )
-        return partners
+        try:
+            partners = request.env['res.partner'].sudo().search_read(
+                domain,
+                ['id', 'name'],
+                order='name',
+            )
+            _logger.info(
+                "helpdesk clubs_by_type: %s clubs for club_type=%s",
+                len(partners), club_type,
+            )
+            return partners   # already [{"id": N, "name": "…"}, …]
+        except Exception as exc:
+            request.env.cr.rollback()
+            _logger.exception("helpdesk clubs_by_type failed: %s", exc)
+            return []

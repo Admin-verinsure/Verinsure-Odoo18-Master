@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!--
+    ══════════════════════════════════════════════════════════════════
+    PROGRAM TYPE + CLUB DROPDOWNS  –  odoo_website_helpdesk ticket form
+    ══════════════════════════════════════════════════════════════════
+
+    inherit_id = "odoo_website_helpdesk.ticket_form"
+      Confirmed from shell:
+        id=6350 (your customised copy) shares key with id=2264 (base).
+        Odoo resolves inheritance against the key, so both are covered.
+
+    XPATH STRATEGY
+    ──────────────
+    The standard odoo_website_helpdesk ticket_form template renders a
+    <form> with individual field rows, ending with a submit <button
+    type="submit"> or a <div> wrapping it.
+
+    We target the submit button directly — safe across Odoo 16/17/18:
+      <button type="submit" …>
+
+    Our two fields are inserted BEFORE it, inside the same <div>/<form>.
+
+    If the submit button in your customised view (id=6350) has a
+    different wrapper, open /helpdesk_ticket, right-click the Send
+    button → Inspect, and adjust the xpath expr accordingly.
+    ══════════════════════════════════════════════════════════════════
+  -->
+
+  <template
+      id="helpdesk_page_add_program_club"
+      name="Helpdesk page: Program Type + Club"
+      inherit_id="odoo_website_helpdesk.ticket_form">
+
+    <!--
+      Insert our two fields immediately before the form submit button.
+      The standard ticket_form uses:
+        <button type="submit" class="btn btn-primary …">Send</button>
+      Wrapped in a div.  We go before the button itself so we're always
+      inside the <form> element regardless of surrounding markup.
+    -->
+    <xpath expr="//button[@type='submit']" position="before">
+
+      <!-- ── Program Type ──────────────────────────────────────────────── -->
+      <div class="mb-3">
+        <label for="helpdesk_program_type" class="col-form-label fw-bold">
+          Program Type <span class="text-danger">*</span>
+        </label>
+
+        <!--
+          Options are pulled live from the club_type Selection field on
+          res.partner — same technique as signup_club_type/signup_form.xml.
+          No hardcoding: adding a new program type in res.partner
+          automatically appears here.
+        -->
+        <t t-set="club_types"
+           t-value="(env['res.partner']._fields.get('club_type')
+                     and env['res.partner']._fields['club_type'].selection)
+                    or []"/>
+
+        <select name="helpdesk_program_type"
+                id="helpdesk_program_type"
+                class="form-select"
+                required="required">
+
+          <option value="">-- Select Program Type --</option>
+
+          <t t-foreach="club_types" t-as="opt">
+            <option
+                t-att-value="opt[0]"
+                t-att-selected="request.params.get('helpdesk_program_type') == opt[0] or None">
+              <t t-esc="opt[1]"/>
+            </option>
+          </t>
+
+        </select>
+      </div>
+      <!-- ──────────────────────────────────────────────────────────────── -->
+
+      <!-- ── Club ─────────────────────────────────────────────────────── -->
+      <div class="mb-3">
+        <label for="helpdesk_club_id" class="col-form-label fw-bold">
+          Club <span class="text-danger">*</span>
+        </label>
+
+        <!--
+          Server-side pre-fill on form re-post (e.g. validation error).
+          On a clean GET this renders just the placeholder; JS takes over.
+        -->
+        <t t-set="sel_program"
+           t-value="request.params.get('helpdesk_program_type', '')"/>
+
+        <t t-set="clubs"
+           t-value="sel_program
+                    and env['res.partner'].sudo().search(
+                          [('club_type', '=', sel_program), ('active', '=', True)],
+                          order='name')
+                    or env['res.partner'].browse([])"/>
+
+        <select name="helpdesk_club_id"
+                id="helpdesk_club_id"
+                class="form-select"
+                required="required">
+
+          <t t-if="not sel_program">
+            <option value="">-- Select Program Type first --</option>
+          </t>
+          <t t-if="sel_program and not clubs">
+            <option value="">-- No clubs found for this program --</option>
+          </t>
+          <t t-if="sel_program and clubs">
+            <option value="">-- Select Club --</option>
+            <t t-foreach="clubs" t-as="c">
+              <option
+                  t-att-value="c.id"
+                  t-att-selected="(request.params.get('helpdesk_club_id')
+                                   and int(request.params.get('helpdesk_club_id') or 0) == c.id)
+                                  or None">
+                <t t-esc="c.name"/>
+              </option>
+            </t>
+          </t>
+
+        </select>
+      </div>
+      <!-- ──────────────────────────────────────────────────────────────── -->
+
+    </xpath>
+  </template>
+
+</odoo>
