@@ -1,25 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
   <!--
-    Show Program Type and Club on the backend helpdesk ticket form
-    so agents can see what was submitted from the website.
-    Inserted after the "Customer" field which is always present.
+    Show Program Type and Club on the backend ticket form.
+    inherit_id points to odoo_website_helpdesk's ticket form view.
+    If this causes an error, remove this file from __manifest__.py data list
+    — it only affects the backend view, not the website form.
   -->
   <record id="helpdesk_ticket_form_program_club" model="ir.ui.view">
-    <field name="name">helpdesk.ticket.form.program.club</field>
-    <field name="model">helpdesk.ticket</field>
-    <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+    <field name="name">ticket.helpdesk.form.program.club</field>
+    <field name="model">ticket.helpdesk</field>
+    <field name="inherit_id" ref="odoo_website_helpdesk.ticket_form_view"/>
     <field name="arch" type="xml">
-
-      <!-- Insert after the partner_id (Customer) field -->
-      <xpath expr="//field[@name='partner_id']" position="after">
+      <xpath expr="//field[@name='description']" position="before">
         <field name="program_type" string="Program Type" readonly="1"/>
-        <field name="club_id"      string="Club"         readonly="1"
-               options="{'no_open': True, 'no_create': True}"/>
+        <field name="club_id"      string="Club"         readonly="1"/>
       </xpath>
-
     </field>
   </record>
-
 </odoo>
