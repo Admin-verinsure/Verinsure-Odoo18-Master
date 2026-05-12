@@ -14,7 +14,6 @@
         'base',
         'website',
         'helpdesk',
-        'website_helpdesk',
         'mail',
     ],
     'data': [
