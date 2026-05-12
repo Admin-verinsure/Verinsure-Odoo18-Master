@@ -8,9 +8,9 @@ _logger = logging.getLogger(__name__)
 
 class HelpdeskProgramTypeLookup(http.Controller):
     """
-    Returns the list of program types from res.partner.club_type selection.
-    Called by JS to populate the Program Type dropdown when the arch is
-    a static DB blob (no QWeb t-foreach at render time).
+    Returns program type options from res.partner.club_type selection field.
+    Called by JS on page load to populate the Program Type dropdown.
+    Same source as signup_club_type module.
     """
 
     @http.route(
@@ -21,10 +21,17 @@ class HelpdeskProgramTypeLookup(http.Controller):
         website=True,
     )
     def program_types(self, **kw):
-        field = request.env['res.partner']._fields.get('club_type')
-        if not field:
+        try:
+            field = request.env['res.partner']._fields.get('club_type')
+            if not field:
+                _logger.warning("program_types: club_type not found on res.partner")
+                return []
+            selection = field.selection
+            if callable(selection):
+                selection = selection(request.env['res.partner'])
+            result = [{'value': k, 'label': v} for k, v in (selection or [])]
+            _logger.info("program_types: returning %s options", len(result))
+            return result
+        except Exception as e:
+            _logger.exception("program_types error: %s", e)
             return []
-        selection = field.selection
-        if callable(selection):
-            selection = selection(request.env['res.partner'])
-        return [{'value': k, 'label': v} for k, v in (selection or [])]
