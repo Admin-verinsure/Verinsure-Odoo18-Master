@@ -3,113 +3,130 @@
 /**
  * helpdesk_club_fill.js
  *
- * Mirrors the pattern in rotary_signup/club_dynamic_fill.js:
- *  1. On page load, if a Program Type is already selected, populate the Club dropdown.
- *  2. On change of Program Type, call /helpdesk/clubs_by_type and refill the Club dropdown.
+ * Handles the two dynamic dropdowns on the helpdesk ticket form:
+ *   select#helpdesk_program_type  — Program Type
+ *   select#helpdesk_club_id       — Club (filtered by Program Type)
  *
- * Targets:
- *   select[name="helpdesk_program_type"]  – Program Type selector (static <select>)
- *   select[name="helpdesk_club_id"]       – Club selector (dynamically filled)
+ * IMPORTANT: Because the form arch is stored as a static DB blob (view id=6350,
+ * customised via website editor), the <select> elements are injected into the
+ * arch by the post_init_hook with EMPTY option lists.
+ *
+ * This script therefore does TWO things on page load:
+ *   1. Fetches Program Type options from /helpdesk/program_types and fills
+ *      the Program Type <select>.
+ *   2. If a Program Type is already selected (form re-post), fetches and fills
+ *      the Club <select> immediately.
+ *
+ * Then on every Program Type change it refills the Club dropdown via
+ * /helpdesk/clubs_by_type — same pattern as rotary_signup/club_dynamic_fill.js.
  */
 
-// ── helpers ─────────────────────────────────────────────────────────────────
+// ── JSON-RPC helper ──────────────────────────────────────────────────────────
 
-function optionEl(value, text) {
-  const o = document.createElement("option");
-  o.value = value != null ? String(value) : "";
-  o.textContent = text || "";
-  return o;
-}
-
-/**
- * Fetch clubs for a given club_type key via JSON-RPC.
- * Returns an array like [{ id: 123, name: "…" }, …].
- */
-async function fetchClubs(clubType) {
-  if (!clubType) return [];
+async function rpc(route, params) {
   try {
-    const res = await fetch("/helpdesk/clubs_by_type", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
+    const res = await fetch(route, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "call",
+        jsonrpc: '2.0',
+        method: 'call',
         id: Math.floor(Math.random() * 1e9),
-        params: { club_type: clubType },
+        params: params || {},
       }),
     });
     const data = await res.json();
     return (data && data.result) || [];
   } catch (err) {
-    console.error("[helpdesk_club_fill] fetchClubs error:", err);
+    console.error('[helpdesk_club_fill] RPC error on', route, err);
     return [];
   }
 }
 
-/**
- * Refill the Club <select> based on the chosen Program Type key.
- */
-async function fillClubs(clubType, clubSelect) {
-  if (!clubSelect) return;
+// ── DOM helper ───────────────────────────────────────────────────────────────
 
-  if (!clubType) {
-    clubSelect.replaceChildren(
-      optionEl("", "-- Select Program Type first --")
-    );
+function opt(value, text) {
+  const o = document.createElement('option');
+  o.value = String(value ?? '');
+  o.textContent = text || '';
+  return o;
+}
+
+// ── Fill Program Type dropdown ───────────────────────────────────────────────
+
+async function fillProgramTypes(typeSel) {
+  const types = await rpc('/helpdesk/program_types');
+
+  if (!types.length) {
+    typeSel.replaceChildren(opt('', '-- No program types found --'));
     return;
   }
 
-  // Show a loading placeholder while we wait
-  clubSelect.replaceChildren(optionEl("", "Loading…"));
-  clubSelect.disabled = true;
-
-  const clubs = await fetchClubs(clubType);
-
-  clubSelect.disabled = false;
-
-  if (!clubs.length) {
-    clubSelect.replaceChildren(
-      optionEl("", "-- No clubs found for this program --")
-    );
-    return;
-  }
-
-  clubSelect.replaceChildren(
-    optionEl("", "-- Select Club --"),
-    ...clubs.map((c) => optionEl(String(c.id), c.name))
+  typeSel.replaceChildren(
+    opt('', '-- Select Program Type --'),
+    ...types.map((t) => opt(t.value, t.label))
   );
 }
 
-// ── initialisation ────────────────────────────────────────────────────────────
+// ── Fill Club dropdown ───────────────────────────────────────────────────────
 
-function init() {
-  const typeSel = document.querySelector('select[name="helpdesk_program_type"]');
-  const clubSel = document.querySelector('select[name="helpdesk_club_id"]');
-
-  if (!typeSel || !clubSel) {
-    // Not on a page that has these fields – do nothing.
+async function fillClubs(clubType, clubSel) {
+  if (!clubType) {
+    clubSel.replaceChildren(opt('', '-- Select Program Type first --'));
     return;
   }
 
-  // If the page already has a value pre-selected (e.g., after a form error),
-  // populate clubs immediately.
-  if (typeSel.value) {
-    fillClubs(typeSel.value, clubSel);
-  } else {
-    clubSel.replaceChildren(
-      optionEl("", "-- Select Program Type first --")
-    );
+  clubSel.replaceChildren(opt('', 'Loading…'));
+  clubSel.disabled = true;
+
+  const clubs = await rpc('/helpdesk/clubs_by_type', { club_type: clubType });
+
+  clubSel.disabled = false;
+
+  if (!clubs.length) {
+    clubSel.replaceChildren(opt('', '-- No clubs found for this program --'));
+    return;
   }
 
-  // React to user changes
-  typeSel.addEventListener("change", (ev) => {
+  clubSel.replaceChildren(
+    opt('', '-- Select Club --'),
+    ...clubs.map((c) => opt(c.id, c.name))
+  );
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+async function init() {
+  const typeSel = document.querySelector('select[name="helpdesk_program_type"]');
+  const clubSel = document.querySelector('select[name="helpdesk_club_id"]');
+
+  if (!typeSel || !clubSel) return;   // not on this page
+
+  // Step 1: populate Program Type options from DB
+  await fillProgramTypes(typeSel);
+
+  // Step 2: if a value was pre-selected (form re-post after error), restore it
+  //         and immediately load the corresponding clubs
+  const preselected = typeSel.dataset.selected || '';
+  if (preselected) {
+    typeSel.value = preselected;
+  }
+
+  if (typeSel.value) {
+    await fillClubs(typeSel.value, clubSel);
+  } else {
+    clubSel.replaceChildren(opt('', '-- Select Program Type first --'));
+  }
+
+  // Step 3: react to user changes
+  typeSel.addEventListener('change', (ev) => {
     fillClubs(ev.target.value, clubSel);
   });
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
 }
