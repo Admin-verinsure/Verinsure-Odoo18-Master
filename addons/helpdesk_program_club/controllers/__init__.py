@@ -1,2 +1,3 @@
+# -*- coding: utf-8 -*-
 from . import helpdesk_club_lookup
-from . import helpdesk_submit
+from . import helpdesk_form
