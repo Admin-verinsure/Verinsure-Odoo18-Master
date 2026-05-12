@@ -3,28 +3,25 @@
 
   <!--
     ══════════════════════════════════════════════════════════════════
-    PROGRAM TYPE + CLUB DROPDOWNS  –  odoo_website_helpdesk ticket form
+    PROGRAM TYPE + CLUB DROPDOWNS — Helpdesk ticket form
     ══════════════════════════════════════════════════════════════════
 
-    inherit_id = "odoo_website_helpdesk.ticket_form"
-      Confirmed from shell:
-        id=6350 (your customised copy) shares key with id=2264 (base).
-        Odoo resolves inheritance against the key, so both are covered.
+    CONFIRMED FROM BROWSER INSPECTOR:
+      - data-oe-id="6350"              → the active view being rendered
+      - data-oe-field="arch"           → fields are stored in view arch (DB)
+      - Submit element:
+          <div class="s_website_form_submit …">
+            <a class="btn … s_website_form_send" href="#" role="button">
+              Submit
+            </a>
 
-    XPATH STRATEGY
-    ──────────────
-    The standard odoo_website_helpdesk ticket_form template renders a
-    <form> with individual field rows, ending with a submit <button
-    type="submit"> or a <div> wrapping it.
+    XPATH:  target  <div class="… s_website_form_submit …">
+            position="before" → our fields land just above the Submit div,
+            inside the <form> element.
 
-    We target the submit button directly — safe across Odoo 16/17/18:
-      <button type="submit" …>
-
-    Our two fields are inserted BEFORE it, inside the same <div>/<form>.
-
-    If the submit button in your customised view (id=6350) has a
-    different wrapper, open /helpdesk_ticket, right-click the Send
-    button → Inspect, and adjust the xpath expr accordingly.
+    inherit_id: we use odoo_website_helpdesk.ticket_form (the shared key).
+    Odoo applies inherited templates on top of whichever view wins for that
+    key (id=6350 in your DB), so our fields are injected into the live arch.
     ══════════════════════════════════════════════════════════════════
   -->
 
@@ -33,27 +30,19 @@
       name="Helpdesk page: Program Type + Club"
       inherit_id="odoo_website_helpdesk.ticket_form">
 
-    <!--
-      Insert our two fields immediately before the form submit button.
-      The standard ticket_form uses:
-        <button type="submit" class="btn btn-primary …">Send</button>
-      Wrapped in a div.  We go before the button itself so we're always
-      inside the <form> element regardless of surrounding markup.
-    -->
-    <xpath expr="//button[@type='submit']" position="before">
+    <xpath expr="//div[hasclass('s_website_form_submit')]" position="before">
 
       <!-- ── Program Type ──────────────────────────────────────────────── -->
-      <div class="mb-3">
-        <label for="helpdesk_program_type" class="col-form-label fw-bold">
-          Program Type <span class="text-danger">*</span>
+      <div class="form-group col-12 s_website_form_field s_website_form_custom s_website_form_required"
+           data-type="selection"
+           data-name="Field">
+        <label class="col-form-label s_website_form_label"
+               for="helpdesk_program_type"
+               style="width: 200px">
+          <span class="s_website_form_label_content">Program Type</span>
+          <span class="s_website_form_mark"> *</span>
         </label>
 
-        <!--
-          Options are pulled live from the club_type Selection field on
-          res.partner — same technique as signup_club_type/signup_form.xml.
-          No hardcoding: adding a new program type in res.partner
-          automatically appears here.
-        -->
         <t t-set="club_types"
            t-value="(env['res.partner']._fields.get('club_type')
                      and env['res.partner']._fields['club_type'].selection)
@@ -61,11 +50,9 @@
 
         <select name="helpdesk_program_type"
                 id="helpdesk_program_type"
-                class="form-select"
+                class="form-select s_website_form_input"
                 required="required">
-
           <option value="">-- Select Program Type --</option>
-
           <t t-foreach="club_types" t-as="opt">
             <option
                 t-att-value="opt[0]"
@@ -73,24 +60,22 @@
               <t t-esc="opt[1]"/>
             </option>
           </t>
-
         </select>
       </div>
-      <!-- ──────────────────────────────────────────────────────────────── -->
 
       <!-- ── Club ─────────────────────────────────────────────────────── -->
-      <div class="mb-3">
-        <label for="helpdesk_club_id" class="col-form-label fw-bold">
-          Club <span class="text-danger">*</span>
+      <div class="form-group col-12 s_website_form_field s_website_form_custom s_website_form_required"
+           data-type="many2one"
+           data-name="Field">
+        <label class="col-form-label s_website_form_label"
+               for="helpdesk_club_id"
+               style="width: 200px">
+          <span class="s_website_form_label_content">Club</span>
+          <span class="s_website_form_mark"> *</span>
         </label>
 
-        <!--
-          Server-side pre-fill on form re-post (e.g. validation error).
-          On a clean GET this renders just the placeholder; JS takes over.
-        -->
         <t t-set="sel_program"
            t-value="request.params.get('helpdesk_program_type', '')"/>
-
         <t t-set="clubs"
            t-value="sel_program
                     and env['res.partner'].sudo().search(
@@ -100,9 +85,8 @@
 
         <select name="helpdesk_club_id"
                 id="helpdesk_club_id"
-                class="form-select"
+                class="form-select s_website_form_input"
                 required="required">
-
           <t t-if="not sel_program">
             <option value="">-- Select Program Type first --</option>
           </t>
@@ -121,10 +105,8 @@
               </option>
             </t>
           </t>
-
         </select>
       </div>
-      <!-- ──────────────────────────────────────────────────────────────── -->
 
     </xpath>
   </template>
