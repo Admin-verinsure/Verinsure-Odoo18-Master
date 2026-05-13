@@ -49,8 +49,11 @@ class AccountMove(models.Model):
             so_id = self.env['sale.order'].search(
                 [('name', '=', rec.get('invoice_origin'))])
             if so_id.is_subscription:
-                so_id.subscription_id.start_date = (
-                    so_id.subscription_id.next_invoice_date)
+                # FIX: Removed start_date write — advancing start_date here
+                # conflicts with the billing cron's ownership of start_date and
+                # triggers _compute_next_invoice_date to silently push
+                # next_invoice_date forward for manually-originated invoices.
+                # The billing cron advances start_date after posting.
                 rec.update({
                     'is_subscription': True,
                     'subscription_id': so_id.subscription_id.id,

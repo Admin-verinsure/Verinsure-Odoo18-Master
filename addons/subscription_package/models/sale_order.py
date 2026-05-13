@@ -20,7 +20,6 @@
 #
 #############################################################################
 from odoo import api, fields, models
-from odoo.tools.safe_eval import datetime
 
 
 class SaleOrder(models.Model):
@@ -67,20 +66,34 @@ class SaleOrder(models.Model):
                 [('id', '=', rec.subscription_id.id)]).reference_code
 
     def action_confirm(self):
-        """ It Changed the stage, to renew, start date for subscription
-        package based on sale order confirm """
+        """Update subscription stage when a sale order is manually confirmed.
 
+        FIX: Removed 'start_date' write — billing cron owns start_date
+        advancement to avoid a date-race that pushed next_invoice_date forward
+        before the cron could run. Setting start_date here from a manually
+        confirmed SO is the wrong place for it.
+        FIX: datetime.datetime.today() returned a datetime object but
+        start_date is a Date field — this caused a type mismatch error.
+        FIX: self.search([('id', '=', sale_order.id)]) was looking up by
+        sale_order.id (a Many2one) not an integer — replaced with a direct
+        state read from the already-browsed record.
+        """
         res = super().action_confirm()
-        sale_order = self.subscription_id.sale_order_id
-        so_state = self.search([('id', '=', sale_order.id)]).state
-        if so_state in ['sale', 'done']:
-            stage = self.env['subscription.package.stage'].search(
-                [('category', '=', 'progress')], limit=1).id
-            values = {'stage_id': stage, 'is_to_renew': False,
-                      'start_date': datetime.datetime.today()}
-            self.subscription_id.write(values)
+        if self.is_subscription and self.subscription_id:
+            # Only move the subscription to 'progress' stage on a manual SO
+            # confirmation (i.e. not the auto-billing cron SOs, which have
+            # already-active subscriptions). Avoid touching start_date here.
+            sale_order = self.subscription_id.sale_order_id
+            if sale_order and sale_order.state in ('sale', 'done'):
+                stage = self.env['subscription.package.stage'].search(
+                    [('category', '=', 'progress')], limit=1).id
+                self.subscription_id.write({
+                    'stage_id': stage,
+                    'is_to_renew': False,
+                })
         return res
 
+    @api.depends('subscription_id')
     def _compute_subscription_count(self):
         """Compute count of subscriptions associated with the sale order.
 

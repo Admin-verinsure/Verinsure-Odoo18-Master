@@ -19,6 +19,7 @@
 #    If not, see <http://www.gnu.org/licenses/>.
 #
 #############################################################################
+from markupsafe import Markup
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, SUPERUSER_ID, _
 from odoo.exceptions import UserError
@@ -418,6 +419,17 @@ class SubscriptionPackage(models.Model):
         today_date = fields.Date.today()
         pending_subscription = False
         for pending_subscription in pending_subscriptions:
+            # FIX: Guard — skip if next_invoice_date or date_started is not
+            # set. find_renew_date does date arithmetic on both values and
+            # raises TypeError if either is False/None. next_invoice_date is
+            # set to False by the auto-close block below, so subscriptions
+            # that were just closed in the same cron run would crash here
+            # without this guard.
+            if not pending_subscription.next_invoice_date:
+                continue
+            if not pending_subscription.date_started:
+                continue
+
             get_dates = self.find_renew_date(
                 pending_subscription.next_invoice_date,
                 pending_subscription.date_started,
@@ -444,9 +456,10 @@ class SubscriptionPackage(models.Model):
             # Auto-close if renewal limit exceeded
             if (today_date == end_date and
                     pending_subscription.plan_id.limit_choice != 'manual'):
-                display_msg = ("<h5><i>The renewal limit has been exceeded "
-                               "today for this subscription based on the "
-                               "current subscription plan.</i></h5>")
+                display_msg = Markup(
+                    "<h5><i>The renewal limit has been exceeded "
+                    "today for this subscription based on the "
+                    "current subscription plan.</i></h5>")
                 pending_subscription.message_post(body=display_msg)
                 pending_subscription.is_closed = True
                 reason = self.env['subscription.package.stop'].search(
@@ -585,25 +598,28 @@ class SubscriptionPackage(models.Model):
                     # Guard — skip manual invoice mode plans
                     if sub.plan_id.invoice_mode == 'manual':
                         sub.message_post(
-                            body=_("<b>Auto-billing skipped:</b> Plan is set "
-                                   "to manual invoicing. Please invoice "
-                                   "manually."))
+                            body=Markup(_(
+                                "<b>Auto-billing skipped:</b> Plan is set "
+                                "to manual invoicing. Please invoice "
+                                "manually.")))
                         skipped_count += 1
                         continue
 
                     # Guard: skip subscriptions with no billable products
                     if not sub.product_line_ids:
                         sub.message_post(
-                            body=_("<b>Auto-billing skipped:</b> No product "
-                                   "lines configured on this subscription."))
+                            body=Markup(_(
+                                "<b>Auto-billing skipped:</b> No product "
+                                "lines configured on this subscription.")))
                         skipped_count += 1
                         continue
 
                     # Guard: skip subscriptions with no partner
                     if not sub.partner_id:
                         sub.message_post(
-                            body=_("<b>Auto-billing skipped:</b> No customer "
-                                   "set on this subscription."))
+                            body=Markup(_(
+                                "<b>Auto-billing skipped:</b> No customer "
+                                "set on this subscription.")))
                         skipped_count += 1
                         continue
 
@@ -612,9 +628,10 @@ class SubscriptionPackage(models.Model):
                     # Idempotency: skip if invoice already exists for this period
                     if sub._is_duplicate_invoice_exists(billing_date):
                         sub.message_post(
-                            body=_("<b>Auto-billing skipped:</b> Invoice "
-                                   "already exists for billing date %s."
-                                   ) % billing_date)
+                            body=Markup(_(
+                                "<b>Auto-billing skipped:</b> Invoice "
+                                "already exists for billing date %s.")
+                                ) % billing_date)
                         skipped_count += 1
                         continue
 
@@ -668,22 +685,23 @@ class SubscriptionPackage(models.Model):
                     })
 
                     if email_sent:
-                        email_note = (_("Invoice emailed to <b>%s</b>.") %
-                                      sub.partner_id.email)
+                        email_note = Markup(
+                            _("Invoice emailed to <b>%s</b>.") %
+                            sub.partner_id.email)
                     else:
-                        email_note = _(
+                        email_note = Markup(_(
                             "&#9888; Invoice email could not be sent "
-                            "(no email address on customer).")
+                            "(no email address on customer)."))
 
                     sub.message_post(
-                        body=_(
+                        body=Markup(_(
                             "<b>Auto-billing completed</b> for period "
                             "<b>%s</b>.<br/>"
                             "Sale Order: <b>%s</b> | Invoice: <b>%s</b> | "
                             "Next billing date: <b>%s</b><br/>%s"
-                        ) % (billing_date, sale_order.name,
-                             ', '.join(invoices.mapped('name')),
-                             next_date, email_note))
+                        )) % (billing_date, sale_order.name,
+                              ', '.join(invoices.mapped('name')),
+                              next_date, email_note))
 
                     billed_count += 1
 
@@ -691,11 +709,11 @@ class SubscriptionPackage(models.Model):
                 # Savepoint already rolled back the DB changes for this sub.
                 sub = self.env['subscription.package'].browse(sub.id)
                 sub.message_post(
-                    body=_(
+                    body=Markup(_(
                         "<b>Auto-billing failed</b> on %s.<br/>"
                         "<i>Error: %s</i><br/>"
                         "Please review and bill manually if required."
-                    ) % (today, str(exc)))
+                    )) % (today, str(exc)))
 
         return {
             'billed': billed_count,
