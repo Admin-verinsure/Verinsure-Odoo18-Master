@@ -7,7 +7,7 @@
         <field name="model">ticket.helpdesk</field>
         <field name="inherit_id" ref="odoo_website_helpdesk.ticket_helpdesk_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='customer_name']" position="after">
+            <xpath expr="//field[@name='customer_id']" position="after">
                 <!--
                     FIX: removed readonly="1" — the field was visible in the
                     form but always blank because readonly fields are skipped
