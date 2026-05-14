@@ -1,2 +1,2 @@
 # -*- coding: utf-8 -*-
-from . import ticket_helpdesk
+from . import helpdesk_ticket

@@ -3,15 +3,17 @@ from odoo import models, fields
 
 
 class HelpdeskTicket(models.Model):
-    _inherit = 'ticket.helpdesk'
+    _inherit = 'helpdesk.ticket'
 
-    program_type = fields.Char(
+    helpdesk_program_type = fields.Selection(
+        related='partner_id.club_type',
         string='Program Type',
-        help='Program type selected on the website form.',
+        store=True,
+        readonly=False,
     )
-    club_id = fields.Many2one(
+
+    helpdesk_club_id = fields.Many2one(
         comodel_name='res.partner',
-        string='Club',
-        ondelete='set null',
-        help='Club selected on the website form.',
+        string='Club Name',
+        domain="[('club_type', '=', helpdesk_program_type), ('active', '=', True)]",
     )
