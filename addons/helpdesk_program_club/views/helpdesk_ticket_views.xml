@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Backend form: show Program Type and Club Name after Email field -->
-    <record id="ticket_helpdesk_view_form_program_club" model="ir.ui.view">
-        <field name="name">ticket.helpdesk.form.program.club</field>
+    <!-- Backend form: show Club Name after Email field -->
+    <record id="ticket_helpdesk_view_form_club" model="ir.ui.view">
+        <field name="name">ticket.helpdesk.form.club</field>
         <field name="model">ticket.helpdesk</field>
         <field name="inherit_id" ref="odoo_website_helpdesk.ticket_helpdesk_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='email']" position="after">
-                <field name="helpdesk_program_type" string="Program Type" readonly="1"/>
                 <field name="helpdesk_club_id" string="Club Name" readonly="1"
                        options="{'no_create': True, 'no_open': True}"/>
             </xpath>
