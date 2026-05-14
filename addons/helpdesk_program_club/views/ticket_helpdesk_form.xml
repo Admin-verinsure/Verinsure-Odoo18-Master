@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Adds Club field to the main ticket.helpdesk backend form (id=2253).
+        Since the view has no xmlid key, we reference it by database id.
+        The field is placed after the Email field, visible in the left column.
+    -->
+    <record id="ticket_helpdesk_form_add_club" model="ir.ui.view">
+        <field name="name">ticket.helpdesk.form.add.club</field>
+        <field name="model">ticket.helpdesk</field>
+        <field name="inherit_id" ref="odoo_website_helpdesk.ticket_helpdesk_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='email']" position="after">
+                <field name="club_id" string="Club" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
