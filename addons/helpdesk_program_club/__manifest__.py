@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Helpdesk – Program Type & Club Fields',
-    'version': '1.1',
-    'summary': 'Adds Program Type and Club Name to helpdesk tickets (frontend form + backend views)',
+    'version': '1.2',
+    'summary': 'Adds Program Type and Club Name to helpdesk tickets (frontend + backend)',
     'category': 'Helpdesk',
     'license': 'LGPL-3',
-    'depends': ['base', 'helpdesk', 'website', 'mail'],
+    'depends': ['base', 'odoo_website_helpdesk', 'website', 'mail'],
     'data': [
         'views/helpdesk_ticket_views.xml',
     ],
