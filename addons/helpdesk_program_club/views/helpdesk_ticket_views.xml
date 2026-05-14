@@ -8,7 +8,14 @@
         <field name="inherit_id" ref="odoo_website_helpdesk.ticket_helpdesk_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='email']" position="after">
-                <field name="helpdesk_club_id" string="Club Name" readonly="1"
+                <!--
+                    FIX: removed readonly="1" — the field was visible in the
+                    form but always blank because readonly fields are skipped
+                    when Odoo renders saved values that come from the website
+                    submission. With readonly removed the value is both saved
+                    and displayed correctly.
+                -->
+                <field name="helpdesk_club_id" string="Club Name"
                        options="{'no_create': True, 'no_open': True}"/>
             </xpath>
         </field>
