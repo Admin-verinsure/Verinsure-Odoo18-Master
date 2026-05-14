@@ -1,39 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Extend the backend helpdesk ticket form to show Program Type & Club Name -->
-    <record id="helpdesk_ticket_view_form_program_club" model="ir.ui.view">
-        <field name="name">helpdesk.ticket.form.program.club</field>
-        <field name="model">helpdesk.ticket</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+    <!-- Backend form: show Program Type and Club Name after Email field -->
+    <record id="ticket_helpdesk_view_form_program_club" model="ir.ui.view">
+        <field name="name">ticket.helpdesk.form.program.club</field>
+        <field name="model">ticket.helpdesk</field>
+        <field name="inherit_id" ref="odoo_website_helpdesk.ticket_helpdesk_view_form"/>
         <field name="arch" type="xml">
-
-            <!-- Insert after the Email field in the left column -->
-            <xpath expr="//field[@name='partner_email']" position="after">
-                <field name="helpdesk_program_type"
-                       string="Program Type"
-                       widget="selection"/>
-                <field name="helpdesk_club_id"
-                       string="Club Name"
-                       domain="[('club_type', '=', helpdesk_program_type), ('active', '=', True)]"
+            <xpath expr="//field[@name='email']" position="after">
+                <field name="helpdesk_program_type" string="Program Type" readonly="1"/>
+                <field name="helpdesk_club_id" string="Club Name" readonly="1"
                        options="{'no_create': True, 'no_open': True}"/>
             </xpath>
-
-        </field>
-    </record>
-
-    <!-- Add Club Name column to the backend Helpdesk ticket list/tree view -->
-    <record id="helpdesk_ticket_view_list_program_club" model="ir.ui.view">
-        <field name="name">helpdesk.ticket.list.program.club</field>
-        <field name="model">helpdesk.ticket</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_tickets_view_list"/>
-        <field name="arch" type="xml">
-
-            <!-- Insert Club Name column after the partner/customer column -->
-            <xpath expr="//field[@name='partner_name']" position="after">
-                <field name="helpdesk_club_id" string="Club Name" optional="show"/>
-            </xpath>
-
         </field>
     </record>
 
