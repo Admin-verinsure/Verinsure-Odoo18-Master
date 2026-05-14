@@ -1,55 +1,50 @@
 # -*- coding: utf-8 -*-
+import base64
+import json
 import logging
-from odoo import http
 from odoo.http import request
+from odoo.addons.odoo_website_helpdesk.controller.website_form import WebsiteFormInherit
 
 _logger = logging.getLogger(__name__)
 
-# Try to import the base controller — the path varies by community module version
-_BaseController = None
-_base_method_name = None
 
-try:
-    from odoo.addons.odoo_website_helpdesk.controllers.main import WebsiteHelpdesk as _BaseController
-    _base_method_name = 'submit_ticket'
-    _logger.info("helpdesk_program_club: using odoo_website_helpdesk.controllers.main.WebsiteHelpdesk")
-except ImportError:
-    pass
+class WebsiteFormInheritClub(WebsiteFormInherit):
 
-if _BaseController is None:
-    try:
-        from odoo.addons.odoo_website_helpdesk.controllers.helpdesk import WebsiteHelpdesk as _BaseController
-        _base_method_name = 'submit_ticket'
-        _logger.info("helpdesk_program_club: using odoo_website_helpdesk.controllers.helpdesk.WebsiteHelpdesk")
-    except ImportError:
-        pass
+    def _handle_website_form(self, model_name, **kwargs):
+        """
+        Inject helpdesk_club_id into kwargs before the parent builds rec_val.
+        The parent hardcodes its field list, so we post-process the created
+        ticket and write the club field onto it immediately after creation.
+        """
+        # Let the parent create the ticket normally
+        result = super()._handle_website_form(model_name, **kwargs)
 
-if _BaseController is None:
-    _logger.warning(
-        "helpdesk_program_club: Could not import base WebsiteHelpdesk controller. "
-        "Club field will be saved via model-layer override only."
-    )
+        if model_name == 'ticket.helpdesk':
+            # Parse the ticket id from the JSON result
+            try:
+                data = json.loads(result)
+                ticket_id = data.get('id')
+            except Exception:
+                return result
 
+            if not ticket_id:
+                return result
 
-if _BaseController is not None:
-    class WebsiteHelpdeskClub(_BaseController):
-
-        @http.route()
-        def submit_ticket(self, **kw):
-            # Cast helpdesk_club_id string → int before super() drops it
-            raw_club = kw.get('helpdesk_club_id', '')
+            # Now write our custom field onto the ticket
+            raw_club = kwargs.get('helpdesk_club_id', '')
             if isinstance(raw_club, str):
                 raw_club = raw_club.strip()
+
             if raw_club and str(raw_club) not in ('0', 'False', 'false', ''):
                 try:
-                    kw['helpdesk_club_id'] = int(raw_club)
-                except (ValueError, TypeError):
-                    _logger.warning("Cannot cast helpdesk_club_id=%r", raw_club)
-                    kw.pop('helpdesk_club_id', None)
-            else:
-                kw.pop('helpdesk_club_id', None)
+                    club_id = int(raw_club)
+                    ticket = request.env['ticket.helpdesk'].sudo().browse(ticket_id)
+                    ticket.write({'helpdesk_club_id': club_id})
+                    _logger.info(
+                        "helpdesk_club: wrote club_id=%d onto ticket id=%d",
+                        club_id, ticket_id
+                    )
+                except (ValueError, TypeError) as e:
+                    _logger.warning("helpdesk_club: cannot cast club_id=%r: %s", raw_club, e)
 
-            if 'helpdesk_program_type' in kw and not kw['helpdesk_program_type']:
-                kw.pop('helpdesk_program_type', None)
-
-            return super().submit_ticket(**kw)
+        return result
