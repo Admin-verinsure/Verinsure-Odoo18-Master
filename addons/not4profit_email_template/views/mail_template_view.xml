@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit mail.template form view to expose code/source view on body_html -->
+    <record id="mail_template_form_view_custom" model="ir.ui.view">
+        <field name="name">mail.template.form.custom</field>
+        <field name="model">mail.template</field>
+        <field name="inherit_id" ref="mail.email_template_form"/>
+        <field name="arch" type="xml">
+            <!-- Override body_html field to enable codeview and allow raw HTML editing -->
+            <xpath expr="//field[@name='body_html']" position="replace">
+                <field
+                    name="body_html"
+                    widget="html_mail"
+                    class="oe-bordered-editor"
+                    options="{'codeview': true, 'dynamic_placeholder': true, 'allowCommandImage': false}"
+                    readonly="not can_write and id"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>
