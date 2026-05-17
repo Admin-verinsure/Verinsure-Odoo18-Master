@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="email_template_invoice_sending_custom" model="mail.template">
+        <field name="name">Invoice: Sending</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="subject">{{ object.company_id.name }} Invoice (Ref {{ object.name or 'n/a' }})</field>
+        <field name="email_from">{{ (object.invoice_user_id.email_formatted or object.company_id.email_formatted or user.email_formatted) }}</field>
+        <field name="partner_to">{{ object.partner_id.id }}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+<div style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f5f7;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;border:1px solid #e0e0e0;overflow:hidden;">
+
+<tr>
+  <td style="background-color:#f9f9f9;border-bottom:1px solid #e0e0e0;padding:24px 32px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="vertical-align:middle;">
+        <t t-if="object.company_id.logo">
+          <img t-attf-src="/web/image/res.company/#{object.company_id.id}/logo"
+               t-att-alt="object.company_id.name"
+               style="max-height:48px;max-width:160px;display:block;"/>
+        </t>
+        <t t-else="">
+          <span style="font-size:18px;font-weight:bold;color:#1a3a5c;">
+            <t t-out="object.company_id.name or ''">Company Name</t>
+          </span>
+        </t>
+      </td>
+      <td align="right" style="vertical-align:middle;">
+        <span style="display:inline-block;background-color:#e8f0fe;border-radius:20px;padding:5px 14px;font-size:12px;color:#1a56a0;font-weight:bold;">
+          <t t-out="object.name or ''">REF/0000</t>
+        </span>
+      </td>
+    </tr>
+    </table>
+  </td>
+</tr>
+
+<tr>
+<td style="padding:32px;">
+
+  <p style="font-size:15px;color:#1a1a1a;margin:0 0 8px 0;line-height:1.6;">
+    Dear
+    <t t-if="object.partner_id.parent_id">
+      <strong><t t-out="object.partner_id.name or ''">Customer</t></strong>
+      (<t t-out="object.partner_id.parent_id.name or ''">Company</t>),
+    </t>
+    <t t-else="">
+      <strong><t t-out="object.partner_id.name or ''">Customer</t></strong>,
+    </t>
+  </p>
+
+  <p style="font-size:14px;color:#555555;margin:0 0 24px 0;line-height:1.75;">
+    Please find below the details for
+    <strong><t t-out="object.name or ''">REF/0000</t></strong>
+    from
+    <strong><t t-out="object.company_id.name or ''">Company</t></strong>.
+    Kindly review the information and do not hesitate to reach out if you have any questions.
+  </p>
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f9f9f9;border-radius:6px;border:1px solid #e0e0e0;margin-bottom:24px;">
+  <tr><td style="padding:16px 20px;">
+    <p style="font-size:11px;font-weight:bold;color:#999999;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 12px 0;">Document details</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+      <tr>
+        <td style="font-size:13px;color:#777777;padding:7px 0;border-bottom:1px solid #eeeeee;">Reference</td>
+        <td align="right" style="font-size:13px;color:#1a1a1a;font-weight:bold;padding:7px 0;border-bottom:1px solid #eeeeee;">
+          <t t-out="object.name or ''">REF/0000</t>
+        </td>
+      </tr>
+
+      <t t-if="object.invoice_date">
+      <tr>
+        <td style="font-size:13px;color:#777777;padding:7px 0;border-bottom:1px solid #eeeeee;">Date</td>
+        <td align="right" style="font-size:13px;color:#1a1a1a;font-weight:bold;padding:7px 0;border-bottom:1px solid #eeeeee;">
+          <t t-out="object.invoice_date or ''">2024-01-01</t>
+        </td>
+      </tr>
+      </t>
+
+      <t t-if="object.invoice_date_due">
+      <tr>
+        <td style="font-size:13px;color:#777777;padding:7px 0;border-bottom:1px solid #eeeeee;">Due date</td>
+        <td align="right" style="font-size:13px;color:#1a1a1a;font-weight:bold;padding:7px 0;border-bottom:1px solid #eeeeee;">
+          <t t-out="object.invoice_date_due or ''">2024-01-31</t>
+        </td>
+      </tr>
+      </t>
+
+      <t t-if="object.payment_state">
+      <tr>
+        <td style="font-size:13px;color:#777777;padding:7px 0;border-bottom:1px solid #eeeeee;">Payment status</td>
+        <td align="right" style="font-size:13px;color:#1a1a1a;font-weight:bold;padding:7px 0;border-bottom:1px solid #eeeeee;">
+          <t t-out="(object.payment_state or '').replace('_',' ').title()">Not Paid</t>
+        </td>
+      </tr>
+      </t>
+
+      <t t-if="object.amount_total">
+      <tr>
+        <td style="font-size:14px;color:#1a1a1a;font-weight:bold;padding:10px 0 0 0;">Amount due</td>
+        <td align="right" style="font-size:18px;color:#1a3a5c;font-weight:bold;padding:10px 0 0 0;">
+          <t t-out="'%.2f' % object.amount_total">0.00</t>
+          <t t-if="object.currency_id">
+            <t t-out="object.currency_id.name or ''">NZD</t>
+          </t>
+        </td>
+      </tr>
+      </t>
+
+    </table>
+  </td></tr>
+  </table>
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:3px solid #1a56a0;border-top:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;border-radius:0 6px 6px 0;margin-bottom:24px;">
+  <tr><td style="padding:14px 16px;">
+    <p style="font-size:11px;font-weight:bold;color:#999999;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 6px 0;">Note</p>
+    <p style="font-size:13px;color:#555555;line-height:1.75;margin:0;">
+      Please use <strong><t t-out="object.name or ''">REF/0000</t></strong> as your reference for any payment or correspondence.
+      <t t-if="object.company_id.bank_account_id">
+        Transfer to account: <strong><t t-out="object.company_id.bank_account_id.acc_number or ''">00-0000-0000</t></strong>.
+      </t>
+      If any details are incorrect, please contact us immediately.
+    </p>
+  </td></tr>
+  </table>
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+    <tr><td style="border-top:1px solid #eeeeee;height:1px;"></td></tr>
+  </table>
+
+  <p style="font-size:13px;color:#777777;text-align:center;margin:0 0 24px 0;line-height:1.7;">
+    Questions? Reach us at
+    <a t-attf-href="mailto:#{object.company_id.email}"
+       style="color:#1a56a0;text-decoration:none;font-weight:bold;">
+      <t t-out="object.company_id.email or ''">info@company.com</t>
+    </a>
+    <t t-if="object.company_id.phone">
+      &#160;&#183;&#160;
+      <t t-out="object.company_id.phone or ''">+0 000 000 0000</t>
+    </t>
+  </p>
+
+  <p style="font-size:14px;color:#777777;margin:0;line-height:1.8;">
+    Warm regards,<br/>
+    <strong style="color:#1a1a1a;"><t t-out="user.name or ''">Administrator</t></strong><br/>
+    <span style="font-size:12px;color:#aaaaaa;"><t t-out="object.company_id.name or ''">Company</t></span>
+  </p>
+
+</td>
+</tr>
+
+<tr>
+  <td style="background-color:#f9f9f9;border-top:1px solid #e0e0e0;padding:20px 32px;text-align:center;">
+    <p style="font-size:11px;color:#cccccc;margin:0;line-height:1.6;">
+      &#169; <t t-out="object.company_id.name or ''">Company</t>. All rights reserved.<br/>
+      This is an automated notification &#8212; please do not reply directly to this email.
+    </p>
+  </td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+</div>
+        </field>
+    </record>
+</odoo>
