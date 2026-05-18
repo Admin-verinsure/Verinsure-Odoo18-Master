@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import re
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_round
@@ -28,16 +29,14 @@ def _extract_ref_tokens(text):
         "description | particulars | code | reference"
     e.g. "Monthly invoice | INV/26-27/0013 | 4412 | Services"
 
-    This function splits on delimiters, uppercases everything, strips noise
-    words, and returns a set of tokens that can be matched against
-    account.move.name / payment_reference / ref.
+    Splits on delimiters, uppercases, strips noise words, and returns a set
+    of tokens matchable against account.move.name / payment_reference / ref.
 
     Examples:
         "Payment INV/26-27/0013"         → {'INV/26-27/0013'}
         "Rent | REF-0042 | monthly"      → {'REF-0042'}
         "Acme Ltd | INV-99 | consulting" → {'INV-99'}
     """
-    import re
     if not text:
         return set()
 
@@ -46,28 +45,22 @@ def _extract_ref_tokens(text):
         'A', 'AN', 'IN', 'ON', 'AT', 'BY', 'NZ', 'GST', 'INC', 'LIMITED',
         'LTD', 'TRANSFER', 'AKAHU', 'BANK', 'DIRECT', 'DEBIT', 'CREDIT',
         'INTERNET', 'BANKING', 'ONLINE', 'REF', 'REFERENCE', 'INVOICE',
-        'SERVICES', 'SERVICE', 'MONTHLY', 'WEEKLY', 'ANNUAL', 'PAYMENT',
+        'SERVICES', 'SERVICE', 'MONTHLY', 'WEEKLY', 'ANNUAL',
     }
 
     tokens = set()
-    # Split on pipes, commas, spaces, semicolons
     for part in re.split(r'[|\s,;]+', text.upper()):
         part = part.strip()
-        # Keep tokens that look like structured references:
-        # - contain a slash (INV/26-27/0013, BILL/2024/0001)
-        # - contain a hyphen with adjacent digits (REF-0042, PO-881)
-        # - are purely numeric and >= 4 digits (bank codes like 4412)
-        # - start with known NZ invoice prefixes
         if not part or part in NOISE:
             continue
-        if '/' in part:                          # INV/26-27/0013 style
+        if '/' in part:                             # INV/26-27/0013 style
             tokens.add(part)
-        elif re.match(r'^[A-Z]+-\d+', part):    # REF-0042, PO-881 style
+        elif re.match(r'^[A-Z]+-\d+', part):       # REF-0042, PO-881 style
             tokens.add(part)
-        elif re.match(r'^\d{4,}$', part):       # bare numeric codes >= 4 digits
+        elif re.match(r'^\d{4,}$', part):          # bare numeric codes >= 4 digits
             tokens.add(part)
-        elif re.match(r'^(INV|BILL|PO|SO|RFQ|REF|ORD|WO|JO|DO|RCPT)\d*', part):
-            tokens.add(part)                     # known doc-type prefixes
+        elif re.match(r'^(INV|BILL|PO|SO|RFQ|ORD|WO|JO|DO|RCPT)\d*', part):
+            tokens.add(part)                        # known NZ doc-type prefixes
     return tokens
 
 
@@ -358,12 +351,11 @@ class AutoReconciliationEngine(models.Model):
             invoice = None
 
             # ── Pass 1: match on payment memo/reference → invoice number ──────
-            # The customer quotes the invoice number in the payment memo
-            # (e.g. "INV/26-27/0013"). Check payment.ref / memo first.
+            # In Odoo 18 Community, account.payment uses 'ref' as the memo /
+            # communication field. There is no 'memo' field — using it raises
+            # AttributeError and silently skips reference matching entirely.
             if match_by_reference:
-                ref_tokens = _extract_ref_tokens(
-                    ' '.join(filter(None, [payment.ref or '', payment.memo or '']))
-                )
+                ref_tokens = _extract_ref_tokens(payment.ref or '')
                 if ref_tokens:
                     ref_domain = [
                         ('company_id', '=', company.id),
@@ -416,6 +408,7 @@ class AutoReconciliationEngine(models.Model):
                     'currency': payment.currency_id.name,
                     'partner': payment.partner_id.name if payment.partner_id else '',
                     'company': company.name,
+                    'match_criteria': 'reference, amount' if (match_by_reference and payment.ref) else 'amount, partner',
                 })
                 if not preview_mode:
                     self._apply_ar_reconciliation(payment, invoice, 'asset_receivable')
@@ -439,11 +432,9 @@ class AutoReconciliationEngine(models.Model):
             amt = float_round(payment.amount, precision_digits=MONETARY_PRECISION)
             bill = None
 
-            # ── Pass 1: match on payment memo/ref → bill number ───────────────
+            # ── Pass 1: match on payment ref → bill number ────────────────────
             if match_by_reference:
-                ref_tokens = _extract_ref_tokens(
-                    ' '.join(filter(None, [payment.ref or '', payment.memo or '']))
-                )
+                ref_tokens = _extract_ref_tokens(payment.ref or '')
                 if ref_tokens:
                     ref_domain = [
                         ('company_id', '=', company.id),
@@ -495,6 +486,7 @@ class AutoReconciliationEngine(models.Model):
                     'currency': payment.currency_id.name,
                     'partner': payment.partner_id.name if payment.partner_id else '',
                     'company': company.name,
+                    'match_criteria': 'reference, amount' if (match_by_reference and payment.ref) else 'amount, partner',
                 })
                 if not preview_mode:
                     self._apply_ar_reconciliation(payment, bill, 'liability_payable')
