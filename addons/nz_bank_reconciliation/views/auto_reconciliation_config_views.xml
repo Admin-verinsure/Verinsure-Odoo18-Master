@@ -39,7 +39,7 @@
                                 <field name="match_by_currency"/>
                                 <field name="match_by_date_window"/>
                                 <field name="date_window_days"
-                                       attrs="{'invisible': [('match_by_date_window', '=', False)]}"/>
+                                       invisible="not match_by_date_window"/>
                         </group>
                     </group>
                     <group string="Scheduler">
