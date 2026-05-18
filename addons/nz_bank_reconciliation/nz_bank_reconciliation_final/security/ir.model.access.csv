@@ -1,0 +1,16 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_akahu_credential_manager,akahu.credential manager,model_akahu_credential,account.group_account_manager,1,1,1,1
+access_akahu_account_manager,akahu.account manager,model_akahu_account,account.group_account_manager,1,1,1,1
+access_akahu_account_user,akahu.account user,model_akahu_account,account.group_account_user,1,0,0,0
+access_akahu_sync_engine_manager,akahu.sync.engine manager,model_akahu_sync_engine,account.group_account_manager,1,1,1,1
+access_akahu_sync_log_manager,akahu.sync.log manager,model_akahu_sync_log,account.group_account_manager,1,1,1,1
+access_akahu_sync_log_user,akahu.sync.log user,model_akahu_sync_log,account.group_account_user,1,0,0,0
+access_auto_reconciliation_engine_manager,auto.reconciliation.engine manager,model_auto_reconciliation_engine,account.group_account_manager,1,1,1,1
+access_auto_reconciliation_engine_user,auto.reconciliation.engine user,model_auto_reconciliation_engine,account.group_account_user,1,0,0,0
+access_auto_reconciliation_log_manager,auto.reconciliation.log manager,model_auto_reconciliation_log,account.group_account_manager,1,1,1,1
+access_auto_reconciliation_log_user,auto.reconciliation.log user,model_auto_reconciliation_log,account.group_account_user,1,0,0,0
+access_auto_reconciliation_config_manager,auto.reconciliation.config manager,model_auto_reconciliation_config,account.group_account_manager,1,1,1,1
+access_auto_reconciliation_config_user,auto.reconciliation.config user,model_auto_reconciliation_config,account.group_account_user,1,0,0,0
+access_auto_reconciliation_wizard_manager,auto.reconciliation.wizard manager,model_auto_reconciliation_wizard,account.group_account_manager,1,1,1,1
+access_auto_reconciliation_wizard_line_manager,auto.reconciliation.wizard.line manager,model_auto_reconciliation_wizard_line,account.group_account_manager,1,1,1,1
+access_akahu_company_mapping_manager,akahu.company.mapping manager,model_akahu_company_mapping,account.group_account_manager,1,1,1,1
