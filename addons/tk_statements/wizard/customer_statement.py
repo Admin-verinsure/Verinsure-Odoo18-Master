@@ -103,12 +103,12 @@ class CustomerStatementWizard(models.TransientModel):
             if move.move_type == 'out_invoice':
                 debit = move.amount_total
                 credit = None
-                running += residual
+                running += move.amount_total
                 type_label = "Invoice"
             else:
                 debit = None
                 credit = move.amount_total
-                running -= residual
+                running -= move.amount_total
                 type_label = "Credit Note"
 
             if not self.include_zero_balance and residual == 0:
