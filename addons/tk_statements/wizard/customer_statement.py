@@ -99,11 +99,10 @@ class CustomerStatementWizard(models.TransientModel):
         running = opening_balance
         for move in period_moves:
             residual = move.amount_residual
-            paid = move.amount_total - residual
 
             if move.move_type == 'out_invoice':
                 debit = move.amount_total
-                credit = paid if paid > 0 else None
+                credit = None
                 running += residual
                 type_label = "Invoice"
             else:
