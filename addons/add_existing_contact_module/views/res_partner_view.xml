@@ -1,26 +1,32 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
     <record id="view_partner_form_inherit_add_existing_contact"
             model="ir.ui.view">
 
-        <field name="name">
-            res.partner.form.add.existing.contact
-        </field>
-
+        <field name="name">res.partner.form.add.existing.contact</field>
         <field name="model">res.partner</field>
 
+        <!-- The base partner form lives in 'base', not 'contacts' -->
         <field name="inherit_id" ref="base.view_partner_form"/>
 
         <field name="arch" type="xml">
 
-            <xpath expr="//page[@name='contact_addresses']"
-                   position="inside">
+            <!--
+                Place the button inside the "Contacts & Addresses" page,
+                BEFORE the child_ids kanban, so users see it right where
+                they manage child contacts.
+                The xpath targets the page by its stable name attribute.
+            -->
+            <xpath expr="//page[@name='contact_addresses']/field[@name='child_ids']"
+                   position="before">
 
                 <button name="action_open_add_existing_contact_wizard"
                         string="Add Existing Contact"
                         type="object"
-                        class="btn btn-primary oe_inline mb-2"/>
+                        class="btn-secondary mb-2"
+                        invisible="not id"/>
 
             </xpath>
 

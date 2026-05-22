@@ -7,7 +7,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/res_partner_view.xml',
-        'wizard/add_existing_contact_wizard_view.xml',
+        'views/add_existing_contact_wizard_view.xml',
     ],
     'installable': True,
     'application': False,
