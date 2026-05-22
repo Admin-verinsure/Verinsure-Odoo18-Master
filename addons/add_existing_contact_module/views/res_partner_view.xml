@@ -10,16 +10,17 @@
 
         <field name="model">res.partner</field>
 
-        <field name="inherit_id" ref="contacts.view_partner_form"/>
+        <field name="inherit_id" ref="base.view_partner_form"/>
 
         <field name="arch" type="xml">
 
-            <xpath expr="//field[@name='child_ids']" position="before">
+            <xpath expr="//page[@name='contact_addresses']"
+                   position="inside">
 
                 <button name="action_open_add_existing_contact_wizard"
                         string="Add Existing Contact"
                         type="object"
-                        class="btn-secondary"/>
+                        class="btn btn-primary oe_inline mb-2"/>
 
             </xpath>
 
