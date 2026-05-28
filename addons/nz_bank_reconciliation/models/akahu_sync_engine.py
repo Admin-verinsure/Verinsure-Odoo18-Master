@@ -30,6 +30,7 @@ class AkahuSyncEngine(models.Model):
     def cron_sync_all(self):
         """Called by scheduled cron — syncs all active ACTIVE accounts."""
         _logger.info('Akahu Sync Cron: Starting')
+        # sudo(): cron technical user needs cross-company read access to akahu.account
         accounts = self.env['akahu.account'].sudo().search([
             ('active', '=', True),
             ('akahu_status', '!=', 'INACTIVE'),
@@ -42,6 +43,7 @@ class AkahuSyncEngine(models.Model):
                 total_imported += result.get('imported', 0)
             except Exception as e:
                 _logger.error('Akahu sync failed for account %s: %s', account.name, str(e))
+                # sudo(): cron technical user has no create permission on akahu.sync.log; escalate only for log writes
                 self.env['akahu.sync.log'].sudo().create({
                     'akahu_account_id': account.id,
                     'company_id': account.company_id.id,
@@ -109,7 +111,7 @@ class AkahuSyncEngine(models.Model):
                 page_count, akahu_account.name, params.get('cursor', 'none')
             )
             try:
-                data = cred._api_get(akahu_account.user_token, path, params=params)
+                data = cred._api_get(akahu_account._get_user_token(), path, params=params)
             except UserError as e:
                 if '401' in str(e) or '403' in str(e):
                     akahu_account.write({'akahu_status': 'INACTIVE'})
@@ -212,6 +214,7 @@ class AkahuSyncEngine(models.Model):
         "InternalError: current transaction is aborted" and sync_cursor still
         gets updated, permanently losing those transactions.
         """
+        # sudo(): statement lines are written by the sync cron which runs as a limited technical user
         BankLine = self.env['account.bank.statement.line'].sudo()
         count = 0
 
@@ -299,6 +302,7 @@ class AkahuSyncEngine(models.Model):
         foreign_currency_code = conversion.get('currency')
         foreign_amount = conversion.get('amount')
         if foreign_currency_code and foreign_amount is not None:
+            # sudo(): res.currency is only readable by internal users; cron technical user needs this for FX lookup
             foreign_currency = self.env['res.currency'].sudo().search(
                 [('name', '=', foreign_currency_code.upper())], limit=1
             )
@@ -328,6 +332,7 @@ class AkahuSyncEngine(models.Model):
         tx_type = (tx.get('type') or '').upper()
         if tx_type in self.CARD_TX_TYPES:
             # BUG FIX 6: Match on journal code, not on a substring of the name.
+            # sudo(): cron technical user needs cross-company journal read for currency conversion entries
             cc_journal = self.env['account.journal'].sudo().search([
                 ('company_id', '=', akahu_account.company_id.id),
                 ('type', '=', 'bank'),

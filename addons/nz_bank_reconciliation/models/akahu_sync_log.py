@@ -51,3 +51,22 @@ class AkahuSyncLog(models.Model):
             acc = rec.akahu_account_id.name if rec.akahu_account_id else 'All'
             ts = rec.create_date.strftime('%Y%m%d-%H%M%S')
             rec.name = 'SYNC/%s/%s' % (acc, ts)
+
+    # ── Log retention (clause 2.4.1.e) ────────────────────────────────────────
+
+    @api.model
+    def cron_purge_old_logs(self, days=90):
+        """
+        LOG RETENTION FIX (clause 2.4.1.e): Delete sync log entries older
+        than *days* days (default 90).  Called by the scheduled purge cron.
+
+        sudo() is needed here because the cron technical user has no unlink
+        permission on akahu.sync.log — only account managers do.  The cron
+        context restricts the delete to old records only, so privilege
+        escalation is bounded.
+        """
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
+        old = self.sudo().search([('create_date', '<', cutoff)])
+        count = len(old)
+        old.unlink()
+        _logger.info('Akahu sync log purge: deleted %d entries older than %d days.', count, days)

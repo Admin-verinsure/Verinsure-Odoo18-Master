@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
+
+_logger = logging.getLogger(__name__)
 
 
 class AutoReconciliationLog(models.Model):
@@ -100,3 +103,24 @@ class AutoReconciliationLog(models.Model):
             'vendor_matched':        int(row['vendor_matched']),
             'intercompany_matched':  int(row['intercompany_matched']),
         }
+
+    # ── Log retention (clause 2.4.1.e) ────────────────────────────────────────
+
+    @api.model
+    def cron_purge_old_logs(self, days=90):
+        """
+        LOG RETENTION FIX (clause 2.4.1.e): Delete reconciliation log entries
+        older than *days* days (default 90).  Called by the scheduled purge cron.
+
+        sudo() needed so the cron technical user (which has no unlink permission
+        on auto.reconciliation.log) can perform the delete.  Scope is strictly
+        limited to records older than the cutoff.
+        """
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
+        old = self.sudo().search([('create_date', '<', cutoff)])
+        count = len(old)
+        old.unlink()
+        _logger.info(
+            'Auto reconciliation log purge: deleted %d entries older than %d days.',
+            count, days,
+        )

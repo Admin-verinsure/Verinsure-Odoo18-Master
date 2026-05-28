@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'NZ Bank Reconciliation (Akahu)',
-    'version': '18.0.1.1.0',
+    'version': '18.0.1.2.0',
     'category': 'Accounting/Accounting',
     'summary': 'Akahu NZ open banking sync + automatic multi-type reconciliation for Odoo 18',
     'description': """
@@ -54,6 +54,7 @@ UX
         'views/auto_reconciliation_dashboard_views.xml',
         # Wizard
         'wizard/auto_reconciliation_wizard_views.xml',
+        'wizard/akahu_credential_revoke_wizard_views.xml',
         # Menu (last — references all actions above)
         'views/menu.xml',
     ],
