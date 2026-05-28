@@ -28,7 +28,20 @@ class AkahuSyncEngine(models.Model):
 
     @api.model
     def cron_sync_all(self):
-        """Called by scheduled cron — syncs all active ACTIVE accounts."""
+        """
+        Called by scheduled cron — syncs all active ACTIVE accounts.
+
+        METHOD GUARD (SEC-02): Restricted to account managers. Prevents an
+        unprivileged internal user from triggering a full sync run via RPC.
+        The dedicated cron technical user has account.group_account_manager
+        so scheduled execution is unaffected.
+        """
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
         _logger.info('Akahu Sync Cron: Starting')
         # sudo(): cron technical user needs cross-company read access to akahu.account
         accounts = self.env['akahu.account'].sudo().search([
@@ -61,6 +74,13 @@ class AkahuSyncEngine(models.Model):
         Deduplication via unique_import_id (Odoo 18 native column).
         Returns dict with 'imported' count.
         """
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         cred = akahu_account.credential_id
         account_id = akahu_account.akahu_account_id
 

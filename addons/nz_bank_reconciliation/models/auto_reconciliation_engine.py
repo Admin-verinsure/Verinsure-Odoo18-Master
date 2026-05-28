@@ -70,6 +70,13 @@ class AutoReconciliationEngine(models.Model):
 
     @api.model
     def run_all(self, company_ids=None, journal_ids=None, preview_mode=False, triggered_by='manual'):
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         """
         Run all enabled reconciliation passes.
 
@@ -626,6 +633,13 @@ class AutoReconciliationEngine(models.Model):
 
     @api.model
     def cron_run_auto_reconciliation(self):
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         _logger.info("Auto Reconciliation Cron: Starting")
         self.run_all(triggered_by='cron')
         _logger.info("Auto Reconciliation Cron: Completed")
