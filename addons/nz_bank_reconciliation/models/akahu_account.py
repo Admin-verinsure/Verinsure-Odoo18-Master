@@ -135,6 +135,13 @@ class AkahuAccount(models.Model):
     def action_refresh_account_info(self):
         """
         Calls GET /accounts and updates account metadata & status.
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
 
         BUG FIX (multi-account): When no akahu_account_id is stored yet and
         the user token grants access to more than one Akahu account, we now
@@ -211,6 +218,13 @@ class AkahuAccount(models.Model):
 
     def action_sync_transactions(self):
         """Manual trigger to sync transactions for this account."""
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         self.ensure_one()
         engine = self.env['akahu.sync.engine']
         result = engine.sync_account(self)

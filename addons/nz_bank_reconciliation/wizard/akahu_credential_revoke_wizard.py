@@ -55,6 +55,12 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
     def action_revoke(self):
         """
         Clear app_token, app_secret, and all linked user_tokens.
+        # METHOD GUARD: Restricted to ERP Managers only (same group that can see the
+        # credential fields). Prevents account managers from revoking credentials via RPC.
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('Revoking credentials is restricted to ERP Managers.'))
+
         Requires the admin to have ticked the confirmation checkbox.
         """
         self.ensure_one()

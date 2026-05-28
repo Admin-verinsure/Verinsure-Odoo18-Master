@@ -30,8 +30,8 @@ UX
 - Unified dashboard: Akahu account health + reconciliation stats
 - Full audit log for both sync and reconciliation runs
     """,
-    'author': 'Not4Profit',
-    'website': 'https://not4profit.online',
+    'author': 'Verinsure Limited',
+    'website': 'https://Verinsure.online',
     'depends': [
         'account',
         'base_setup',

@@ -66,6 +66,13 @@ class AutoReconciliationLog(models.Model):
 
     @api.model
     def get_dashboard_stats(self):
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         """
         Return pre-aggregated stats via a single SQL SUM query instead of
         fetching every log record to the browser for client-side reduce().
@@ -110,6 +117,13 @@ class AutoReconciliationLog(models.Model):
     def cron_purge_old_logs(self, days=90):
         """
         LOG RETENTION FIX (clause 2.4.1.e): Delete reconciliation log entries
+        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
+        # This prevents unprivileged internal users from invoking this method directly
+        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         older than *days* days (default 90).  Called by the scheduled purge cron.
 
         sudo() needed so the cron technical user (which has no unlink permission
