@@ -2,6 +2,7 @@
 import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from .akahu_credential import _encrypt_token, _decrypt_token
 
 _logger = logging.getLogger(__name__)
 
@@ -12,14 +13,14 @@ class AkahuAccount(models.Model):
     Each account has its own User Access Token (user_token_...)
     and maps to an Odoo journal (bank account).
 
-    Key fields from Akahu /accounts response:
-      _id             → akahu_account_id
-      name            → akahu_account_name
-      formatted_account → akahu_formatted_account
-      status          → akahu_status  (ACTIVE / INACTIVE)
-      balance.available → balance_available
-      connection.name → bank_name
-      refreshed.transactions → last_refreshed
+    SEC-01 FIX: user_token is encrypted at rest via AES-256-GCM.
+    Use self._get_user_token() in server-side code — never read
+    self.user_token directly and pass it to an API call.
+
+    BUG FIX (multi-account): action_refresh_account_info() now raises
+    a clear error when a user token maps to more than one Akahu account
+    and no akahu_account_id is set yet, instead of silently picking
+    items[0].
     """
     _name = 'akahu.account'
     _description = 'Akahu Connected Bank Account'
@@ -54,13 +55,14 @@ class AkahuAccount(models.Model):
     active = fields.Boolean(default=True)
 
     # ── Akahu-side fields ─────────────────────────────────────────────────────
+    # SEC-01 FIX: stored encrypted — use _get_user_token() to read
     user_token = fields.Char(
         string='User Access Token',
         required=True,
         password=True,
         groups='base.group_erp_manager',
         help='The Akahu User Access Token (user_token_...) for this bank account. '
-             'Visible to ERP Managers only — never sent to regular users.',
+             'Stored encrypted. Visible to ERP Managers only.',
     )
     akahu_account_id = fields.Char(
         string='Akahu Account ID',
@@ -79,7 +81,6 @@ class AkahuAccount(models.Model):
     last_refreshed = fields.Datetime(string='Last Refreshed by Akahu', readonly=True)
     last_synced = fields.Datetime(string='Last Synced to Odoo', readonly=True)
 
-    # Cursor for paginated transaction sync — stores the last cursor.next value
     sync_cursor = fields.Char(
         string='Sync Cursor',
         readonly=True,
@@ -94,6 +95,26 @@ class AkahuAccount(models.Model):
             'Please choose a different journal or edit the existing account.',
         ),
     ]
+
+    # ── Encryption hooks ──────────────────────────────────────────────────────
+
+    def write(self, vals):
+        # SEC-01: Encrypt user_token before persisting to the database.
+        if 'user_token' in vals and vals['user_token']:
+            vals['user_token'] = _encrypt_token(self.env, vals['user_token'])
+        return super().write(vals)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('user_token'):
+                vals['user_token'] = _encrypt_token(self.env, vals['user_token'])
+        return super().create(vals_list)
+
+    def _get_user_token(self):
+        """Return the decrypted user_token value. Always use this in code."""
+        self.ensure_one()
+        return _decrypt_token(self.env, self.user_token)
 
     # ── Computed ──────────────────────────────────────────────────────────────
     @api.depends('bank_name', 'akahu_account_name', 'akahu_formatted_account')
@@ -114,26 +135,50 @@ class AkahuAccount(models.Model):
     def action_refresh_account_info(self):
         """
         Calls GET /accounts and updates account metadata & status.
-        Also used to detect INACTIVE accounts.
+
+        BUG FIX (multi-account): When no akahu_account_id is stored yet and
+        the user token grants access to more than one Akahu account, we now
+        raise a descriptive error listing the available account IDs rather
+        than silently picking items[0].  The admin must set akahu_account_id
+        manually (or via a future selection wizard) before the first sync.
         """
         self.ensure_one()
         cred = self.credential_id
         try:
-            data = cred._api_get(self.user_token, '/accounts')
+            data = cred._api_get(self._get_user_token(), '/accounts')
         except Exception as e:
             raise UserError(_('Failed to fetch Akahu accounts: %s') % str(e))
 
-        # Find the matching account in the response (match by akahu_account_id if known)
         items = data.get('items', [])
         matched = None
-        if self.akahu_account_id:
-            matched = next((i for i in items if i.get('_id') == self.akahu_account_id), None)
-        if not matched and items:
-            # First time — pick the first account returned for this user token
-            matched = items[0]
 
-        if not matched:
-            raise UserError(_('No accounts found for this User Token on Akahu.'))
+        if self.akahu_account_id:
+            # Known ID — find exact match
+            matched = next((i for i in items if i.get('_id') == self.akahu_account_id), None)
+            if not matched:
+                raise UserError(_(
+                    'Akahu account ID "%s" was not found in the response from Akahu. '
+                    'The account may have been disconnected.'
+                ) % self.akahu_account_id)
+        else:
+            # First-time resolution
+            if len(items) == 0:
+                raise UserError(_('No accounts found for this User Token on Akahu.'))
+            if len(items) == 1:
+                # Unambiguous — safe to auto-select
+                matched = items[0]
+            else:
+                # BUG FIX: Multiple accounts — refuse to pick arbitrarily.
+                # List available IDs so the admin can set the correct one.
+                available = ', '.join(
+                    '%s (%s)' % (i.get('_id', '?'), i.get('name', '?'))
+                    for i in items
+                )
+                raise UserError(_(
+                    'This User Token grants access to %d Akahu accounts:\n\n%s\n\n'
+                    'Please enter the correct "Akahu Account ID" (acc_...) in the '
+                    '"Akahu Account ID" field, then refresh again.'
+                ) % (len(items), available))
 
         vals = {
             'akahu_account_id': matched.get('_id'),

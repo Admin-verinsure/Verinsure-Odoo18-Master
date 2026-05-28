@@ -82,8 +82,10 @@ class AutoReconciliationEngine(models.Model):
         :param triggered_by: 'manual' or 'cron' (written to the audit log)
         """
         if not company_ids:
+            # sudo(): res.company requires elevated read for multi-company enumeration in cron context
             companies = self.env['res.company'].sudo().search([])
         else:
+            # sudo(): see above — same privilege rationale for browse path
             companies = self.env['res.company'].sudo().browse(company_ids)
 
         all_results = {}
@@ -105,6 +107,7 @@ class AutoReconciliationEngine(models.Model):
         return all_results
 
     def _process_company(self, company, preview_mode=False, journal_ids=None):
+        # sudo(): cron technical user has read-only group; sudo() needed to read config written by managers
         config = self.env['auto.reconciliation.config'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
         ], limit=1)
@@ -134,7 +137,9 @@ class AutoReconciliationEngine(models.Model):
 
         matched = []
         unmatched_count = 0
+        # sudo(): cron technical user cannot read statement lines directly; escalate for reconciliation reads
         BankLine = self.env['account.bank.statement.line'].sudo()
+        # sudo(): move lines are restricted; cron needs cross-company read for reconciliation matching
         MoveLine = self.env['account.move.line'].sudo()
 
         stmt_domain = [
@@ -340,7 +345,9 @@ class AutoReconciliationEngine(models.Model):
         match_by_amount    = not config or config.match_by_amount
         match_by_reference = not config or config.match_by_reference
         matched = []
+        # sudo(): cron technical user needs payment read for customer/vendor matching steps
         Payment = self.env['account.payment'].sudo()
+        # sudo(): cron needs journal entry read/write for reconciliation; sudo() scoped to this method
         Move = self.env['account.move'].sudo()
 
         for payment in Payment.search([
@@ -510,6 +517,7 @@ class AutoReconciliationEngine(models.Model):
         matched = []
         MoveLine = self.env['account.move.line'].sudo()
 
+        # sudo(): cron technical user needs cross-company mapping read for inter-company reconciliation
         mappings = self.env['akahu.company.mapping'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
         ])
@@ -581,6 +589,7 @@ class AutoReconciliationEngine(models.Model):
                         # call and it silently fails.  Re-fetching both IDs through
                         # a single sudo() env ensures they share the same environment
                         # and bypasses the cross-company rule restriction.
+                        # sudo(): targeted browse to reconcile specific move lines identified earlier in this method
                         self.env['account.move.line'].sudo().browse(
                             [line.id, counterpart.id]
                         ).reconcile()
@@ -591,6 +600,7 @@ class AutoReconciliationEngine(models.Model):
 
     # ── LOGGING ───────────────────────────────────────────────────────────────
     def _create_log_entries(self, all_results, triggered_by='manual'):
+        # sudo(): cron technical user has no create permission on auto.reconciliation.log
         Log = self.env['auto.reconciliation.log'].sudo()
         for company_id, result in all_results.items():
             if 'error' in result:
