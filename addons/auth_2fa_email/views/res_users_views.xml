@@ -2,294 +2,328 @@
 <odoo>
 
     <!-- ================================================================
-         OTP Verification Page
-         Pure standalone QWeb — no t-call to any layout template.
-         Rendered via ir.ui.view._render_template() + sudo() so the
-         website module's singleton check never fires.
+         OTP Page — matches Odoo 18 default login page look & feel.
+         All CSS and JS inlined. No t-call to any layout so website.layout
+         singleton crash never fires.
+         Rendered via ir.ui.view._render_template() + sudo() in controller.
          ================================================================ -->
     <template id="otp_page" name="2FA OTP Verification">
         <html lang="en">
             <head>
                 <meta charset="UTF-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-                <title>Two-Factor Authentication</title>
+                <title>Two-Factor Authentication — Odoo</title>
                 <style>
-                    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=DM+Sans:wght@300;400;500;600&amp;display=swap');
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-                    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Page — matches Odoo login bg */
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: #f3ede8;
+}
 
-                    body {
-                        min-height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        background: #0d0d0f;
-                        background-image:
-                            radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,.18) 0%, transparent 60%),
-                            repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,.02) 40px),
-                            repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,.02) 40px);
-                        padding: 24px;
-                        font-family: 'DM Sans', sans-serif;
-                    }
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 16px;
+}
 
-                    .otp-card {
-                        width: 100%;
-                        max-width: 420px;
-                        background: #18181b;
-                        border-radius: 16px;
-                        border: 1px solid rgba(255,255,255,.08);
-                        box-shadow: 0 0 0 1px rgba(99,102,241,.15), 0 24px 64px rgba(0,0,0,.6);
-                        overflow: hidden;
-                        animation: card-in .45s cubic-bezier(.22,1,.36,1) both;
-                    }
+/* Card — matches Odoo login card */
+.o_login_card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 4px 20px rgba(0,0,0,.08);
+    width: 100%;
+    max-width: 384px;
+    overflow: hidden;
+}
 
-                    @keyframes card-in {
-                        from { opacity: 0; transform: translateY(24px) scale(.97); }
-                        to   { opacity: 1; transform: translateY(0) scale(1); }
-                    }
+/* Header strip */
+.o_login_header {
+    background: #714B67;
+    padding: 28px 32px 24px;
+    text-align: center;
+}
 
-                    .otp-header {
-                        padding: 36px 40px 28px;
-                        text-align: center;
-                        border-bottom: 1px solid rgba(255,255,255,.06);
-                        background: linear-gradient(160deg, #1e1b4b 0%, #18181b 100%);
-                    }
+.o_login_header .shield {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 10px;
+}
 
-                    .otp-icon {
-                        font-size: 40px;
-                        line-height: 1;
-                        margin-bottom: 14px;
-                        display: block;
-                        animation: glow 2.4s ease-in-out infinite;
-                    }
+.o_login_header h1 {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: .2px;
+}
 
-                    @keyframes glow {
-                        0%,100% { filter: drop-shadow(0 0 12px rgba(99,102,241,.5)); }
-                        50%     { filter: drop-shadow(0 0 28px rgba(99,102,241,.9)); }
-                    }
+.o_login_header p {
+    color: rgba(255,255,255,.75);
+    font-size: 13px;
+    line-height: 1.5;
+}
 
-                    .otp-title {
-                        color: #f4f4f5;
-                        font-size: 20px;
-                        font-weight: 600;
-                        margin-bottom: 8px;
-                        letter-spacing: -.3px;
-                    }
+.o_login_header p strong {
+    color: #fff;
+    font-weight: 500;
+}
 
-                    .otp-subtitle {
-                        color: #71717a;
-                        font-size: 13.5px;
-                        line-height: 1.55;
-                    }
+/* Body */
+.o_login_body {
+    padding: 28px 32px 24px;
+}
 
-                    .otp-subtitle strong { color: #a1a1aa; font-weight: 500; }
+/* Alert */
+.alert {
+    padding: 10px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+}
 
-                    .otp-alert {
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                        margin: 20px 32px 0;
-                        padding: 12px 16px;
-                        border-radius: 8px;
-                        font-size: 13.5px;
-                        font-weight: 500;
-                    }
+.alert-danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
 
-                    .otp-alert-error  { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
-                    .otp-alert-success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+.alert-success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+}
 
-                    .otp-digits-wrapper {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
-                        padding: 32px 32px 0;
-                    }
+/* Digit inputs */
+.digit-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
 
-                    .otp-digit {
-                        width: 48px;
-                        height: 58px;
-                        text-align: center;
-                        font-family: 'IBM Plex Mono', monospace;
-                        font-size: 24px;
-                        font-weight: 600;
-                        color: #f4f4f5;
-                        background: #27272a;
-                        border: 1.5px solid #3f3f46;
-                        border-radius: 10px;
-                        outline: none;
-                        transition: border-color .2s, box-shadow .2s, transform .1s;
-                        caret-color: #6366f1;
-                    }
+.otp-digit {
+    width: 44px;
+    height: 52px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 600;
+    font-family: "Courier New", monospace;
+    color: #333;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    caret-color: #714B67;
+}
 
-                    .otp-digit:focus {
-                        border-color: #6366f1;
-                        box-shadow: 0 0 0 3px rgba(99,102,241,.25);
-                        transform: translateY(-2px);
-                        background: #2d2b52;
-                    }
+.otp-digit:focus {
+    border-color: #714B67;
+    box-shadow: 0 0 0 3px rgba(113,75,103,.2);
+}
 
-                    .otp-digit.filled { border-color: #818cf8; color: #c7d2fe; }
-                    .otp-sep { color: #52525b; font-size: 18px; padding: 0 2px; user-select: none; }
+.otp-digit.filled {
+    border-color: #714B67;
+    background: #fdf8fc;
+}
 
-                    .otp-timer {
-                        text-align: center;
-                        font-size: 12.5px;
-                        color: #52525b;
-                        padding: 14px 32px 0;
-                        font-family: 'IBM Plex Mono', monospace;
-                        letter-spacing: .5px;
-                    }
+.otp-sep {
+    color: #adb5bd;
+    font-size: 20px;
+    user-select: none;
+    padding: 0 2px;
+}
 
-                    #otp_countdown { color: #a1a1aa; font-weight: 600; }
-                    #otp_countdown.expiring { color: #f87171; animation: blink .8s step-end infinite; }
-                    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+/* Timer */
+.otp-timer {
+    text-align: center;
+    font-size: 12px;
+    color: #6c757d;
+    margin-bottom: 20px;
+}
 
-                    .otp-btn {
-                        display: block;
-                        width: calc(100% - 64px);
-                        margin: 20px auto 0;
-                        padding: 14px;
-                        background: linear-gradient(135deg, #4f46e5, #6366f1);
-                        color: #fff;
-                        font-family: 'DM Sans', sans-serif;
-                        font-size: 15px;
-                        font-weight: 600;
-                        border: none;
-                        border-radius: 10px;
-                        cursor: pointer;
-                        box-shadow: 0 4px 20px rgba(99,102,241,.4);
-                        transition: opacity .2s, transform .15s, box-shadow .2s;
-                    }
+#otp_countdown { font-weight: 600; color: #495057; }
+#otp_countdown.expiring { color: #dc3545; }
 
-                    .otp-btn:not(:disabled):hover { opacity:.9; transform:translateY(-1px); box-shadow:0 8px 30px rgba(99,102,241,.55); }
-                    .otp-btn:disabled { background:#27272a; color:#52525b; cursor:not-allowed; box-shadow:none; }
+/* Submit button — matches Odoo primary btn */
+.btn-primary {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    background: #714B67;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background .15s, opacity .15s;
+    margin-bottom: 16px;
+    letter-spacing: .2px;
+}
 
-                    .otp-links {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 12px;
-                        padding: 20px 32px 32px;
-                        font-size: 13px;
-                    }
+.btn-primary:hover:not(:disabled) { background: #5c3d55; }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
 
-                    .otp-links a { color: #818cf8; text-decoration: none; transition: color .2s; }
-                    .otp-links a:hover { color: #c7d2fe; text-decoration: underline; }
-                    .otp-links span { color: #3f3f46; }
+/* Links */
+.o_login_links {
+    text-align: center;
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.o_login_links a {
+    color: #714B67;
+    text-decoration: none;
+}
+
+.o_login_links a:hover { text-decoration: underline; }
+.o_login_links .sep { margin: 0 8px; color: #dee2e6; }
+
+/* Footer */
+.o_login_footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #adb5bd;
+    text-align: center;
+}
                 </style>
             </head>
             <body>
-                <div class="otp-card">
 
-                    <div class="otp-header">
-                        <span class="otp-icon">&#128274;</span>
-                        <h1 class="otp-title">Two-Factor Authentication</h1>
-                        <p class="otp-subtitle">
-                            We sent a 6-digit code to
-                            <strong><t t-esc="user_email"/></strong>
-                        </p>
+                <div class="o_login_card">
+
+                    <!-- Header -->
+                    <div class="o_login_header">
+                        <span class="shield">&#128274;</span>
+                        <h1>Two-Factor Authentication</h1>
+                        <p>We sent a 6-digit code to <strong><t t-esc="user_email"/></strong></p>
                     </div>
 
-                    <t t-if="error">
-                        <div class="otp-alert otp-alert-error">
-                            <span>&#10005;</span>
-                            <span><t t-esc="error"/></span>
-                        </div>
-                    </t>
-                    <t t-if="success">
-                        <div class="otp-alert otp-alert-success">
-                            <span>&#10003;</span>
-                            <span><t t-esc="success"/></span>
-                        </div>
-                    </t>
+                    <!-- Body -->
+                    <div class="o_login_body">
 
-                    <form method="POST" action="/web/login/otp" id="otp_form">
-                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                        <input type="hidden" name="redirect" t-att-value="redirect"/>
+                        <!-- Error / success alerts -->
+                        <t t-if="error">
+                            <div class="alert alert-danger">
+                                <span>&#9888; </span><span><t t-esc="error"/></span>
+                            </div>
+                        </t>
+                        <t t-if="success">
+                            <div class="alert alert-success">
+                                <span>&#10003; </span><span><t t-esc="success"/></span>
+                            </div>
+                        </t>
 
-                        <div class="otp-digits-wrapper">
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 1"/>
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 2"/>
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 3"/>
-                            <span class="otp-sep">&#8212;</span>
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 4"/>
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 5"/>
-                            <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 6"/>
+                        <!-- OTP Form -->
+                        <form method="POST" action="/web/login/otp" id="otp_form" autocomplete="off">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="redirect" t-att-value="redirect"/>
                             <input type="hidden" name="otp_code" id="otp_hidden"/>
+
+                            <div class="digit-row">
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 1"/>
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2"/>
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3"/>
+                                <span class="otp-sep">&#8212;</span>
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4"/>
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 5"/>
+                                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 6"/>
+                            </div>
+
+                            <div class="otp-timer">
+                                Expires in <span id="otp_countdown">10:00</span>
+                            </div>
+
+                            <button type="submit" class="btn-primary" id="otp_submit_btn" disabled="disabled">
+                                Verify &#38; Sign In
+                            </button>
+                        </form>
+
+                        <div class="o_login_links">
+                            <t t-set="resend_url" t-value="'/web/login/otp/resend?redirect=' + (redirect or '/odoo')"/>
+                            <a t-att-href="resend_url">Resend Code</a>
+                            <span class="sep">|</span>
+                            <a href="/web/login">&#8592; Back to Login</a>
                         </div>
 
-                        <div class="otp-timer">
-                            Code expires in <span id="otp_countdown">10:00</span>
-                        </div>
+                    </div><!-- /.o_login_body -->
+                </div><!-- /.o_login_card -->
 
-                        <button type="submit" class="otp-btn" id="otp_submit_btn" disabled="disabled">
-                            Verify &#38; Sign In
-                        </button>
-                    </form>
-
-                    <div class="otp-links">
-                        <t t-set="resend_url" t-value="'/web/login/otp/resend?redirect=' + (redirect or '/odoo')"/>
-                        <a t-att-href="resend_url">Resend Code</a>
-                        <span>&#183;</span>
-                        <a href="/web/login">Back to Login</a>
-                    </div>
-
-                </div>
+                <div class="o_login_footer">Powered by Odoo</div>
 
                 <script>
-                (function () {
-                    var digits = Array.from(document.querySelectorAll('.otp-digit'));
-                    var hidden = document.getElementById('otp_hidden');
-                    var btn    = document.getElementById('otp_submit_btn');
-                    var countdown = document.getElementById('otp_countdown');
+(function () {
+    var digits   = Array.from(document.querySelectorAll('.otp-digit'));
+    var hidden   = document.getElementById('otp_hidden');
+    var btn      = document.getElementById('otp_submit_btn');
+    var cdEl     = document.getElementById('otp_countdown');
+    var secs     = 600;
 
-                    function sync() {
-                        var code = digits.map(function(d){ return d.value; }).join('');
-                        hidden.value = code;
-                        btn.disabled = !/^\d{6}$/.test(code);
-                        digits.forEach(function(d){ d.classList.toggle('filled', !!d.value); });
-                    }
+    function sync() {
+        var code = digits.map(function (d) { return d.value; }).join('');
+        hidden.value = code;
+        btn.disabled = !/^\d{6}$/.test(code);
+        digits.forEach(function (d) { d.classList.toggle('filled', !!d.value); });
+    }
 
-                    digits.forEach(function(inp, i) {
-                        inp.addEventListener('keydown', function(e) {
-                            if (e.key === 'Backspace') {
-                                if (inp.value) { inp.value = ''; }
-                                else if (i > 0) { digits[i-1].focus(); digits[i-1].value = ''; }
-                                sync(); e.preventDefault();
-                            } else if (e.key === 'ArrowLeft'  &amp;&amp; i > 0) { digits[i-1].focus(); }
-                              else if (e.key === 'ArrowRight' &amp;&amp; i &lt; 5) { digits[i+1].focus(); }
-                        });
-                        inp.addEventListener('input', function() {
-                            inp.value = inp.value.replace(/\D/g,'').slice(-1);
-                            if (inp.value &amp;&amp; i &lt; 5) digits[i+1].focus();
-                            sync();
-                        });
-                        inp.addEventListener('click', function(){ inp.select(); });
-                        inp.addEventListener('paste', function(e) {
-                            e.preventDefault();
-                            var p = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
-                            p.split('').forEach(function(c,j){ if(digits[j]) digits[j].value=c; });
-                            digits[Math.min(p.length, 5)].focus();
-                            sync();
-                        });
-                    });
+    digits.forEach(function (inp, i) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace') {
+                if (inp.value) { inp.value = ''; }
+                else if (i > 0) { digits[i - 1].focus(); digits[i - 1].value = ''; }
+                sync(); e.preventDefault();
+            } else if (e.key === 'ArrowLeft'  &amp;&amp; i > 0) { digits[i - 1].focus(); }
+              else if (e.key === 'ArrowRight' &amp;&amp; i &lt; 5) { digits[i + 1].focus(); }
+        });
+        inp.addEventListener('input', function () {
+            inp.value = inp.value.replace(/\D/g, '').slice(-1);
+            if (inp.value &amp;&amp; i &lt; 5) { digits[i + 1].focus(); }
+            sync();
+        });
+        inp.addEventListener('click', function () { inp.select(); });
+        inp.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var p = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+            p.split('').forEach(function (c, j) { if (digits[j]) digits[j].value = c; });
+            digits[Math.min(p.length, 5)].focus();
+            sync();
+        });
+    });
 
-                    digits[0].focus();
+    digits[0].focus();
 
-                    // Countdown
-                    var secs = 600;
-                    function tick() {
-                        secs--;
-                        if (secs &lt;= 0) { countdown.textContent='00:00'; countdown.classList.add('expiring'); btn.disabled=true; return; }
-                        var m = String(Math.floor(secs/60)).padStart(2,'0');
-                        var s = String(secs%60).padStart(2,'0');
-                        countdown.textContent = m+':'+s;
-                        if (secs &lt;= 60) countdown.classList.add('expiring');
-                        setTimeout(tick, 1000);
-                    }
-                    setTimeout(tick, 1000);
-                })();
+    // Countdown timer
+    function tick() {
+        secs--;
+        if (secs &lt;= 0) {
+            cdEl.textContent = '00:00';
+            cdEl.classList.add('expiring');
+            btn.disabled = true;
+            return;
+        }
+        var m = String(Math.floor(secs / 60)).padStart(2, '0');
+        var s = String(secs % 60).padStart(2, '0');
+        cdEl.textContent = m + ':' + s;
+        if (secs &lt;= 60) cdEl.classList.add('expiring');
+        setTimeout(tick, 1000);
+    }
+    setTimeout(tick, 1000);
+})();
                 </script>
             </body>
         </html>
@@ -297,7 +331,7 @@
 
 
     <!-- ================================================================
-         Add Security tab to Settings > Users form
+         Security tab on Settings > Users form
          ================================================================ -->
     <record id="view_users_form_2fa" model="ir.ui.view">
         <field name="name">res.users.form.2fa</field>
