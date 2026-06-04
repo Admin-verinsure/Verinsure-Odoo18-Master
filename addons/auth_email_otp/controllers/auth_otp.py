@@ -247,7 +247,7 @@ class AuthOtpController(http.Controller):
     @http.route('/auth/otp/verify', type='http', auth='none', methods=['GET'], csrf=False, website=True)
     def otp_verify_get(self, **kwargs):
         if request.env.uid is None:
-        request.env['ir.http']._auth_method_public()
+            request.env['ir.http']._auth_method_public()
         """
         Display the OTP verification form.
         Validates session state before rendering.
