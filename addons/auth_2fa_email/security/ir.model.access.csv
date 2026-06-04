@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_auth_otp_admin,auth.otp admin,model_auth_otp,base.group_system,1,1,1,1
+access_auth_otp_user,auth.otp user,model_auth_otp,base.group_user,0,0,0,0
