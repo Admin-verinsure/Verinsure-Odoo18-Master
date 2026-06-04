@@ -37,6 +37,8 @@ Features:
         'auth_signup',
     ],
     'data': [
+        'views/res_users_views.xml',
+        'security/ir.model.access.csv',
         
     ],
     'assets': {
