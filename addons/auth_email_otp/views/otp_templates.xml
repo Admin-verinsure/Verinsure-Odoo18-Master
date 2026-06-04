@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        OTP Verification Page
+        ======================
+        - Inherits website.layout for proper header/footer/assets
+        - No inline CSS — styles are in otp_form.css
+        - No inline JS — logic is in otp_timer.js
+        - CSRF token via Odoo's native t-att-data-csrf pattern
+        - Accessible: labels, aria attributes, role attributes
+        - Mobile-first responsive layout
+        - Dark mode compatible via CSS custom properties
+    -->
+    <template id="otp_verify_page" name="Email OTP Verification">
+        <t t-call="web.login_layout">
+            <div class="otp-verify-wrapper" role="main">
+                <div class="otp-card" aria-labelledby="otp-heading">
+
+                    <!-- Icon -->
+                    <div class="otp-icon-wrap" aria-hidden="true">
+                        <svg class="otp-icon" viewBox="0 0 24 24" fill="none"
+                             xmlns="http://www.w3.org/2000/svg">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"
+                                  stroke="currentColor" stroke-width="2"
+                                  fill="none"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"
+                                  stroke="currentColor" stroke-width="2"
+                                  stroke-linecap="round"/>
+                            <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </div>
+
+                    <!-- Heading -->
+                    <h1 id="otp-heading" class="otp-heading">
+                        Verify Your Identity
+                    </h1>
+                    <p class="otp-subheading">
+                        We sent a 6-digit code to your email address.
+                        Enter it below to complete login.
+                    </p>
+
+                    <!-- Alert: error -->
+                    <t t-if="error">
+                        <div class="otp-alert otp-alert-danger" role="alert" aria-live="assertive">
+                            <svg class="otp-alert-icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9a1 1 0 112 0v4a1 1 0 11-2 0V9zm1-4a1 1 0 100 2 1 1 0 000-2z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            <span><t t-esc="error"/></span>
+                        </div>
+                    </t>
+
+                    <!-- Alert: success (resend confirmation) -->
+                    <t t-if="success">
+                        <div class="otp-alert otp-alert-success" role="status" aria-live="polite">
+                            <svg class="otp-alert-icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            <span><t t-esc="success"/></span>
+                        </div>
+                    </t>
+
+                    <!-- OTP Submit Form -->
+                    <form class="otp-form"
+                          method="post"
+                          action="/auth/otp/verify"
+                          autocomplete="off"
+                          novalidate="novalidate"
+                          aria-label="OTP verification form">
+
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+
+                        <div class="otp-field-wrap">
+                            <label for="otp_code" class="otp-label">
+                                Verification Code
+                            </label>
+                            <input
+                                id="otp_code"
+                                name="otp_code"
+                                type="text"
+                                inputmode="numeric"
+                                pattern="[0-9]{6}"
+                                maxlength="6"
+                                minlength="6"
+                                class="otp-input"
+                                placeholder="• • • • • •"
+                                autocomplete="one-time-code"
+                                autofocus="autofocus"
+                                required="required"
+                                aria-required="true"
+                                aria-describedby="otp-hint"
+                                aria-label="6-digit verification code"
+                            />
+                            <p id="otp-hint" class="otp-hint">
+                                Enter the 6-digit code from your email.
+                                This code expires in 5 minutes.
+                            </p>
+                        </div>
+
+                        <!-- Countdown timer (populated by JS) -->
+                        <div class="otp-timer" id="otp-timer" aria-live="polite" aria-atomic="true">
+                            <span id="otp-timer-text">Code expires in </span>
+                            <span id="otp-countdown" class="otp-countdown">5:00</span>
+                        </div>
+
+                        <button type="submit" class="otp-btn otp-btn-primary">
+                            Verify Code
+                        </button>
+
+                    </form>
+
+                    <!-- Resend Form -->
+                    <div class="otp-resend-section">
+                        <p class="otp-resend-label">Didn't receive a code?</p>
+                        <form method="post" action="/auth/otp/resend" class="otp-resend-form">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button
+                                type="submit"
+                                class="otp-btn otp-btn-secondary"
+                                id="otp-resend-btn"
+                                t-att-disabled="'disabled' if (resend_cooldown and resend_cooldown > 0) else None"
+                                aria-describedby="resend-cooldown-label"
+                            >
+                                Resend Code
+                                <t t-if="resend_cooldown and resend_cooldown > 0">
+                                    (<span id="resend-countdown"
+                                           t-att-data-seconds="resend_cooldown">
+                                        <t t-esc="resend_cooldown"/>s
+                                    </span>)
+                                </t>
+                            </button>
+                        </form>
+                        <p id="resend-cooldown-label" class="otp-resend-hint sr-only">
+                            <t t-if="resend_cooldown and resend_cooldown > 0">
+                                You can request a new code after
+                                <t t-esc="resend_cooldown"/> seconds.
+                            </t>
+                        </p>
+                    </div>
+
+                    <!-- Back link -->
+                    <div class="otp-back-section">
+                        <a href="/auth/otp/cancel" class="otp-back-link"
+                           aria-label="Cancel and return to login">
+                            ← Back to Login
+                        </a>
+                    </div>
+
+                </div><!-- /.otp-card -->
+            </div><!-- /.otp-verify-wrapper -->
+        </t>
+    </template>
+
+</odoo>
