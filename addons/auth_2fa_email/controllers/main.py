@@ -11,9 +11,8 @@ _PENDING_2FA_USER_KEY = '2fa_pending_user_id'
 
 def _render_otp_page(values):
     """
-    Render the OTP page bypassing website.layout entirely.
-    We call ir.ui.view._render_template() with sudo() so the website
-    module never gets a chance to inject its layout / singleton check.
+    Render using ir.ui.view directly with sudo() so website.layout
+    pipeline is never triggered, even with the website module installed.
     """
     html = request.env['ir.ui.view'].sudo()._render_template(
         'auth_2fa_email.otp_page', values
@@ -23,9 +22,6 @@ def _render_otp_page(values):
 
 class TwoFactorAuthController(Home):
 
-    # ------------------------------------------------------------------
-    # Step 1 – intercept the normal login POST
-    # ------------------------------------------------------------------
     @http.route('/web/login', type='http', auth='none', methods=['GET', 'POST'], sitemap=False)
     def web_login(self, redirect=None, **kw):
         response = super().web_login(redirect=redirect, **kw)
@@ -41,36 +37,31 @@ class TwoFactorAuthController(Home):
         if not user.two_factor_enabled:
             return response
 
-        # Park the uid and strip authentication from the session
+        # Park uid, strip the authenticated session
         request.session[_PENDING_2FA_USER_KEY] = uid
         request.session.uid = None
         request.session.login = None
         request.session.password = ''
 
-        # Generate & email OTP
         try:
             token = request.env['auth.otp'].sudo().generate_otp(uid)
             self._send_otp_email(user, token.otp_code)
-        except Exception:
-            _logger.exception('2FA: failed to send OTP email to user %s', uid)
+            _logger.info('2FA: OTP sent successfully to user %s (%s)', uid, user.email)
+        except Exception as e:
+            _logger.exception('2FA: failed to send OTP email to user %s: %s', uid, str(e))
             return _render_otp_page({
-                'user_email': '',
+                'user_email': self._mask_email(user.email or ''),
                 'redirect': redirect or '/odoo',
-                'error': _('Could not send OTP email. Please contact your administrator.'),
+                'error': _('Could not send OTP email: %s. Please contact your administrator.') % str(e),
                 'success': False,
                 'request': request,
             })
 
-        target = '/web/login/otp?redirect=%s' % (redirect or '/odoo')
-        return request.redirect(target)
+        return request.redirect('/web/login/otp?redirect=%s' % (redirect or '/odoo'))
 
-    # ------------------------------------------------------------------
-    # Step 2 – OTP verification page
-    # ------------------------------------------------------------------
     @http.route('/web/login/otp', type='http', auth='none', methods=['GET', 'POST'], sitemap=False)
     def otp_verify(self, redirect='/odoo', **kw):
         pending_uid = request.session.get(_PENDING_2FA_USER_KEY)
-
         if not pending_uid:
             return request.redirect('/web/login')
 
@@ -86,7 +77,6 @@ class TwoFactorAuthController(Home):
                 'request': request,
             })
 
-        # POST – verify code
         code = (kw.get('otp_code') or '').strip()
         valid = request.env['auth.otp'].sudo().verify_otp(pending_uid, code)
 
@@ -99,17 +89,13 @@ class TwoFactorAuthController(Home):
                 'request': request,
             })
 
-        # Valid – finalise session
+        # Finalise session
         request.session.pop(_PENDING_2FA_USER_KEY, None)
         request.session.uid = pending_uid
         request.session.login = user.login
         request.session.session_token = user._compute_session_token(request.session.sid)
-
         return request.redirect(redirect)
 
-    # ------------------------------------------------------------------
-    # Resend OTP
-    # ------------------------------------------------------------------
     @http.route('/web/login/otp/resend', type='http', auth='none', methods=['GET'], sitemap=False)
     def otp_resend(self, redirect='/odoo', **kw):
         pending_uid = request.session.get(_PENDING_2FA_USER_KEY)
@@ -124,9 +110,9 @@ class TwoFactorAuthController(Home):
             self._send_otp_email(user, token.otp_code)
             error = False
             success = _('A new OTP has been sent to your email.')
-        except Exception:
-            _logger.exception('2FA: failed to resend OTP for user %s', pending_uid)
-            error = _('Failed to resend OTP. Please contact your administrator.')
+        except Exception as e:
+            _logger.exception('2FA resend failed: %s', str(e))
+            error = _('Failed to resend OTP: %s') % str(e)
             success = False
 
         return _render_otp_page({
@@ -137,28 +123,33 @@ class TwoFactorAuthController(Home):
             'request': request,
         })
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
     @staticmethod
     def _send_otp_email(user, otp_code):
-        template = request.env.ref(
-            'auth_2fa_email.mail_template_otp', raise_if_not_found=False
-        )
-        if template:
-            template.sudo().with_context(otp_code=otp_code).send_mail(
-                user.id, force_send=True, raise_exception=True
-            )
-        else:
-            request.env['mail.mail'].sudo().create({
-                'subject': _('Your Login Verification Code'),
-                'email_to': user.email,
-                'body_html': (
-                    '<p>Hello %s,</p>'
-                    '<p>Your one-time login code is: <strong>%s</strong></p>'
-                    '<p>This code expires in 10 minutes. Do not share it with anyone.</p>'
-                ) % (user.name, otp_code),
-            }).send()
+        """Send OTP via plain mail.mail — avoids template rendering issues."""
+        mail = request.env['mail.mail'].sudo().create({
+            'subject': 'Your Login Verification Code - %s' % otp_code,
+            'email_to': user.email,
+            'email_from': request.env['ir.mail_server'].sudo().search([], limit=1).smtp_user
+                          or request.env['ir.config_parameter'].sudo().get_param('web.base.url'),
+            'body_html': '''
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+  <div style="background:#714B67;padding:20px;border-radius:8px 8px 0 0;text-align:center;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">Login Verification Code</h2>
+  </div>
+  <div style="background:#f9f9f9;padding:30px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+    <p style="color:#333;font-size:15px;">Hello <strong>%s</strong>,</p>
+    <p style="color:#555;font-size:14px;">Use the code below to complete your login:</p>
+    <div style="background:#fff;border:2px dashed #714B67;border-radius:8px;padding:20px;text-align:center;margin:20px 0;">
+      <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">One-Time Password</div>
+      <div style="font-size:38px;font-weight:bold;letter-spacing:10px;color:#714B67;font-family:'Courier New',monospace;">%s</div>
+    </div>
+    <p style="color:#999;font-size:12px;">This code expires in <strong>10 minutes</strong>. Never share it with anyone.</p>
+  </div>
+</div>
+''' % (user.name, otp_code),
+            'auto_delete': True,
+        })
+        mail.send(raise_exception=True)
 
     @staticmethod
     def _mask_email(email):
