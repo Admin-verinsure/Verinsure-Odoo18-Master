@@ -37,6 +37,7 @@ Features:
         'auth_signup',
     ],
     'data': [
+        'views/res_users_views.xml',
         
     ],
     'assets': {
