@@ -131,11 +131,17 @@ class AuthOtpController(http.Controller):
 
         # --- Step 1: Attempt native Odoo authentication ---
         try:
-            uid = request.session.authenticate(db, login, password)
-        except Exception:
-            # Authentication raised (e.g., AccessDenied) — let native handler deal with it
-            return self._fallback_to_native_login(redirect=redirect, **post)
+            credential = {
+                'login': login,
+                'password': password,
+                'type': 'password',
+            }
 
+            auth_info = request.session.authenticate(db, credential)
+            uid = auth_info['uid']
+
+        except Exception:
+            return self._fallback_to_native_login(redirect=redirect, **post)
         if not uid:
             # Credentials wrong — let native handler show the error
             return self._fallback_to_native_login(redirect=redirect, **post)
@@ -158,6 +164,7 @@ class AuthOtpController(http.Controller):
             )
             # Wipe the session (don't let the user in)
             request.session.logout(keep_db=True)
+            request.update_env(user=None)
             return self._render_login_error(
                 _('Your account requires two-factor authentication but no email address is configured. '
                   'Please contact your administrator.')
@@ -239,6 +246,8 @@ class AuthOtpController(http.Controller):
 
     @http.route('/auth/otp/verify', type='http', auth='none', methods=['GET'], csrf=False, website=True)
     def otp_verify_get(self, **kwargs):
+        if request.env.uid is None:
+        request.env['ir.http']._auth_method_public()
         """
         Display the OTP verification form.
         Validates session state before rendering.
