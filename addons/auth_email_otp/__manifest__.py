@@ -26,7 +26,7 @@ Features:
 - Multi-company and multi-website support
 - Translation-ready email template
     """,
-    'author': 'Custom Development',
+    'author': 'Verinsure Limited',
     'website': '',
     'license': 'LGPL-3',
     'depends': [
@@ -37,23 +37,7 @@ Features:
         'auth_signup',
     ],
     'data': [
-        # 1. ACL first — ir.model.access.csv only needs the model to exist
-        #    in ir_model (done by ORM before any XML loads).
-        'security/ir.model.access.csv',
-
-        # 2. Views — loads field definitions, menus, actions.
-        'views/res_users_views.xml',
-        'views/auth_otp_challenge_views.xml',
-        'views/otp_templates.xml',
-        'views/assets.xml',
-
-        # 3. Record rules — after views so model_auth_otp_challenge XML id exists
-        #    in ir_model_data (written when views are processed by the ORM).
-        'security/auth_otp_security.xml',
-
-        # 4. Data — cron and mail template, same reason.
-        'data/mail_template_data.xml',
-        'data/ir_cron_data.xml',
+        
     ],
     'assets': {
         'web.assets_frontend': [
