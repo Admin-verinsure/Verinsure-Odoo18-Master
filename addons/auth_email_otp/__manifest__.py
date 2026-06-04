@@ -38,6 +38,7 @@ Features:
     ],
     'data': [
         'views/res_users_views.xml',
+        'security/ir.model.access.csv',
         
     ],
     'assets': {
