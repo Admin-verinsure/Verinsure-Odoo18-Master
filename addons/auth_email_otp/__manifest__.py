@@ -42,6 +42,7 @@ Features:
         'security/ir.model.access.csv',
         'security/auth_otp_security.xml',
         'data/mail_template_data.xml',
+        'data/ir_cron_data.xml',
         
     ],
     'assets': {
