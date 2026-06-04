@@ -42,6 +42,7 @@ class TwoFactorAuthController(Home):
         request.session.uid = None
         request.session.login = None
         request.session.password = ''
+        request.session.session_token = None
 
         try:
             token = request.env['auth.otp'].sudo().generate_otp(uid)
