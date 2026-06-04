@@ -331,19 +331,21 @@ class AuthOtpController(http.Controller):
             })
 
         # --- OTP correct: finalise authentication ---
+        # --- OTP correct: finalise authentication ---
         _clear_otp_session()
 
-        # Re-authenticate the session: give user a brand-new session ID
-        # (session fixation prevention: we never reuse the anonymous session SID)
-        db_name = request.db
         user = env['res.users'].browse(uid)
 
-        # Authenticate creates a proper Odoo session
-        request.session.db = db_name
+        # Create authenticated session
         request.session.uid = uid
         request.session.login = user.login
-        request.session.session_token = user._compute_session_token(request.session.sid)
-        request.session.get_context()
+        request.session.session_token = user._compute_session_token(
+            request.session.sid
+        )
+
+        # IMPORTANT FOR ODOO 18:
+        # Refresh request environment so request.env.user is valid
+        request.update_env(user=uid)
 
         _logger.info(
             'auth.otp: Login completed for user %s (id=%d) via 2FA.',
