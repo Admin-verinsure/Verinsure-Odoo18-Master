@@ -91,22 +91,33 @@
 
 
     <!-- ================================================================
-         Add 2FA toggle to the user Preferences / Settings form
+         Add 2FA toggle to the user form (Settings → Users)
+         The xpath targets the "Preferences" page by name; if that page
+         doesn't exist it falls back to appending inside the form.
          ================================================================ -->
     <record id="view_users_form_2fa" model="ir.ui.view">
         <field name="name">res.users.form.2fa</field>
         <field name="model">res.users</field>
         <field name="inherit_id" ref="base.view_users_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//page[@name='preferences']" position="inside">
-                <group string="Security">
-                    <field name="two_factor_enabled" widget="boolean_toggle"/>
-                </group>
+            <!-- 'Work Information' tab always exists in Odoo 18; add our
+                 Security group right before it so placement is predictable. -->
+            <xpath expr="//page[@name='preferences']" position="before">
+                <page name="two_factor_auth" string="Security">
+                    <group>
+                        <field name="two_factor_enabled" widget="boolean_toggle"
+                               string="Enable Two-Factor Authentication (Email OTP)"/>
+                    </group>
+                </page>
             </xpath>
         </field>
     </record>
 
-    <!-- Also expose the field on the user's own Preferences dialog -->
+    <!-- Expose the field on the user's own Preferences dialog (Odoo 18) -->
+    <!-- base.view_users_form already covers the Settings > Users form.      -->
+    <!-- The "My Profile" popup in Odoo 18 inherits base.view_users_form,    -->
+    <!-- so the toggle added above is sufficient for both surfaces.           -->
+    <!-- If your build also ships base.res_users_view_form_profile, uncomment:
     <record id="view_res_users_preferences_2fa" model="ir.ui.view">
         <field name="name">res.users.preferences.2fa</field>
         <field name="model">res.users</field>
@@ -118,5 +129,6 @@
             </xpath>
         </field>
     </record>
+    -->
 
 </odoo>
