@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-import random
-import string
-from datetime import datetime, timedelta
+import secrets
+from datetime import timedelta
 from odoo import models, fields, api
 
 
@@ -25,8 +24,8 @@ class AuthOtp(models.Model):
         self.sudo().search([('user_id', '=', user_id), ('is_used', '=', False)]).write(
             {'is_used': True}
         )
-        code = ''.join(random.choices(string.digits, k=6))
-        expiry = datetime.now() + timedelta(minutes=10)
+        code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        expiry = fields.Datetime.now() + timedelta(minutes=10)
         token = self.sudo().create({
             'user_id': user_id,
             'otp_code': code,
@@ -44,7 +43,7 @@ class AuthOtp(models.Model):
             ('user_id', '=', user_id),
             ('otp_code', '=', code),
             ('is_used', '=', False),
-            ('expiry_time', '>=', datetime.now()),
+            ('expiry_time', '>=', fields.Datetime.now()),
         ], limit=1)
         if token:
             token.write({'is_used': True})
@@ -54,7 +53,7 @@ class AuthOtp(models.Model):
     @api.model
     def cleanup_expired(self):
         """Cron-friendly method to remove old/expired OTP records."""
-        cutoff = datetime.now() - timedelta(hours=24)
+        cutoff = fields.Datetime.now() - timedelta(hours=24)
         self.sudo().search([
             ('created_at', '<', fields.Datetime.to_string(cutoff))
         ]).unlink()

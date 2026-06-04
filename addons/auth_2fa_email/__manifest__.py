@@ -16,12 +16,6 @@
         'data/email_template.xml',
         'views/res_users_views.xml',
     ],
-    'assets': {
-        'web.assets_frontend': [
-            'auth_2fa_email/static/src/css/otp_login.css',
-            'auth_2fa_email/static/src/js/otp_login.js',
-        ],
-    },
     'installable': True,
     'application': False,
     'license': 'LGPL-3',
