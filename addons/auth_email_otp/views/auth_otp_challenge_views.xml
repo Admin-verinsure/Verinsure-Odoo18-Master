@@ -98,10 +98,10 @@
         </field>
     </record>
 
-    <!-- Menu items -->
+    <!-- Menu items — parent must be a menu item, not an action -->
     <menuitem id="menu_auth_otp_root"
               name="2FA Audit"
-              parent="base_setup.action_general_configuration"
+              parent="base_setup.menu_general_configuration"
               sequence="100"
               groups="base.group_erp_manager"/>
 
