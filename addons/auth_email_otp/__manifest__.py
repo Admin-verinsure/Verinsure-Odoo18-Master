@@ -41,6 +41,7 @@ Features:
         'views/auth_otp_challenge_views.xml',
         'security/ir.model.access.csv',
         'security/auth_otp_security.xml',
+        'data/mail_template_data.xml',
         
     ],
     'assets': {
