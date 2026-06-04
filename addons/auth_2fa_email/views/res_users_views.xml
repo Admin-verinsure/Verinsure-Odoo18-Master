@@ -3,105 +3,102 @@
 
     <!-- ================================================================
          OTP Verification Page (rendered at /web/login/otp)
+         Fully self-contained HTML — does NOT use web.layout or
+         website.layout to avoid the res.users() singleton crash when
+         the website module is installed and no user is in session.
          ================================================================ -->
     <template id="otp_page" name="2FA OTP Verification">
-        <t t-call="web.layout">
-            <t t-set="head">
+        <html lang="en">
+            <head>
+                <meta charset="UTF-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                <title>Two-Factor Authentication</title>
                 <link rel="stylesheet" href="/auth_2fa_email/static/src/css/otp_login.css"/>
-            </t>
-            <div class="o_login_page otp-page-wrapper">
+            </head>
+            <body>
+                <div class="otp-page-wrapper">
+                    <div class="otp-card">
 
-                <div class="otp-card">
+                        <!-- Header -->
+                        <div class="otp-header">
+                            <div class="otp-shield-icon">&#128274;</div>
+                            <h1 class="otp-title">Two-Factor Authentication</h1>
+                            <p class="otp-subtitle">
+                                We sent a 6-digit code to
+                                <strong><t t-esc="user_email"/></strong>
+                            </p>
+                        </div>
 
-                    <!-- Brand / Logo area -->
-                    <div class="otp-header">
-                        <div class="otp-shield-icon">🔐</div>
-                        <h1 class="otp-title">Two-Factor Authentication</h1>
-                        <p class="otp-subtitle">
-                            We sent a 6-digit code to
-                            <strong>
-                                <t t-esc="user_email"/>
-                            </strong>
-                        </p>
+                        <!-- Alerts -->
+                        <t t-if="error">
+                            <div class="otp-alert otp-alert-error">
+                                <span class="otp-alert-icon">&#10005;</span>
+                                <span><t t-esc="error"/></span>
+                            </div>
+                        </t>
+                        <t t-if="success">
+                            <div class="otp-alert otp-alert-success">
+                                <span class="otp-alert-icon">&#10003;</span>
+                                <span><t t-esc="success"/></span>
+                            </div>
+                        </t>
+
+                        <!-- OTP Form -->
+                        <form method="POST" action="/web/login/otp" id="otp_form">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="redirect" t-att-value="redirect"/>
+
+                            <div class="otp-digits-wrapper">
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 1"/>
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 2"/>
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 3"/>
+                                <span class="otp-digit-sep">&#8212;</span>
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 4"/>
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 5"/>
+                                <input class="otp-digit" type="text" inputmode="numeric"
+                                       maxlength="1" autocomplete="off" aria-label="Digit 6"/>
+                                <input type="hidden" name="otp_code" id="otp_hidden"/>
+                            </div>
+
+                            <div class="otp-timer" id="otp_timer">
+                                Code expires in <span id="otp_countdown">10:00</span>
+                            </div>
+
+                            <button type="submit" class="otp-submit-btn" id="otp_submit_btn" disabled="disabled">
+                                Verify &#38; Sign In
+                            </button>
+                        </form>
+
+                        <!-- Links -->
+                        <div class="otp-links">
+                            <t t-set="resend_url" t-value="'/web/login/otp/resend?redirect=' + (redirect or '/odoo')"/>
+                            <a t-att-href="resend_url">Resend Code</a>
+                            <span class="otp-link-sep">&#183;</span>
+                            <a href="/web/login">Back to Login</a>
+                        </div>
+
                     </div>
+                </div>
 
-                    <!-- Alerts -->
-                    <t t-if="error">
-                        <div class="otp-alert otp-alert-error">
-                            <span class="otp-alert-icon">✕</span>
-                            <span><t t-esc="error"/></span>
-                        </div>
-                    </t>
-                    <t t-if="success">
-                        <div class="otp-alert otp-alert-success">
-                            <span class="otp-alert-icon">✓</span>
-                            <span><t t-esc="success"/></span>
-                        </div>
-                    </t>
-
-                    <!-- OTP Form -->
-                    <form method="POST" action="/web/login/otp" id="otp_form">
-                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                        <input type="hidden" name="redirect" t-att-value="redirect"/>
-
-                        <div class="otp-digits-wrapper">
-                            <!-- 6 individual digit inputs for UX; JS merges them into hidden field -->
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 1"/>
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 2"/>
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 3"/>
-                            <span class="otp-digit-sep">—</span>
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 4"/>
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 5"/>
-                            <input class="otp-digit" type="text" inputmode="numeric"
-                                   maxlength="1" autocomplete="off" aria-label="Digit 6"/>
-                            <!-- Hidden field that holds the assembled code -->
-                            <input type="hidden" name="otp_code" id="otp_hidden"/>
-                        </div>
-
-                        <!-- Countdown timer -->
-                        <div class="otp-timer" id="otp_timer">
-                            Code expires in <span id="otp_countdown">10:00</span>
-                        </div>
-
-                        <button type="submit" class="otp-submit-btn" id="otp_submit_btn" disabled="disabled">
-                            Verify &amp; Sign In
-                        </button>
-                    </form>
-
-                    <!-- Resend & Back links -->
-                    <div class="otp-links">
-                        <a href="#" id="otp_resend_link"
-                           t-attf-href="/web/login/otp/resend?redirect=#{redirect}">
-                            Resend Code
-                        </a>
-                        <span class="otp-link-sep">·</span>
-                        <a href="/web/login">Back to Login</a>
-                    </div>
-
-                </div><!-- /.otp-card -->
-
-            </div>
-        </t>
+                <script src="/auth_2fa_email/static/src/js/otp_login.js"></script>
+            </body>
+        </html>
     </template>
 
 
     <!-- ================================================================
-         Add 2FA toggle to the user form (Settings → Users)
-         The xpath targets the "Preferences" page by name; if that page
-         doesn't exist it falls back to appending inside the form.
+         Add 2FA toggle to the user form (Settings > Users)
          ================================================================ -->
     <record id="view_users_form_2fa" model="ir.ui.view">
         <field name="name">res.users.form.2fa</field>
         <field name="model">res.users</field>
         <field name="inherit_id" ref="base.view_users_form"/>
         <field name="arch" type="xml">
-            <!-- 'Work Information' tab always exists in Odoo 18; add our
-                 Security group right before it so placement is predictable. -->
             <xpath expr="//page[@name='preferences']" position="before">
                 <page name="two_factor_auth" string="Security">
                     <group>
@@ -113,11 +110,7 @@
         </field>
     </record>
 
-    <!-- Expose the field on the user's own Preferences dialog (Odoo 18) -->
-    <!-- base.view_users_form already covers the Settings > Users form.      -->
-    <!-- The "My Profile" popup in Odoo 18 inherits base.view_users_form,    -->
-    <!-- so the toggle added above is sufficient for both surfaces.           -->
-    <!-- If your build also ships base.res_users_view_form_profile, uncomment:
+    <!-- If your Odoo 18 build ships base.res_users_view_form_profile, uncomment:
     <record id="view_res_users_preferences_2fa" model="ir.ui.view">
         <field name="name">res.users.preferences.2fa</field>
         <field name="model">res.users</field>
