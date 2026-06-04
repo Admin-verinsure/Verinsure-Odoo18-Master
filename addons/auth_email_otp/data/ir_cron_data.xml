@@ -4,12 +4,14 @@
 
         <!--
             Scheduled action: cleanup expired OTP challenge records.
-            Runs daily at 02:00 UTC.
-            Deletes records older than 30 days regardless of state.
+            Runs daily. Deletes records older than 30 days regardless of state.
+
+            model_id: resolved via search= on ir.model to avoid the
+            auto-generated XML id timing problem on fresh installs.
         -->
         <record id="ir_cron_cleanup_otp_challenges" model="ir.cron">
             <field name="name">Auth OTP: Cleanup Expired Challenges</field>
-            <field name="model_id" ref="auth_email_otp.model_auth_otp_challenge"/>
+            <field name="model_id" search="[('model', '=', 'auth.otp.challenge')]"/>
             <field name="state">code</field>
             <field name="code">model.cleanup_expired_records()</field>
             <field name="interval_number">1</field>

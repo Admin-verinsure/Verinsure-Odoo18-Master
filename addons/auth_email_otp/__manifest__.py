@@ -37,19 +37,25 @@ Features:
         'auth_signup',
     ],
     'data': [
-        # Security
+        # 1. ACL first — ir.model.access.csv only needs the model to exist
+        #    in ir_model (done by ORM before any XML loads).
         'security/ir.model.access.csv',
-        'security/auth_otp_security.xml',
 
-        # Data (mail template, cron, scheduled action)
-        'data/mail_template_data.xml',
-        'data/ir_cron_data.xml',
-
-        # Views
+        # 2. Views — loads field definitions, menus, actions.
         'views/res_users_views.xml',
         'views/auth_otp_challenge_views.xml',
         'views/otp_templates.xml',
         'views/assets.xml',
+
+        # 3. Record rules AFTER views — model_id resolved via search=,
+        #    but loading after views gives the ORM the best chance to have
+        #    written the ir.model row before we reference it.
+        'security/auth_otp_security.xml',
+
+        # 4. Data that references the model (mail template, cron).
+        #    model_id also uses search= here for the same reason.
+        'data/mail_template_data.xml',
+        'data/ir_cron_data.xml',
     ],
     'assets': {
         'web.assets_frontend': [
