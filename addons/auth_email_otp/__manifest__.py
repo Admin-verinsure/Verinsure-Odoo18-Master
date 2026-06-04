@@ -47,13 +47,11 @@ Features:
         'views/otp_templates.xml',
         'views/assets.xml',
 
-        # 3. Record rules AFTER views — model_id resolved via search=,
-        #    but loading after views gives the ORM the best chance to have
-        #    written the ir.model row before we reference it.
+        # 3. Record rules — after views so model_auth_otp_challenge XML id exists
+        #    in ir_model_data (written when views are processed by the ORM).
         'security/auth_otp_security.xml',
 
-        # 4. Data that references the model (mail template, cron).
-        #    model_id also uses search= here for the same reason.
+        # 4. Data — cron and mail template, same reason.
         'data/mail_template_data.xml',
         'data/ir_cron_data.xml',
     ],
