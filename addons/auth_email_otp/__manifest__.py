@@ -40,6 +40,7 @@ Features:
         'views/res_users_views.xml',
         'views/auth_otp_challenge_views.xml',
         'security/ir.model.access.csv',
+        'security/auth_otp_security.xml',
         
     ],
     'assets': {
