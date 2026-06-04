@@ -16,14 +16,14 @@
                                    widget="boolean_toggle"
                                    string="Require Email Verification on Login"/>
                             <div class="alert alert-info" role="alert"
-                                 attrs="{'invisible': [('email_otp_enabled', '=', False)]}">
+                                 invisible="not email_otp_enabled">
                                 <strong>Email 2FA is active.</strong>
                                 This user will be sent a One-Time Password to their email
                                 address each time they log in. Ensure their email address
                                 is correctly configured.
                             </div>
                             <div class="alert alert-warning" role="alert"
-                                 attrs="{'invisible': [('email_otp_enabled', '=', True)]}">
+                                 invisible="email_otp_enabled">
                                 Email 2FA is currently disabled for this user.
                                 Enable it above to enforce two-factor authentication.
                             </div>
