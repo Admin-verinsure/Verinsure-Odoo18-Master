@@ -3,13 +3,14 @@
     <data noupdate="1">
 
         <!--
-            Record rule: regular users cannot read/write OTP challenge records at all.
-            All access via sudo() in the controller/model layer.
-            Administrators can see all records (for audit).
+            Record rule: only administrators can see OTP challenge records.
+            model_id resolved by searching ir.model by model name — avoids
+            dependency on the auto-generated XML id which may not exist yet
+            at data-load time on a fresh install.
         -->
         <record id="rule_otp_challenge_admin_only" model="ir.rule">
             <field name="name">OTP Challenge: Admin Access Only</field>
-            <field name="model_id" ref="auth_email_otp.model_auth_otp_challenge"/>
+            <field name="model_id" search="[('model', '=', 'auth.otp.challenge')]"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('base.group_erp_manager'))]"/>
             <field name="perm_read" eval="True"/>
