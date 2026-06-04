@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Asset registration is handled in __manifest__.py via the `assets` key.
+        This file is kept for any additional asset inheritance if needed in future.
+    -->
+</odoo>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List view -->
+    <record id="view_auth_otp_challenge_list" model="ir.ui.view">
+        <field name="name">auth.otp.challenge.list</field>
+        <field name="model">auth.otp.challenge</field>
+        <field name="arch" type="xml">
+            <list string="OTP Challenges" default_order="create_date desc" decoration-danger="state == 'cancelled'" decoration-success="state == 'verified'" decoration-muted="state in ('expired',)">
+                <field name="create_date" string="Generated At"/>
+                <field name="user_id" string="User"/>
+                <field name="state" string="Status" widget="badge"
+                       decoration-success="state == 'verified'"
+                       decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'cancelled'"
+                       decoration-muted="state == 'expired'"/>
+                <field name="attempt_count" string="Attempts"/>
+                <field name="expiry_time" string="Expires At"/>
+                <field name="ip_address" string="IP Address"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view (read-only audit) -->
+    <record id="view_auth_otp_challenge_form" model="ir.ui.view">
+        <field name="name">auth.otp.challenge.form</field>
+        <field name="model">auth.otp.challenge</field>
+        <field name="arch" type="xml">
+            <form string="OTP Challenge" create="false" edit="false">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,verified,expired,cancelled"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Challenge Details">
+                            <field name="user_id" readonly="1"/>
+                            <field name="create_date" string="Generated At" readonly="1"/>
+                            <field name="expiry_time" readonly="1"/>
+                            <field name="attempt_count" readonly="1"/>
+                        </group>
+                        <group string="Request Context">
+                            <field name="ip_address" readonly="1"/>
+                            <field name="user_agent" readonly="1"/>
+                            <field name="last_resend" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Security">
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Note:</strong> OTP hashes are cleared after verification
+                            or cancellation for security. Raw OTP values are never stored.
+                        </div>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search view -->
+    <record id="view_auth_otp_challenge_search" model="ir.ui.view">
+        <field name="name">auth.otp.challenge.search</field>
+        <field name="model">auth.otp.challenge</field>
+        <field name="arch" type="xml">
+            <search string="OTP Challenges">
+                <field name="user_id"/>
+                <field name="ip_address"/>
+                <filter name="pending" string="Pending" domain="[('state','=','pending')]"/>
+                <filter name="verified" string="Verified" domain="[('state','=','verified')]"/>
+                <filter name="expired" string="Expired" domain="[('state','=','expired')]"/>
+                <filter name="cancelled" string="Cancelled / Locked Out" domain="[('state','=','cancelled')]"/>
+                <separator/>
+                <filter name="today" string="Today"
+                        domain="[('create_date','&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="User" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_auth_otp_challenge" model="ir.actions.act_window">
+        <field name="name">OTP Audit Log</field>
+        <field name="res_model">auth.otp.challenge</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_auth_otp_challenge_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No OTP challenges recorded yet.
+            </p>
+            <p>
+                OTP challenges are created when a user with Email 2FA enabled logs in.
+                This log is retained for 30 days.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu items -->
+    <menuitem id="menu_auth_otp_root"
+              name="2FA Audit"
+              parent="base_setup.action_general_configuration"
+              sequence="100"
+              groups="base.group_erp_manager"/>
+
+    <menuitem id="menu_auth_otp_log"
+              name="OTP Audit Log"
+              parent="menu_auth_otp_root"
+              action="action_auth_otp_challenge"
+              sequence="10"
+              groups="base.group_erp_manager"/>
+
+</odoo>

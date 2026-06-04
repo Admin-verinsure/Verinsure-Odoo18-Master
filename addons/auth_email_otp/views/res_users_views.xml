@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Add 2FA toggle to the user preferences form (backend) -->
+    <record id="view_users_form_2fa" model="ir.ui.view">
+        <field name="name">res.users.form.2fa</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='access_rights']" position="after">
+                <page name="two_factor_auth" string="Two-Factor Authentication"
+                      groups="base.group_erp_manager">
+                    <group>
+                        <group string="Email 2FA Settings">
+                            <field name="email_otp_enabled"
+                                   widget="boolean_toggle"
+                                   string="Require Email Verification on Login"/>
+                            <div class="alert alert-info" role="alert"
+                                 attrs="{'invisible': [('email_otp_enabled', '=', False)]}">
+                                <strong>Email 2FA is active.</strong>
+                                This user will be sent a One-Time Password to their email
+                                address each time they log in. Ensure their email address
+                                is correctly configured.
+                            </div>
+                            <div class="alert alert-warning" role="alert"
+                                 attrs="{'invisible': [('email_otp_enabled', '=', True)]}">
+                                Email 2FA is currently disabled for this user.
+                                Enable it above to enforce two-factor authentication.
+                            </div>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Add 2FA column to users list view -->
+    <record id="view_users_list_2fa" model="ir.ui.view">
+        <field name="name">res.users.list.2fa</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_simple_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='login']" position="after">
+                <field name="email_otp_enabled" string="2FA" optional="show"
+                       groups="base.group_erp_manager"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
