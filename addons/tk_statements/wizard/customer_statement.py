@@ -85,10 +85,11 @@ class CustomerStatementWizard(models.TransientModel):
         )
 
         # ---- Period: inbound payments ----
+        # In Odoo 18, validated payments may have state 'posted' or 'in_process'
         period_payments = self.env['account.payment'].search([
             ('partner_id', 'child_of', self.partner_id.id),
             ('payment_type', '=', 'inbound'),
-            ('state', '=', 'posted'),
+            ('state', 'in', ['posted', 'in_process']),
             ('date', '>=', self.start_date),
             ('date', '<=', self.end_date),
         ], order='date asc, name asc')
