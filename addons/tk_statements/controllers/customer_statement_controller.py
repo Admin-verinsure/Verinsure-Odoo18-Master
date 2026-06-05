@@ -88,7 +88,7 @@ class CustomerStatementController(http.Controller):
             cell.number_format = fmt
 
         # ── Column widths ───────────────────────────────────────────────
-        for i, w in enumerate([16, 24, 16, 16, 16, 18], 1):
+        for i, w in enumerate([16, 24, 16, 16, 16, 16, 18], 1):
             ws.column_dimensions[get_column_letter(i)].width = w
 
         # ── Row 1 — Company name ────────────────────────────────────────
@@ -143,14 +143,14 @@ class CustomerStatementController(http.Controller):
         ws.row_dimensions[7].height = 6
 
         # ── Row 8 — Opening balance ─────────────────────────────────────
-        ws.merge_cells("A8:E8")
+        ws.merge_cells("A8:F8")
         c = ws["A8"]
         c.value     = "Opening Balance (before period)"
         c.font      = fnt(bold=True, color=DARK_BLUE)
         c.fill      = fill(LIGHT_BLUE); c.border = bdr()
         c.alignment = aln("left")
 
-        ob = ws["F8"]
+        ob = ws["G8"]
         ob.value     = data['opening_balance']
         ob.font      = fnt(bold=True, color=DARK_BLUE)
         ob.fill      = fill(LIGHT_BLUE); ob.border = bdr()
@@ -160,7 +160,7 @@ class CustomerStatementController(http.Controller):
 
         # ── Row 9 — Header ──────────────────────────────────────────────
         for col, hdr in enumerate(
-            ["Date", "Document No.", "Type", "Debit", "Credit", "Balance"], 1
+            ["Date", "Document No.", "Type", "Debit", "Credit", "Paid", "Balance"], 1
         ):
             c = ws.cell(row=9, column=col, value=hdr)
             c.font = fnt(bold=True, color="FFFFFF")
@@ -195,8 +195,13 @@ class CustomerStatementController(http.Controller):
             else:
                 cell(5, "", h="right")
 
+            if line.get('paid'):
+                c = cell(6, line['paid'], h="right", color=MID_BLUE); num(c)
+            else:
+                cell(6, "", h="right")
+
             bal = line['running_balance']
-            c = cell(6, bal, h="right", bold=True,
+            c = cell(7, bal, h="right", bold=True,
                      color=(RED if bal < 0 else "000000"))
             num(c)
 
@@ -204,14 +209,14 @@ class CustomerStatementController(http.Controller):
             row += 1
 
         # ── Closing / net balance row ────────────────────────────────────
-        ws.merge_cells(f"A{row}:E{row}")
+        ws.merge_cells(f"A{row}:F{row}")
         c = ws.cell(row=row, column=1, value="NET BALANCE DUE")
         c.font = fnt(bold=True, size=11, color="FFFFFF")
         c.fill = fill(DARK_BLUE); c.border = bdr()
         c.alignment = aln("right")
 
         nb = data['net_balance']
-        c = ws.cell(row=row, column=6, value=nb)
+        c = ws.cell(row=row, column=7, value=nb)
         c.font = fnt(bold=True, size=11,
                      color=("FF6B6B" if nb < 0 else "FFFFFF"))
         c.fill = fill(DARK_BLUE); c.border = bdr()

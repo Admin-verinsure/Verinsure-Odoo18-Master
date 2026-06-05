@@ -8,14 +8,11 @@ class CustomerStatementWizard(models.TransientModel):
     """
     Wizard for generating Customer Statement Reports.
 
-    Supports:
-    - Date range filtering (start_date / end_date)
-    - Posted invoices (out_invoice) and credit notes (out_refund)
-    - Running balance ledger
-    - Opening balance (outstanding before start_date)
-    - Partial payment handling via amount_residual
-    - PDF output (QWeb / external_layout)
-    - Excel output (via controller route, no base64 URL payload)
+    Columns: Date | Document No. | Type | Debit | Credit | Paid | Balance
+    - Debit  : invoice amount_total
+    - Credit : credit note amount_total
+    - Paid   : inbound payment amount
+    - Balance: running balance (opening + debits - credits - payments)
     """
     _name = 'customer.statement.wizard'
     _description = "Customer Statement Report"
@@ -57,14 +54,6 @@ class CustomerStatementWizard(models.TransientModel):
     # ------------------------------------------------------------------
 
     def _get_statement_data(self):
-        """
-        Returns a dict with all data needed to render PDF or Excel.
-
-        IMPORTANT: the key 'company' holds the real res.company recordset
-        so that web.external_layout can access company.external_report_layout_id
-        and other ORM fields it needs.  Extra display fields (address, currency
-        symbol) are stored under 'company_info' as a plain dict.
-        """
         self.ensure_one()
         self._check_dates()
 
@@ -74,7 +63,7 @@ class CustomerStatementWizard(models.TransientModel):
             ('state', '=', 'posted'),
         ]
 
-        # ---- Opening balance: all posted moves BEFORE start_date ----
+        # ---- Opening balance: outstanding amount before start_date ----
         opening_moves = self.env['account.move'].search(
             domain_base + [('invoice_date', '<', self.start_date)],
             order='invoice_date asc, name asc',
@@ -86,7 +75,7 @@ class CustomerStatementWizard(models.TransientModel):
             else:
                 opening_balance -= move.amount_residual
 
-        # ---- Period moves ----
+        # ---- Period: invoices + credit notes ----
         period_moves = self.env['account.move'].search(
             domain_base + [
                 ('invoice_date', '>=', self.start_date),
@@ -95,75 +84,106 @@ class CustomerStatementWizard(models.TransientModel):
             order='invoice_date asc, name asc',
         )
 
-        lines = []
-        running = opening_balance
+        # ---- Period: inbound payments ----
+        period_payments = self.env['account.payment'].search([
+            ('partner_id', 'child_of', self.partner_id.id),
+            ('payment_type', '=', 'inbound'),
+            ('state', '=', 'posted'),
+            ('date', '>=', self.start_date),
+            ('date', '<=', self.end_date),
+        ], order='date asc, name asc')
+
+        # ---- Build raw line list ----
+        raw_lines = []
+
         for move in period_moves:
-            residual = move.amount_residual
-
-            if move.move_type == 'out_invoice':
-                debit = move.amount_total
-                credit = None
-                running += move.amount_total
-                type_label = "Invoice"
-            else:
-                debit = None
-                credit = move.amount_total
-                running -= move.amount_total
-                type_label = "Credit Note"
-
-            if not self.include_zero_balance and residual == 0:
-                continue
-
-            lines.append({
+            raw_lines.append({
                 'date': move.invoice_date,
                 'name': move.name,
                 'move_type': move.move_type,
-                'type_label': type_label,
-                'debit': round(debit, 2) if debit else None,
-                'credit': round(credit, 2) if credit else None,
+                'type_label': 'Invoice' if move.move_type == 'out_invoice' else 'Credit Note',
+                'debit':   move.amount_total if move.move_type == 'out_invoice' else None,
+                'credit':  move.amount_total if move.move_type == 'out_refund'  else None,
+                'paid':    None,
+                'residual': move.amount_residual,
+            })
+
+        for payment in period_payments:
+            raw_lines.append({
+                'date': payment.date,
+                'name': payment.name,
+                'move_type': 'payment',
+                'type_label': 'Payment',
+                'debit':   None,
+                'credit':  None,
+                'paid':    payment.amount,
+                'residual': 0.0,
+            })
+
+        # Sort by date then document name
+        raw_lines.sort(key=lambda l: (l['date'], l['name']))
+
+        lines = []
+        running = opening_balance
+        for line in raw_lines:
+            if line['debit']:
+                running += line['debit']
+            if line['credit']:
+                running -= line['credit']
+            if line['paid']:
+                running -= line['paid']
+
+            # Skip fully settled invoices/credit notes when flag is off
+            if (not self.include_zero_balance
+                    and line['move_type'] != 'payment'
+                    and line['residual'] == 0):
+                continue
+
+            lines.append({
+                'date':            line['date'],
+                'name':            line['name'],
+                'move_type':       line['move_type'],
+                'type_label':      line['type_label'],
+                'debit':           round(line['debit'],  2) if line['debit']  else None,
+                'credit':          round(line['credit'], 2) if line['credit'] else None,
+                'paid':            round(line['paid'],   2) if line['paid']   else None,
                 'running_balance': round(running, 2),
             })
 
-        # ---- Company recordset (required by web.external_layout) ----
+        # ---- Company ----
         company_rec = self.env.company
-
-        # ---- Company display info (plain dict for template & Excel) ----
         addr_parts = filter(None, [
             company_rec.street, company_rec.street2,
             company_rec.city, company_rec.zip,
-            company_rec.state_id.name if company_rec.state_id else None,
+            company_rec.state_id.name  if company_rec.state_id  else None,
             company_rec.country_id.name if company_rec.country_id else None,
         ])
         company_info = {
-            'name': company_rec.name,
-            'address': ', '.join(addr_parts),
+            'name':            company_rec.name,
+            'address':         ', '.join(addr_parts),
             'currency_symbol': company_rec.currency_id.symbol,
         }
 
-        # ---- Partner ----
         partner = self.partner_id
 
         return {
-            # 'company' MUST be the real recordset — web.external_layout needs it
-            'company': company_rec,
-            # plain dict for our own template variables and Excel
+            'company':      company_rec,
             'company_info': company_info,
             'partner': {
-                'name': partner.name,
-                'street': partner.street or '',
+                'name':    partner.name,
+                'street':  partner.street  or '',
                 'street2': partner.street2 or '',
-                'city': partner.city or '',
-                'zip': partner.zip or '',
-                'state': partner.state_id.name if partner.state_id else '',
+                'city':    partner.city    or '',
+                'zip':     partner.zip     or '',
+                'state':   partner.state_id.name   if partner.state_id   else '',
                 'country': partner.country_id.name if partner.country_id else '',
             },
-            'start_date': self.start_date.strftime('%d/%m/%Y'),
-            'end_date': self.end_date.strftime('%d/%m/%Y'),
+            'start_date':    self.start_date.strftime('%d/%m/%Y'),
+            'end_date':      self.end_date.strftime('%d/%m/%Y'),
             'opening_balance': round(opening_balance, 2),
-            'lines': lines,
-            'net_balance': round(running, 2),
-            # Required by Odoo's report engine
-            'docs': self,
+            'lines':           lines,
+            'net_balance':     round(running, 2),
+            'docs':            self,
         }
 
     # ------------------------------------------------------------------
@@ -171,19 +191,13 @@ class CustomerStatementWizard(models.TransientModel):
     # ------------------------------------------------------------------
 
     def customer_statements_pdf_report(self):
-        """Trigger QWeb PDF report."""
         self.ensure_one()
         self._check_dates()
-        data = {'wizard_id': self.id}
         return self.env.ref(
             'tk_statements.customer_report_template_action'
-        ).report_action(self, data=data)
+        ).report_action(self, data={'wizard_id': self.id})
 
     def customer_statements_excel_report(self):
-        """
-        Open the Excel download URL (controller route).
-        The controller reads the wizard by ID — no large payload in the URL.
-        """
         self.ensure_one()
         self._check_dates()
         return {
