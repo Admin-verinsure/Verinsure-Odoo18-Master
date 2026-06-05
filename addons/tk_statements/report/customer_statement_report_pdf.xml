@@ -186,9 +186,9 @@
 
                 <!-- Footer note -->
                 <p style="font-size:8px;color:#888;margin-top:14px;text-align:center;">
-                    Debit = Invoice charged &nbsp;|&nbsp;
-                    Credit = Credit note applied &nbsp;|&nbsp;
-                    Paid = Payment received &nbsp;|&nbsp;
+                    Debit = Invoice charged &#160;|&#160;
+                    Credit = Credit note applied &#160;|&#160;
+                    Paid = Payment received &#160;|&#160;
                     Balance = Net amount outstanding
                 </p>
 
