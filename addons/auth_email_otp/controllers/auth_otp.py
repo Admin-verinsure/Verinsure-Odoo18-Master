@@ -7,29 +7,25 @@ Implements the 2FA flow by extending Odoo's native /web/login endpoint.
 Flow overview:
     POST /web/login
         ↓ (credentials valid AND 2FA enabled)
-    Redirect → GET /auth/otp/verify?next=<encoded_url>
+    Redirect → GET /auth/otp/verify
         ↓ (OTP submitted)
     POST /auth/otp/verify
         ↓ (OTP correct)
-    Session finalised → Redirect to `next`
+    Session finalised → Redirect to /odoo (or original target)
 
 Security architecture:
-- Pending auth state is stored in an encrypted, signed Odoo session cookie
-  (standard Werkzeug session) — NOT in the URL or a plain cookie.
-- The session is given a new SID (session fixation prevention) only after
-  the full 2FA flow completes and the user is truly authenticated.
-- CSRF token is validated on every POST via Odoo's built-in mechanism
-  (`type='http', csrf=True`).
-- The `next` redirect is validated against the current host to prevent
-  open-redirect attacks.
-- No information about whether a user exists is ever exposed to the client.
-- All error messages are generic.
+- Pending auth state is stored in the Werkzeug session cookie (signed/encrypted).
+- Session is wiped after credentials check and before 2FA completes
+  (session fixation prevention).
+- CSRF validated on every POST via Odoo built-in (csrf=True).
+- Redirect target validated against current host (open-redirect prevention).
+- Generic error messages only — no user-existence information leaked.
 
-Session keys used (prefixed to avoid collisions):
-    otp_pending_uid       : int  — user id awaiting 2FA
-    otp_challenge_id      : int  — auth.otp.challenge record id
-    otp_redirect          : str  — post-login redirect target
-    otp_db                : str  — database name (multi-db safety)
+Session keys (otp_ prefix avoids collisions):
+    otp_pending_uid    : int — user id awaiting 2FA
+    otp_challenge_id   : int — auth.otp.challenge record id
+    otp_redirect       : str — post-login redirect target
+    otp_db             : str — database name (multi-db safety)
 """
 import logging
 from urllib.parse import urlparse
@@ -43,16 +39,16 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Session key constants
 # ---------------------------------------------------------------------------
-_SESSION_UID       = 'otp_pending_uid'
-_SESSION_CHALLENGE = 'otp_challenge_id'
-_SESSION_REDIRECT  = 'otp_redirect'
-_SESSION_DB        = 'otp_db'
+_SESSION_UID        = 'otp_pending_uid'
+_SESSION_CHALLENGE  = 'otp_challenge_id'
+_SESSION_REDIRECT   = 'otp_redirect'
+_SESSION_DB         = 'otp_db'
 
 # ---------------------------------------------------------------------------
-# User-facing messages  (generic — never reveal internals)
+# User-facing messages  (keep generic — never leak internals)
 # ---------------------------------------------------------------------------
-_GENERIC_ERROR      = _('Invalid or expired verification code. Please try again.')
-_LOCKOUT_ERROR      = _('Too many incorrect attempts. Please log in again.')
+_GENERIC_ERROR       = _('Invalid or expired verification code. Please try again.')
+_LOCKOUT_ERROR       = _('Too many incorrect attempts. Please log in again.')
 _RESEND_COOLDOWN_MSG = _('Please wait before requesting a new code.')
 _RESEND_SUCCESS_MSG  = _('A new verification code has been sent to your email.')
 
@@ -62,17 +58,12 @@ _RESEND_SUCCESS_MSG  = _('A new verification code has been sent to your email.')
 # ---------------------------------------------------------------------------
 
 def _safe_redirect(url: str, default: str = '/odoo') -> str:
-    """
-    Validate redirect URL to prevent open-redirect attacks.
-    Only allows relative URLs or URLs on the same host.
-    """
+    """Return url only if it is relative or on the same host — else default."""
     if not url:
         return default
     parsed = urlparse(url)
-    # Allow relative paths (no netloc means relative)
-    if not parsed.netloc:
+    if not parsed.netloc:          # relative path — always safe
         return url
-    # Allow same host
     request_host = urlparse(request.httprequest.host_url).netloc
     if parsed.netloc == request_host:
         return url
@@ -81,8 +72,8 @@ def _safe_redirect(url: str, default: str = '/odoo') -> str:
 
 def _get_challenge(env, challenge_id: int, user_id: int):
     """
-    Fetch the auth.otp.challenge record safely.
-    Returns None if not found, wrong user, or not in 'pending' state.
+    Return the auth.otp.challenge record if it exists, belongs to user_id,
+    and is still in 'pending' state.  Returns None otherwise.
     """
     try:
         challenge = env['auth.otp.challenge'].sudo().browse(challenge_id)
@@ -98,9 +89,23 @@ def _get_challenge(env, challenge_id: int, user_id: int):
 
 
 def _clear_otp_session():
-    """Remove all OTP-related keys from the session."""
+    """Remove every OTP-related key from the current session."""
     for key in (_SESSION_UID, _SESSION_CHALLENGE, _SESSION_REDIRECT, _SESSION_DB):
         request.session.pop(key, None)
+
+
+def _ensure_public_user():
+    """
+    Ensure the request environment has at least the public user set.
+
+    This is required before calling request.render() with website=True
+    templates (e.g. web.login, website.layout) from auth='none' routes.
+    Without it Odoo's website.layout QWeb evaluates website.add_to_cart_action
+    against an empty res.users() recordset and raises:
+        ValueError: Expected singleton: res.users()
+    """
+    if not request.env.uid:
+        request.env['ir.http']._auth_method_public()
 
 
 # ---------------------------------------------------------------------------
@@ -109,85 +114,72 @@ def _clear_otp_session():
 
 class AuthOtpController(http.Controller):
     """
-    Intercepts /web/login POST to inject 2FA when required,
-    and handles the OTP verification sub-flow at /auth/otp/verify.
+    Intercepts POST /web/login to inject 2FA, then handles the OTP
+    verification sub-flow at /auth/otp/verify.
     """
 
     # -----------------------------------------------------------------------
-    # Login interception — POST /web/login
+    # POST /web/login  — credential check + 2FA gate
     # -----------------------------------------------------------------------
 
-    @http.route('/web/login', type='http', auth='none', methods=['POST'], csrf=True, website=True)
+    @http.route('/web/login', type='http', auth='none', methods=['POST'],
+                csrf=True, website=True)
     def web_login_post(self, redirect=None, **post):
         """
         Override POST /web/login to inject 2FA.
 
-        Strategy:
-        1. Call Odoo's native login logic via request.session.authenticate().
-        2. If authentication fails → fall through to native error page.
-        3. If user has 2FA disabled → allow native redirect to complete.
-        4. If user has 2FA enabled:
-           a. Clear the just-created session (prevent session fixation).
-           b. Store pending state in a fresh anonymous session.
-           c. Generate OTP challenge and send email.
-           d. Redirect to /auth/otp/verify.
+        1. Authenticate credentials via session.authenticate().
+        2. No 2FA  → session already authenticated, redirect normally.
+        3. 2FA on  → wipe session, create challenge, redirect to /auth/otp/verify.
 
-        NOTE (Odoo 18): session.authenticate() returns the uid (int) directly,
-        NOT a dict. Subscripting the return value with ['uid'] raises TypeError
-        and causes a 500. We handle both cases defensively below.
+        Odoo 18 note: session.authenticate() returns the uid (int) directly,
+        NOT a dict like older versions.  We handle both shapes defensively.
+
+        website.layout note: request.render() on an auth='none' route needs a
+        valid env user or website.layout raises "Expected singleton: res.users()".
+        We call _ensure_public_user() before every render() call.
         """
-        db    = request.db
-        login = post.get('login', '').strip()
+        # Ensure public env is ready for template rendering
+        _ensure_public_user()
+
+        db       = request.db
+        login    = post.get('login', '').strip()
         password = post.get('password', '')
 
         # --- Step 1: Attempt native Odoo authentication ---
         try:
             credential = {
-                'login': login,
+                'login':    login,
                 'password': password,
-                'type': 'password',
+                'type':     'password',
             }
-            # Odoo 18: authenticate() returns int uid on success, or raises.
+            # Odoo 18 returns int uid; older builds returned {'uid': int}.
             result = request.session.authenticate(db, credential)
-
-            # Defensive: handle both int (Odoo 18) and dict (older builds)
-            if isinstance(result, dict):
-                uid = result.get('uid')
-            else:
-                uid = result
-
+            uid = result.get('uid') if isinstance(result, dict) else result
         except Exception:
-            # Wrong credentials or any auth error — show login page with error
-            return self._render_login_error(
-                _('Wrong login/password'),
-                redirect=redirect,
-            )
+            return self._render_login_error(_('Wrong login/password'), redirect=redirect)
 
         if not uid or not isinstance(uid, int):
-            return self._render_login_error(
-                _('Wrong login/password'),
-                redirect=redirect,
-            )
+            return self._render_login_error(_('Wrong login/password'), redirect=redirect)
 
-        # --- Step 2: Check if this user has 2FA enabled ---
+        # --- Step 2: Check whether this user requires 2FA ---
         env  = request.env(user=SUPERUSER_ID)
         user = env['res.users'].browse(uid)
 
         if not user.email_otp_enabled:
             # 2FA not required — session is already authenticated, just redirect
-            redirect_url = _safe_redirect(
-                redirect or request.params.get('redirect') or '/odoo'
+            return request.redirect(
+                _safe_redirect(redirect or request.params.get('redirect') or '/odoo')
             )
-            return request.redirect(redirect_url)
 
-        # --- Step 3: 2FA required — validate email exists ---
+        # --- Step 3: Guard — user must have an email address ---
         if not user.email:
             _logger.error(
-                'auth.otp: User %s (id=%d) has 2FA enabled but no email configured'
-                ' — blocking login.',
+                'auth.otp: User %s (id=%d) has 2FA enabled but no email — blocking login.',
                 user.login, uid,
             )
             request.session.logout(keep_db=True)
+            _ensure_public_user()
             return self._render_login_error(
                 _(
                     'Your account requires two-factor authentication but no email '
@@ -196,22 +188,23 @@ class AuthOtpController(http.Controller):
                 redirect=redirect,
             )
 
-        # --- Step 4: Wipe the authenticated session (prevent session fixation) ---
-        # The user is NOT considered logged in yet — start a fresh anonymous session.
+        # --- Step 4: Wipe the authenticated session (session-fixation prevention) ---
+        # User is NOT logged in yet — we start a fresh anonymous session.
         request.session.logout(keep_db=True)
+        _ensure_public_user()
 
-        # --- Step 5: Collect request metadata for audit trail ---
+        # --- Step 5: Gather audit metadata ---
         ip_address = request.httprequest.environ.get(
             'HTTP_X_FORWARDED_FOR',
             request.httprequest.environ.get('REMOTE_ADDR', ''),
         )
-        ip_address = ip_address.split(',')[0].strip()  # first IP if comma-separated
+        ip_address = ip_address.split(',')[0].strip()
         user_agent = (
             request.httprequest.user_agent.string
             if request.httprequest.user_agent else ''
         )
 
-        # --- Step 6: Create OTP challenge ---
+        # --- Step 6: Create OTP challenge record ---
         challenge, plain_otp = env['auth.otp.challenge'].create_challenge(
             user,
             ip_address=ip_address,
@@ -235,8 +228,8 @@ class AuthOtpController(http.Controller):
                 redirect=redirect,
             )
 
-        # --- Step 8: Store pending auth state in session ---
-        request.session[_SESSION_UID]      = uid
+        # --- Step 8: Store pending state in session ---
+        request.session[_SESSION_UID]       = uid
         request.session[_SESSION_CHALLENGE] = challenge.id
         request.session[_SESSION_REDIRECT]  = _safe_redirect(
             redirect or request.params.get('redirect') or '/odoo'
@@ -248,28 +241,29 @@ class AuthOtpController(http.Controller):
             'auth.otp: 2FA challenge initiated for user %s (id=%d) | challenge_id=%d',
             user.login, uid, challenge.id,
         )
-
         return request.redirect('/auth/otp/verify')
 
     # -----------------------------------------------------------------------
-    # Internal helpers
+    # Shared render helper
     # -----------------------------------------------------------------------
 
-    def _render_login_error(self, message: str, redirect=None):
+    @staticmethod
+    def _render_login_error(message: str, redirect=None):
         """
-        Render the standard Odoo login page with an error message.
+        Render the standard Odoo login page with an error banner.
 
-        NOTE (Odoo 18): the login template expects the key 'login_error',
-        NOT 'error'. Using 'error' silently renders no message at all.
+        Odoo 18 note: the web.login QWeb template expects the key 'login_error',
+        NOT 'error'.  Passing 'error' silently renders a blank error area.
         """
+        _ensure_public_user()
         return request.render('web.login', {
             'login_error': message,
-            'redirect': redirect,
+            'redirect':    redirect,
         })
 
     @staticmethod
     def _send_otp_email(env, user, plain_otp: str):
-        """Send the OTP via the Odoo mail template."""
+        """Dispatch the OTP code via the module's mail template."""
         template = env.ref(
             'auth_email_otp.email_template_otp_code',
             raise_if_not_found=True,
@@ -281,18 +275,18 @@ class AuthOtpController(http.Controller):
         )
 
     # -----------------------------------------------------------------------
-    # OTP Verification — GET /auth/otp/verify
+    # GET /auth/otp/verify  — show the OTP entry form
     # -----------------------------------------------------------------------
 
-    @http.route('/auth/otp/verify', type='http', auth='none', methods=['GET'], csrf=False, website=True)
+    @http.route('/auth/otp/verify', type='http', auth='none', methods=['GET'],
+                csrf=False, website=True)
     def otp_verify_get(self, **kwargs):
         """
-        Display the OTP verification form.
-        Validates session state before rendering.
+        Display the OTP verification form after validating session state.
 
-        NOTE (Odoo 18): Do NOT call _auth_method_public() manually here.
-        For auth='none' routes Odoo already initialises a public env; calling
-        it before the session keys are read causes an AttributeError / 500.
+        Odoo 18 note: do NOT call _auth_method_public() before reading session
+        keys — it reinitialises the env and can wipe session-local state on
+        some Odoo builds.  Call _ensure_public_user() only when about to render.
         """
         uid          = request.session.get(_SESSION_UID)
         challenge_id = request.session.get(_SESSION_CHALLENGE)
@@ -300,7 +294,7 @@ class AuthOtpController(http.Controller):
 
         if not uid or not challenge_id or db != request.db:
             _logger.warning(
-                'auth.otp: GET /auth/otp/verify accessed without valid session state.'
+                'auth.otp: GET /auth/otp/verify — missing or invalid session state.'
             )
             return request.redirect('/web/login')
 
@@ -309,42 +303,41 @@ class AuthOtpController(http.Controller):
 
         if not challenge:
             _logger.warning(
-                'auth.otp: No valid challenge found for uid=%d challenge_id=%d'
+                'auth.otp: No valid pending challenge for uid=%d challenge_id=%d'
                 ' — redirecting to login.',
                 uid, challenge_id,
             )
             _clear_otp_session()
             return request.redirect('/web/login')
 
-        resend_seconds = challenge.resend_seconds_remaining()
+        _ensure_public_user()
         return request.render('auth_email_otp.otp_verify_page', {
-            'resend_cooldown': resend_seconds,
+            'resend_cooldown': challenge.resend_seconds_remaining(),
         })
 
     # -----------------------------------------------------------------------
-    # OTP Verification — POST /auth/otp/verify (submit code)
+    # POST /auth/otp/verify  — validate submitted OTP code
     # -----------------------------------------------------------------------
 
-    @http.route('/auth/otp/verify', type='http', auth='none', methods=['POST'], csrf=True, website=True)
+    @http.route('/auth/otp/verify', type='http', auth='none', methods=['POST'],
+                csrf=True, website=True)
     def otp_verify_post(self, otp_code='', **kwargs):
         """
-        Handle OTP submission.
+        Validate the submitted OTP and finalise the session on success.
 
         Security controls:
-        - Session state validated (uid, challenge_id, db match).
-        - Challenge existence and 'pending' state validated.
-        - OTP stripped and length-checked (rejects obvious junk early).
-        - Hash comparison delegated to model (constant-time digest).
-        - On success: finalise session, set session.db, prevent fixation.
-        - On failure: generic error only — no detail leaked.
-        - On lockout: clear session, redirect to login with lockout message.
+        - Session state (uid / challenge_id / db) validated first.
+        - Input rejected early if not exactly 6 digits.
+        - Hash comparison is constant-time inside challenge.verify_otp().
+        - On success: session.db set explicitly before uid (Odoo 18 requirement).
+        - On lockout: session cleared, user sent back to login.
+        - All error messages are generic.
         """
         uid          = request.session.get(_SESSION_UID)
         challenge_id = request.session.get(_SESSION_CHALLENGE)
         redirect_url = request.session.get(_SESSION_REDIRECT, '/odoo')
         db           = request.session.get(_SESSION_DB)
 
-        # --- Validate session state ---
         if not uid or not challenge_id or db != request.db:
             return request.redirect('/web/login')
 
@@ -355,21 +348,21 @@ class AuthOtpController(http.Controller):
             _clear_otp_session()
             return request.redirect('/web/login')
 
-        # --- Validate input format (fast reject before hitting DB) ---
+        # Fast-reject obviously invalid input before touching the DB
         otp_code = (otp_code or '').strip()
         if len(otp_code) != 6 or not otp_code.isdigit():
+            _ensure_public_user()
             return request.render('auth_email_otp.otp_verify_page', {
-                'error': _GENERIC_ERROR,
+                'error':          _GENERIC_ERROR,
                 'resend_cooldown': challenge.resend_seconds_remaining(),
             })
 
-        # --- Verify OTP (constant-time comparison inside model) ---
+        # Constant-time hash comparison delegated to the model
         is_valid = challenge.verify_otp(otp_code)
 
         if not is_valid:
-            # Re-fetch to check if challenge was cancelled (lockout / expiry)
+            # Re-fetch to detect lockout / expiry state change
             challenge = env['auth.otp.challenge'].sudo().browse(challenge_id)
-
             if challenge.state == 'cancelled':
                 _clear_otp_session()
                 _logger.warning(
@@ -377,22 +370,22 @@ class AuthOtpController(http.Controller):
                     ' — forcing re-login.',
                     challenge_id, uid,
                 )
+                _ensure_public_user()
                 return request.render('web.login', {'login_error': _LOCKOUT_ERROR})
 
+            _ensure_public_user()
             return request.render('auth_email_otp.otp_verify_page', {
-                'error': _GENERIC_ERROR,
+                'error':          _GENERIC_ERROR,
                 'resend_cooldown': challenge.resend_seconds_remaining(),
             })
 
-        # --- OTP correct: finalise authentication ---
+        # --- OTP correct: finalise the authenticated session ---
         _clear_otp_session()
-
         user = env['res.users'].browse(uid)
 
-        # NOTE (Odoo 18): session.db MUST be set explicitly on auth='none' routes
-        # before setting uid/login, otherwise the session middleware discards the
-        # session as invalid and the user is immediately logged out on the next
-        # request.
+        # Odoo 18: session.db MUST be set before uid/login.
+        # Without it the session middleware treats the session as invalid and
+        # immediately logs the user out on the very next request.
         request.session.db            = db
         request.session.uid           = uid
         request.session.login         = user.login
@@ -400,29 +393,25 @@ class AuthOtpController(http.Controller):
             request.session.sid
         )
 
-        # Refresh request.env so downstream code sees the correct user
+        # Refresh request.env so the rest of this request sees the real user
         request.update_env(user=uid)
 
         _logger.info(
-            'auth.otp: Login completed for user %s (id=%d) via 2FA.',
+            'auth.otp: 2FA login complete for user %s (id=%d).',
             user.login, uid,
         )
-
         return request.redirect(_safe_redirect(redirect_url))
 
     # -----------------------------------------------------------------------
-    # OTP Resend — POST /auth/otp/resend
+    # POST /auth/otp/resend  — issue a fresh OTP code
     # -----------------------------------------------------------------------
 
-    @http.route('/auth/otp/resend', type='http', auth='none', methods=['POST'], csrf=True, website=True)
+    @http.route('/auth/otp/resend', type='http', auth='none', methods=['POST'],
+                csrf=True, website=True)
     def otp_resend(self, **kwargs):
         """
-        Resend OTP to the user.
-
-        Controls:
-        - 60-second cooldown enforced via model.
-        - Creates a NEW challenge (old one is cancelled inside create_challenge).
-        - All actions logged for audit trail.
+        Cancel the current challenge and send a new OTP.
+        A 60-second cooldown is enforced via challenge.can_resend().
         """
         uid          = request.session.get(_SESSION_UID)
         challenge_id = request.session.get(_SESSION_CHALLENGE)
@@ -438,11 +427,11 @@ class AuthOtpController(http.Controller):
             _clear_otp_session()
             return request.redirect('/web/login')
 
-        # Enforce cooldown
         if not old_challenge.can_resend():
             remaining = old_challenge.resend_seconds_remaining()
+            _ensure_public_user()
             return request.render('auth_email_otp.otp_verify_page', {
-                'error': _RESEND_COOLDOWN_MSG,
+                'error':          _RESEND_COOLDOWN_MSG,
                 'resend_cooldown': remaining,
             })
 
@@ -475,7 +464,6 @@ class AuthOtpController(http.Controller):
             _clear_otp_session()
             return request.redirect('/web/login')
 
-        # Update session to point to the new challenge
         request.session[_SESSION_CHALLENGE] = new_challenge.id
         request.session.modified            = True
 
@@ -484,18 +472,20 @@ class AuthOtpController(http.Controller):
             user.login, uid, new_challenge.id,
         )
 
+        _ensure_public_user()
         return request.render('auth_email_otp.otp_verify_page', {
-            'success': _RESEND_SUCCESS_MSG,
+            'success':        _RESEND_SUCCESS_MSG,
             'resend_cooldown': 60,
         })
 
     # -----------------------------------------------------------------------
-    # Cancel / Back to login
+    # GET|POST /auth/otp/cancel  — abandon 2FA and return to login
     # -----------------------------------------------------------------------
 
-    @http.route('/auth/otp/cancel', type='http', auth='none', methods=['GET', 'POST'], csrf=False, website=True)
+    @http.route('/auth/otp/cancel', type='http', auth='none',
+                methods=['GET', 'POST'], csrf=False, website=True)
     def otp_cancel(self, **kwargs):
-        """Allow the user to abandon the OTP flow and return to the login page."""
+        """Cancel the OTP flow, mark the challenge as cancelled, go to login."""
         challenge_id = request.session.get(_SESSION_CHALLENGE)
         uid          = request.session.get(_SESSION_UID)
 
