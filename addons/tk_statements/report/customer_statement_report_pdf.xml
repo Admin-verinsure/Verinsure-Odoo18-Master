@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-    
+
     <template id="customer_report_template">
         <t t-call="web.html_container">
             <t t-call="web.external_layout">
 
-                <!-- ── Page styles ── -->
                 <style>
                     .cs-title {
                         text-align: center;
@@ -36,11 +35,7 @@
                         margin-top: 10px;
                         font-size: 9.5px;
                     }
-
-
-                    .cs-ledger thead {
-                        display: table-row-group;
-                    }
+                    .cs-ledger thead { display: table-row-group; }
                     .cs-ledger thead tr {
                         background: #1F3864;
                         color: #fff;
@@ -51,7 +46,6 @@
                         border: 1px solid #1F3864;
                         font-weight: 700;
                     }
-
                     .cs-ledger tbody tr:nth-child(odd)  { background: #F5F8FB; }
                     .cs-ledger tbody tr:nth-child(even) { background: #fff; }
                     .cs-ledger tbody td {
@@ -59,8 +53,6 @@
                         border: 1px solid #D0D0D0;
                         vertical-align: middle;
                     }
-
-                    /* Net balance row — plain tbody row styled to look like tfoot */
                     .cs-ledger-total td {
                         background: #1F3864;
                         color: #fff;
@@ -75,111 +67,102 @@
                     .txt-left   { text-align: left; }
                     .type-invoice    { color: #375623; font-weight: 600; }
                     .type-creditnote { color: #C00000; font-weight: 600; }
+                    .type-payment    { color: #2E75B6; font-weight: 600; }
                     .bal-negative    { color: #C00000; }
-                    .bal-negative-white { color: #FF6B6B; }
                 </style>
 
-                <!-- ── Report Title ── -->
+                <!-- Title -->
                 <p class="cs-title">STATEMENT OF ACCOUNT</p>
 
-                <!-- ── Header meta block ── -->
+                <!-- Header meta -->
                 <table class="cs-meta-table" style="width:100%;margin-bottom:12px;">
                     <tr>
-                        <!-- Customer address -->
                         <td style="width:55%;vertical-align:top;">
                             <strong style="font-size:11px;">
                                 <t t-out="partner['name']"/>
                             </strong><br/>
-                            <t t-if="partner['street']">
-                                <t t-out="partner['street']"/><br/>
-                            </t>
-                            <t t-if="partner['street2']">
-                                <t t-out="partner['street2']"/><br/>
-                            </t>
+                            <t t-if="partner['street']"><t t-out="partner['street']"/><br/></t>
+                            <t t-if="partner['street2']"><t t-out="partner['street2']"/><br/></t>
                             <t t-if="partner['city'] or partner['zip']">
                                 <t t-out="partner['city']"/>
                                 <t t-if="partner['city'] and partner['zip']">, </t>
                                 <t t-out="partner['zip']"/><br/>
                             </t>
-                            <t t-if="partner['state']">
-                                <t t-out="partner['state']"/><br/>
-                            </t>
-                            <t t-if="partner['country']">
-                                <t t-out="partner['country']"/>
-                            </t>
+                            <t t-if="partner['state']"><t t-out="partner['state']"/><br/></t>
+                            <t t-if="partner['country']"><t t-out="partner['country']"/></t>
                         </td>
-                        <!-- Statement meta -->
                         <td style="width:45%;vertical-align:top;text-align:right;">
                             <table style="margin-left:auto;">
                                 <tr>
                                     <td class="cs-meta-label">Period:</td>
+                                    <td><t t-out="start_date"/> — <t t-out="end_date"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="cs-meta-label">Currency:</td>
                                     <td>
-                                        <t t-out="start_date"/> — <t t-out="end_date"/>
+                                        <t t-out="company.currency_id.name"/>
+                                        <t t-out="company.currency_id.symbol"/>
                                     </td>
                                 </tr>
-                                                        <tr>
-    <td class="cs-meta-label">Currency:</td>
-    <td>
-        <span class="currency-text">
-    <t t-out="company.currency_id.name"/>
-    <t t-out="company.currency_id.symbol"/>
-</span>
-    </td>
-</tr>
                             </table>
                         </td>
                     </tr>
                 </table>
 
-                <!-- ── Ledger table ── -->
-                <!-- NOTE: No <tfoot> — replaced with a tbody row so wkhtmltopdf
-                     does NOT repeat the NET BALANCE on every page break -->
+                <!-- Ledger table — 7 columns -->
                 <table class="cs-ledger">
                     <thead>
                         <tr>
-                            <th style="width:11%;">Date</th>
-                            <th style="width:22%;">Document No.</th>
-                            <th style="width:13%;">Type</th>
-                            <th style="width:14%;" class="txt-right">Debit</th>
-                            <th style="width:14%;" class="txt-right">Credit</th>
-                            <th style="width:14%;" class="txt-right">Balance</th>
+                            <th style="width:10%;">Date</th>
+                            <th style="width:20%;">Document No.</th>
+                            <th style="width:12%;">Type</th>
+                            <th style="width:13%;" class="txt-right">Debit</th>
+                            <th style="width:13%;" class="txt-right">Credit</th>
+                            <th style="width:13%;" class="txt-right">Paid</th>
+                            <th style="width:13%;" class="txt-right">Balance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Opening Balance row -->
+                        <!-- Opening Balance -->
                         <tr class="cs-opening-row">
-                            <td colspan="5" class="txt-left">
-                                Opening Balance (before period)
-                            </td>
+                            <td colspan="6" class="txt-left">Opening Balance (before period)</td>
                             <td class="txt-right">
                                 <t t-out="'%.2f' % opening_balance"/>
                             </td>
                         </tr>
 
-                        <!-- Ledger lines -->
+                        <!-- Lines -->
                         <t t-foreach="lines" t-as="line">
                             <tr>
+                                <td class="txt-center"><t t-out="line['date']"/></td>
+                                <td class="txt-left"><t t-out="line['name']"/></td>
                                 <td class="txt-center">
-                                    <t t-out="line['date']"/>
-                                </td>
-                                <td class="txt-left">
-                                    <t t-out="line['name']"/>
-                                </td>
-                                <td class="txt-center">
-                                    <span t-attf-class="#{line['move_type'] == 'out_invoice' and 'type-invoice' or 'type-creditnote'}">
+                                    <span t-attf-class="#{
+                                        line['move_type'] == 'out_invoice' and 'type-invoice' or
+                                        line['move_type'] == 'out_refund'  and 'type-creditnote' or
+                                        'type-payment'}">
                                         <t t-out="line['type_label']"/>
                                     </span>
                                 </td>
+                                <!-- Debit -->
                                 <td class="txt-right">
                                     <t t-if="line['debit']">
                                         <t t-out="'%.2f' % line['debit']"/>
                                     </t>
                                 </td>
+                                <!-- Credit -->
                                 <td class="txt-right" style="color:#C00000;">
                                     <t t-if="line['credit']">
                                         <t t-out="'%.2f' % line['credit']"/>
                                     </t>
                                 </td>
+                                <!-- Paid -->
+                                <td class="txt-right" style="color:#2E75B6;">
+                                    <t t-if="line['paid']">
+                                        <t t-out="'%.2f' % line['paid']"/>
+                                    </t>
+                                </td>
+                                <!-- Balance -->
                                 <td class="txt-right">
                                     <span t-attf-class="#{line['running_balance'] &lt; 0 and 'bal-negative' or ''}">
                                         <t t-out="'%.2f' % line['running_balance']"/>
@@ -188,9 +171,9 @@
                             </tr>
                         </t>
 
-                        <!-- NET BALANCE row — plain tbody so it renders ONCE at the end only -->
+                        <!-- NET BALANCE — tbody row so wkhtmltopdf renders it ONCE only -->
                         <tr class="cs-ledger-total">
-                            <td colspan="5" class="txt-right">
+                            <td colspan="6" class="txt-right">
                                 NET BALANCE DUE (<t t-out="company_info['currency_symbol']"/>)
                             </td>
                             <td class="txt-right"
@@ -201,18 +184,18 @@
                     </tbody>
                 </table>
 
-                <!-- ── Footer note ── -->
+                <!-- Footer note -->
                 <p style="font-size:8px;color:#888;margin-top:14px;text-align:center;">
-                    This statement reflects all posted invoices and credit notes
-                    for the selected period. Debit = Invoice amount outstanding;
-                    Credit = Credit note amount. Balance shown is the net payable.
+                    Debit = Invoice charged &nbsp;|&nbsp;
+                    Credit = Credit note applied &nbsp;|&nbsp;
+                    Paid = Payment received &nbsp;|&nbsp;
+                    Balance = Net amount outstanding
                 </p>
 
             </t>
         </t>
     </template>
 
-    <!-- ── Report Action ── -->
     <record id="customer_report_template_action" model="ir.actions.report">
         <field name="name">Customer Statement Report</field>
         <field name="model">customer.statement.wizard</field>
@@ -222,4 +205,5 @@
         <field name="binding_model_id" ref="model_customer_statement_wizard"/>
         <field name="binding_type">report</field>
     </record>
+
 </odoo>
