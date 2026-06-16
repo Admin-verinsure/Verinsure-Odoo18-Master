@@ -37,10 +37,8 @@ class AccountMove(models.Model):
                                              'move_id',
                                              string='Assets Depreciation Lines')
     to_check = fields.Boolean(string='To Check', tracking=True,
-                              help="If this checkbox is ticked, it means that "
-                                   "the user was not sure of all the related "
-                                   "information at the time of the creation of "
-                                   "the move and that the move needs to be "
+                              help="If this checkbox is ticked, it means that the user was not sure of all the related "
+                                   "information at the time of the creation of the move and that the move needs to be "
                                    "checked again.",
                               )
 
@@ -75,40 +73,33 @@ class AccountMove(models.Model):
         return res
 
     def action_post(self):
+        """Action used to post invoice"""
+        result = super(AccountMove, self).action_post()
+        for inv in self:
+            context = dict(self.env.context)
+            # Within the context of an invoice,
+            # this default value is for the type of the invoice, not the type
+            # of the asset. This has to be cleaned from the context before
+            # creating the asset,otherwise it tries to create the asset with
+            # the type of the invoice.
+            context.pop('default_type', None)
+            inv.invoice_line_ids.with_context(context).asset_create()
+        return result
+
+    def action_post(self):
         """To check the selected customers due amount is exceed than blocking stage"""
         pay_type = ['out_invoice', 'out_refund', 'out_receipt']
         for rec in self:
             if rec.partner_id.active_limit and rec.move_type in pay_type \
                     and rec.partner_id.enable_credit_limit:
-                if rec.due_amount >= rec.partner_id.blocking_stage \
-                        and rec.partner_id.blocking_stage != 0:
-                    raise UserError(_(
-                        "%s is in  Blocking Stage and "
-                        "has a due amount of %s %s to pay") % (
-                                        rec.partner_id.name, rec.due_amount,
-                                        rec.currency_id.symbol))
-
-        result = super(AccountMove, self).action_post()
-        for inv in self:
-            context = dict(self.env.context)
-            context.pop('default_type', None)
-            inv.invoice_line_ids.with_context(context).asset_create()
-        return result
-
-    @api.depends('amount_residual', 'move_type', 'state', 'company_id',
-                 'reconciled_payment_ids.state',
-                 'reconciled_payment_ids.is_matched')
-    def _compute_payment_state(self):
-        """Override to ensure invoices remain 'in_payment' if linked bank
-        payments are not matched with a statement."""
-        super()._compute_payment_state()
-        for move in self:
-            if move.state == 'posted' and move.is_invoice(True) and \
-                    move.payment_state == 'paid':
-                payments = move._get_reconciled_payments()
-                if any(p.journal_id.type in ('bank', 'cash') and
-                       not p.is_matched for p in payments):
-                    move.payment_state = 'in_payment'
+                if rec.due_amount >= rec.partner_id.blocking_stage:
+                    if rec.partner_id.blocking_stage != 0:
+                        raise UserError(_(
+                            "%s is in  Blocking Stage and "
+                            "has a due amount of %s %s to pay") % (
+                                            rec.partner_id.name, rec.due_amount,
+                                            rec.currency_id.symbol))
+        return super(AccountMove, self).action_post()
 
     @api.onchange('partner_id')
     def check_due(self):
