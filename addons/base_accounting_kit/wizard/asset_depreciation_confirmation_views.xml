@@ -32,13 +32,13 @@
         <field name="context">{'asset_type': 'purchase'}</field>
     </record>
 <!--Menu Generate Assets Entries-->
-    <menuitem name="Generate Entries"
-              id="generate_entries_menu"
-              parent="account.menu_finance_entries"
-              sequence="111" groups="base.group_no_one"/>
-    <menuitem name="Generate Assets Entries"
-              action="action_asset_depreciation_confirmation_wizard"
-              id="menu_asset_depreciation_confirmation_wizard"
-              parent="base_accounting_kit.generate_entries_menu"
-              sequence="111" groups="base.group_no_one"/>
+<!--    <menuitem name="Generate Entries"-->
+<!--              id="generate_entries_menu"-->
+<!--              parent="account.menu_finance_entries"-->
+<!--              sequence="111" groups="base.group_no_one"/>-->
+<!--    <menuitem name="Generate Assets Entries"-->
+<!--              action="action_asset_depreciation_confirmation_wizard"-->
+<!--              id="menu_asset_depreciation_confirmation_wizard"-->
+<!--              parent="base_accounting_kit.generate_entries_menu"-->
+<!--              sequence="111" groups="base.group_no_one"/>-->
 </odoo>

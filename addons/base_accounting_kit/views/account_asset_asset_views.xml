@@ -62,10 +62,10 @@
                             <field name="depreciation_line_ids" mode="list"
                                    readonly="state not in ['draft', 'open']"
                                    options="{'reload_whole_on_button': true}">
-                                <list string="Depreciation Lines" decoration-info="(move_check == False)" create="false">
-                                    <field name="depreciation_date"/>
+                                <list string="Depreciation Lines" decoration-info="(move_check == False)" create="0" editable="top">
+                                    <field name="depreciation_date" readonly="1"/>
                                     <field name="depreciated_value" readonly="1"/>
-                                    <field name="amount" widget="monetary" string="Depreciation"/>
+                                    <field name="amount" widget="monetary" string="Depreciation" readonly="1"/>
                                     <field name="remaining_value" readonly="1" widget="monetary" string="Residual"/>
                                     <field name="move_check" widget="deprec_lines_toggler"
                                            invisible="parent_state != 'open'"/>
