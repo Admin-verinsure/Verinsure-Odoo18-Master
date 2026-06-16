@@ -21,8 +21,9 @@
 #############################################################################
 {
     'name': 'Odoo 18 Full Accounting Kit for Community',
-    'version': '18.0.1.0.1',
+    'version': '18.0.5.0.9',
     'category': 'Accounting',
+    'live_test_url': 'https://kit.easyinstance.com/web/login?redirect=/odoo/accounting',
     'summary': """Odoo 18 Accounting, Odoo 18 Accounting Reports, Odoo18 Accounting, Odoo Accounting, Odoo18 Financial Reports, Odoo18 Asset, Odoo18 Profit and Loss, PDC, Followups, Odoo18, Accounting, Odoo Apps, Reports""",
     'description': """ Odoo 18 Accounting, The module used to manage the Full
      Account Features that can manage the Account Reports,Journals Asset and 
@@ -52,6 +53,7 @@
         'views/account_followup.xml',
         'views/followup_line_views.xml',
         'views/followup_report.xml',
+        'views/res_partner_views.xml',
         'wizard/asset_depreciation_confirmation_views.xml',
         'wizard/asset_modify_views.xml',
         'views/account_asset_asset_views.xml',
@@ -87,13 +89,19 @@
         'report/report.xml',
         'report/multiple_invoice_layouts.xml',
         'report/multiple_invoice_report_template.xml',
+        'report/res_partner_reports.xml',
+        'report/res_partner_templates.xml',
         'views/account_recurring_payments_view.xml',
         'views/account_move_line_views.xml',
         'views/account_bank_statement_views.xml',
         'views/account_bank_statement_line_views.xml',
         'views/account_payment_view.xml',
         'wizard/account_lock_date_views.xml',
+        'wizard/import_bank_statement_views.xml',
     ],
+    'external_dependencies': {
+            'python': ['openpyxl', 'ofxparse', 'qifparse']
+        },
     'assets': {
         'web.assets_backend': [
             'base_accounting_kit/static/src/scss/style.scss',
@@ -102,6 +110,7 @@
             'base_accounting_kit/static/src/js/KanbanController.js',
             'base_accounting_kit/static/src/js/ListController.js',
             'base_accounting_kit/static/src/js/bank_reconcile_form_lines_widget.js',
+            'base_accounting_kit/static/src/js/action_manager.js',
             'base_accounting_kit/static/src/xml/bank_rec_widget.xml',
             'base_accounting_kit/static/src/xml/bank_reconcile_widget.xml',
         ]

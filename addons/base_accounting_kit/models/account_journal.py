@@ -115,3 +115,15 @@ class AccountJournal(models.Model):
             'view_mode': 'list,form',
             'context': {'default_journal_id': self.id},
         }
+
+    def action_import_wizard(self):
+        """Function to open wizard"""
+        return {
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'import.bank.statement',
+            'target': 'new',
+            'context': {
+                'default_journal_id': self.id,
+            }
+        }
