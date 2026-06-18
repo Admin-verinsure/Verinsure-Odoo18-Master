@@ -220,30 +220,30 @@ class AgeReceivableReport(models.TransientModel):
             data['filters']['end_date'] else ''
         sheet = workbook.add_worksheet()
         head = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '15px'})
+            {'align': 'center', 'bold': True, 'font_size': 15})
         sub_heading = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px',
+            {'align': 'center', 'bold': True, 'font_size': 10,
              'border': 1, 'bg_color': '#D3D3D3',
              'border_color': 'black'})
         filter_head = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px',
+            {'align': 'center', 'bold': True, 'font_size': 10,
              'border': 1, 'bg_color': '#D3D3D3',
              'border_color': 'black'})
         filter_body = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px'})
+            {'align': 'center', 'bold': True, 'font_size': 10})
         side_heading_sub = workbook.add_format(
-            {'align': 'left', 'bold': True, 'font_size': '10px',
+            {'align': 'left', 'bold': True, 'font_size': 10,
              'border': 1,
              'border_color': 'black'})
         side_heading_sub.set_indent(1)
-        txt_name = workbook.add_format({'font_size': '10px', 'border': 1})
+        txt_name = workbook.add_format({'font_size': 10, 'border': 1})
         txt_name.set_indent(2)
         # Define a number format with thousand separator
-        num_format = workbook.add_format({'font_size': '10px', 'border': 1, 'num_format': '#,##0.00'})
+        num_format = workbook.add_format({'font_size': 10, 'border': 1, 'num_format': '#,##0.00'})
         num_format.set_indent(2)
         # Define a number format for totals with thousand separator
         total_num_format = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px',
+            {'align': 'center', 'bold': True, 'font_size': 10,
              'border': 1, 'bg_color': '#D3D3D3',
              'border_color': 'black', 'num_format': '#,##0.00'})
         sheet.set_column(0, 0, 30)
@@ -251,9 +251,9 @@ class AgeReceivableReport(models.TransientModel):
         sheet.set_column(2, 2, 15)
         sheet.set_column(3, 3, 15)
         col = 0
-        sheet.write('A1:b1', report_name, head)
-        sheet.write('B3:b4', 'Date Range', filter_head)
-        sheet.write('B4:b4', 'Partners', filter_head)
+        sheet.merge_range('A1:G1', report_name, head)
+        sheet.write('B3', 'Date Range', filter_head)
+        sheet.write('B4', 'Partners', filter_head)
         if end_date:
             sheet.merge_range('C3:G3', f"{end_date}", filter_body)
         if data['filters']['partner']:

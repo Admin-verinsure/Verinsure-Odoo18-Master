@@ -389,16 +389,16 @@ class AccountPartnerLedger(models.TransientModel):
         head = workbook.add_format({'font_size': 15, 'align': 'center', 'bold': True})
         head_highlight = workbook.add_format({'font_size': 10, 'align': 'center', 'bold': True})
         sub_heading = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px', 'border': 1, 'bg_color': '#D3D3D3',
+            {'align': 'center', 'bold': True, 'font_size': 10, 'border': 1, 'bg_color': '#D3D3D3',
              'border_color': 'black'})
         filter_head = workbook.add_format(
-            {'align': 'center', 'bold': True, 'font_size': '10px', 'border': 1, 'bg_color': '#D3D3D3',
+            {'align': 'center', 'bold': True, 'font_size': 10, 'border': 1, 'bg_color': '#D3D3D3',
              'border_color': 'black'})
-        filter_body = workbook.add_format({'align': 'center', 'bold': True, 'font_size': '10px'})
+        filter_body = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 10})
         side_heading_sub = workbook.add_format(
-            {'align': 'left', 'bold': True, 'font_size': '10px', 'border': 1, 'border_color': 'black'})
+            {'align': 'left', 'bold': True, 'font_size': 10, 'border': 1, 'border_color': 'black'})
         side_heading_sub.set_indent(1)
-        txt_name = workbook.add_format({'font_size': '10px', 'border': 1})
+        txt_name = workbook.add_format({'font_size': 10, 'border': 1})
         txt_name.set_indent(2)
 
         # Set column widths
@@ -409,11 +409,11 @@ class AccountPartnerLedger(models.TransientModel):
 
         # Write headers and filters
         col = 0
-        sheet.write('A1:B1', report_name, head)
-        sheet.write('B3:B4', 'Date Range', filter_head)
-        sheet.write('B4:B4', 'Partners', filter_head)
-        sheet.write('B5:B4', 'Accounts', filter_head)
-        sheet.write('B6:B4', 'Options', filter_head)
+        sheet.merge_range('A1:G1', report_name, head)
+        sheet.write('B3', 'Date Range', filter_head)
+        sheet.write('B4', 'Partners', filter_head)
+        sheet.write('B5', 'Accounts', filter_head)
+        sheet.write('B6', 'Options', filter_head)
 
         if start_date or end_date:
             sheet.merge_range('C3:G3', f"{start_date} to {end_date}", filter_body)
