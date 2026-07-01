@@ -117,6 +117,12 @@ class AutoReconciliationLog(models.Model):
     def cron_purge_old_logs(self, days=90):
         """
         LOG RETENTION FIX (clause 2.4.1.e): Delete reconciliation log entries
+        older than *days* days (default 90).  Called by the scheduled purge cron.
+
+        sudo() needed so the cron technical user (which has no unlink permission
+        on auto.reconciliation.log) can perform the delete.  Scope is strictly
+        limited to records older than the cutoff.
+        """
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
         # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
@@ -124,12 +130,6 @@ class AutoReconciliationLog(models.Model):
             from odoo.exceptions import AccessError
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
-        older than *days* days (default 90).  Called by the scheduled purge cron.
-
-        sudo() needed so the cron technical user (which has no unlink permission
-        on auto.reconciliation.log) can perform the delete.  Scope is strictly
-        limited to records older than the cutoff.
-        """
         cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
         old = self.sudo().search([('create_date', '<', cutoff)])
         count = len(old)

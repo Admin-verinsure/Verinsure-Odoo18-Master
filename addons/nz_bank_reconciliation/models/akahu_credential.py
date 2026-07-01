@@ -165,16 +165,16 @@ class AkahuCredential(models.Model):
 
     def action_revoke_credentials(self):
         """
-        SEC-03 FIX
+        SEC-03 FIX (clause 2.2.1.d): Revoke and clear all stored credentials
+        for this company so that fresh tokens can be re-entered.  A
+        confirmation wizard is shown before any data is cleared.
+        """
         # METHOD GUARD: Restricted to ERP Managers only (same group that can see the
         # credential fields). Prevents account managers from revoking credentials via RPC.
         if not self.env.user.has_group('base.group_erp_manager'):
             from odoo.exceptions import AccessError
             raise AccessError(_('Revoking credentials is restricted to ERP Managers.'))
- (clause 2.2.1.d): Revoke and clear all stored credentials
-        for this company so that fresh tokens can be re-entered.  A
-        confirmation wizard is shown before any data is cleared.
-        """
+
         self.ensure_one()
         return {
             'type': 'ir.actions.act_window',
@@ -276,16 +276,16 @@ class AkahuCredential(models.Model):
 
     def action_test_connection(self):
         """
-        Test credentials by fetching the list of accounts
+        Test credentials by fetching the list of accounts for the first
+        linked akahu.account.
+        """
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
         # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
         if not self.env.user.has_group('account.group_account_manager'):
             from odoo.exceptions import AccessError
             raise AccessError(_('This action is restricted to Accounting Managers.'))
- for the first
-        linked akahu.account.
-        """
+
         self.ensure_one()
         accounts = self.env['akahu.account'].search([
             ('credential_id', '=', self.id),

@@ -69,5 +69,5 @@ UX
     'application': True,
     'auto_install': False,
     'license': 'LGPL-3',
-    'external_dependencies': {'python': ['requests']},
+    'external_dependencies': {'python': ['requests', 'cryptography']},
 }

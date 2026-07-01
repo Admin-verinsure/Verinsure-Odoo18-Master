@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from odoo import models, fields, api, _
@@ -11,6 +12,19 @@ from odoo.exceptions import UserError
 MAX_PAGES = 500
 
 _logger = logging.getLogger(__name__)
+
+
+def _sanitize_error_text(text, limit=512):
+    """
+    SEC-04 FIX (consistency): apply the same token-shaped-string redaction
+    used in akahu.credential._api_get() before persisting exception text to
+    akahu.sync.log.error_message, which is readable by account.group_account_user.
+    Truncates to *limit* chars and redacts anything matching [a-zA-Z0-9_]{20,}.
+    """
+    if not text:
+        return text
+    truncated = text[:limit]
+    return re.sub(r'[a-zA-Z0-9_]{20,}', '[REDACTED]', truncated)
 
 
 class AkahuSyncEngine(models.Model):
@@ -62,7 +76,7 @@ class AkahuSyncEngine(models.Model):
                     'company_id': account.company_id.id,
                     'status': 'error',
                     'transactions_imported': 0,
-                    'error_message': str(e)[:512],
+                    'error_message': _sanitize_error_text(str(e)),
                 })
         _logger.info('Akahu Sync Cron: Done. Total imported: %d', total_imported)
 
