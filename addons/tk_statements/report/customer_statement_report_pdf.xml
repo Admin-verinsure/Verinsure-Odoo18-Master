@@ -94,7 +94,7 @@
                         <td style="width:45%;vertical-align:top;text-align:right;">
                             <table style="margin-left:auto;">
                                 <tr>
-                                    <td class="cs-meta-label">Period:</td>
+                                    <td class="cs-meta-label">Accounting Period:</td>
                                     <td><t t-out="start_date"/> — <t t-out="end_date"/></td>
                                 </tr>
                                 <tr>

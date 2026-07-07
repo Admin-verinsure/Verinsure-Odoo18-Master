@@ -132,7 +132,7 @@ class CustomerStatementController(http.Controller):
 
         meta_label(4, 4, "Customer:")
         meta_value(4, 5, 6, data['partner']['name'])
-        meta_label(5, 4, "Period:")
+        meta_label(5, 4, "Accounting Period:")
         meta_value(5, 5, 6, f"{data['start_date']}  →  {data['end_date']}")
         meta_label(6, 4, "As of:")
         meta_value(6, 5, 6, date.today().strftime("%d/%m/%Y"))
