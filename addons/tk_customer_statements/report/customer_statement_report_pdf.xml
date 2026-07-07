@@ -32,6 +32,10 @@
                             <span>As of
                                 <t t-esc="today_date"/>
                             </span>
+                            <br/>
+                            <span>Accounting Period:
+                                <t t-esc="start_date"/> - <t t-esc="end_date"/>
+                            </span>
                         </td>
                     </tr>
                 </table>

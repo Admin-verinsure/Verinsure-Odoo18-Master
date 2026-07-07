@@ -57,6 +57,8 @@ class InvoiceAbstractReport(models.AbstractModel):
             'total_amount': round(total_amount, 2),
             'total_payment': round(total_payment, 2),
             'total_balance': round(total_balance, 2),
+            'start_date': start_date,
+            'end_date': end_date,
             'partner_name': partner_id[1],
             'partner_street': invoices.partner_id[0].street,
             'partner_street2': invoices.partner_id[0].street2,
