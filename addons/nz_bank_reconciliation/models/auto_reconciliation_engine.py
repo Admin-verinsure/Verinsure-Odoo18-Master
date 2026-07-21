@@ -400,6 +400,8 @@ class AutoReconciliationEngine(models.Model):
         match_by_currency  = not config or config.match_by_currency
         match_by_amount    = not config or config.match_by_amount
         match_by_reference = not config or config.match_by_reference
+        match_by_date_window = not config or config.match_by_date_window
+        date_window_days   = (config.date_window_days if config else 60) or 60
         matched = []
         # sudo(): cron technical user needs payment read for customer/vendor matching steps
         Payment = self.env['account.payment'].sudo()
@@ -430,17 +432,47 @@ class AutoReconciliationEngine(models.Model):
                         ('payment_reference', 'in', list(ref_tokens)),
                         ('ref', 'in', list(ref_tokens)),
                     ]
+                    if match_by_date_window and payment.date:
+                        ref_domain += [
+                            ('invoice_date', '>=', payment.date - timedelta(days=date_window_days)),
+                            ('invoice_date', '<=', payment.date + timedelta(days=date_window_days)),
+                        ]
                     if match_by_currency:
                         ref_domain.append(('currency_id', '=', payment.currency_id.id))
                     if match_by_partner and payment.partner_id:
                         ref_domain.append(('partner_id', '=', payment.partner_id.id))
                     ref_hits = Move.search(ref_domain, limit=5, order='invoice_date asc, id asc')
-                    # Among reference hits confirm amount
+                    # Among reference hits, keep amount-valid records and pick
+                    # deterministically: exact reference equality, then closest date,
+                    # then lowest id.
+                    amount_valid_hits = []
                     for hit in ref_hits:
                         if match_by_amount and not _amounts_match(hit.amount_residual, amt):
                             continue
-                        invoice = hit
-                        break
+                        amount_valid_hits.append(hit)
+
+                    if amount_valid_hits:
+                        def _normalize_ref(value):
+                            return ' '.join((value or '').upper().split())
+
+                        payment_ref_upper = _normalize_ref(payment.ref)
+
+                        def _is_exact_ref_equal(hit):
+                            return payment_ref_upper and (
+                                _normalize_ref(hit.name) == payment_ref_upper
+                                or _normalize_ref(hit.payment_reference) == payment_ref_upper
+                                or _normalize_ref(hit.ref) == payment_ref_upper
+                            )
+
+                        def _score(hit):
+                            exact_rank = 0 if _is_exact_ref_equal(hit) else 1
+                            if payment.date and hit.invoice_date:
+                                date_delta = abs((payment.date - hit.invoice_date).days)
+                            else:
+                                date_delta = 10 ** 9
+                            return (exact_rank, date_delta, hit.id)
+
+                        invoice = min(amount_valid_hits, key=_score)
 
             # ── Pass 2: amount + partner fallback ─────────────────────────────
             if not invoice:
@@ -483,6 +515,8 @@ class AutoReconciliationEngine(models.Model):
         match_by_currency  = not config or config.match_by_currency
         match_by_amount    = not config or config.match_by_amount
         match_by_reference = not config or config.match_by_reference
+        match_by_date_window = not config or config.match_by_date_window
+        date_window_days   = (config.date_window_days if config else 60) or 60
         matched = []
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
@@ -509,16 +543,44 @@ class AutoReconciliationEngine(models.Model):
                         ('payment_reference', 'in', list(ref_tokens)),
                         ('ref', 'in', list(ref_tokens)),
                     ]
+                    if match_by_date_window and payment.date:
+                        ref_domain += [
+                            ('invoice_date', '>=', payment.date - timedelta(days=date_window_days)),
+                            ('invoice_date', '<=', payment.date + timedelta(days=date_window_days)),
+                        ]
                     if match_by_currency:
                         ref_domain.append(('currency_id', '=', payment.currency_id.id))
                     if match_by_partner and payment.partner_id:
                         ref_domain.append(('partner_id', '=', payment.partner_id.id))
                     ref_hits = Move.search(ref_domain, limit=5, order='invoice_date asc, id asc')
+                    amount_valid_hits = []
                     for hit in ref_hits:
                         if match_by_amount and not _amounts_match(hit.amount_residual, amt):
                             continue
-                        bill = hit
-                        break
+                        amount_valid_hits.append(hit)
+
+                    if amount_valid_hits:
+                        def _normalize_ref(value):
+                            return ' '.join((value or '').upper().split())
+
+                        payment_ref_upper = _normalize_ref(payment.ref)
+
+                        def _is_exact_ref_equal(hit):
+                            return payment_ref_upper and (
+                                _normalize_ref(hit.name) == payment_ref_upper
+                                or _normalize_ref(hit.payment_reference) == payment_ref_upper
+                                or _normalize_ref(hit.ref) == payment_ref_upper
+                            )
+
+                        def _score(hit):
+                            exact_rank = 0 if _is_exact_ref_equal(hit) else 1
+                            if payment.date and hit.invoice_date:
+                                date_delta = abs((payment.date - hit.invoice_date).days)
+                            else:
+                                date_delta = 10 ** 9
+                            return (exact_rank, date_delta, hit.id)
+
+                        bill = min(amount_valid_hits, key=_score)
 
             # ── Pass 2: amount + partner fallback ─────────────────────────────
             if not bill:
