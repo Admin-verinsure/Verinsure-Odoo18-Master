@@ -248,12 +248,14 @@ class AkahuCredential(models.Model):
     def _get_app_token(self):
         """Return the decrypted app_token value."""
         self.ensure_one()
-        return _decrypt_token(self.env, self.app_token)
+        cred = self.sudo()
+        return _decrypt_token(cred.env, cred.app_token)
 
     def _get_app_secret(self):
         """Return the decrypted app_secret value."""
         self.ensure_one()
-        return _decrypt_token(self.env, self.app_secret)
+        cred = self.sudo()
+        return _decrypt_token(cred.env, cred.app_secret)
 
     # -------------------------------------------------------------------------
     # SEC-03: Token revocation / rotation
