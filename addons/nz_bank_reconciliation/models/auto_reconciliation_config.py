@@ -61,7 +61,6 @@ class AutoReconciliationConfig(models.Model):
         results = engine.run_all(
             company_ids=[self.company_id.id],
             preview_mode=False,
-            triggered_by='manual',
         )
         # BUG FIX: Report actual match count instead of a generic "finished" message.
         company_res = results.get(self.company_id.id, {})

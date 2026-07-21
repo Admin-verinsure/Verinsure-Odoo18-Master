@@ -72,7 +72,7 @@ class AutoReconciliationEngine(models.Model):
     _description = 'Auto Reconciliation Engine'
 
     @api.model
-    def run_all(self, company_ids=None, journal_ids=None, preview_mode=False, triggered_by='manual'):
+    def run_all(self, company_ids=None, journal_ids=None, preview_mode=False):
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
         # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
@@ -80,25 +80,34 @@ class AutoReconciliationEngine(models.Model):
             from odoo.exceptions import AccessError
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
+        return self._run_all_internal(
+            company_ids=company_ids,
+            journal_ids=journal_ids,
+            preview_mode=preview_mode,
+            allow_all_companies=False,
+            triggered_by='manual',
+        )
+
+    def _run_all_internal(self, company_ids=None, journal_ids=None, preview_mode=False,
+                          allow_all_companies=False, triggered_by='manual'):
+
         """
         Run all enabled reconciliation passes.
 
         :param company_ids: list of res.company IDs to process (None = caller's
-                            own allowed companies; see VNZ-07 fix below)
+                            own allowed companies unless allow_all_companies=True)
         :param journal_ids: list of account.journal IDs to restrict bank-statement
                             reconciliation to (None = all journals in the company).
                             Used by action_fetch_akahu_transactions to avoid running
                             a company-wide reconciliation when only one journal changed.
         :param preview_mode: if True, collect matches but do not apply them
+        :param allow_all_companies: internal-only switch for scheduler path
         :param triggered_by: 'manual' or 'cron' (written to the audit log)
         """
-        # VNZ-07 FIX: company_ids was caller-controlled and browsed under
-        # sudo() with no check against the caller's actual company access,
-        # letting an Accounting Manager confined to one company reconcile
-        # (and read back, via preview_mode) another company's data. The
-        # scheduled cron path (triggered_by='cron') still needs to reach
-        # every company, so only the interactive/RPC path is restricted.
-        if triggered_by == 'cron':
+        # VNZ-07 FIX: privilege separation is internal-only. RPC callers never
+        # choose scheduler scope; only cron_run_auto_reconciliation can pass
+        # allow_all_companies=True.
+        if allow_all_companies:
             allowed_company_ids = None  # scheduler: intentionally unrestricted
         else:
             allowed_company_ids = self.env.companies.ids
@@ -788,5 +797,5 @@ class AutoReconciliationEngine(models.Model):
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
         _logger.info("Auto Reconciliation Cron: Starting")
-        self.run_all(triggered_by='cron')
+        self._run_all_internal(allow_all_companies=True, triggered_by='cron')
         _logger.info("Auto Reconciliation Cron: Completed")
