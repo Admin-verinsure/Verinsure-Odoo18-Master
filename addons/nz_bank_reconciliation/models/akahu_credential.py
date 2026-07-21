@@ -186,6 +186,7 @@ class AkahuCredential(models.Model):
         help='Your Akahu App Secret. Stored encrypted. '
              'Visible to ERP Managers only — never sent to regular users.',
     )
+
     active = fields.Boolean(default=True)
     connection_status = fields.Selection([
         ('untested', 'Not Tested'),
@@ -266,6 +267,22 @@ class AkahuCredential(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Revoke Akahu Credentials'),
             'res_model': 'akahu.credential.revoke.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_credential_id': self.id},
+        }
+
+    def action_open_replace_credentials_wizard(self):
+        """Open wizard to replace stored App Token and App Secret."""
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('Replacing credentials is restricted to ERP Managers.'))
+
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Replace Akahu Credentials'),
+            'res_model': 'akahu.credential.replace.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_credential_id': self.id},

@@ -17,3 +17,4 @@ access_auto_reconciliation_wizard_line_manager,auto.reconciliation.wizard.line m
 access_akahu_company_mapping_manager,akahu.company.mapping manager,model_akahu_company_mapping,account.group_account_manager,1,1,1,1
 access_akahu_company_mapping_user,akahu.company.mapping user,model_akahu_company_mapping,account.group_account_user,1,0,0,0
 access_akahu_credential_revoke_wizard_manager,akahu.credential.revoke.wizard manager,model_akahu_credential_revoke_wizard,account.group_account_manager,1,1,1,1
+access_akahu_credential_replace_wizard_erp_manager,akahu.credential.replace.wizard erp manager,model_akahu_credential_replace_wizard,base.group_erp_manager,1,1,1,1
