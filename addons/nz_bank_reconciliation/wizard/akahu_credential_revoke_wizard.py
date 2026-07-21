@@ -71,13 +71,21 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
             ))
 
         cred = self.credential_id
+        # VNZ-09 FIX: app_token / app_secret are required=True (NOT NULL).
+        # Writing False sets NULL, which the DB constraint rejects — the
+        # whole write rolled back and nothing was cleared, including the
+        # linked user tokens below (never reached). Write empty strings
+        # instead: they satisfy NOT NULL, _encrypt_token() treats a falsy
+        # value as "nothing to encrypt" so no ciphertext is stored, and
+        # _get_app_token()/_get_app_secret() will read back ''.
+        #
         # sudo() needed here: revocation must succeed even if the current user
         # only has account.group_account_manager (not base.group_erp_manager),
         # because the field-level group restriction on app_token/app_secret
         # would otherwise block the write.
         cred.sudo().write({
-            'app_token': False,
-            'app_secret': False,
+            'app_token': '',
+            'app_secret': '',
             'connection_status': 'untested',
             'error_message': 'Credentials revoked by %s on %s. Re-enter tokens to resume sync.' % (
                 self.env.user.name,
@@ -86,10 +94,12 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
         })
 
         # Also wipe all linked user tokens so sync cannot resume with stale tokens.
+        # VNZ-09 FIX: user_token is also required=True — same False->NULL
+        # problem — write empty string here too.
         linked_accounts = self.env['akahu.account'].sudo().search([
             ('credential_id', '=', cred.id),
         ])
-        linked_accounts.write({'user_token': False})
+        linked_accounts.write({'user_token': ''})
 
         return {
             'type': 'ir.actions.client',

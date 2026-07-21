@@ -11,3 +11,4 @@ from . import auto_reconciliation_config
 from . import auto_reconciliation_log
 from . import akahu_company_mapping
 from . import account_journal_extend
+from . import account_bank_statement_line

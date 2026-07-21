@@ -119,19 +119,29 @@ class AutoReconciliationLog(models.Model):
         LOG RETENTION FIX (clause 2.4.1.e): Delete reconciliation log entries
         older than *days* days (default 90).  Called by the scheduled purge cron.
 
-        sudo() needed so the cron technical user (which has no unlink permission
-        on auto.reconciliation.log) can perform the delete.  Scope is strictly
-        limited to records older than the cutoff.
+        VNZ-02 FIX: previously ran unscoped under sudo() with a
+        caller-controlled ``days`` value, letting any Accounting Manager
+        erase every company's reconciliation audit trail in one call. Now
+        restricted to ERP Manager, validates ``days``, and scopes the
+        delete to the caller's own companies (or company-agnostic records).
         """
-        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
-        # This prevents unprivileged internal users from invoking this method directly
-        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
-        if not self.env.user.has_group('account.group_account_manager'):
+        # METHOD GUARD (VNZ-02): raised to ERP Manager.
+        if not self.env.user.has_group('base.group_erp_manager'):
             from odoo.exceptions import AccessError
-            raise AccessError(_('This action is restricted to Accounting Managers.'))
+            raise AccessError(_('Purging reconciliation logs is restricted to ERP Managers.'))
+
+        if not isinstance(days, int) or days < 1:
+            from odoo.exceptions import UserError
+            raise UserError(_('Retention window must be a positive number of days.'))
 
         cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
-        old = self.sudo().search([('create_date', '<', cutoff)])
+        # VNZ-02 FIX: scope to the caller's own companies (plus records with
+        # no company set) instead of every company in the database.
+        company_ids = self.env.companies.ids
+        old = self.sudo().search([
+            ('create_date', '<', cutoff),
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids),
+        ])
         count = len(old)
         old.unlink()
         _logger.info(

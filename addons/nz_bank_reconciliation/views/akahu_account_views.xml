@@ -45,6 +45,7 @@
                             <field name="credential_id"/>
                             <field name="journal_id"/>
                             <field name="user_token"
+                                   widget="password"
                                    placeholder="user_token_xxxxxxxxxxxxxxxxxxxxxxx"/>
                             <field name="active"/>
                         </group>

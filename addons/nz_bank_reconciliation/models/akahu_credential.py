@@ -10,6 +10,20 @@ from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
+# VNZ-19 FIX: shared redaction helper so every place that stores/returns
+# error text uses the same denylist consistently. This is defense-in-depth,
+# not the primary control (secrets are never intentionally echoed back) —
+# the denylist can still miss a secret with unusual characters or under 20
+# chars, so this narrows exposure rather than eliminating it.
+import re as _re
+
+
+def _redact_secret(text):
+    if not text:
+        return text
+    return _re.sub(r'[a-zA-Z0-9_]{20,}', '[REDACTED]', text)
+
+
 AKAHU_BASE_URL = 'https://api.akahu.io/v1'
 
 # RISK-01 FIX: Retry configuration for HTTP 429 (rate-limit) responses.
@@ -29,19 +43,52 @@ _RETRY_BACKOFF = [1, 2, 4, 8]  # seconds between attempts
 # ---------------------------------------------------------------------------
 
 def _get_encryption_key(env):
-    """Return (and lazily create) the 32-byte AES key stored in ir.config_parameter."""
+    """Return the 32-byte AES key used to encrypt/decrypt tokens.
+
+    VNZ-06 FIX: encryption-at-rest is meant to survive a database
+    compromise (stolen backup, DBA access, SQL injection from another
+    module). Storing the key in ir.config_parameter — the same database as
+    the ciphertext — defeats that: anyone who can read the DB has both
+    halves of the secret. We now prefer a key supplied via the
+    AKAHU_TOKEN_KEY environment variable (set it from your secrets
+    manager / KMS, e.g. `export AKAHU_TOKEN_KEY=$(openssl rand -base64 32)`
+    in the Odoo service's environment, outside the database). Falling back
+    to ir.config_parameter is kept only so existing installs keep working
+    without an immediate outage; a warning is logged so this residual risk
+    is visible rather than silent, and it should be migrated off ASAP
+    (encrypt backups in the meantime — see the report recommendation).
+    """
+    env_key_b64 = os.environ.get('AKAHU_TOKEN_KEY')
+    if env_key_b64:
+        return base64.b64decode(env_key_b64)
+
     ICP = env['ir.config_parameter'].sudo()
     key_b64 = ICP.get_param('akahu.token_key')
     if not key_b64:
         # First use — generate a random 256-bit key and persist it.
+        _logger.warning(
+            'SEC-01/VNZ-06: no AKAHU_TOKEN_KEY environment variable set — '
+            'generating and storing the encryption key in the database '
+            'alongside the ciphertext it protects. Set AKAHU_TOKEN_KEY in '
+            'the server environment (secrets manager / KMS) to remove this '
+            'residual risk; see the pen test report (VNZ-06) for detail.'
+        )
         raw_key = os.urandom(32)
         ICP.set_param('akahu.token_key', base64.b64encode(raw_key).decode())
         return raw_key
     return base64.b64decode(key_b64)
 
 
+# VNZ-13 FIX: an explicit version marker on every ciphertext blob so
+# "is this value already encrypted?" is a prefix check, not a guess based on
+# byte length/shape. Previously a plaintext App Secret that happened to be
+# valid base64 of 28+ bytes was silently classified as "already encrypted"
+# and left in plaintext (see migration script).
+_CIPHERTEXT_MARKER = 'gcm1:'
+
+
 def _encrypt_token(env, plaintext):
-    """Encrypt *plaintext* string; return a base64-encoded 'nonce||ciphertext||tag' blob."""
+    """Encrypt *plaintext* string; return a marker-prefixed base64 'nonce||ciphertext||tag' blob."""
     if not plaintext:
         return plaintext
     try:
@@ -55,26 +102,46 @@ def _encrypt_token(env, plaintext):
     key = _get_encryption_key(env)
     nonce = os.urandom(12)  # 96-bit nonce recommended for GCM
     ct = AESGCM(key).encrypt(nonce, plaintext.encode(), None)
-    return base64.b64encode(nonce + ct).decode()
+    return _CIPHERTEXT_MARKER + base64.b64encode(nonce + ct).decode()
 
 
 def _decrypt_token(env, blob):
     """Decrypt a blob produced by _encrypt_token; return the original string."""
     if not blob:
         return blob
+    if not blob.startswith(_CIPHERTEXT_MARKER):
+        # No marker: legacy plaintext value that predates SEC-01, or the
+        # `cryptography` package was unavailable at write time. Return as-is
+        # so existing credentials keep working after upgrade.
+        return blob
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError:
-        return blob  # graceful degradation — same as encrypt path
+        # VNZ-12 FIX: this is a real error state (we have a marked ciphertext
+        # but can't decrypt it), not a legacy-plaintext case — fail closed
+        # instead of returning the raw ciphertext blob as if it were a token.
+        _logger.error('SEC-01: cryptography package not available — cannot decrypt stored token.')
+        raise UserError(_(
+            'Cannot decrypt the stored Akahu token: the required encryption '
+            'library is not installed on this server. Contact your administrator.'
+        ))
+    payload = blob[len(_CIPHERTEXT_MARKER):]
     try:
-        raw = base64.b64decode(blob)
+        raw = base64.b64decode(payload)
         nonce, ct = raw[:12], raw[12:]
         key = _get_encryption_key(env)
         return AESGCM(key).decrypt(nonce, ct, None).decode()
     except Exception:
-        # Blob is not encrypted (e.g. legacy plaintext value migrated in).
-        # Return as-is so existing credentials keep working after upgrade.
-        return blob
+        # VNZ-12 FIX: previously this silently returned the raw ciphertext
+        # blob, which was then sent to Akahu as a bearer token (a confusing
+        # 401 instead of a clear error). Fail closed with a clear message —
+        # this happens when the encryption key changed/was reset.
+        _logger.error('SEC-01: failed to decrypt stored token — encryption key may have changed.')
+        raise UserError(_(
+            'Cannot decrypt the stored Akahu token. This usually means the '
+            'server\'s encryption key was reset or changed. Please re-enter '
+            'the App Token / App Secret / User Token to fix this.'
+        ))
 
 
 class AkahuCredential(models.Model):
@@ -110,7 +177,11 @@ class AkahuCredential(models.Model):
     app_secret = fields.Char(
         string='App Secret',
         required=True,
-        password=True,
+        # VNZ-11 FIX: `password=True` is not a valid Char field parameter in
+        # this Odoo version (it was silently ignored, logging an install
+        # warning, and did NOT mask the field). Masking is now applied at
+        # the view level with widget="password" instead — see
+        # views/akahu_credential_views.xml.
         groups='base.group_erp_manager',
         help='Your Akahu App Secret. Stored encrypted. '
              'Visible to ERP Managers only — never sent to regular users.',
@@ -148,6 +219,21 @@ class AkahuCredential(models.Model):
             if vals.get('app_secret'):
                 vals['app_secret'] = _encrypt_token(self.env, vals['app_secret'])
         return super().create(vals_list)
+
+    def unlink(self):
+        # VNZ-03 FIX: the ACL now only grants unlink to base.group_erp_manager
+        # (see security/ir.model.access.csv), but this explicit guard is kept
+        # as defense-in-depth so the "can destroy, cannot restore" gap cannot
+        # reopen from a future ACL edit alone. Deleting a credential while
+        # bank accounts still reference it is blocked at the DB level too
+        # (see akahu.account.credential_id, now ondelete='restrict').
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_(
+                'Deleting Akahu credentials is restricted to ERP Managers. '
+                'Use Revoke Credentials to clear tokens instead.'
+            ))
+        return super().unlink()
 
     def _get_app_token(self):
         """Return the decrypted app_token value."""
@@ -250,11 +336,11 @@ class AkahuCredential(models.Model):
             if resp.status_code >= 400:
                 # SEC-04 FIX: Sanitise the error body before showing it in the
                 # UI.  We truncate to 120 chars and redact any token-shaped
-                # strings (anything matching [a-zA-Z0-9_]{20,}) to prevent
-                # accidental credential leakage through Akahu's error payloads.
-                import re
+                # strings via the shared _redact_secret() helper (VNZ-19) to
+                # prevent accidental credential leakage through Akahu's error
+                # payloads.
                 raw = resp.text[:120] if resp.text else ''
-                safe_msg = re.sub(r'[a-zA-Z0-9_]{20,}', '[REDACTED]', raw)
+                safe_msg = _redact_secret(raw)
                 raise UserError(_(
                     'Akahu API error %s. Please check your credentials and try again. '
                     'Detail: %s'
@@ -333,9 +419,13 @@ class AkahuCredential(models.Model):
                     }
                 }
         except Exception as e:
+            # VNZ-19 FIX: this write bypassed _redact_secret() entirely,
+            # unlike the _api_get() error path above — a raw exception
+            # string (which can echo back request/response content) was
+            # stored as-is. Apply the same redaction helper for consistency.
             self.write({
                 'connection_status': 'error',
                 'last_tested': fields.Datetime.now(),
-                'error_message': str(e)[:256],
+                'error_message': _redact_secret(str(e)[:256]),
             })
             raise

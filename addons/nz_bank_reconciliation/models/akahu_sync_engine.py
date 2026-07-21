@@ -38,6 +38,39 @@ class AkahuSyncEngine(models.Model):
     _name = 'akahu.sync.engine'
     _description = 'Akahu Sync Engine'
 
+    def _notify_admins_of_cron_permission_loss(self, method_name):
+        """
+        VNZ-20 FIX: scheduled jobs previously failed silently (server log
+        only) if the akahu_cron_technical user ever lost
+        account.group_account_manager. Escalate to a real notification —
+        an email to every Settings Administrator — so an admin sees it
+        instead of the sync just quietly stopping. Best-effort: a mail
+        failure here must never mask the original AccessError.
+        """
+        try:
+            admins = self.env['res.users'].sudo().search([
+                ('groups_id', 'in', self.env.ref('base.group_erp_manager').id),
+                ('active', '=', True),
+            ])
+            if not admins:
+                return
+            body = _(
+                'The Akahu integration\'s scheduled job "%s" was blocked because '
+                'the technical user (%s) no longer has the Accounting Manager '
+                'group. Scheduled bank sync / reconciliation will not run until '
+                'this is restored.'
+            ) % (method_name, self.env.user.login)
+            self.env['mail.mail'].sudo().create({
+                'subject': _('Akahu integration: scheduled job blocked (permission lost)'),
+                'body_html': '<p>%s</p>' % body,
+                'email_to': ','.join(admins.mapped('email') or []),
+            }).send()
+        except Exception:
+            _logger.exception(
+                'VNZ-20: failed to notify administrators about cron permission loss for %s',
+                method_name,
+            )
+
     # ── PUBLIC ENTRY POINTS ────────────────────────────────────────────────────
 
     @api.model
@@ -53,8 +86,18 @@ class AkahuSyncEngine(models.Model):
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
         # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        #
+        # VNZ-20 FIX: this guard also fires for the legitimate scheduled cron
+        # if the akahu_cron_technical user ever loses account.group_account_manager
+        # (e.g. an admin edits the noupdate="1" user record). Previously that
+        # produced only a log line and the sync silently stopped running.
+        # Escalate to a mail activity for administrators so it is visible
+        # outside the server log.
         if not self.env.user.has_group('account.group_account_manager'):
             from odoo.exceptions import AccessError
+            self.sudo()._notify_admins_of_cron_permission_loss(
+                'akahu.sync.engine.cron_sync_all',
+            )
             raise AccessError(_('This action is restricted to Accounting Managers.'))
         _logger.info('Akahu Sync Cron: Starting')
         # sudo(): cron technical user needs cross-company read access to akahu.account
@@ -188,25 +231,45 @@ class AkahuSyncEngine(models.Model):
         if new_transactions:
             imported = self._create_statement_lines(akahu_account, new_transactions)
 
+        # VNZ-05 FIX: previously the cursor always advanced and the log
+        # always said 'success' even when some (or all) statement-line
+        # inserts failed and were rolled back — silently losing those
+        # transactions while reporting nothing wrong. Now: only advance the
+        # cursor / log success when every new transaction was imported; a
+        # partial or total failure keeps the old cursor (so the failed
+        # transactions are retried next sync) and is logged as an error.
+        failed = len(new_transactions) - imported
+        sync_ok = failed == 0
+
         # ── Update account metadata ────────────────────────────────────────────
-        akahu_account.write({
-            'last_synced': fields.Datetime.now(),
+        write_vals = {'last_synced': fields.Datetime.now()}
+        if sync_ok:
             # BUG FIX 1: Use final_cursor (terminal page's 'current') not a
             # mid-pagination 'next' value. Falls back to existing cursor if
             # Akahu returned no cursor at all (e.g. empty account).
-            'sync_cursor': final_cursor or akahu_account.sync_cursor,
-        })
+            write_vals['sync_cursor'] = final_cursor or akahu_account.sync_cursor
+        akahu_account.write(write_vals)
 
         # ── Write sync log ─────────────────────────────────────────────────────
-        self.env['akahu.sync.log'].sudo().create({
+        log_vals = {
             'akahu_account_id': akahu_account.id,
             'company_id': akahu_account.company_id.id,
-            'status': 'success',
+            'status': 'success' if sync_ok else 'error',
             'transactions_fetched': len(all_transactions),
             'transactions_imported': imported,
-        })
+        }
+        if not sync_ok:
+            log_vals['error_message'] = (
+                '%d of %d new transaction(s) failed to import and were skipped; '
+                'cursor was not advanced so they will be retried next sync.'
+            ) % (failed, len(new_transactions))
+            _logger.error(
+                'Akahu sync: %d of %d new transactions failed to import for %s — cursor not advanced.',
+                failed, len(new_transactions), akahu_account.name,
+            )
+        self.env['akahu.sync.log'].sudo().create(log_vals)
 
-        return {'imported': imported, 'fetched': len(all_transactions)}
+        return {'imported': imported, 'fetched': len(all_transactions), 'failed': failed}
 
     # ── HELPERS ────────────────────────────────────────────────────────────────
 
