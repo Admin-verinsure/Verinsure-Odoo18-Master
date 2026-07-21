@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, AccessError
 from .akahu_credential import _encrypt_token, _decrypt_token
 
 _logger = logging.getLogger(__name__)
+
+PROTECTED_FIELDS = {
+    'user_token',
+    'credential_id',
+    'journal_id',
+    'company_id',
+}
 
 
 class AkahuAccount(models.Model):
@@ -122,6 +129,9 @@ class AkahuAccount(models.Model):
     # ── Encryption hooks ──────────────────────────────────────────────────────
 
     def write(self, vals):
+        if PROTECTED_FIELDS.intersection(vals) and not self.env.user.has_group('base.group_erp_manager'):
+            raise AccessError(_('Only ERP Managers can modify Akahu account configuration.'))
+
         # SEC-01: Encrypt user_token before persisting to the database.
         if 'user_token' in vals and vals['user_token']:
             vals['user_token'] = _encrypt_token(self.env, vals['user_token'])
@@ -129,10 +139,18 @@ class AkahuAccount(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.user.has_group('base.group_erp_manager'):
+            raise AccessError(_('Creating Akahu accounts is restricted to ERP Managers.'))
+
         for vals in vals_list:
             if vals.get('user_token'):
                 vals['user_token'] = _encrypt_token(self.env, vals['user_token'])
         return super().create(vals_list)
+
+    def unlink(self):
+        if not self.env.user.has_group('base.group_erp_manager'):
+            raise AccessError(_('Deleting Akahu accounts is restricted to ERP Managers.'))
+        return super().unlink()
 
     def _get_user_token(self):
         """Return the decrypted user_token value. Always use this in code."""
