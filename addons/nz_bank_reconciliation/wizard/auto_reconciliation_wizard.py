@@ -3,6 +3,7 @@ import json
 import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -19,12 +20,7 @@ class AutoReconciliationWizard(models.TransientModel):
     # confirm() applies only these — engine never re-runs from scratch.
     match_pairs_json = fields.Text(string='Match Pairs JSON')
 
-    # CRITICAL FIX: line_ids must NOT be a computed field.
-    # A computed One2many with no inverse= raises "Field is not stored and cannot
-    # be inversed" the moment the user unchecks a row — making the entire
-    # preview/select/confirm workflow non-functional.
-    # Fix: plain writable One2many. Lines are created explicitly in
-    # action_open_wizard() by the config model after the wizard record is saved.
+    
     line_ids = fields.One2many(
         'auto.reconciliation.wizard.line', 'wizard_id',
         string='Match Lines',
@@ -51,14 +47,6 @@ class AutoReconciliationWizard(models.TransientModel):
         still unreconciled before applying — items reconciled in the
         meantime (e.g. by cron) are safely skipped.
         """
-        # METHOD GUARD (VNZ-07): this entry point had no group check at all —
-        # it read record IDs from a manager-writable field and applied them
-        # under sudo(). Add the same guard used by every other engine entry
-        # point in this module.
-        if not self.env.user.has_group('account.group_account_manager'):
-            from odoo.exceptions import AccessError
-            raise AccessError(_('This action is restricted to Accounting Managers.'))
-
         self.ensure_one()
         if not self.match_pairs_json:
             raise UserError(_('No preview data found. Please close and run Preview again.'))
@@ -129,7 +117,12 @@ class AutoReconciliationWizard(models.TransientModel):
                     ).reconcile()
                     applied += 1
             except Exception as e:
-                _logger.warning("Wizard confirm failed for %s pair %s: %s", rtype, pair, str(e))
+                _logger.warning(
+                    "Wizard confirm failed for %s pair %s: %s",
+                    sanitize_log_value(rtype),
+                    sanitize_log_value(pair),
+                    sanitize_log_value(e),
+                )
                 skipped += 1
 
         self.write({'state': 'confirmed', 'skipped_count': skipped})

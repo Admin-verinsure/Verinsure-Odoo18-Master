@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from odoo import models, fields, api, _
+from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -174,12 +175,16 @@ class AccountJournalAkahuExtend(models.Model):
                 company_ids_synced.add(akahu_account.company_id.id)
                 _logger.info(
                     "Akahu fetch: %d new transactions for journal %s (company: %s)",
-                    result.get('imported', 0),
-                    self.name,
-                    akahu_account.company_id.name,
+                    sanitize_log_value(result.get('imported', 0)),
+                    sanitize_log_value(self.name),
+                    sanitize_log_value(akahu_account.company_id.name),
                 )
             except Exception as e:
-                _logger.error("Akahu fetch failed for journal %s: %s", self.name, str(e))
+                _logger.error(
+                    "Akahu fetch failed for journal %s: %s",
+                    sanitize_log_value(self.name),
+                    sanitize_log_value(e),
+                )
                 return {
                     'type': 'ir.actions.client',
                     'tag': 'display_notification',
@@ -221,13 +226,15 @@ class AccountJournalAkahuExtend(models.Model):
                         )
                 _logger.info(
                     "Auto-reconciliation after fetch: %d matches for journal %s",
-                    total_reconciled, self.name,
+                    sanitize_log_value(total_reconciled),
+                    sanitize_log_value(self.name),
                 )
             except Exception as e:
                 # Reconciliation failure is non-fatal — transactions were still imported
                 _logger.warning(
                     "Auto-reconciliation failed after fetch for journal %s: %s",
-                    self.name, str(e)
+                    sanitize_log_value(self.name),
+                    sanitize_log_value(e),
                 )
                 return {
                     'type': 'ir.actions.client',

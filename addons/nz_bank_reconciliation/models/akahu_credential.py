@@ -7,6 +7,7 @@ import requests
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -343,7 +344,10 @@ class AkahuCredential(models.Model):
                 _logger.warning(
                     'Akahu API rate-limited (429) on %s. '
                     'Waiting %ds before retry %d/%d.',
-                    path, retry_after, attempt + 1, _MAX_RETRIES,
+                    sanitize_log_value(path),
+                    sanitize_log_value(retry_after),
+                    sanitize_log_value(attempt + 1),
+                    sanitize_log_value(_MAX_RETRIES),
                 )
                 time.sleep(retry_after)
                 continue
