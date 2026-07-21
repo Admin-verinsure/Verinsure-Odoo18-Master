@@ -93,6 +93,19 @@ class AkahuAccount(models.Model):
         readonly=True,
         help='Akahu pagination cursor. Used internally — do not edit.',
     )
+    sync_failure_count = fields.Integer(
+        string='Consecutive Sync Failures',
+        default=0,
+        readonly=True,
+    )
+    last_failure = fields.Datetime(
+        string='Last Sync Failure',
+        readonly=True,
+    )
+    last_failure_notification = fields.Datetime(
+        string='Last Failure Notification',
+        readonly=True,
+    )
     has_user_token = fields.Boolean(
         compute='_compute_has_user_token',
     )
