@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import base64
+import binascii
 import logging
 import os
 import time
 import requests
+from pathlib import Path
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import config as odoo_config
 from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
@@ -35,37 +38,28 @@ _RETRY_BACKOFF = [1, 2, 4, 8]  # seconds between attempts
 # Token encryption helpers
 # ---------------------------------------------------------------------------
 # SEC-01 FIX: Tokens are encrypted at rest using AES-256-GCM (via the
-# `cryptography` package that ships with Odoo 16+). The symmetric key must
-# be supplied from the process environment via AKAHU_TOKEN_KEY so it is
-# never stored in the same database as ciphertext.
+# `cryptography` package that ships with Odoo 16+). The symmetric key is
+# sourced from AKAHU_TOKEN_KEY (if set) or from an instance-local key file
+# under Odoo's data_dir. It is never stored in PostgreSQL.
 # ---------------------------------------------------------------------------
 
 def _get_encryption_key(env):
     """Return the 32-byte AES key used to encrypt/decrypt tokens.
 
     VNZ-06 FIX: encryption-at-rest must survive a database compromise.
-    Therefore the key is loaded only from AKAHU_TOKEN_KEY (outside DB).
-    No database fallback is allowed.
+    Priority: (1) AKAHU_TOKEN_KEY env var, (2) instance-local key file.
+    The key is never persisted in PostgreSQL.
     """
     env_key_b64 = os.environ.get('AKAHU_TOKEN_KEY')
-    if not env_key_b64:
-        raise UserError(_(
-            'AKAHU_TOKEN_KEY is not configured. Set a base64-encoded 32-byte '
-            'encryption key in the Odoo service environment before using the '
-            'Akahu integration.'
-        ))
-    try:
-        key = base64.b64decode(env_key_b64)
-    except Exception:
-        raise UserError(_(
-            'AKAHU_TOKEN_KEY is invalid. It must be a base64-encoded 32-byte '
-            'encryption key.'
-        ))
-    if len(key) != 32:
-        raise UserError(_(
-            'AKAHU_TOKEN_KEY has invalid length. It must decode to exactly '
-            '32 bytes for AES-256-GCM.'
-        ))
+    if env_key_b64:
+        key = _decode_key_material(env_key_b64, source_label='AKAHU_TOKEN_KEY')
+    else:
+        key = _read_or_create_file_key()
+
+    # One-time migration path for installations that still carry the
+    # historical database-stored key. We only use it to re-encrypt existing
+    # ciphertext and immediately remove it from ir.config_parameter.
+    _migrate_legacy_db_key(env, key)
     return key
 
 
@@ -75,6 +69,144 @@ def _get_encryption_key(env):
 # valid base64 of 28+ bytes was silently classified as "already encrypted"
 # and left in plaintext (see migration script).
 _CIPHERTEXT_MARKER = 'gcm1:'
+
+_KEY_FILE_NAME = 'akahu_token.key'
+_KEY_FILE_DIR = 'nz_bank_reconciliation'
+
+
+def _get_key_file_path():
+    data_dir = odoo_config.get('data_dir')
+    if not data_dir:
+        raise UserError(_(
+            'Odoo data_dir is not configured. Configure data_dir so the '
+            'Akahu encryption key file can be stored outside PostgreSQL.'
+        ))
+    return Path(data_dir) / _KEY_FILE_DIR / _KEY_FILE_NAME
+
+
+def _decode_key_material(raw_key_b64, source_label='encryption key'):
+    try:
+        if isinstance(raw_key_b64, str):
+            raw_key_b64 = raw_key_b64.encode()
+        key = base64.urlsafe_b64decode(raw_key_b64)
+    except (binascii.Error, ValueError, TypeError):
+        raise UserError(_(
+            'The Akahu %s is invalid. It must be a base64-encoded 32-byte key.'
+        ) % source_label)
+
+    if len(key) != 32:
+        raise UserError(_(
+            'The Akahu %s has invalid length. It must decode to exactly '
+            '32 bytes for AES-256-GCM.'
+        ) % source_label)
+    return key
+
+
+def _read_or_create_file_key():
+    key_path = _get_key_file_path()
+    if key_path.exists():
+        try:
+            key_b64 = key_path.read_bytes().strip()
+        except OSError as e:
+            raise UserError(_(
+                'Cannot read Akahu encryption key file at %s: %s'
+            ) % (str(key_path), str(e)))
+
+        try:
+            key = _decode_key_material(key_b64, source_label='key file')
+        except UserError:
+            raise UserError(_(
+                'The Akahu key file at %s is invalid or corrupt. Restore the '
+                'original key file from backup, or set AKAHU_TOKEN_KEY to the '
+                'original key value used to encrypt existing tokens.'
+            ) % str(key_path))
+        try:
+            os.chmod(str(key_path), 0o600)
+        except OSError:
+            # Non-POSIX filesystems may not support chmod semantics.
+            pass
+        return key
+
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from cryptography.fernet import Fernet
+        key_b64 = Fernet.generate_key()
+    except Exception:
+        # Fallback preserves the same 32-byte key size expected by AES-256-GCM.
+        key_b64 = base64.urlsafe_b64encode(os.urandom(32))
+
+    try:
+        with open(key_path, 'xb') as fp:
+            fp.write(key_b64)
+            fp.write(b'\n')
+        os.chmod(str(key_path), 0o600)
+    except FileExistsError:
+        # Race-safe: another worker created the key file first.
+        key_b64 = key_path.read_bytes().strip()
+    except OSError as e:
+        raise UserError(_(
+            'Cannot create Akahu encryption key file at %s: %s'
+        ) % (str(key_path), str(e)))
+
+    return _decode_key_material(key_b64, source_label='key file')
+
+
+def _encrypt_token_with_key(plaintext, key):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = os.urandom(12)  # 96-bit nonce recommended for GCM
+    ct = AESGCM(key).encrypt(nonce, plaintext.encode(), None)
+    return _CIPHERTEXT_MARKER + base64.b64encode(nonce + ct).decode()
+
+
+def _decrypt_token_with_key(blob, key):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    payload = blob[len(_CIPHERTEXT_MARKER):]
+    raw = base64.b64decode(payload)
+    nonce, ct = raw[:12], raw[12:]
+    return AESGCM(key).decrypt(nonce, ct, None).decode()
+
+
+def _migrate_legacy_db_key(env, active_key):
+    """One-time migration: re-encrypt ciphertext from legacy DB key to active key."""
+    ICP = env['ir.config_parameter'].sudo()
+    legacy_b64 = ICP.get_param('akahu.token_key')
+    if not legacy_b64:
+        return
+
+    legacy_key = _decode_key_material(legacy_b64, source_label='legacy database key')
+
+    def _rewrite_table(table, fields_to_process):
+        select_cols = ', '.join(['id'] + fields_to_process)
+        env.cr.execute('SELECT %s FROM %s' % (select_cols, table))
+        rows = env.cr.fetchall()
+        for row in rows:
+            rec_id = row[0]
+            updates = {}
+            for idx, field_name in enumerate(fields_to_process, start=1):
+                value = row[idx]
+                if not value or not value.startswith(_CIPHERTEXT_MARKER):
+                    continue
+                try:
+                    plain = _decrypt_token_with_key(value, legacy_key)
+                except Exception:
+                    # Already migrated or encrypted with a different key.
+                    continue
+                updates[field_name] = _encrypt_token_with_key(plain, active_key)
+
+            if updates:
+                set_sql = ', '.join('%s = %%s' % k for k in updates.keys())
+                params = list(updates.values()) + [rec_id]
+                env.cr.execute(
+                    'UPDATE %s SET %s WHERE id = %%s' % (table, set_sql),
+                    params,
+                )
+
+    _rewrite_table('akahu_credential', ['app_token', 'app_secret'])
+    _rewrite_table('akahu_account', ['user_token'])
+    ICP.search([('key', '=', 'akahu.token_key')]).unlink()
+    _logger.info('SEC-01/VNZ-06: migrated legacy DB encryption key to non-DB key source.')
 
 
 def _encrypt_token(env, plaintext):
@@ -90,9 +222,7 @@ def _encrypt_token(env, plaintext):
         )
         return plaintext
     key = _get_encryption_key(env)
-    nonce = os.urandom(12)  # 96-bit nonce recommended for GCM
-    ct = AESGCM(key).encrypt(nonce, plaintext.encode(), None)
-    return _CIPHERTEXT_MARKER + base64.b64encode(nonce + ct).decode()
+    return _encrypt_token_with_key(plaintext, key)
 
 
 def _decrypt_token(env, blob):
@@ -117,10 +247,8 @@ def _decrypt_token(env, blob):
         ))
     payload = blob[len(_CIPHERTEXT_MARKER):]
     try:
-        raw = base64.b64decode(payload)
-        nonce, ct = raw[:12], raw[12:]
         key = _get_encryption_key(env)
-        return AESGCM(key).decrypt(nonce, ct, None).decode()
+        return _decrypt_token_with_key(_CIPHERTEXT_MARKER + payload, key)
     except Exception:
         # VNZ-12 FIX: previously this silently returned the raw ciphertext
         # blob, which was then sent to Akahu as a bearer token (a confusing
