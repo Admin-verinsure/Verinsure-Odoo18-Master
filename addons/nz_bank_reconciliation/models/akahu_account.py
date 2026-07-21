@@ -155,7 +155,8 @@ class AkahuAccount(models.Model):
     def _get_user_token(self):
         """Return the decrypted user_token value. Always use this in code."""
         self.ensure_one()
-        return _decrypt_token(self.env, self.user_token)
+        account = self.sudo()
+        return _decrypt_token(account.env, account.user_token)
 
     # ── Computed ──────────────────────────────────────────────────────────────
     @api.depends('bank_name', 'akahu_account_name', 'akahu_formatted_account')
