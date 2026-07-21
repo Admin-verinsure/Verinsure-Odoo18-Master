@@ -93,6 +93,9 @@ class AkahuAccount(models.Model):
         readonly=True,
         help='Akahu pagination cursor. Used internally — do not edit.',
     )
+    has_user_token = fields.Boolean(
+        compute='_compute_has_user_token',
+    )
 
     _sql_constraints = [
         (
@@ -134,10 +137,30 @@ class AkahuAccount(models.Model):
             ]
             rec.name = ' — '.join(p for p in parts if p) or _('New Account')
 
+    @api.depends('user_token')
+    def _compute_has_user_token(self):
+        for rec in self:
+            rec.has_user_token = bool(rec.user_token)
+
     def _is_inactive_warning(self):
         return self.akahu_status == 'INACTIVE'
 
     # ── Actions ───────────────────────────────────────────────────────────────
+
+    def action_open_replace_user_token_wizard(self):
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('Replacing user tokens is restricted to ERP Managers.'))
+
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Replace User Token'),
+            'res_model': 'akahu.account.replace.token.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_account_id': self.id},
+        }
 
     def action_refresh_account_info(self):
         """

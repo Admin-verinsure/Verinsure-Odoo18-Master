@@ -57,6 +57,7 @@ UX
         'wizard/auto_reconciliation_wizard_views.xml',
         'wizard/akahu_credential_revoke_wizard_views.xml',
         'wizard/akahu_credential_replace_wizard_views.xml',
+        'wizard/akahu_account_replace_token_wizard_views.xml',
         # Menu (last — references all actions above)
         'views/menu.xml',
     ],
