@@ -51,11 +51,16 @@
                             <field name="company_id"/>
                             <field name="credential_id"/>
                             <field name="journal_id"/>
+                            <field name="user_token"
+                                   widget="password"
+                                   placeholder="user_token_xxxxxxxxxxxxxxxxxxxxxxx"
+                                   groups="base.group_erp_manager"
+                                   invisible="id"/>
                             <field name="has_user_token" invisible="1"/>
 
                             <div class="o_form_label">User Access Token</div>
-                            <div invisible="not has_user_token">••••••••••••••••</div>
-                            <div invisible="has_user_token" class="text-muted">Not configured</div>
+                            <div invisible="not id or not has_user_token">••••••••••••••••</div>
+                            <div invisible="not id or has_user_token" class="text-muted">Not configured</div>
                             <field name="active"/>
                         </group>
 
