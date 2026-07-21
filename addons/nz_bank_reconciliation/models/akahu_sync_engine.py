@@ -299,11 +299,28 @@ class AkahuSyncEngine(models.Model):
         )
 
         # ── Deduplication via unique_import_id ────────────────────────────────
-        existing_ids = self._get_existing_akahu_ids(akahu_account.journal_id)
-        new_transactions = [
-            t for t in all_transactions
-            if t.get('_id') and t['_id'] not in existing_ids
-        ]
+        # VNZ-05 follow-up: dedupe must use the same destination journal that
+        # _map_transaction_to_statement_line() will use. Some transactions are
+        # rerouted (e.g. card tx to credit-card journal), so checking only
+        # akahu_account.journal_id can miss existing rows in the routed journal.
+        # That causes repeated unique-constraint failures and cursor stalls.
+        existing_ids_by_journal = {}
+
+        def _get_existing_ids_for_journal(journal):
+            journal_key = journal.id
+            if journal_key not in existing_ids_by_journal:
+                existing_ids_by_journal[journal_key] = self._get_existing_akahu_ids(journal)
+            return existing_ids_by_journal[journal_key]
+
+        new_transactions = []
+        for tx in all_transactions:
+            tx_id = tx.get('_id')
+            if not tx_id:
+                continue
+            destination_journal = self._resolve_journal(tx, akahu_account)
+            existing_ids = _get_existing_ids_for_journal(destination_journal)
+            if tx_id not in existing_ids:
+                new_transactions.append(tx)
 
         _logger.info(
             'Akahu sync: %d new (of %d total) for %s',
