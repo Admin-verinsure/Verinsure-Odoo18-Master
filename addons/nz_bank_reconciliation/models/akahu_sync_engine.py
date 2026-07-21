@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from ..utils.log_redaction import sanitize_log_value
@@ -37,6 +37,16 @@ class AkahuSyncEngine(models.Model):
     _name = 'akahu.sync.engine'
     _description = 'Akahu Sync Engine'
 
+    _SYNC_FAILURE_NOTIFICATION_THRESHOLD = 3
+    _SYNC_FAILURE_NOTIFICATION_COOLDOWN_HOURS = 24
+
+    def _get_active_erp_admins(self):
+        """Return active ERP Managers to notify for cron-related failures."""
+        return self.env['res.users'].sudo().search([
+            ('groups_id', 'in', self.env.ref('base.group_erp_manager').id),
+            ('active', '=', True),
+        ])
+
     def _notify_admins_of_cron_permission_loss(self, method_name):
         """
         VNZ-20 FIX: scheduled jobs previously failed silently (server log
@@ -47,10 +57,7 @@ class AkahuSyncEngine(models.Model):
         failure here must never mask the original AccessError.
         """
         try:
-            admins = self.env['res.users'].sudo().search([
-                ('groups_id', 'in', self.env.ref('base.group_erp_manager').id),
-                ('active', '=', True),
-            ])
+            admins = self._get_active_erp_admins()
             if not admins:
                 return
             body = _(
@@ -70,6 +77,44 @@ class AkahuSyncEngine(models.Model):
                 sanitize_log_value(method_name),
                 sanitize_log_value(e),
             )
+
+    def _notify_admins_of_sync_failure(self, account, error_message):
+        """Notify ERP managers of repeated scheduled sync failures."""
+        try:
+            admins = self._get_active_erp_admins()
+            if not admins:
+                return False
+
+            body = _(
+                'Akahu scheduled sync has failed repeatedly for this account.\n\n'
+                'Company: %s\n'
+                'Journal: %s\n'
+                'Account: %s\n'
+                'Time: %s\n'
+                'Failure count: %s\n'
+                'Error: %s'
+            ) % (
+                sanitize_log_value(account.company_id.name or ''),
+                sanitize_log_value(account.journal_id.display_name or ''),
+                sanitize_log_value(account.name or ''),
+                sanitize_log_value(fields.Datetime.now()),
+                sanitize_log_value(account.sync_failure_count),
+                sanitize_log_value(error_message or ''),
+            )
+
+            self.env['mail.mail'].sudo().create({
+                'subject': _('Akahu Scheduled Sync Failure'),
+                'body_html': '<pre>%s</pre>' % body,
+                'email_to': ','.join(admins.mapped('email') or []),
+            }).send()
+            return True
+        except Exception as e:
+            _logger.exception(
+                'VNZ-20: failed to notify administrators about repeated sync failure for account %s: %s',
+                sanitize_log_value(account.name if account else ''),
+                sanitize_log_value(e),
+            )
+            return False
 
     # ── PUBLIC ENTRY POINTS ────────────────────────────────────────────────────
 
@@ -111,7 +156,35 @@ class AkahuSyncEngine(models.Model):
             try:
                 result = self.sync_account(account)
                 total_imported += result.get('imported', 0)
+                account.sudo().write({
+                    'sync_failure_count': 0,
+                    'last_failure': False,
+                    'last_failure_notification': False,
+                })
             except Exception as e:
+                now = fields.Datetime.now()
+                next_count = (account.sync_failure_count or 0) + 1
+                account.sudo().write({
+                    'sync_failure_count': next_count,
+                    'last_failure': now,
+                })
+
+                should_notify = next_count >= self._SYNC_FAILURE_NOTIFICATION_THRESHOLD
+                if should_notify and account.last_failure_notification:
+                    last_notice = fields.Datetime.to_datetime(account.last_failure_notification)
+                    if last_notice and fields.Datetime.to_datetime(now) < (last_notice + timedelta(hours=self._SYNC_FAILURE_NOTIFICATION_COOLDOWN_HOURS)):
+                        should_notify = False
+
+                if should_notify:
+                    sent = self._notify_admins_of_sync_failure(account, e)
+                    if sent:
+                        account.sudo().write({'last_failure_notification': now})
+                        _logger.info(
+                            'Notification email sent for account %s after %d consecutive failures.',
+                            sanitize_log_value(account.name),
+                            sanitize_log_value(next_count),
+                        )
+
                 _logger.error(
                     'Akahu sync failed for account %s: %s',
                     sanitize_log_value(account.name),
