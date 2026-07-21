@@ -63,20 +63,36 @@ class AkahuSyncLog(models.Model):
         LOG RETENTION FIX (clause 2.4.1.e): Delete sync log entries older
         than *days* days (default 90).  Called by the scheduled purge cron.
 
-        sudo() is needed here because the cron technical user has no unlink
-        permission on akahu.sync.log — only account managers do.  The cron
-        context restricts the delete to old records only, so privilege
-        escalation is bounded.
+        VNZ-02 FIX: this is destructive and previously ran unscoped under
+        sudo() with a caller-controlled ``days`` value, letting any
+        Accounting Manager erase every company's audit trail in one call.
+        Now: (1) restricted to ERP Manager, a stricter group than the normal
+        operator role; (2) ``days`` is validated so it cannot be used to
+        bypass the retention window; (3) the delete is scoped to the
+        caller's own companies even though sudo() is used to get past the
+        unlink ACL gap for the cron technical user.
         """
-        # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
-        # This prevents unprivileged internal users from invoking this method directly
-        # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
-        if not self.env.user.has_group('account.group_account_manager'):
+        # METHOD GUARD (VNZ-02): raised to ERP Manager — a normal Accounting
+        # Manager can no longer invoke this destructive method via RPC.
+        if not self.env.user.has_group('base.group_erp_manager'):
             from odoo.exceptions import AccessError
-            raise AccessError(_('This action is restricted to Accounting Managers.'))
+            raise AccessError(_('Purging sync logs is restricted to ERP Managers.'))
+
+        if not isinstance(days, int) or days < 1:
+            from odoo.exceptions import UserError
+            raise UserError(_('Retention window must be a positive number of days.'))
 
         cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
-        old = self.sudo().search([('create_date', '<', cutoff)])
+        # VNZ-02 FIX: scope to the caller's own companies instead of every
+        # company in the database.
+        company_ids = self.env.companies.ids
+        old = self.sudo().search([
+            ('create_date', '<', cutoff),
+            ('company_id', 'in', company_ids),
+        ])
         count = len(old)
         old.unlink()
-        _logger.info('Akahu sync log purge: deleted %d entries older than %d days.', count, days)
+        _logger.info(
+            'Akahu sync log purge: deleted %d entries older than %d days for companies %s.',
+            count, days, company_ids,
+        )

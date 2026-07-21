@@ -35,6 +35,7 @@ UX
     'depends': [
         'account',
         'base_setup',
+        'mail',
     ],
     'data': [
         # Security

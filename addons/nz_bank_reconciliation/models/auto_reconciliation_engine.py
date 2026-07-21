@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import re
+from datetime import timedelta
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_round
@@ -57,8 +58,9 @@ def _extract_ref_tokens(text):
             tokens.add(part)
         elif re.match(r'^[A-Z]+-\d+', part):       # REF-0042, PO-881 style
             tokens.add(part)
-        elif re.match(r'^\d{4,}$', part):          # bare numeric codes >= 4 digits
-            tokens.add(part)
+        elif re.match(r'^\d{6,}$', part):          # VNZ-21 FIX: was >=4 digits;
+            tokens.add(part)                        # raised to >=6 to cut collisions
+            # with incidental short numbers (phone extensions, dates, etc.)
         elif re.match(r'^(INV|BILL|PO|SO|RFQ|ORD|WO|JO|DO|RCPT)\d*', part):
             tokens.add(part)                        # known NZ doc-type prefixes
     return tokens
@@ -80,7 +82,8 @@ class AutoReconciliationEngine(models.Model):
         """
         Run all enabled reconciliation passes.
 
-        :param company_ids: list of res.company IDs to process (None = all companies)
+        :param company_ids: list of res.company IDs to process (None = caller's
+                            own allowed companies; see VNZ-07 fix below)
         :param journal_ids: list of account.journal IDs to restrict bank-statement
                             reconciliation to (None = all journals in the company).
                             Used by action_fetch_akahu_transactions to avoid running
@@ -88,10 +91,31 @@ class AutoReconciliationEngine(models.Model):
         :param preview_mode: if True, collect matches but do not apply them
         :param triggered_by: 'manual' or 'cron' (written to the audit log)
         """
-        if not company_ids:
-            # sudo(): res.company requires elevated read for multi-company enumeration in cron context
-            companies = self.env['res.company'].sudo().search([])
+        # VNZ-07 FIX: company_ids was caller-controlled and browsed under
+        # sudo() with no check against the caller's actual company access,
+        # letting an Accounting Manager confined to one company reconcile
+        # (and read back, via preview_mode) another company's data. The
+        # scheduled cron path (triggered_by='cron') still needs to reach
+        # every company, so only the interactive/RPC path is restricted.
+        if triggered_by == 'cron':
+            allowed_company_ids = None  # scheduler: intentionally unrestricted
         else:
+            allowed_company_ids = self.env.companies.ids
+
+        if not company_ids:
+            if allowed_company_ids is None:
+                # sudo(): res.company requires elevated read for multi-company enumeration in cron context
+                companies = self.env['res.company'].sudo().search([])
+            else:
+                companies = self.env['res.company'].sudo().browse(allowed_company_ids)
+        else:
+            if allowed_company_ids is not None:
+                disallowed = set(company_ids) - set(allowed_company_ids)
+                if disallowed:
+                    from odoo.exceptions import AccessError
+                    raise AccessError(_(
+                        'You do not have access to company id(s) %s.'
+                    ) % list(disallowed))
             # sudo(): see above — same privilege rationale for browse path
             companies = self.env['res.company'].sudo().browse(company_ids)
 
@@ -182,7 +206,7 @@ class AutoReconciliationEngine(models.Model):
                     # Search invoices/bills whose name OR ref OR payment_reference
                     # contains any of the tokens extracted from the bank line.
                     # We use OR logic across fields but require at least one token hit.
-                    ref_candidates = MoveLine.search([
+                    ref_candidates_domain = [
                         ('company_id', '=', company.id),
                         ('reconciled', '=', False),
                         ('parent_state', '=', 'posted'),
@@ -192,7 +216,19 @@ class AutoReconciliationEngine(models.Model):
                         ('move_id.name', 'in', list(ref_tokens)),
                         ('move_id.payment_reference', 'in', list(ref_tokens)),
                         ('move_id.ref', 'in', list(ref_tokens)),
-                    ], order='date asc, id asc', limit=20)
+                    ]
+                    # VNZ-21 FIX: the reference pass previously had no date
+                    # window at all (only the amount+partner fallback did),
+                    # so a reference-token collision could match a very old
+                    # invoice. Apply the same window here when enabled.
+                    if match_by_date_window and stmt_line.date:
+                        ref_candidates_domain += [
+                            ('date', '>=', stmt_line.date - timedelta(days=date_window_days)),
+                            ('date', '<=', stmt_line.date + timedelta(days=date_window_days)),
+                        ]
+                    ref_candidates = MoveLine.search(
+                        ref_candidates_domain, order='date asc, id asc', limit=20,
+                    )
 
                     # Among reference hits, confirm amount also matches
                     for cand in ref_candidates:
@@ -533,6 +569,14 @@ class AutoReconciliationEngine(models.Model):
 
         partner_to_company = {m.partner_id.id: m.counterpart_company_id.id for m in mappings}
 
+        # VNZ-08 FIX: the bank/customer/vendor passes all apply a date-window
+        # guard before falling back to amount-only matching; this pass did
+        # not, so with more than one open item of the same amount on the
+        # counterpart side it could (and in testing did) pick the wrong,
+        # older one. Reuse the same config-driven window as the other passes.
+        match_by_date_window = not config or config.match_by_date_window
+        date_window_days = (config.date_window_days if config else 60) or 60
+
         ic_lines = MoveLine.search([
             ('company_id', '=', company.id), ('reconciled', '=', False),
             ('parent_state', '=', 'posted'),
@@ -575,8 +619,25 @@ class AutoReconciliationEngine(models.Model):
                         ('account_id.account_type', '=', 'asset_receivable'),
                     ]
 
-            # H1 FIX: deterministic ordering — oldest matching entry preferred.
-            counterpart = MoveLine.search(domain, limit=1, order='date asc, id asc')
+            # VNZ-08 FIX: require the counterpart to fall within the same
+            # date window used by the other passes, instead of accepting
+            # any same-amount entry regardless of age.
+            if match_by_date_window and line.date:
+                domain += [
+                    ('date', '>=', line.date - timedelta(days=date_window_days)),
+                    ('date', '<=', line.date + timedelta(days=date_window_days)),
+                ]
+
+            # VNZ-08 FIX: prefer the closest date to the source line rather
+            # than always the oldest — "oldest first" is what let an old
+            # decoy entry outrank the true counterpart. Ties broken by id
+            # for determinism.
+            candidates = MoveLine.search(domain, order='id asc')
+            counterpart = False
+            if candidates:
+                counterpart = min(
+                    candidates, key=lambda c: (abs((c.date - line.date).days) if c.date and line.date else 0, c.id)
+                )
             if counterpart:
                 cc_name = self.env['res.company'].browse(cc_id).name
                 line_currency = line.currency_id or company.currency_id
@@ -636,8 +697,15 @@ class AutoReconciliationEngine(models.Model):
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
         # via XML-RPC or JSON-RPC, which bypasses the UI but not the ORM method layer.
+        #
+        # VNZ-20 FIX: alert admins by email if the cron technical user has
+        # lost this group, instead of only logging (see akahu.sync.engine
+        # for the same fix and rationale).
         if not self.env.user.has_group('account.group_account_manager'):
             from odoo.exceptions import AccessError
+            self.sudo().env['akahu.sync.engine']._notify_admins_of_cron_permission_loss(
+                'auto.reconciliation.engine.cron_run_auto_reconciliation',
+            )
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
         _logger.info("Auto Reconciliation Cron: Starting")

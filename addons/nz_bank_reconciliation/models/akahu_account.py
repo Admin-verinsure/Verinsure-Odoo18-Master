@@ -43,7 +43,12 @@ class AkahuAccount(models.Model):
         string='Akahu Credentials',
         required=True,
         domain="[('company_id', '=', company_id)]",
-        ondelete='cascade',
+        # VNZ-03 FIX: was 'cascade' — deleting a credential silently wiped
+        # every connected bank account with no confirmation. 'restrict'
+        # means the credential can't be deleted while accounts still
+        # reference it; disconnect/archive the accounts first, or use the
+        # Revoke Credentials wizard to clear tokens without deleting rows.
+        ondelete='restrict',
     )
     journal_id = fields.Many2one(
         'account.journal',
@@ -59,7 +64,9 @@ class AkahuAccount(models.Model):
     user_token = fields.Char(
         string='User Access Token',
         required=True,
-        password=True,
+        # VNZ-11 FIX: see akahu_credential.py — password=True is not a valid
+        # Char parameter here; masking is applied via widget="password" in
+        # views/akahu_account_views.xml instead.
         groups='base.group_erp_manager',
         help='The Akahu User Access Token (user_token_...) for this bank account. '
              'Stored encrypted. Visible to ERP Managers only.',

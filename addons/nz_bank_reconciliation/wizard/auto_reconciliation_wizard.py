@@ -51,6 +51,14 @@ class AutoReconciliationWizard(models.TransientModel):
         still unreconciled before applying — items reconciled in the
         meantime (e.g. by cron) are safely skipped.
         """
+        # METHOD GUARD (VNZ-07): this entry point had no group check at all —
+        # it read record IDs from a manager-writable field and applied them
+        # under sudo(). Add the same guard used by every other engine entry
+        # point in this module.
+        if not self.env.user.has_group('account.group_account_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('This action is restricted to Accounting Managers.'))
+
         self.ensure_one()
         if not self.match_pairs_json:
             raise UserError(_('No preview data found. Please close and run Preview again.'))
