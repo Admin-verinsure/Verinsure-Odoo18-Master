@@ -32,6 +32,7 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
             'app_token': self.new_app_token,
             'app_secret': self.new_app_secret,
             'connection_status': 'untested',
+            'last_tested': False,
             'error_message': False,
         })
 

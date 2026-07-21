@@ -195,10 +195,18 @@ class AkahuCredential(models.Model):
     ], string='Status', default='untested', readonly=True)
     last_tested = fields.Datetime(string='Last Tested', readonly=True)
     error_message = fields.Char(string='Last Error', readonly=True)
+    has_credentials = fields.Boolean(
+        compute='_compute_has_credentials',
+    )
 
     _sql_constraints = [
         ('company_unique', 'UNIQUE(company_id)', 'Only one Akahu credential per company is allowed.'),
     ]
+
+    @api.depends('app_token', 'app_secret')
+    def _compute_has_credentials(self):
+        for rec in self:
+            rec.has_credentials = bool(rec.app_token and rec.app_secret)
 
     # -------------------------------------------------------------------------
     # Encryption hooks
