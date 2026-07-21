@@ -35,49 +35,38 @@ _RETRY_BACKOFF = [1, 2, 4, 8]  # seconds between attempts
 # Token encryption helpers
 # ---------------------------------------------------------------------------
 # SEC-01 FIX: Tokens are encrypted at rest using AES-256-GCM (via the
-# `cryptography` package that ships with Odoo 16+).  The symmetric key is
-# stored in ir.config_parameter (key: akahu.token_key) so it lives in the
-# database but is separate from the token ciphertext — an attacker needs
-# both the config-param table row AND the credential table row to decrypt.
-# For a higher assurance level, replace _get_encryption_key() with a call
-# to an external KMS / Odoo vault module and store nothing in the DB.
+# `cryptography` package that ships with Odoo 16+). The symmetric key must
+# be supplied from the process environment via AKAHU_TOKEN_KEY so it is
+# never stored in the same database as ciphertext.
 # ---------------------------------------------------------------------------
 
 def _get_encryption_key(env):
     """Return the 32-byte AES key used to encrypt/decrypt tokens.
 
-    VNZ-06 FIX: encryption-at-rest is meant to survive a database
-    compromise (stolen backup, DBA access, SQL injection from another
-    module). Storing the key in ir.config_parameter — the same database as
-    the ciphertext — defeats that: anyone who can read the DB has both
-    halves of the secret. We now prefer a key supplied via the
-    AKAHU_TOKEN_KEY environment variable (set it from your secrets
-    manager / KMS, e.g. `export AKAHU_TOKEN_KEY=$(openssl rand -base64 32)`
-    in the Odoo service's environment, outside the database). Falling back
-    to ir.config_parameter is kept only so existing installs keep working
-    without an immediate outage; a warning is logged so this residual risk
-    is visible rather than silent, and it should be migrated off ASAP
-    (encrypt backups in the meantime — see the report recommendation).
+    VNZ-06 FIX: encryption-at-rest must survive a database compromise.
+    Therefore the key is loaded only from AKAHU_TOKEN_KEY (outside DB).
+    No database fallback is allowed.
     """
     env_key_b64 = os.environ.get('AKAHU_TOKEN_KEY')
-    if env_key_b64:
-        return base64.b64decode(env_key_b64)
-
-    ICP = env['ir.config_parameter'].sudo()
-    key_b64 = ICP.get_param('akahu.token_key')
-    if not key_b64:
-        # First use — generate a random 256-bit key and persist it.
-        _logger.warning(
-            'SEC-01/VNZ-06: no AKAHU_TOKEN_KEY environment variable set — '
-            'generating and storing the encryption key in the database '
-            'alongside the ciphertext it protects. Set AKAHU_TOKEN_KEY in '
-            'the server environment (secrets manager / KMS) to remove this '
-            'residual risk; see the pen test report (VNZ-06) for detail.'
-        )
-        raw_key = os.urandom(32)
-        ICP.set_param('akahu.token_key', base64.b64encode(raw_key).decode())
-        return raw_key
-    return base64.b64decode(key_b64)
+    if not env_key_b64:
+        raise UserError(_(
+            'AKAHU_TOKEN_KEY is not configured. Set a base64-encoded 32-byte '
+            'encryption key in the Odoo service environment before using the '
+            'Akahu integration.'
+        ))
+    try:
+        key = base64.b64decode(env_key_b64)
+    except Exception:
+        raise UserError(_(
+            'AKAHU_TOKEN_KEY is invalid. It must be a base64-encoded 32-byte '
+            'encryption key.'
+        ))
+    if len(key) != 32:
+        raise UserError(_(
+            'AKAHU_TOKEN_KEY has invalid length. It must decode to exactly '
+            '32 bytes for AES-256-GCM.'
+        ))
+    return key
 
 
 # VNZ-13 FIX: an explicit version marker on every ciphertext blob so
