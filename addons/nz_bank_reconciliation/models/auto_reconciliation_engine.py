@@ -67,6 +67,25 @@ def _extract_ref_tokens(text):
     return tokens
 
 
+def _normalize_ref_value(value):
+    return ' '.join((value or '').upper().split())
+
+
+def _get_move_line_reference_signals(line):
+    values = {
+        _normalize_ref_value(line.name),
+        _normalize_ref_value(line.move_id.name),
+        _normalize_ref_value(line.move_id.ref),
+        _normalize_ref_value(line.move_id.payment_reference),
+    }
+    values.discard('')
+
+    tokens = set()
+    for value in values:
+        tokens.update(_extract_ref_tokens(value))
+    return values, tokens
+
+
 class AutoReconciliationEngine(models.Model):
     _name = 'auto.reconciliation.engine'
     _description = 'Auto Reconciliation Engine'
@@ -678,6 +697,8 @@ class AutoReconciliationEngine(models.Model):
             if not cc_id:
                 continue
 
+            source_ref_values, source_ref_tokens = _get_move_line_reference_signals(line)
+
             domain = [
                 ('company_id', '=', cc_id), ('reconciled', '=', False),
                 ('parent_state', '=', 'posted'),
@@ -727,8 +748,31 @@ class AutoReconciliationEngine(models.Model):
                     candidates, key=lambda c: (abs((c.date - line.date).days) if c.date and line.date else 0, c.id)
                 )
             if counterpart:
+                counterpart_ref_values, counterpart_ref_tokens = _get_move_line_reference_signals(counterpart)
+                exact_ref_match = bool(source_ref_values & counterpart_ref_values)
+                token_ref_match = bool(source_ref_tokens & counterpart_ref_tokens)
+                has_strong_reference_match = exact_ref_match or token_ref_match
+
+                if not has_strong_reference_match and not preview_mode:
+                    _logger.info(
+                        'IC reconciliation skipped for line %s in %s: no strong reference match with counterpart %s in %s.',
+                        sanitize_log_value(line.id),
+                        sanitize_log_value(company.name),
+                        sanitize_log_value(counterpart.id),
+                        sanitize_log_value(self.env["res.company"].browse(cc_id).name),
+                    )
+                    continue
+
                 cc_name = self.env['res.company'].browse(cc_id).name
                 line_currency = line.currency_id or company.currency_id
+                match_criteria = ['amount']
+                if match_by_date_window and line.date:
+                    match_criteria.append('date_window')
+                if exact_ref_match or token_ref_match:
+                    match_criteria.append('reference')
+                elif preview_mode:
+                    match_criteria.append('review_required')
+
                 matched.append({
                     'type': 'intercompany', 'line_id': line.id, 'line_name': line.name,
                     'counterpart_line_id': counterpart.id,
@@ -736,6 +780,7 @@ class AutoReconciliationEngine(models.Model):
                     'amount': abs(line.amount_currency if line.currency_id else (line.debit or line.credit)),
                     'currency': line_currency.name,
                     'company_from': company.name, 'company_to': cc_name,
+                    'match_criteria': ', '.join(match_criteria),
                 })
                 if not preview_mode:
                     try:

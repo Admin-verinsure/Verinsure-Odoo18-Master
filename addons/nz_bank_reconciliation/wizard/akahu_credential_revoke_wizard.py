@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class AkahuCredentialRevokeWizard(models.TransientModel):
@@ -71,6 +76,87 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
             ))
 
         cred = self.credential_id
+        linked_accounts = self.env['akahu.account'].sudo().search([
+            ('credential_id', '=', cred.id),
+        ])
+
+        remote_failures = []
+
+        # Prefer authorisation-level revoke when authorisation IDs are available.
+        auth_field_name = next((
+            name for name in ('akahu_authorisation_id', 'authorisation_id')
+            if name in linked_accounts._fields
+        ), None)
+        authorisation_rows = []
+        if auth_field_name:
+            for account in linked_accounts:
+                authorisation_id = (account[auth_field_name] or '').strip()
+                try:
+                    user_token = account._get_user_token()
+                except Exception as e:
+                    remote_failures.append('authorisation-token-read (%s)' % str(e))
+                    _logger.warning(
+                        'Akahu remote revoke token read failed for credential_id=%s account_id=%s: %s',
+                        cred.id,
+                        account.id,
+                        str(e),
+                    )
+                    continue
+                if authorisation_id and user_token:
+                    authorisation_rows.append((authorisation_id, user_token))
+
+        if authorisation_rows:
+            seen_authorisations = set()
+            for authorisation_id, user_token in authorisation_rows:
+                if authorisation_id in seen_authorisations:
+                    continue
+                seen_authorisations.add(authorisation_id)
+                try:
+                    cred._api_request(
+                        user_token_plain=user_token,
+                        path='/authorisations/%s' % authorisation_id,
+                        method='DELETE',
+                    )
+                except Exception as e:
+                    remote_failures.append('authorisation:%s (%s)' % (authorisation_id, str(e)))
+                    _logger.warning(
+                        'Akahu remote revoke failed for credential_id=%s authorisation_id=%s: %s',
+                        cred.id,
+                        authorisation_id,
+                        str(e),
+                    )
+        else:
+            # Fall back to token revoke once per unique user token.
+            unique_tokens = set()
+            for account in linked_accounts:
+                try:
+                    user_token = account._get_user_token()
+                except Exception as e:
+                    remote_failures.append('token-read (%s)' % str(e))
+                    _logger.warning(
+                        'Akahu remote token revoke read failed for credential_id=%s account_id=%s: %s',
+                        cred.id,
+                        account.id,
+                        str(e),
+                    )
+                    continue
+                if user_token:
+                    unique_tokens.add(user_token)
+            for user_token in unique_tokens:
+                try:
+                    cred._api_request(
+                        user_token_plain=user_token,
+                        path='/token',
+                        method='DELETE',
+                    )
+                except Exception as e:
+                    remote_failures.append('token (%s)' % str(e))
+                    _logger.warning(
+                        'Akahu remote token revoke failed for credential_id=%s: %s',
+                        cred.id,
+                        str(e),
+                    )
+
         # VNZ-09 FIX: app_token / app_secret are required=True (NOT NULL).
         # Writing False sets NULL, which the DB constraint rejects — the
         # whole write rolled back and nothing was cleared, including the
@@ -87,18 +173,21 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
             'app_token': '',
             'app_secret': '',
             'connection_status': 'untested',
-            'error_message': 'Credentials revoked by %s on %s. Re-enter tokens to resume sync.' % (
+            'error_message': (
+                'Credentials revoked by %s on %s. Re-enter tokens to resume sync.%s'
+            ) % (
                 self.env.user.name,
                 fields.Datetime.now(),
+                (
+                    ' Remote Akahu revoke had %d failure(s); check server logs.'
+                    % len(remote_failures)
+                ) if remote_failures else '',
             ),
         })
 
         # Also wipe all linked user tokens so sync cannot resume with stale tokens.
         # VNZ-09 FIX: user_token is also required=True — same False->NULL
         # problem — write empty string here too.
-        linked_accounts = self.env['akahu.account'].sudo().search([
-            ('credential_id', '=', cred.id),
-        ])
         linked_accounts.write({'user_token': ''})
 
         return {
