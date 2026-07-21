@@ -432,6 +432,77 @@ class AkahuCredential(models.Model):
             'Content-Type': 'application/json',
         }
 
+    def _api_request(self, user_token_plain, path, method='GET', params=None, json_body=None):
+        """
+        Generic Akahu API request helper with shared auth/retry/error handling.
+        Returns parsed JSON response (or {'success': True} for empty 2xx responses).
+        """
+        self.ensure_one()
+        url = '%s%s' % (AKAHU_BASE_URL, path)
+        method = (method or 'GET').upper()
+
+        for attempt in range(_MAX_RETRIES):
+            try:
+                resp = requests.request(
+                    method,
+                    url,
+                    headers=self._get_headers(user_token_plain),
+                    params=params or {},
+                    json=json_body,
+                    timeout=30,
+                )
+            except requests.exceptions.RequestException as e:
+                raise UserError(_('Akahu API connection failed: %s') % str(e))
+
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get('Retry-After', _RETRY_BACKOFF[attempt]))
+                _logger.warning(
+                    'Akahu API rate-limited (429) on %s %s. '
+                    'Waiting %ds before retry %d/%d.',
+                    sanitize_log_value(method),
+                    sanitize_log_value(path),
+                    sanitize_log_value(retry_after),
+                    sanitize_log_value(attempt + 1),
+                    sanitize_log_value(_MAX_RETRIES),
+                )
+                time.sleep(retry_after)
+                continue
+
+            if resp.status_code == 401:
+                raise UserError(_(
+                    'Akahu authentication failed (401). '
+                    'Check your App Token and User Token.'
+                ))
+            if resp.status_code == 403:
+                raise UserError(_(
+                    'Akahu permission denied (403). '
+                    'Your app may be missing required scopes.'
+                ))
+            if resp.status_code >= 400:
+                raw = resp.text[:120] if resp.text else ''
+                safe_msg = _redact_secret(raw)
+                raise UserError(_(
+                    'Akahu API error %s. Please check your credentials and try again. '
+                    'Detail: %s'
+                ) % (resp.status_code, safe_msg))
+
+            if not resp.text:
+                return {'success': True}
+
+            try:
+                data = resp.json()
+            except ValueError:
+                raise UserError(_('Akahu API returned a non-JSON success response.'))
+
+            if not data.get('success'):
+                raise UserError(_('Akahu returned success=false. Check the server logs for details.'))
+            return data
+
+        raise UserError(_(
+            'Akahu API rate limit exceeded for %s %s after %d retries. '
+            'The operation will be retried later.'
+        ) % (method, path, _MAX_RETRIES))
+
     def _api_get(self, user_token_plain, path, params=None):
         """
         Generic GET against the Akahu API.
