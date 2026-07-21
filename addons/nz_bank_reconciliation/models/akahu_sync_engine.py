@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging
-import re
 import time
 from datetime import datetime, timezone
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from ..utils.log_redaction import sanitize_log_value
 
 # BUG-01 FIX: Hard cap on paginated fetches. If Akahu ever returns a circular
 # cursor or never sends a terminal page, the cron worker would hang forever.
@@ -23,8 +23,7 @@ def _sanitize_error_text(text, limit=512):
     """
     if not text:
         return text
-    truncated = text[:limit]
-    return re.sub(r'[a-zA-Z0-9_]{20,}', '[REDACTED]', truncated)
+    return str(sanitize_log_value(text))[:limit]
 
 
 class AkahuSyncEngine(models.Model):
@@ -65,10 +64,11 @@ class AkahuSyncEngine(models.Model):
                 'body_html': '<p>%s</p>' % body,
                 'email_to': ','.join(admins.mapped('email') or []),
             }).send()
-        except Exception:
+        except Exception as e:
             _logger.exception(
-                'VNZ-20: failed to notify administrators about cron permission loss for %s',
-                method_name,
+                'VNZ-20: failed to notify administrators about cron permission loss for %s: %s',
+                sanitize_log_value(method_name),
+                sanitize_log_value(e),
             )
 
     # ── PUBLIC ENTRY POINTS ────────────────────────────────────────────────────
@@ -112,7 +112,11 @@ class AkahuSyncEngine(models.Model):
                 result = self.sync_account(account)
                 total_imported += result.get('imported', 0)
             except Exception as e:
-                _logger.error('Akahu sync failed for account %s: %s', account.name, str(e))
+                _logger.error(
+                    'Akahu sync failed for account %s: %s',
+                    sanitize_log_value(account.name),
+                    sanitize_log_value(e),
+                )
                 # sudo(): cron technical user has no create permission on akahu.sync.log; escalate only for log writes
                 self.env['akahu.sync.log'].sudo().create({
                     'akahu_account_id': account.id,
@@ -121,7 +125,10 @@ class AkahuSyncEngine(models.Model):
                     'transactions_imported': 0,
                     'error_message': _sanitize_error_text(str(e)),
                 })
-        _logger.info('Akahu Sync Cron: Done. Total imported: %d', total_imported)
+        _logger.info(
+            'Akahu Sync Cron: Done. Total imported: %d',
+            sanitize_log_value(total_imported),
+        )
 
     @api.model
     def sync_account(self, akahu_account):
@@ -185,7 +192,9 @@ class AkahuSyncEngine(models.Model):
             page_count += 1
             _logger.info(
                 'Akahu sync: fetching page %d for account %s (cursor: %s)',
-                page_count, akahu_account.name, params.get('cursor', 'none')
+                sanitize_log_value(page_count),
+                sanitize_log_value(akahu_account.name),
+                sanitize_log_value(params.get('cursor', 'none')),
             )
             try:
                 data = cred._api_get(akahu_account._get_user_token(), path, params=params)
@@ -211,7 +220,9 @@ class AkahuSyncEngine(models.Model):
 
         _logger.info(
             'Akahu sync: fetched %d transactions across %d page(s) for %s',
-            len(all_transactions), page_count, akahu_account.name
+            sanitize_log_value(len(all_transactions)),
+            sanitize_log_value(page_count),
+            sanitize_log_value(akahu_account.name),
         )
 
         # ── Deduplication via unique_import_id ────────────────────────────────
@@ -223,7 +234,9 @@ class AkahuSyncEngine(models.Model):
 
         _logger.info(
             'Akahu sync: %d new (of %d total) for %s',
-            len(new_transactions), len(all_transactions), akahu_account.name
+            sanitize_log_value(len(new_transactions)),
+            sanitize_log_value(len(all_transactions)),
+            sanitize_log_value(akahu_account.name),
         )
 
         # ── Create bank statement lines ────────────────────────────────────────
@@ -265,7 +278,9 @@ class AkahuSyncEngine(models.Model):
             ) % (failed, len(new_transactions))
             _logger.error(
                 'Akahu sync: %d of %d new transactions failed to import for %s — cursor not advanced.',
-                failed, len(new_transactions), akahu_account.name,
+                sanitize_log_value(failed),
+                sanitize_log_value(len(new_transactions)),
+                sanitize_log_value(akahu_account.name),
             )
         self.env['akahu.sync.log'].sudo().create(log_vals)
 
@@ -333,7 +348,8 @@ class AkahuSyncEngine(models.Model):
                 self.env.cr.execute('ROLLBACK TO SAVEPOINT %s' % savepoint)
                 _logger.warning(
                     'Failed to create statement line for tx %s (savepoint rolled back): %s',
-                    tx.get('_id'), str(e)
+                    sanitize_log_value(tx.get('_id')),
+                    sanitize_log_value(e),
                 )
 
         return count
@@ -440,8 +456,8 @@ class AkahuSyncEngine(models.Model):
             _logger.debug(
                 'Akahu: CARD transaction for %s but no credit-card journal found '
                 '(codes checked: %s) — using default journal %s.',
-                akahu_account.name,
-                self.CREDIT_CARD_JOURNAL_CODES,
-                akahu_account.journal_id.code,
+                sanitize_log_value(akahu_account.name),
+                sanitize_log_value(self.CREDIT_CARD_JOURNAL_CODES),
+                sanitize_log_value(akahu_account.journal_id.code),
             )
         return akahu_account.journal_id

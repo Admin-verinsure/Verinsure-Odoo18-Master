@@ -5,6 +5,7 @@ from datetime import timedelta
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_round
+from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -121,7 +122,10 @@ class AutoReconciliationEngine(models.Model):
 
         all_results = {}
         for company in companies:
-            _logger.info("Auto Reconciliation: Processing company %s", company.name)
+            _logger.info(
+                "Auto Reconciliation: Processing company %s",
+                sanitize_log_value(company.name),
+            )
             try:
                 results = self._process_company(
                     company,
@@ -130,7 +134,11 @@ class AutoReconciliationEngine(models.Model):
                 )
                 all_results[company.id] = results
             except Exception as e:
-                _logger.error("Auto Reconciliation failed for %s: %s", company.name, str(e))
+                _logger.error(
+                    "Auto Reconciliation failed for %s: %s",
+                    sanitize_log_value(company.name),
+                    sanitize_log_value(e),
+                )
                 all_results[company.id] = {'error': str(e)}
 
         if not preview_mode:
@@ -376,10 +384,15 @@ class AutoReconciliationEngine(models.Model):
             else:
                 _logger.warning(
                     "Bank recon: no suitable line on stmt_line %s to reconcile against move_line %s",
-                    stmt_line.id, move_line.id
+                    sanitize_log_value(stmt_line.id),
+                    sanitize_log_value(move_line.id),
                 )
         except Exception as e:
-            _logger.warning("Bank recon failed for stmt_line %s: %s", stmt_line.id, str(e))
+            _logger.warning(
+                "Bank recon failed for stmt_line %s: %s",
+                sanitize_log_value(stmt_line.id),
+                sanitize_log_value(e),
+            )
 
     # ── CUSTOMER PAYMENTS ─────────────────────────────────────────────────────
     def _reconcile_customer_payments(self, company, preview_mode=False, config=None):
@@ -553,7 +566,11 @@ class AutoReconciliationEngine(models.Model):
             if p_lines and m_lines:
                 (p_lines[0] | m_lines[0]).reconcile()
         except Exception as e:
-            _logger.warning("AR reconciliation failed for payment %s: %s", payment.id, str(e))
+            _logger.warning(
+                "AR reconciliation failed for payment %s: %s",
+                sanitize_log_value(payment.id),
+                sanitize_log_value(e),
+            )
 
     # ── INTER-COMPANY ─────────────────────────────────────────────────────────
     def _reconcile_intercompany(self, company, preview_mode=False, config=None):
@@ -662,7 +679,7 @@ class AutoReconciliationEngine(models.Model):
                             [line.id, counterpart.id]
                         ).reconcile()
                     except Exception as e:
-                        _logger.warning("IC reconciliation failed: %s", str(e))
+                        _logger.warning("IC reconciliation failed: %s", sanitize_log_value(e))
 
         return {'matched': matched, 'matched_count': len(matched)}
 

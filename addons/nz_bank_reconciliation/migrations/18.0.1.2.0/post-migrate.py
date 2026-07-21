@@ -15,6 +15,7 @@ based on base64 validity / byte length. The previous heuristic could
 misclassify a plaintext App Secret as already-encrypted and skip it.
 """
 import logging
+from odoo.addons.nz_bank_reconciliation.utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -65,11 +66,14 @@ def migrate(cr, version):
             vals['app_secret'] = app_secret
         if vals:
             env['akahu.credential'].browse(rec_id).write(vals)
-            _logger.info('SEC-01: encrypted credential id=%d', rec_id)
+            _logger.info('SEC-01: encrypted credential id=%d', sanitize_log_value(rec_id))
 
     for rec_id, user_token in acct_rows:
         if _looks_like_plaintext(user_token):
             env['akahu.account'].browse(rec_id).write({'user_token': user_token})
-            _logger.info('SEC-01: encrypted akahu.account id=%d user_token', rec_id)
+            _logger.info(
+                'SEC-01: encrypted akahu.account id=%d user_token',
+                sanitize_log_value(rec_id),
+            )
 
     _logger.info('SEC-01 migration: done.')

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from odoo import models, fields, api, _
+from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
@@ -146,5 +147,6 @@ class AutoReconciliationLog(models.Model):
         old.unlink()
         _logger.info(
             'Auto reconciliation log purge: deleted %d entries older than %d days.',
-            count, days,
+            sanitize_log_value(count),
+            sanitize_log_value(days),
         )
