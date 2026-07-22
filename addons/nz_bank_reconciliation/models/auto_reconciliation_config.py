@@ -64,8 +64,8 @@ class AutoReconciliationConfig(models.Model):
         )
         # BUG FIX: Report actual match count instead of a generic "finished" message.
         company_res = results.get(self.company_id.id, {})
-        total = sum(
-            company_res.get(k, {}).get('matched_count', 0)
+        total_applied = sum(
+            company_res.get(k, {}).get('applied_count', company_res.get(k, {}).get('matched_count', 0))
             for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
         )
         if 'error' in company_res:
@@ -83,9 +83,9 @@ class AutoReconciliationConfig(models.Model):
             'tag': 'display_notification',
             'params': {
                 'title': _('Auto Reconciliation Complete'),
-                'message': _('%d match(es) applied for %s.') % (total, self.company_id.name)
-                           if total else _('No new matches found for %s.') % self.company_id.name,
-                'type': 'success' if total else 'info',
+                'message': _('%d match(es) applied for %s.') % (total_applied, self.company_id.name)
+                           if total_applied else (_('No new matches applied for %s.') % self.company_id.name),
+                'type': 'success' if total_applied else 'info',
                 'sticky': False,
             }
         }
