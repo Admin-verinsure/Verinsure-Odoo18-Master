@@ -73,7 +73,6 @@ class AutoReconciliationConfig(models.Model):
             company_res.get(k, {}).get('matched_count', 0)
             for k in buckets
         )
-        found_not_applied = max(total_found - total_applied, 0)
         unmatched = company_res.get('bank_statement', {}).get('unmatched_count', 0)
         if 'error' in company_res:
             return {
@@ -86,10 +85,9 @@ class AutoReconciliationConfig(models.Model):
                 }
             }
         message = _(
-            'Reconciled: %(applied)d. Found but not applied: %(not_applied)d. No-match: %(unmatched)d.'
+            'Reconciled: %(applied)d. No-match: %(unmatched)d.'
         ) % {
             'applied': total_applied,
-            'not_applied': found_not_applied,
             'unmatched': unmatched,
         }
 

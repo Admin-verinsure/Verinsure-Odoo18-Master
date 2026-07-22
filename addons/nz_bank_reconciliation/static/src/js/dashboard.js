@@ -103,10 +103,9 @@ class AutoReconciliationDashboard extends Component {
                 (sum, key) => sum + (companyRes?.[key]?.matched_count ?? 0),
                 0
             );
-            const foundNotApplied = Math.max(found - applied, 0);
             const unmatched = companyRes?.bank_statement?.unmatched_count ?? 0;
 
-            const message = `Reconciled: ${applied}. Found but not applied: ${foundNotApplied}. No-match: ${unmatched}.`;
+            const message = `Reconciled: ${applied}. No-match: ${unmatched}.`;
 
             this.notification.add(message, {
                 type: applied > 0 ? "success" : "info",

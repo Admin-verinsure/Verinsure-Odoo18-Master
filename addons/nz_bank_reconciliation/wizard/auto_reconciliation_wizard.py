@@ -137,11 +137,8 @@ class AutoReconciliationWizard(models.TransientModel):
                 skipped += 1
 
         self.write({'state': 'confirmed', 'skipped_count': skipped})
-        deselected = len(all_pairs) - len(pairs)
-        found_not_applied = skipped + deselected
-        msg = _('Reconciled: %(applied)d. Found but not applied: %(not_applied)d.') % {
+        msg = _('Reconciled: %(applied)d.') % {
             'applied': applied,
-            'not_applied': found_not_applied,
         }
         return {
             'type': 'ir.actions.client',
