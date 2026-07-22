@@ -54,6 +54,7 @@
                             <field name="user_token"
                                    widget="password"
                                    placeholder="user_token_xxxxxxxxxxxxxxxxxxxxxxx"
+                                nolabel="1"
                                    groups="base.group_erp_manager"
                                    invisible="id"/>
                             <field name="has_user_token" invisible="1"/>
