@@ -581,9 +581,11 @@ class AkahuCredential(models.Model):
 
     def action_test_connection(self):
         """
-        Validate app credentials against an app-scoped Akahu endpoint.
+        Validate credentials using the same user-scoped API contract as account
+        refresh when a linked account token is available.
 
-        This check must not depend on linked accounts or account user tokens.
+        If no linked active account exists yet, perform a local app credential
+        sanity check so first-time setup can proceed without account records.
         """
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
@@ -593,94 +595,44 @@ class AkahuCredential(models.Model):
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
         self.ensure_one()
+        accounts = self.env['akahu.account'].search([
+            ('credential_id', '=', self.id),
+            ('active', '=', True),
+            ('user_token', '!=', ''),
+        ])
+
         try:
-            plain_token = self._get_app_token()
-            plain_secret = self._get_app_secret()
+            if accounts:
+                last_error = None
+                count = 0
+                for account in accounts:
+                    try:
+                        data = self._api_get(account._get_user_token(), '/accounts')
+                        count = len(data.get('items', []))
+                        last_error = None
+                        break
+                    except Exception as e:
+                        last_error = e
 
-            if not plain_token:
-                raise ValidationError(_('App Token is required.'))
-            if not plain_secret:
-                raise ValidationError(_('App Secret is required.'))
-            if not plain_token.startswith('app_token_'):
-                raise ValidationError(_('App Token must start with "app_token_"'))
+                if last_error:
+                    raise last_error
 
-            credentials = ('%s:%s' % (plain_token, plain_secret)).encode()
-            auth_header = base64.b64encode(credentials).decode()
-            # /connections is an Akahu app-scoped endpoint and validates
-            # App Token + App Secret via HTTP Basic auth.
-            url = '%s/connections' % AKAHU_BASE_URL
-
-            for attempt in range(_MAX_RETRIES):
-                try:
-                    resp = requests.get(
-                        url,
-                        headers={
-                            'Accept': 'application/json',
-                            'Authorization': 'Basic %s' % auth_header,
-                        },
-                        timeout=30,
-                    )
-                except requests.exceptions.Timeout:
-                    raise UserError(_(
-                        'Akahu did not respond in time while testing app credentials. '
-                        'Please try again.'
-                    ))
-                except requests.exceptions.ConnectionError:
-                    raise UserError(_(
-                        'Unable to reach Akahu while testing app credentials. '
-                        'Please check network connectivity and try again.'
-                    ))
-                except requests.exceptions.RequestException as e:
-                    raise UserError(_('Akahu API connection failed: %s') % str(e))
-
-                if resp.status_code == 429:
-                    retry_after = int(resp.headers.get('Retry-After', _RETRY_BACKOFF[attempt]))
-                    _logger.warning(
-                        'Akahu API rate-limited (429) on app credential test. '
-                        'Waiting %ds before retry %d/%d.',
-                        sanitize_log_value(retry_after),
-                        sanitize_log_value(attempt + 1),
-                        sanitize_log_value(_MAX_RETRIES),
-                    )
-                    time.sleep(retry_after)
-                    continue
-
-                if resp.status_code == 401:
-                    raise UserError(_(
-                        'Akahu app authentication failed (401). '
-                        'Check your App Token and App Secret.'
-                    ))
-                if resp.status_code == 403:
-                    raise UserError(_(
-                        'Akahu app permission denied (403). '
-                        'Your application may not have access to this endpoint.'
-                    ))
-                if resp.status_code >= 500:
-                    raise UserError(_(
-                        'Akahu is currently unavailable (%s). '
-                        'Please try again shortly.'
-                    ) % resp.status_code)
-                if resp.status_code >= 400:
-                    raw = resp.text[:120] if resp.text else ''
-                    safe_msg = _redact_secret(raw)
-                    raise UserError(_(
-                        'Akahu API error %s. Please check your app credentials and try again. '
-                        'Detail: %s'
-                    ) % (resp.status_code, safe_msg))
-
-                try:
-                    data = resp.json() if resp.text else {'success': True}
-                except ValueError:
-                    raise UserError(_('Akahu API returned a non-JSON success response.'))
-
-                if not data.get('success'):
-                    raise UserError(_('Akahu returned success=false. Check the server logs for details.'))
-                break
+                message = _('Connected! Found %d account(s) on Akahu.') % count
+                notif_type = 'success'
             else:
-                raise UserError(_(
-                    'Akahu API rate limit exceeded for app credential test after %d retries. '
-                    'Please try again shortly.'
-                ) % _MAX_RETRIES)
+                plain_token = self._get_app_token()
+                plain_secret = self._get_app_secret()
+                if not plain_token:
+                    raise ValidationError(_('App Token is required.'))
+                if not plain_secret:
+                    raise ValidationError(_('App Secret is required.'))
+                if not plain_token.startswith('app_token_'):
+                    raise ValidationError(_('App Token must start with "app_token_"'))
+                message = _(
+                    'App credentials look valid. Add bank accounts and user token to '
+                    'verify end-to-end account authentication.'
+                )
+                notif_type = 'info'
 
             self.write({
                 'connection_status': 'ok',
@@ -692,8 +644,8 @@ class AkahuCredential(models.Model):
                 'tag': 'display_notification',
                 'params': {
                     'title': _('Connection Successful'),
-                    'message': _('App credentials are valid.'),
-                    'type': 'success',
+                    'message': message,
+                    'type': notif_type,
                 }
             }
         except Exception as e:
