@@ -69,10 +69,6 @@ class AutoReconciliationConfig(models.Model):
             company_res.get(k, {}).get('applied_count', company_res.get(k, {}).get('matched_count', 0))
             for k in buckets
         )
-        total_found = sum(
-            company_res.get(k, {}).get('matched_count', 0)
-            for k in buckets
-        )
         unmatched = company_res.get('bank_statement', {}).get('unmatched_count', 0)
         if 'error' in company_res:
             return {

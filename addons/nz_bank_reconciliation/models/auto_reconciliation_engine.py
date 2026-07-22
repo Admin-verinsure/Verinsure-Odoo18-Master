@@ -830,16 +830,21 @@ class AutoReconciliationEngine(models.Model):
                     'triggered_by': triggered_by,
                 })
                 continue
+
+            def _applied(result_key):
+                bucket = result.get(result_key, {})
+                return bucket.get('applied_count', bucket.get('matched_count', 0))
+
             total = sum(
-                result.get(k, {}).get('matched_count', 0)
+                _applied(k)
                 for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
             )
             Log.create({
                 'company_id': company_id,
-                'bank_matched': result.get('bank_statement', {}).get('matched_count', 0),
-                'customer_matched': result.get('customer_payment', {}).get('matched_count', 0),
-                'vendor_matched': result.get('vendor_payment', {}).get('matched_count', 0),
-                'intercompany_matched': result.get('intercompany', {}).get('matched_count', 0),
+                'bank_matched': _applied('bank_statement'),
+                'customer_matched': _applied('customer_payment'),
+                'vendor_matched': _applied('vendor_payment'),
+                'intercompany_matched': _applied('intercompany'),
                 'total_matched': total, 'state': 'done',
                 'triggered_by': triggered_by,
             })
