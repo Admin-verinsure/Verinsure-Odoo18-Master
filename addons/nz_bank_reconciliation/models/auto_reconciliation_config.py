@@ -64,10 +64,17 @@ class AutoReconciliationConfig(models.Model):
         )
         # BUG FIX: Report actual match count instead of a generic "finished" message.
         company_res = results.get(self.company_id.id, {})
+        buckets = ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
         total_applied = sum(
             company_res.get(k, {}).get('applied_count', company_res.get(k, {}).get('matched_count', 0))
-            for k in ['bank_statement', 'customer_payment', 'vendor_payment', 'intercompany']
+            for k in buckets
         )
+        total_found = sum(
+            company_res.get(k, {}).get('matched_count', 0)
+            for k in buckets
+        )
+        found_not_applied = max(total_found - total_applied, 0)
+        unmatched = company_res.get('bank_statement', {}).get('unmatched_count', 0)
         if 'error' in company_res:
             return {
                 'type': 'ir.actions.client',
@@ -78,13 +85,20 @@ class AutoReconciliationConfig(models.Model):
                     'type': 'danger', 'sticky': True,
                 }
             }
+        message = _(
+            'Reconciled: %(applied)d. Found but not applied: %(not_applied)d. No-match: %(unmatched)d.'
+        ) % {
+            'applied': total_applied,
+            'not_applied': found_not_applied,
+            'unmatched': unmatched,
+        }
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Auto Reconciliation Complete'),
-                'message': _('%d match(es) applied for %s.') % (total_applied, self.company_id.name)
-                           if total_applied else (_('No new matches applied for %s.') % self.company_id.name),
+                'message': message,
                 'type': 'success' if total_applied else 'info',
                 'sticky': False,
             }

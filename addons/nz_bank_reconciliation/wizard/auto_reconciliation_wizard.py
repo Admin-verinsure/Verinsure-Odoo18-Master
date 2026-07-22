@@ -138,12 +138,11 @@ class AutoReconciliationWizard(models.TransientModel):
 
         self.write({'state': 'confirmed', 'skipped_count': skipped})
         deselected = len(all_pairs) - len(pairs)
-        msg = _('%d match(es) applied for %s.%s%s') % (
-            applied,
-            self.company_id.name,
-            _(' %d skipped (already reconciled).') % skipped if skipped else '',
-            _(' %d deselected by user (not applied).') % deselected if deselected else '',
-        )
+        found_not_applied = skipped + deselected
+        msg = _('Reconciled: %(applied)d. Found but not applied: %(not_applied)d.') % {
+            'applied': applied,
+            'not_applied': found_not_applied,
+        }
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
