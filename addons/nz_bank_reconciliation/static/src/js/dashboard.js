@@ -83,12 +83,33 @@ class AutoReconciliationDashboard extends Component {
 
     async onRunNow(companyId) {
         try {
-            await this.orm.call("auto.reconciliation.engine", "run_all", [], {
+            const results = await this.orm.call("auto.reconciliation.engine", "run_all", [], {
                 company_ids: [companyId],
                 preview_mode: false,
             });
-            this.notification.add("Reconciliation completed successfully!", {
-                type: "success",
+
+            const companyRes = results?.[companyId] || results?.[String(companyId)] || {};
+            const buckets = [
+                "bank_statement",
+                "customer_payment",
+                "vendor_payment",
+                "intercompany",
+            ];
+            const applied = buckets.reduce(
+                (sum, key) => sum + (companyRes?.[key]?.applied_count ?? companyRes?.[key]?.matched_count ?? 0),
+                0
+            );
+            const found = buckets.reduce(
+                (sum, key) => sum + (companyRes?.[key]?.matched_count ?? 0),
+                0
+            );
+            const foundNotApplied = Math.max(found - applied, 0);
+            const unmatched = companyRes?.bank_statement?.unmatched_count ?? 0;
+
+            const message = `Reconciled: ${applied}. Found but not applied: ${foundNotApplied}. No-match: ${unmatched}.`;
+
+            this.notification.add(message, {
+                type: applied > 0 ? "success" : "info",
             });
             await this._loadData();
         } catch (e) {
