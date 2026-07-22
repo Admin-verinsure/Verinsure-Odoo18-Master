@@ -264,13 +264,12 @@ def _decrypt_token(env, blob):
 
 class AkahuCredential(models.Model):
     """
-    Stores the Akahu App Token and App Secret for each company.
+    Stores the Akahu App Token and User Access Token for each company.
     One record per company.
 
-    SEC-01 FIX: app_token and app_secret are encrypted before being written to
-    the database (AES-256-GCM).  The raw values are never stored as plaintext.
-    Use self._get_app_token() / self._get_app_secret() to retrieve decrypted
-    values in server-side code.
+    SEC-01 FIX: sensitive tokens are encrypted before being written to the
+    database (AES-256-GCM). The raw values are never stored as plaintext.
+    Use token getter helpers to retrieve decrypted values in server-side code.
     """
     _name = 'akahu.credential'
     _description = 'Akahu API Credentials'
@@ -291,10 +290,19 @@ class AkahuCredential(models.Model):
         help='Your Akahu App Token (starts with app_token_...). '
              'Stored encrypted. Visible to ERP Managers only.',
     )
-    # Stored encrypted — do NOT read .app_secret directly in code; use _get_app_secret()
+    # Stored encrypted — do NOT read .user_access_token directly in code;
+    # use _get_user_access_token()
+    user_access_token = fields.Char(
+        string='User Access Token',
+        groups='base.group_erp_manager',
+        help='Akahu User Access Token (user_token_...). Stored encrypted. '
+             'Visible to ERP Managers only.',
+    )
+    # Legacy field retained for backward compatibility with existing databases.
+    # New flow uses user_access_token instead.
     app_secret = fields.Char(
-        string='App Secret',
-        required=True,
+        string='App Secret (Legacy)',
+        required=False,
         # VNZ-11 FIX: `password=True` is not a valid Char field parameter in
         # this Odoo version (it was silently ignored, logging an install
         # warning, and did NOT mask the field). Masking is now applied at
@@ -321,10 +329,10 @@ class AkahuCredential(models.Model):
         ('company_unique', 'UNIQUE(company_id)', 'Only one Akahu credential per company is allowed.'),
     ]
 
-    @api.depends('app_token', 'app_secret')
+    @api.depends('app_token', 'user_access_token')
     def _compute_has_credentials(self):
         for rec in self:
-            rec.has_credentials = bool(rec.app_token and rec.app_secret)
+            rec.has_credentials = bool(rec.app_token and rec.user_access_token)
 
     # -------------------------------------------------------------------------
     # Encryption hooks
@@ -334,6 +342,8 @@ class AkahuCredential(models.Model):
         # SEC-01: Encrypt tokens before persisting to DB.
         if 'app_token' in vals and vals['app_token']:
             vals['app_token'] = _encrypt_token(self.env, vals['app_token'])
+        if 'user_access_token' in vals and vals['user_access_token']:
+            vals['user_access_token'] = _encrypt_token(self.env, vals['user_access_token'])
         if 'app_secret' in vals and vals['app_secret']:
             vals['app_secret'] = _encrypt_token(self.env, vals['app_secret'])
         return super().write(vals)
@@ -343,6 +353,8 @@ class AkahuCredential(models.Model):
         for vals in vals_list:
             if vals.get('app_token'):
                 vals['app_token'] = _encrypt_token(self.env, vals['app_token'])
+            if vals.get('user_access_token'):
+                vals['user_access_token'] = _encrypt_token(self.env, vals['user_access_token'])
             if vals.get('app_secret'):
                 vals['app_secret'] = _encrypt_token(self.env, vals['app_secret'])
         return super().create(vals_list)
@@ -373,6 +385,12 @@ class AkahuCredential(models.Model):
         self.ensure_one()
         cred = self.sudo()
         return _decrypt_token(cred.env, cred.app_secret)
+
+    def _get_user_access_token(self):
+        """Return the decrypted user access token value."""
+        self.ensure_one()
+        cred = self.sudo()
+        return _decrypt_token(cred.env, cred.user_access_token)
 
     # -------------------------------------------------------------------------
     # SEC-03: Token revocation / rotation
@@ -581,11 +599,8 @@ class AkahuCredential(models.Model):
 
     def action_test_connection(self):
         """
-        Validate credentials using the same user-scoped API contract as account
-        refresh when a linked account token is available.
-
-        If no linked account token exists yet, store credentials and report
-        that full connectivity is verified during account refresh.
+        Validate credentials against Akahu using app token + user access token.
+        This test does not depend on bank account records.
         """
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
@@ -595,46 +610,21 @@ class AkahuCredential(models.Model):
             raise AccessError(_('This action is restricted to Accounting Managers.'))
 
         self.ensure_one()
-        accounts = self.env['akahu.account'].search([
-            ('credential_id', '=', self.id),
-            ('active', '=', True),
-            ('user_token', '!=', ''),
-        ])
-
         try:
-            if accounts:
-                last_error = None
-                count = 0
-                for account in accounts:
-                    try:
-                        data = self._api_get(account._get_user_token(), '/accounts')
-                        count = len(data.get('items', []))
-                        last_error = None
-                        break
-                    except Exception as e:
-                        last_error = e
+            plain_token = self._get_app_token()
+            user_token = self._get_user_access_token()
+            if not plain_token:
+                raise ValidationError(_('App Token is required.'))
+            if not user_token:
+                raise ValidationError(_('User Access Token is required.'))
+            if not plain_token.startswith('app_token_'):
+                raise ValidationError(_('App Token must start with "app_token_"'))
 
-                if last_error:
-                    raise last_error
-
-                message = _('Connected! Found %d account(s) on Akahu.') % count
-                notif_type = 'success'
-                status = 'ok'
-            else:
-                plain_token = self._get_app_token()
-                plain_secret = self._get_app_secret()
-                if not plain_token:
-                    raise ValidationError(_('App Token is required.'))
-                if not plain_secret:
-                    raise ValidationError(_('App Secret is required.'))
-                if not plain_token.startswith('app_token_'):
-                    raise ValidationError(_('App Token must start with "app_token_"'))
-                message = _(
-                    'Credentials saved. Add a bank account with User Access Token '
-                    'and use Refresh to verify Akahu connectivity.'
-                )
-                notif_type = 'info'
-                status = 'untested'
+            data = self._api_get(user_token, '/accounts')
+            count = len(data.get('items', []))
+            message = _('Connected! Found %d account(s) on Akahu.') % count
+            notif_type = 'success'
+            status = 'ok'
 
             self.write({
                 'connection_status': status,

@@ -16,8 +16,8 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
         string='New App Token',
         required=True,
     )
-    new_app_secret = fields.Char(
-        string='New App Secret',
+    new_user_access_token = fields.Char(
+        string='New User Access Token',
         required=True,
     )
 
@@ -30,7 +30,7 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
         credential = self.credential_id.sudo()
         credential.write({
             'app_token': self.new_app_token,
-            'app_secret': self.new_app_secret,
+            'user_access_token': self.new_user_access_token,
             'connection_status': 'untested',
             'last_tested': False,
             'error_message': False,

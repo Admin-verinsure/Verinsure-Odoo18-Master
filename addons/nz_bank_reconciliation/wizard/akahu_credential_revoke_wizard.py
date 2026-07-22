@@ -171,6 +171,7 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
         # would otherwise block the write.
         cred.sudo().write({
             'app_token': '',
+            'user_access_token': '',
             'app_secret': '',
             'connection_status': 'untested',
             'error_message': (
@@ -197,7 +198,7 @@ class AkahuCredentialRevokeWizard(models.TransientModel):
                 'title': _('Credentials Revoked'),
                 'message': _(
                     'All tokens for %s have been cleared. '
-                    'Re-enter the App Token, App Secret, and User Tokens to resume sync.'
+                    'Re-enter the App Token and User Access Token to resume sync.'
                 ) % cred.company_id.name,
                 'type': 'warning',
                 'sticky': True,
