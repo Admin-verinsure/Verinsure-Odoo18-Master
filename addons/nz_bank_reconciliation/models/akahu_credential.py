@@ -216,11 +216,13 @@ def _encrypt_token(env, plaintext):
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError:
-        _logger.warning(
-            'SEC-01: cryptography package not available — storing token in plaintext. '
-            'Install `cryptography` to enable at-rest encryption.'
+        _logger.error(
+            'SEC-01: cryptography package not available — refusing to store token plaintext.'
         )
-        return plaintext
+        raise UserError(_(
+            'Cannot store Akahu credentials because the required encryption '
+            'library is not installed on this server. Contact your administrator.'
+        ))
     key = _get_encryption_key(env)
     return _encrypt_token_with_key(plaintext, key)
 
