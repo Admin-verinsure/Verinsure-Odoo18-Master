@@ -216,7 +216,7 @@ class AccountJournalAkahuExtend(models.Model):
                 for company_id, result in recon_results.items():
                     if 'error' not in result:
                         total_reconciled += sum(
-                            result.get(k, {}).get('matched_count', 0)
+                            result.get(k, {}).get('applied_count', result.get(k, {}).get('matched_count', 0))
                             for k in [
                                 'bank_statement',
                                 'customer_payment',

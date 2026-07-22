@@ -203,6 +203,7 @@ class AutoReconciliationEngine(models.Model):
         date_window_days   = (config.date_window_days if config else 60) or 60
 
         matched = []
+        applied_count = 0
         unmatched_count = 0
         # sudo(): cron technical user cannot read statement lines directly; escalate for reconciliation reads
         BankLine = self.env['account.bank.statement.line'].sudo()
@@ -362,11 +363,17 @@ class AutoReconciliationEngine(models.Model):
                     'match_criteria': ', '.join(match_criteria),
                 })
                 if not preview_mode:
-                    self._apply_bank_reconciliation_community(stmt_line, best_candidate)
+                    if self._apply_bank_reconciliation_community(stmt_line, best_candidate):
+                        applied_count += 1
             else:
                 unmatched_count += 1
 
-        return {'matched': matched, 'matched_count': len(matched), 'unmatched_count': unmatched_count}
+        return {
+            'matched': matched,
+            'matched_count': len(matched),
+            'applied_count': applied_count,
+            'unmatched_count': unmatched_count,
+        }
 
     def _apply_bank_reconciliation_community(self, stmt_line, move_line):
         """
@@ -389,7 +396,7 @@ class AutoReconciliationEngine(models.Model):
             )
             if stmt_move_lines:
                 (stmt_move_lines[0] | move_line).reconcile()
-                return
+                return True
 
             # CRITICAL FIX 2: Use journal's configured suspense account
             suspense_account = stmt_line.journal_id.suspense_account_id
@@ -399,7 +406,7 @@ class AutoReconciliationEngine(models.Model):
                 )
                 if suspense_lines:
                     (suspense_lines[0] | move_line).reconcile()
-                    return
+                    return True
 
             # Last resort: current asset/liability line
             fallback = stmt_line.move_id.line_ids.filtered(
@@ -409,18 +416,21 @@ class AutoReconciliationEngine(models.Model):
             )
             if fallback:
                 (fallback[0] | move_line).reconcile()
+                return True
             else:
                 _logger.warning(
                     "Bank recon: no suitable line on stmt_line %s to reconcile against move_line %s",
                     sanitize_log_value(stmt_line.id),
                     sanitize_log_value(move_line.id),
                 )
+                return False
         except Exception as e:
             _logger.warning(
                 "Bank recon failed for stmt_line %s: %s",
                 sanitize_log_value(stmt_line.id),
                 sanitize_log_value(e),
             )
+            return False
 
     # ── CUSTOMER PAYMENTS ─────────────────────────────────────────────────────
     def _reconcile_customer_payments(self, company, preview_mode=False, config=None):
@@ -431,6 +441,7 @@ class AutoReconciliationEngine(models.Model):
         match_by_date_window = not config or config.match_by_date_window
         date_window_days   = (config.date_window_days if config else 60) or 60
         matched = []
+        applied_count = 0
         # sudo(): cron technical user needs payment read for customer/vendor matching steps
         Payment = self.env['account.payment'].sudo()
         # sudo(): cron needs journal entry read/write for reconciliation; sudo() scoped to this method
@@ -534,8 +545,9 @@ class AutoReconciliationEngine(models.Model):
                     'match_criteria': 'reference, amount' if (match_by_reference and payment.ref) else 'amount, partner',
                 })
                 if not preview_mode:
-                    self._apply_ar_reconciliation(payment, invoice, 'asset_receivable')
-        return {'matched': matched, 'matched_count': len(matched)}
+                    if self._apply_ar_reconciliation(payment, invoice, 'asset_receivable'):
+                        applied_count += 1
+        return {'matched': matched, 'matched_count': len(matched), 'applied_count': applied_count}
 
     # ── VENDOR PAYMENTS ───────────────────────────────────────────────────────
     def _reconcile_vendor_payments(self, company, preview_mode=False, config=None):
@@ -546,6 +558,7 @@ class AutoReconciliationEngine(models.Model):
         match_by_date_window = not config or config.match_by_date_window
         date_window_days   = (config.date_window_days if config else 60) or 60
         matched = []
+        applied_count = 0
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
 
@@ -642,8 +655,9 @@ class AutoReconciliationEngine(models.Model):
                     'match_criteria': 'reference, amount' if (match_by_reference and payment.ref) else 'amount, partner',
                 })
                 if not preview_mode:
-                    self._apply_ar_reconciliation(payment, bill, 'liability_payable')
-        return {'matched': matched, 'matched_count': len(matched)}
+                    if self._apply_ar_reconciliation(payment, bill, 'liability_payable'):
+                        applied_count += 1
+        return {'matched': matched, 'matched_count': len(matched), 'applied_count': applied_count}
 
     def _apply_ar_reconciliation(self, payment, move, account_type):
         try:
@@ -655,16 +669,20 @@ class AutoReconciliationEngine(models.Model):
             )
             if p_lines and m_lines:
                 (p_lines[0] | m_lines[0]).reconcile()
+                return True
+            return False
         except Exception as e:
             _logger.warning(
                 "AR reconciliation failed for payment %s: %s",
                 sanitize_log_value(payment.id),
                 sanitize_log_value(e),
             )
+            return False
 
     # ── INTER-COMPANY ─────────────────────────────────────────────────────────
     def _reconcile_intercompany(self, company, preview_mode=False, config=None):
         matched = []
+        applied_count = 0
         MoveLine = self.env['account.move.line'].sudo()
 
         # sudo(): cron technical user needs cross-company mapping read for inter-company reconciliation
@@ -794,10 +812,11 @@ class AutoReconciliationEngine(models.Model):
                         self.env['account.move.line'].sudo().browse(
                             [line.id, counterpart.id]
                         ).reconcile()
+                        applied_count += 1
                     except Exception as e:
                         _logger.warning("IC reconciliation failed: %s", sanitize_log_value(e))
 
-        return {'matched': matched, 'matched_count': len(matched)}
+        return {'matched': matched, 'matched_count': len(matched), 'applied_count': applied_count}
 
     # ── LOGGING ───────────────────────────────────────────────────────────────
     def _create_log_entries(self, all_results, triggered_by='manual'):
