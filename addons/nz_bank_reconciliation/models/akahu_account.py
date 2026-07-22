@@ -16,9 +16,9 @@ PROTECTED_FIELDS = {
 
 class AkahuAccount(models.Model):
     """
-    Represents one connected bank account in Akahu.
-    Each account has its own User Access Token (user_token_...)
-    and maps to an Odoo journal (bank account).
+    Represents one connected bank account in Akahu and maps to an Odoo journal.
+    User access token is sourced from linked credentials by default, with
+    account-level override retained for backward compatibility.
 
     SEC-01 FIX: user_token is encrypted at rest via AES-256-GCM.
     Use self._get_user_token() in server-side code — never read
@@ -70,13 +70,14 @@ class AkahuAccount(models.Model):
     # SEC-01 FIX: stored encrypted — use _get_user_token() to read
     user_token = fields.Char(
         string='User Access Token',
-        required=True,
+        required=False,
         # VNZ-11 FIX: see akahu_credential.py — password=True is not a valid
         # Char parameter here; masking is applied via widget="password" in
         # views/akahu_account_views.xml instead.
         groups='base.group_erp_manager',
-        help='The Akahu User Access Token (user_token_...) for this bank account. '
-             'Stored encrypted. Visible to ERP Managers only.',
+           help='Optional per-account override token. If empty, the token from '
+               'linked Akahu Credentials is used. Stored encrypted. '
+               'Visible to ERP Managers only.',
     )
     akahu_account_id = fields.Char(
         string='Akahu Account ID',
@@ -153,10 +154,12 @@ class AkahuAccount(models.Model):
         return super().unlink()
 
     def _get_user_token(self):
-        """Return the decrypted user_token value. Always use this in code."""
+        """Return decrypted user token, preferring account override then credential token."""
         self.ensure_one()
         account = self.sudo()
-        return _decrypt_token(account.env, account.user_token)
+        if account.user_token:
+            return _decrypt_token(account.env, account.user_token)
+        return account.credential_id._get_user_access_token()
 
     # ── Computed ──────────────────────────────────────────────────────────────
     @api.depends('bank_name', 'akahu_account_name', 'akahu_formatted_account')
@@ -172,7 +175,7 @@ class AkahuAccount(models.Model):
     @api.depends('user_token')
     def _compute_has_user_token(self):
         for rec in self:
-            rec.has_user_token = bool(rec.user_token)
+            rec.has_user_token = bool(rec.user_token or rec.credential_id.user_access_token)
 
     def _is_inactive_warning(self):
         return self.akahu_status == 'INACTIVE'
