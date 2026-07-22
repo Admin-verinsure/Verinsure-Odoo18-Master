@@ -56,11 +56,12 @@ class AutoReconciliationWizard(models.TransientModel):
             raise UserError(_('Preview data is corrupt. Please close and run Preview again.'))
 
         # Only process pairs whose wizard line is still selected.
-        selected_indices = {
-            line.pair_index for line in self.line_ids if line.selected
+        selected_lines_by_index = {
+            line.pair_index: line for line in self.line_ids if line.selected
         }
+        selected_indices = set(selected_lines_by_index.keys())
         pairs = [
-            p for i, p in enumerate(all_pairs)
+            (i, p) for i, p in enumerate(all_pairs)
             if i in selected_indices
         ]
 
@@ -75,9 +76,19 @@ class AutoReconciliationWizard(models.TransientModel):
         Payment = self.env['account.payment'].sudo()
         Move = self.env['account.move'].sudo()
 
-        for pair in pairs:
+        for pair_index, pair in pairs:
             rtype = pair.get('type')
             try:
+                line = selected_lines_by_index.get(pair_index)
+                if (
+                    rtype == 'intercompany'
+                    and line
+                    and 'review_required' in (line.match_criteria or '')
+                    and line.selected == line.initial_selected
+                ):
+                    skipped += 1
+                    continue
+
                 if rtype == 'bank_statement':
                     stmt_line = BankLine.browse(pair['statement_line_id'])
                     move_line = MoveLine.browse(pair['move_line_id'])
@@ -154,6 +165,11 @@ class AutoReconciliationWizardLine(models.TransientModel):
 
     wizard_id = fields.Many2one('auto.reconciliation.wizard', string='Wizard', ondelete='cascade')
     selected = fields.Boolean(string='Include', default=True)
+    initial_selected = fields.Boolean(
+        string='Initial Include',
+        default=True,
+        readonly=True,
+    )
     # Zero-based index into match_pairs_json — links this display row back to
     # its reconciliation pair so action_confirm() can filter by selection.
     pair_index = fields.Integer(string='Pair Index', default=0)

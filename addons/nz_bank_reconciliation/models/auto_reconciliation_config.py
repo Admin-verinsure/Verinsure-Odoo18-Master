@@ -163,6 +163,7 @@ class AutoReconciliationConfig(models.Model):
                 )
             else:
                 label = 'Unknown'
+            selected_by_default = 'review_required' not in (match.get('match_criteria') or '')
             WizardLine.create({
                 'wizard_id': wizard.id,
                 'reconciliation_type': rtype,
@@ -170,7 +171,9 @@ class AutoReconciliationConfig(models.Model):
                 'amount': match.get('amount', 0.0),
                 'partner_name': match.get('partner', match.get('company_from', '')),
                 'pair_index': idx,
-                'selected': True,
+                # Keep potentially weak preview matches opt-in only.
+                'selected': selected_by_default,
+                'initial_selected': selected_by_default,
                 'match_criteria': match.get('match_criteria', ''),
             })
 
