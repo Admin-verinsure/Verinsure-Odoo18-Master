@@ -584,8 +584,8 @@ class AkahuCredential(models.Model):
         Validate credentials using the same user-scoped API contract as account
         refresh when a linked account token is available.
 
-        If no linked active account exists yet, perform a local app credential
-        sanity check so first-time setup can proceed without account records.
+        If no linked account token exists yet, store credentials and report
+        that full connectivity is verified during account refresh.
         """
         # METHOD GUARD: Raises AccessError if the RPC caller is not an Accounting Manager.
         # This prevents unprivileged internal users from invoking this method directly
@@ -619,6 +619,7 @@ class AkahuCredential(models.Model):
 
                 message = _('Connected! Found %d account(s) on Akahu.') % count
                 notif_type = 'success'
+                status = 'ok'
             else:
                 plain_token = self._get_app_token()
                 plain_secret = self._get_app_secret()
@@ -628,84 +629,15 @@ class AkahuCredential(models.Model):
                     raise ValidationError(_('App Secret is required.'))
                 if not plain_token.startswith('app_token_'):
                     raise ValidationError(_('App Token must start with "app_token_"'))
-
-                credentials = ('%s:%s' % (plain_token.strip(), plain_secret.strip())).encode()
-                auth_header = base64.b64encode(credentials).decode()
-                url = '%s/connections' % AKAHU_BASE_URL
-
-                validated = False
-                for attempt in range(_MAX_RETRIES):
-                    try:
-                        resp = requests.get(
-                            url,
-                            headers={
-                                'Accept': 'application/json',
-                                'Authorization': 'Basic %s' % auth_header,
-                            },
-                            timeout=30,
-                        )
-                    except requests.exceptions.RequestException as e:
-                        raise UserError(_('Akahu API connection failed: %s') % str(e))
-
-                    if resp.status_code == 429:
-                        retry_after = int(resp.headers.get('Retry-After', _RETRY_BACKOFF[attempt]))
-                        _logger.warning(
-                            'Akahu API rate-limited (429) on app credential test. '
-                            'Waiting %ds before retry %d/%d.',
-                            sanitize_log_value(retry_after),
-                            sanitize_log_value(attempt + 1),
-                            sanitize_log_value(_MAX_RETRIES),
-                        )
-                        time.sleep(retry_after)
-                        continue
-
-                    if resp.status_code == 401:
-                        raise UserError(_(
-                            'Akahu app authentication failed (401). '
-                            'Check your App Token and App Secret.'
-                        ))
-                    if resp.status_code == 403:
-                        raise UserError(_(
-                            'Akahu app permission denied (403). '
-                            'This app may not support app-scoped validation in this environment.'
-                        ))
-                    if resp.status_code >= 500:
-                        raise UserError(_(
-                            'Akahu is currently unavailable (%s). Please try again shortly.'
-                        ) % resp.status_code)
-                    if resp.status_code >= 400:
-                        raw = resp.text[:120] if resp.text else ''
-                        safe_msg = _redact_secret(raw)
-                        raise UserError(_(
-                            'Akahu API error %s. Please check your credentials and try again. '
-                            'Detail: %s'
-                        ) % (resp.status_code, safe_msg))
-
-                    try:
-                        data = resp.json() if resp.text else {'success': True}
-                    except ValueError:
-                        raise UserError(_('Akahu API returned a non-JSON success response.'))
-
-                    if not data.get('success'):
-                        raise UserError(_('Akahu returned success=false. Check the server logs for details.'))
-
-                    validated = True
-                    break
-
-                if not validated:
-                    raise UserError(_(
-                        'Akahu API rate limit exceeded for app credential test after %d retries. '
-                        'Please try again shortly.'
-                    ) % _MAX_RETRIES)
-
                 message = _(
-                    'App credentials are authenticated with Akahu. '
-                    'Add bank accounts and user token to verify account connectivity.'
+                    'Credentials saved. Add a bank account with User Access Token '
+                    'and use Refresh to verify Akahu connectivity.'
                 )
-                notif_type = 'success'
+                notif_type = 'info'
+                status = 'untested'
 
             self.write({
-                'connection_status': 'ok',
+                'connection_status': status,
                 'last_tested': fields.Datetime.now(),
                 'error_message': False,
             })
