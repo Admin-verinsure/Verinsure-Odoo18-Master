@@ -96,8 +96,10 @@ class AutoReconciliationWizard(models.TransientModel):
                         skipped += 1; continue
                     if not move_line.exists() or move_line.reconciled:
                         skipped += 1; continue
-                    engine._apply_bank_reconciliation_community(stmt_line, move_line)
-                    applied += 1
+                    if engine._apply_bank_reconciliation_community(stmt_line, move_line):
+                        applied += 1
+                    else:
+                        skipped += 1
                 elif rtype == 'customer_payment':
                     payment = Payment.browse(pair['payment_id'])
                     invoice = Move.browse(pair['invoice_id'])
@@ -105,8 +107,10 @@ class AutoReconciliationWizard(models.TransientModel):
                         skipped += 1; continue
                     if not invoice.exists() or invoice.payment_state == 'paid':
                         skipped += 1; continue
-                    engine._apply_ar_reconciliation(payment, invoice, 'asset_receivable')
-                    applied += 1
+                    if engine._apply_ar_reconciliation(payment, invoice, 'asset_receivable'):
+                        applied += 1
+                    else:
+                        skipped += 1
                 elif rtype == 'vendor_payment':
                     payment = Payment.browse(pair['payment_id'])
                     bill = Move.browse(pair['bill_id'])
@@ -114,8 +118,10 @@ class AutoReconciliationWizard(models.TransientModel):
                         skipped += 1; continue
                     if not bill.exists() or bill.payment_state == 'paid':
                         skipped += 1; continue
-                    engine._apply_ar_reconciliation(payment, bill, 'liability_payable')
-                    applied += 1
+                    if engine._apply_ar_reconciliation(payment, bill, 'liability_payable'):
+                        applied += 1
+                    else:
+                        skipped += 1
                 elif rtype == 'intercompany':
                     line = MoveLine.browse(pair['line_id'])
                     counterpart = MoveLine.browse(pair['counterpart_line_id'])
@@ -146,7 +152,7 @@ class AutoReconciliationWizard(models.TransientModel):
             'params': {
                 'title': _('Reconciliation Applied'),
                 'message': msg,
-                'type': 'warning' if (skipped or deselected) else 'success',
+                'type': 'warning' if skipped else 'success',
                 'sticky': bool(skipped),
             }
         }
