@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import re
+from datetime import date, datetime
 from odoo import fields, models, _
 from odoo.exceptions import ValidationError
 
@@ -57,6 +58,47 @@ class InvoicePocPayload(models.Model):
             .search([("login", "=", login)], limit=1)
             or self.env.user
         )
+
+    def _parse_payload_date(self, value):
+        if not value:
+            return False
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return fields.Date.to_date(value)
+            except Exception:
+                return False
+        return False
+
+    def _get_payload_date(self, payload, *candidates):
+        if not isinstance(payload, dict):
+            return False
+        for candidate in candidates:
+            if not candidate:
+                continue
+            if isinstance(candidate, (tuple, list)):
+                current = payload
+                found = True
+                for key in candidate:
+                    if not isinstance(current, dict):
+                        found = False
+                        break
+                    current = current.get(key)
+                if found and current not in (None, ""):
+                    parsed = self._parse_payload_date(current)
+                    if parsed:
+                        return parsed
+                continue
+            if isinstance(candidate, str):
+                value = payload.get(candidate)
+                if value not in (None, ""):
+                    parsed = self._parse_payload_date(value)
+                    if parsed:
+                        return parsed
+        return False
 
     # -------------------------------------------------------
     # Partner
@@ -143,7 +185,20 @@ class InvoicePocPayload(models.Model):
             for l in (payload.get("lines") or [])
         )
 
-        return self.env["insurance.details"].create({
+        start_date = self._get_payload_date(
+            payload,
+            ("start_date",),
+            ("invoice_date",),
+            ("policy", "start_date"),
+            ("policy", "date"),
+            ("invoice", "date"),
+            ("invoice", "invoice_date"),
+            ("policy", "effective_date"),
+            ("policy", "issue_date"),
+            ("policy", "expiry_date"),
+        ) or fields.Date.today()
+
+        insurance_vals = {
             "name": policy_data.get("name") or _("Insurance"),
             "partner_id": partner.id,
             "employee_id": employee.id,
@@ -152,11 +207,23 @@ class InvoicePocPayload(models.Model):
             "policy_duration": int(policy_data.get("policy_duration") or 0),
             "currency_id": currency.id,
             "payment_type": policy_data.get("payment_type"),
-            "start_date": payload.get("invoice_date") or fields.Date.today(),
+            "start_date": start_date,
             "amount_installment": total_lines or policy_data.get("amount"),
             "state": "draft",
             "amount": policy_data.get("amount") or 0.0,
-        })
+        }
+
+        end_date = self._get_payload_date(
+            payload,
+            ("end_date",),
+            ("policy", "end_date"),
+            ("policy", "expiry_date"),
+            ("invoice", "due_date"),
+        )
+        if end_date and "close_date" in self.env["insurance.details"]._fields:
+            insurance_vals["close_date"] = end_date
+
+        return self.env["insurance.details"].create(insurance_vals)
 
     # -------------------------------------------------------
     # Invoice
@@ -221,8 +288,17 @@ class InvoicePocPayload(models.Model):
             "invoice_line_ids": invoice_lines,
         }
 
-        if payload.get("invoice_date"):
-            move_vals["invoice_date"] = payload["invoice_date"]
+        invoice_date = self._get_payload_date(
+            payload,
+            ("invoice_date",),
+            ("invoice", "date"),
+            ("invoice", "invoice_date"),
+            ("date",),
+            ("policy", "start_date"),
+            ("policy", "date"),
+        )
+        if invoice_date:
+            move_vals["invoice_date"] = invoice_date
 
         return self.env["account.move"].with_company(company).create(move_vals)
 
