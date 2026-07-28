@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from datetime import date, datetime
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
@@ -117,6 +118,47 @@ class InsuranceDetails(models.Model):
                     rec.sudo().write({"company_id": self.env.company.id})
             except Exception:
                 pass
+
+    def _parse_payload_date(self, value):
+        if not value:
+            return False
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return fields.Date.to_date(value)
+            except Exception:
+                return False
+        return False
+
+    def _get_payload_date(self, payload, *candidates):
+        if not isinstance(payload, dict):
+            return False
+        for candidate in candidates:
+            if not candidate:
+                continue
+            if isinstance(candidate, (tuple, list)):
+                current = payload
+                found = True
+                for key in candidate:
+                    if not isinstance(current, dict):
+                        found = False
+                        break
+                    current = current.get(key)
+                if found and current not in (None, ""):
+                    parsed = self._parse_payload_date(current)
+                    if parsed:
+                        return parsed
+                continue
+            if isinstance(candidate, str):
+                value = payload.get(candidate)
+                if value not in (None, ""):
+                    parsed = self._parse_payload_date(value)
+                    if parsed:
+                        return parsed
+        return False
 
     # -------------------------
     # Fix: amount is related → write to the SOURCE field
@@ -338,7 +380,15 @@ class InsuranceDetails(models.Model):
         expected_total = price_unit * qty
 
         # Insurance create
-        start_date = payload.get("start_date") or fields.Date.context_today(self)
+        start_date = self._get_payload_date(
+            payload,
+            ("start_date",),
+            ("invoice_date",),
+            ("policy", "start_date"),
+            ("policy", "date"),
+            ("invoice", "date"),
+            ("invoice", "invoice_date"),
+        ) or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
             "employee_id": emp_rec.id,
@@ -394,12 +444,21 @@ class InsuranceDetails(models.Model):
             raise UserError("No Sales Journal found for this company.")
 
         # Invoice
+        invoice_date = self._get_payload_date(
+            payload,
+            ("invoice_date",),
+            ("invoice", "date"),
+            ("invoice", "invoice_date"),
+            ("date",),
+            ("policy", "start_date"),
+            ("policy", "date"),
+        ) or fields.Date.context_today(self)
         move_vals = {
             "move_type": "out_invoice",
             "company_id": company.id,
             "partner_id": partner.id,
             "currency_id": currency.id,
-            "invoice_date": fields.Date.context_today(self),
+            "invoice_date": invoice_date,
             "journal_id": journal.id,
             "invoice_user_id": self.env.user.id,
             "invoice_origin": insurance_name,
