@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import fields, models
 
+
 class AccountMove(models.Model):
     _inherit = "account.move"
 
@@ -10,3 +11,5 @@ class AccountMove(models.Model):
         index=True,
         ondelete="cascade",
     )
+    insurance_start_date = fields.Date(string="Insurance Start Date")
+    insurance_expiry_date = fields.Date(string="Insurance Expiry Date")
