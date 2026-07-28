@@ -453,6 +453,23 @@ class InsuranceDetails(models.Model):
             ("policy", "start_date"),
             ("policy", "date"),
         ) or fields.Date.context_today(self)
+        start_date = self._get_payload_date(
+            payload,
+            ("start_date",),
+            ("policy", "start_date"),
+            ("invoice", "start_date"),
+            ("policy", "date"),
+            ("invoice", "date"),
+        )
+        expiry_date = self._get_payload_date(
+            payload,
+            ("end_date",),
+            ("expiry_date",),
+            ("policy", "end_date"),
+            ("policy", "expiry_date"),
+            ("invoice", "expiry_date"),
+            ("invoice", "due_date"),
+        )
         move_vals = {
             "move_type": "out_invoice",
             "company_id": company.id,
@@ -470,6 +487,11 @@ class InsuranceDetails(models.Model):
                 "price_unit": price_unit,
             })],
         }
+        if start_date:
+            move_vals["insurance_start_date"] = start_date
+        if expiry_date:
+            move_vals["insurance_expiry_date"] = expiry_date
+
         move_vals = self._set_cybro_invoice_link_fields(move_vals, insurance)
         cybro_link_field_used = move_vals.pop("_cybro_link_field_used", None)
 

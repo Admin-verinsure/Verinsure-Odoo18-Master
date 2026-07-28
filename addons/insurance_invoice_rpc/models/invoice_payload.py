@@ -300,6 +300,28 @@ class InvoicePocPayload(models.Model):
         if invoice_date:
             move_vals["invoice_date"] = invoice_date
 
+        start_date = self._get_payload_date(
+            payload,
+            ("start_date",),
+            ("policy", "start_date"),
+            ("invoice", "start_date"),
+            ("policy", "date"),
+            ("invoice", "date"),
+        )
+        expiry_date = self._get_payload_date(
+            payload,
+            ("end_date",),
+            ("expiry_date",),
+            ("policy", "end_date"),
+            ("policy", "expiry_date"),
+            ("invoice", "expiry_date"),
+            ("invoice", "due_date"),
+        )
+        if start_date:
+            move_vals["insurance_start_date"] = start_date
+        if expiry_date:
+            move_vals["insurance_expiry_date"] = expiry_date
+
         return self.env["account.move"].with_company(company).create(move_vals)
 
     # -------------------------------------------------------
