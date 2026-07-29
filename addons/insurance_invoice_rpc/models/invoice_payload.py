@@ -4,7 +4,7 @@ import json
 import re
 from datetime import date, datetime
 from odoo import fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import ValidationError
 
 
 
@@ -533,40 +533,6 @@ class InvoicePocPayload(models.Model):
         for rec in self:
             try:
                 payload = rec._load_payload()
-
-                policy_data = payload.get("policy") or {}
-                dates_data = payload.get("dates") or {}
-                start_date = rec._get_payload_date(
-                    payload,
-                    ("policy", "start_date"),
-                    ("policy", "effective_date"),
-                    ("policy", "issue_date"),
-                    ("dates", "start_date"),
-                    ("dates", "startDateText"),
-                    ("start_date",),
-                    ("policy", "date"),
-                )
-                expiry_date = rec._get_payload_date(
-                    payload,
-                    ("policy", "end_date"),
-                    ("policy", "expiry_date"),
-                    ("dates", "end_date"),
-                    ("dates", "endDateText"),
-                    ("end_date",),
-                    ("expiry_date",),
-                )
-
-                raise UserError(
-                    f"""
-invoice_date={payload.get('invoice_date')}
-policy.start_date={policy_data.get('start_date')}
-policy.end_date={policy_data.get('end_date')}
-dates.start_date={dates_data.get('start_date')}
-dates.end_date={dates_data.get('end_date')}
-resolved_start={start_date}
-resolved_end={expiry_date}
-"""
-                )
 
                 partner = rec._get_or_create_partner(payload.get("customer") or {})
                 salesperson = rec._get_salesperson(
