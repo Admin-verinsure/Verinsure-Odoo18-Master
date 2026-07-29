@@ -169,24 +169,53 @@ class InvoicePocPayload(models.Model):
                 return parsed
         return False
 
-    def _find_date_in_payload(self, payload):
+    def _find_date_in_payload(self, payload, mode="any"):
         if not isinstance(payload, dict):
             return False
 
+        start_variants = {
+            "start_date", "startdate", "start",
+            "start_date_text", "startdatetext",
+            "effective_date", "effectivedate", "effective",
+            "issue_date", "issuedate", "issue",
+        }
+        end_variants = {
+            "end_date", "enddate", "end",
+            "end_date_text", "enddatetext",
+            "expiry_date", "expirydate", "expiry",
+            "due_date", "duedate", "due",
+        }
+        invoice_variants = {
+            "invoice_date", "invoicedate", "invoice", "date",
+            "due_date", "duedate", "due",
+        }
+
+        def _matches_mode(key_name):
+            if mode == "any":
+                return True
+            variants = {variant.lower() for variant in self._get_key_variants(key_name)}
+            if mode == "start":
+                return bool(variants & start_variants)
+            if mode == "end":
+                return bool(variants & end_variants)
+            if mode == "invoice":
+                return bool(variants & invoice_variants)
+            return True
+
         for key, value in payload.items():
-            if self._looks_like_date_key(key):
+            if self._looks_like_date_key(key) and _matches_mode(key):
                 parsed = self._parse_payload_date(value)
                 if parsed:
                     return parsed
 
             if isinstance(value, dict):
-                parsed = self._find_date_in_payload(value)
+                parsed = self._find_date_in_payload(value, mode=mode)
                 if parsed:
                     return parsed
             elif isinstance(value, list):
                 for item in value:
                     if isinstance(item, dict):
-                        parsed = self._find_date_in_payload(item)
+                        parsed = self._find_date_in_payload(item, mode=mode)
                         if parsed:
                             return parsed
 
@@ -243,7 +272,15 @@ class InvoicePocPayload(models.Model):
                     if parsed:
                         return parsed
 
-        return self._find_date_in_payload(payload)
+        fallback_mode = "any"
+        if wants_start and not wants_end:
+            fallback_mode = "start"
+        elif wants_end and not wants_start:
+            fallback_mode = "end"
+        elif "invoice" in normalized_candidates and not wants_start and not wants_end:
+            fallback_mode = "invoice"
+
+        return self._find_date_in_payload(payload, mode=fallback_mode)
 
     # -------------------------------------------------------
     # Partner
@@ -339,10 +376,6 @@ class InvoicePocPayload(models.Model):
             ("start_date",),
             ("dates", "start_date"),
             ("dates", "startDateText"),
-            ("invoice_date",),
-            ("invoice", "date"),
-            ("invoice", "invoice_date"),
-            ("invoice", "start_date"),
             ("policy", "expiry_date"),
         ) or fields.Date.today()
 
@@ -368,9 +401,6 @@ class InvoicePocPayload(models.Model):
             ("dates", "end_date"),
             ("dates", "endDateText"),
             ("end_date",),
-            ("invoice", "due_date"),
-            ("invoice", "expiry_date"),
-            ("invoice", "end_date"),
         )
         if end_date and "close_date" in self.env["insurance.details"]._fields:
             insurance_vals["close_date"] = end_date
@@ -462,9 +492,7 @@ class InvoicePocPayload(models.Model):
             ("dates", "start_date"),
             ("dates", "startDateText"),
             ("start_date",),
-            ("invoice", "start_date"),
             ("policy", "date"),
-            ("invoice", "date"),
         )
         expiry_date = self._get_payload_date(
             payload,
@@ -474,9 +502,6 @@ class InvoicePocPayload(models.Model):
             ("dates", "endDateText"),
             ("end_date",),
             ("expiry_date",),
-            ("due_date",),
-            ("invoice", "expiry_date"),
-            ("invoice", "due_date"),
         )
         if start_date:
             move_vals["insurance_start_date"] = start_date

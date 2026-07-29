@@ -230,24 +230,53 @@ class InsuranceDetails(models.Model):
                 return parsed
         return False
 
-    def _find_date_in_payload(self, payload):
+    def _find_date_in_payload(self, payload, mode="any"):
         if not isinstance(payload, dict):
             return False
 
+        start_variants = {
+            "start_date", "startdate", "start",
+            "start_date_text", "startdatetext",
+            "effective_date", "effectivedate", "effective",
+            "issue_date", "issuedate", "issue",
+        }
+        end_variants = {
+            "end_date", "enddate", "end",
+            "end_date_text", "enddatetext",
+            "expiry_date", "expirydate", "expiry",
+            "due_date", "duedate", "due",
+        }
+        invoice_variants = {
+            "invoice_date", "invoicedate", "invoice", "date",
+            "due_date", "duedate", "due",
+        }
+
+        def _matches_mode(key_name):
+            if mode == "any":
+                return True
+            variants = {variant.lower() for variant in self._get_key_variants(key_name)}
+            if mode == "start":
+                return bool(variants & start_variants)
+            if mode == "end":
+                return bool(variants & end_variants)
+            if mode == "invoice":
+                return bool(variants & invoice_variants)
+            return True
+
         for key, value in payload.items():
-            if self._looks_like_date_key(key):
+            if self._looks_like_date_key(key) and _matches_mode(key):
                 parsed = self._parse_payload_date(value)
                 if parsed:
                     return parsed
 
             if isinstance(value, dict):
-                parsed = self._find_date_in_payload(value)
+                parsed = self._find_date_in_payload(value, mode=mode)
                 if parsed:
                     return parsed
             elif isinstance(value, list):
                 for item in value:
                     if isinstance(item, dict):
-                        parsed = self._find_date_in_payload(item)
+                        parsed = self._find_date_in_payload(item, mode=mode)
                         if parsed:
                             return parsed
 
@@ -304,7 +333,15 @@ class InsuranceDetails(models.Model):
                     if parsed:
                         return parsed
 
-        return self._find_date_in_payload(payload)
+        fallback_mode = "any"
+        if wants_start and not wants_end:
+            fallback_mode = "start"
+        elif wants_end and not wants_start:
+            fallback_mode = "end"
+        elif "invoice" in normalized_candidates and not wants_start and not wants_end:
+            fallback_mode = "invoice"
+
+        return self._find_date_in_payload(payload, mode=fallback_mode)
 
     # -------------------------
     # Fix: amount is related → write to the SOURCE field
@@ -535,9 +572,6 @@ class InsuranceDetails(models.Model):
             ("start_date",),
             ("dates", "start_date"),
             ("dates", "startDateText"),
-            ("invoice_date",),
-            ("invoice", "date"),
-            ("invoice", "invoice_date"),
         ) or fields.Date.context_today(self)
         insurance_vals = {
             "partner_id": partner.id,
@@ -611,9 +645,7 @@ class InsuranceDetails(models.Model):
             ("dates", "start_date"),
             ("dates", "startDateText"),
             ("start_date",),
-            ("invoice", "start_date"),
             ("policy", "date"),
-            ("invoice", "date"),
         )
         expiry_date = self._get_payload_date(
             payload,
@@ -623,9 +655,6 @@ class InsuranceDetails(models.Model):
             ("dates", "endDateText"),
             ("end_date",),
             ("expiry_date",),
-            ("due_date",),
-            ("invoice", "expiry_date"),
-            ("invoice", "due_date"),
         )
         move_vals = {
             "move_type": "out_invoice",
