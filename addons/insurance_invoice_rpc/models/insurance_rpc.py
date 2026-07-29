@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 import itertools
+import logging
 import re
 from datetime import date, datetime
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class InsuranceDetails(models.Model):
@@ -343,6 +347,43 @@ class InsuranceDetails(models.Model):
 
         return self._find_date_in_payload(payload, mode=fallback_mode)
 
+    def _log_payload_date_debug(self, payload, source="insurance_rpc"):
+        policy_data = payload.get("policy") or {}
+        dates_data = payload.get("dates") or {}
+
+        start_date = self._get_payload_date(
+            payload,
+            ("policy", "start_date"),
+            ("policy", "effective_date"),
+            ("policy", "issue_date"),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("start_date",),
+            ("policy", "date"),
+        )
+        expiry_date = self._get_payload_date(
+            payload,
+            ("policy", "end_date"),
+            ("policy", "expiry_date"),
+            ("dates", "end_date"),
+            ("dates", "endDateText"),
+            ("end_date",),
+            ("expiry_date",),
+        )
+
+        _logger.warning(
+            "[%s] payload date debug | invoice_date=%s | due_date=%s | policy.start_date=%s | policy.end_date=%s | dates.start_date=%s | dates.end_date=%s | resolved_start_date=%s | resolved_expiry_date=%s",
+            source,
+            payload.get("invoice_date"),
+            payload.get("due_date"),
+            policy_data.get("start_date"),
+            policy_data.get("end_date"),
+            dates_data.get("start_date"),
+            dates_data.get("end_date"),
+            start_date,
+            expiry_date,
+        )
+
     # -------------------------
     # Fix: amount is related → write to the SOURCE field
     # -------------------------
@@ -521,6 +562,7 @@ class InsuranceDetails(models.Model):
     # -------------------------
     @api.model
     def rpc_create_insurance_invoice_and_email(self, payload: dict):
+        self._log_payload_date_debug(payload, source="rpc_create_insurance_invoice_and_email")
         customer = payload.get("customer") or {}
         employee = payload.get("employee") or {}
         policy = payload.get("policy") or {}
