@@ -1,4 +1,4 @@
-from . import invoice_payload 
+from . import invoice_payload
 from . import product
 from . import contact
-from. import account_move
+from . import account_move
