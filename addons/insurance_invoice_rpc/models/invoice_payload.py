@@ -304,14 +304,17 @@ class InvoicePocPayload(models.Model):
 
         start_date = self._get_payload_date(
             payload,
-            ("start_date",),
-            ("invoice_date",),
             ("policy", "start_date"),
-            ("policy", "date"),
-            ("invoice", "date"),
-            ("invoice", "invoice_date"),
             ("policy", "effective_date"),
             ("policy", "issue_date"),
+            ("policy", "date"),
+            ("start_date",),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("invoice_date",),
+            ("invoice", "date"),
+            ("invoice", "invoice_date"),
+            ("invoice", "start_date"),
             ("policy", "expiry_date"),
         ) or fields.Date.today()
 
@@ -332,10 +335,14 @@ class InvoicePocPayload(models.Model):
 
         end_date = self._get_payload_date(
             payload,
-            ("end_date",),
             ("policy", "end_date"),
             ("policy", "expiry_date"),
+            ("dates", "end_date"),
+            ("dates", "endDateText"),
+            ("end_date",),
             ("invoice", "due_date"),
+            ("invoice", "expiry_date"),
+            ("invoice", "end_date"),
         )
         if end_date and "close_date" in self.env["insurance.details"]._fields:
             insurance_vals["close_date"] = end_date
@@ -410,6 +417,8 @@ class InvoicePocPayload(models.Model):
             ("invoice_date",),
             ("invoice", "date"),
             ("invoice", "invoice_date"),
+            ("invoice", "due_date"),
+            ("due_date",),
             ("date",),
             ("policy", "start_date"),
             ("policy", "date"),
@@ -419,18 +428,23 @@ class InvoicePocPayload(models.Model):
 
         start_date = self._get_payload_date(
             payload,
-            ("start_date",),
             ("policy", "start_date"),
+            ("policy", "effective_date"),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("start_date",),
             ("invoice", "start_date"),
             ("policy", "date"),
             ("invoice", "date"),
         )
         expiry_date = self._get_payload_date(
             payload,
-            ("end_date",),
-            ("expiry_date",),
             ("policy", "end_date"),
             ("policy", "expiry_date"),
+            ("dates", "end_date"),
+            ("dates", "endDateText"),
+            ("end_date",),
+            ("expiry_date",),
             ("invoice", "expiry_date"),
             ("invoice", "due_date"),
         )
