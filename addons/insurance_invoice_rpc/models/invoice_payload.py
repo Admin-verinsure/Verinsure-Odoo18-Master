@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import itertools
 import json
 import re
 from datetime import date, datetime
@@ -70,7 +71,114 @@ class InvoicePocPayload(models.Model):
             try:
                 return fields.Date.to_date(value)
             except Exception:
-                return False
+                try:
+                    return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+                except Exception:
+                    return False
+        return False
+
+    def _get_key_variants(self, key):
+        if key in (None, ""):
+            return []
+        raw = str(key).strip()
+        if not raw:
+            return []
+
+        normalized = raw.lower()
+        variants = [raw, normalized]
+
+        snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", raw).lower()
+        if snake not in variants:
+            variants.append(snake)
+
+        variants.append(normalized.replace("_", ""))
+        variants.append(normalized.replace(" ", ""))
+        variants.append(normalized.replace("-", ""))
+
+        if normalized in {"start_date", "startdate", "start"}:
+            variants += [
+                "start_date", "startDate", "start",
+                "start_date_text", "startDateText", "startdatetext",
+                "effective_date", "effectiveDate", "effective",
+                "issue_date", "issueDate", "issue",
+            ]
+        elif normalized in {"end_date", "enddate", "end", "expiry_date", "expirydate", "expiry", "due_date", "duedate", "due"}:
+            variants += [
+                "end_date", "endDate", "end",
+                "end_date_text", "endDateText", "enddatetext",
+                "expiry_date", "expiryDate", "expiry",
+                "due_date", "dueDate", "due",
+            ]
+        elif normalized in {"invoice_date", "invoicedate", "invoice", "date"}:
+            variants += ["invoice_date", "invoiceDate", "invoice", "date"]
+        elif normalized.endswith("_date") and normalized[:-5]:
+            base = normalized[:-5]
+            variants += [base, f"{base}_date", f"{base}Date", f"{base}date"]
+        elif normalized.endswith("date") and normalized[:-4]:
+            base = normalized[:-4]
+            variants += [base, f"{base}_date", f"{base}Date", f"{base}date"]
+
+        return list(dict.fromkeys(v for v in variants if v))
+
+    def _looks_like_date_key(self, key):
+        if key in (None, ""):
+            return False
+        variants = {variant.lower() for variant in self._get_key_variants(key)}
+        return bool(variants & {
+            "start_date", "startdate", "start",
+            "start_date_text", "startdatetext",
+            "effective_date", "effectivedate", "effective",
+            "issue_date", "issuedate", "issue",
+            "end_date", "enddate", "end",
+            "end_date_text", "enddatetext",
+            "expiry_date", "expirydate", "expiry",
+            "due_date", "duedate", "due",
+            "invoice_date", "invoicedate", "invoice", "date",
+        })
+
+    def _resolve_date_from_path(self, payload, candidate):
+        if not isinstance(candidate, (tuple, list)):
+            return False
+
+        path_variants = [self._get_key_variants(key) for key in candidate]
+        for path in itertools.product(*path_variants):
+            current = payload
+            found = True
+            for key in path:
+                if not isinstance(current, dict):
+                    found = False
+                    break
+                current = current.get(key)
+            if not found:
+                continue
+            if current in (None, ""):
+                continue
+            parsed = self._parse_payload_date(current)
+            if parsed:
+                return parsed
+        return False
+
+    def _find_date_in_payload(self, payload):
+        if not isinstance(payload, dict):
+            return False
+
+        for key, value in payload.items():
+            if self._looks_like_date_key(key):
+                parsed = self._parse_payload_date(value)
+                if parsed:
+                    return parsed
+
+            if isinstance(value, dict):
+                parsed = self._find_date_in_payload(value)
+                if parsed:
+                    return parsed
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        parsed = self._find_date_in_payload(item)
+                        if parsed:
+                            return parsed
+
         return False
 
     def _get_payload_date(self, payload, *candidates):
@@ -80,25 +188,34 @@ class InvoicePocPayload(models.Model):
             if not candidate:
                 continue
             if isinstance(candidate, (tuple, list)):
-                current = payload
-                found = True
-                for key in candidate:
-                    if not isinstance(current, dict):
-                        found = False
-                        break
-                    current = current.get(key)
-                if found and current not in (None, ""):
-                    parsed = self._parse_payload_date(current)
-                    if parsed:
-                        return parsed
+                parsed = self._resolve_date_from_path(payload, candidate)
+                if parsed:
+                    return parsed
                 continue
             if isinstance(candidate, str):
-                value = payload.get(candidate)
+                for key in self._get_key_variants(candidate):
+                    value = payload.get(key)
+                    if value not in (None, ""):
+                        parsed = self._parse_payload_date(value)
+                        if parsed:
+                            return parsed
+
+        if isinstance(payload.get("dates"), dict):
+            dates_payload = payload.get("dates")
+            for key in ("start_date", "startDateText", "startDate", "start"):
+                value = dates_payload.get(key)
                 if value not in (None, ""):
                     parsed = self._parse_payload_date(value)
                     if parsed:
                         return parsed
-        return False
+            for key in ("end_date", "endDateText", "endDate", "end", "expiry_date", "expiryDate"):
+                value = dates_payload.get(key)
+                if value not in (None, ""):
+                    parsed = self._parse_payload_date(value)
+                    if parsed:
+                        return parsed
+
+        return self._find_date_in_payload(payload)
 
     # -------------------------------------------------------
     # Partner

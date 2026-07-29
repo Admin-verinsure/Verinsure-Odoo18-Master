@@ -58,3 +58,31 @@ def test_get_payload_date_uses_nested_and_fallback_fields():
     assert handler._get_payload_date(payload, ("policy", "start_date"), "start_date") == date(2024, 2, 10)
     assert handler._get_payload_date(payload, ("invoice", "date"), "invoice_date") == date(2024, 3, 15)
     assert handler._get_payload_date({"invoice_date": "2024-04-20"}, "date", "invoice_date") == date(2024, 4, 20)
+
+
+def test_get_payload_date_supports_camel_case_and_alternate_names():
+    handler = module.InvoicePocPayload.__new__(module.InvoicePocPayload)
+
+    payload = {
+        "policy": {"effectiveDate": "2024-05-01"},
+        "insurance": {"expiryDate": "2024-06-15"},
+        "invoice": {"invoiceDate": "2024-07-20"},
+    }
+
+    assert handler._get_payload_date(payload, ("policy", "start_date")) == date(2024, 5, 1)
+    assert handler._get_payload_date(payload, ("insurance", "expiry_date")) == date(2024, 6, 15)
+    assert handler._get_payload_date(payload, ("invoice", "invoice_date")) == date(2024, 7, 20)
+
+
+def test_get_payload_date_supports_nested_dates_object_with_text_fields():
+    handler = module.InvoicePocPayload.__new__(module.InvoicePocPayload)
+
+    payload = {
+        "dates": {
+            "startDateText": "2024-08-01",
+            "endDateText": "2024-09-15",
+        }
+    }
+
+    assert handler._get_payload_date(payload, ("dates", "start_date")) == date(2024, 8, 1)
+    assert handler._get_payload_date(payload, ("dates", "end_date")) == date(2024, 9, 15)
