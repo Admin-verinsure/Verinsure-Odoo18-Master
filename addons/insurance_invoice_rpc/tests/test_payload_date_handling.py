@@ -116,3 +116,17 @@ def test_get_payload_date_dates_fallback_respects_start_vs_end_context():
 
     assert handler._get_payload_date(payload, ("policy", "start_date")) == date(2026, 8, 1)
     assert handler._get_payload_date(payload, ("policy", "end_date")) == date(2026, 8, 15)
+
+
+def test_get_payload_date_start_context_does_not_pick_invoice_date():
+    handler = module.InvoicePocPayload.__new__(module.InvoicePocPayload)
+
+    payload = {
+        "invoice_date": "2026-07-29",
+        "due_date": "2026-08-12",
+        "policy": {
+            "start_date": "invalid-date",
+        },
+    }
+
+    assert handler._get_payload_date(payload, ("policy", "start_date")) is False
