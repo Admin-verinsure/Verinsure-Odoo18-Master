@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import itertools
 import json
+import logging
 import re
 from datetime import date, datetime
 from odoo import fields, models, _
 from odoo.exceptions import ValidationError
+
+
+_logger = logging.getLogger(__name__)
 
 
 
@@ -282,6 +286,43 @@ class InvoicePocPayload(models.Model):
 
         return self._find_date_in_payload(payload, mode=fallback_mode)
 
+    def _log_payload_date_debug(self, payload, source="invoice_payload"):
+        policy_data = payload.get("policy") or {}
+        dates_data = payload.get("dates") or {}
+
+        start_date = self._get_payload_date(
+            payload,
+            ("policy", "start_date"),
+            ("policy", "effective_date"),
+            ("policy", "issue_date"),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("start_date",),
+            ("policy", "date"),
+        )
+        expiry_date = self._get_payload_date(
+            payload,
+            ("policy", "end_date"),
+            ("policy", "expiry_date"),
+            ("dates", "end_date"),
+            ("dates", "endDateText"),
+            ("end_date",),
+            ("expiry_date",),
+        )
+
+        _logger.warning(
+            "[%s] payload date debug | invoice_date=%s | due_date=%s | policy.start_date=%s | policy.end_date=%s | dates.start_date=%s | dates.end_date=%s | resolved_start_date=%s | resolved_expiry_date=%s",
+            source,
+            payload.get("invoice_date"),
+            payload.get("due_date"),
+            policy_data.get("start_date"),
+            policy_data.get("end_date"),
+            dates_data.get("start_date"),
+            dates_data.get("end_date"),
+            start_date,
+            expiry_date,
+        )
+
     # -------------------------------------------------------
     # Partner
     # -------------------------------------------------------
@@ -533,6 +574,7 @@ class InvoicePocPayload(models.Model):
         for rec in self:
             try:
                 payload = rec._load_payload()
+                rec._log_payload_date_debug(payload, source="action_create_policy_and_invoice")
 
                 partner = rec._get_or_create_partner(payload.get("customer") or {})
                 salesperson = rec._get_salesperson(
