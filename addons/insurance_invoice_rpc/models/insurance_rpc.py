@@ -129,13 +129,24 @@ class InsuranceDetails(models.Model):
         if isinstance(value, date):
             return value
         if isinstance(value, str):
+            cleaned = value.strip()
             try:
-                return fields.Date.to_date(value)
+                return fields.Date.to_date(cleaned)
             except Exception:
+                pass
+
+            try:
+                return datetime.fromisoformat(cleaned.replace("Z", "+00:00")).date()
+            except Exception:
+                pass
+
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%m/%d/%Y", "%m-%d-%Y"):
                 try:
-                    return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+                    return datetime.strptime(cleaned, fmt).date()
                 except Exception:
-                    return False
+                    continue
+
+            return False
         return False
 
     def _get_key_variants(self, key):
@@ -245,6 +256,18 @@ class InsuranceDetails(models.Model):
     def _get_payload_date(self, payload, *candidates):
         if not isinstance(payload, dict):
             return False
+
+        candidate_labels = []
+        for candidate in candidates:
+            if isinstance(candidate, (tuple, list)):
+                candidate_labels.append(".".join(str(part) for part in candidate if part))
+            elif isinstance(candidate, str):
+                candidate_labels.append(candidate)
+
+        normalized_candidates = " ".join(candidate_labels).lower()
+        wants_start = any(token in normalized_candidates for token in ("start", "effective", "issue"))
+        wants_end = any(token in normalized_candidates for token in ("end", "expiry", "due"))
+
         for candidate in candidates:
             if not candidate:
                 continue
@@ -263,13 +286,18 @@ class InsuranceDetails(models.Model):
 
         if isinstance(payload.get("dates"), dict):
             dates_payload = payload.get("dates")
-            for key in ("start_date", "startDateText", "startDate", "start"):
-                value = dates_payload.get(key)
-                if value not in (None, ""):
-                    parsed = self._parse_payload_date(value)
-                    if parsed:
-                        return parsed
-            for key in ("end_date", "endDateText", "endDate", "end", "expiry_date", "expiryDate"):
+            if wants_start and not wants_end:
+                keys_to_try = ("start_date", "startDateText", "startDate", "start", "effective_date", "effectiveDate", "issue_date", "issueDate")
+            elif wants_end and not wants_start:
+                keys_to_try = ("end_date", "endDateText", "endDate", "end", "expiry_date", "expiryDate", "due_date", "dueDate")
+            else:
+                keys_to_try = (
+                    "start_date", "startDateText", "startDate", "start",
+                    "end_date", "endDateText", "endDate", "end",
+                    "expiry_date", "expiryDate", "due_date", "dueDate",
+                )
+
+            for key in keys_to_try:
                 value = dates_payload.get(key)
                 if value not in (None, ""):
                     parsed = self._parse_payload_date(value)
@@ -500,10 +528,14 @@ class InsuranceDetails(models.Model):
         # Insurance create
         start_date = self._get_payload_date(
             payload,
-            ("start_date",),
-            ("invoice_date",),
             ("policy", "start_date"),
+            ("policy", "effective_date"),
+            ("policy", "issue_date"),
             ("policy", "date"),
+            ("start_date",),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("invoice_date",),
             ("invoice", "date"),
             ("invoice", "invoice_date"),
         ) or fields.Date.context_today(self)
@@ -573,18 +605,25 @@ class InsuranceDetails(models.Model):
         ) or fields.Date.context_today(self)
         start_date = self._get_payload_date(
             payload,
-            ("start_date",),
             ("policy", "start_date"),
+            ("policy", "effective_date"),
+            ("policy", "issue_date"),
+            ("dates", "start_date"),
+            ("dates", "startDateText"),
+            ("start_date",),
             ("invoice", "start_date"),
             ("policy", "date"),
             ("invoice", "date"),
         )
         expiry_date = self._get_payload_date(
             payload,
-            ("end_date",),
-            ("expiry_date",),
             ("policy", "end_date"),
             ("policy", "expiry_date"),
+            ("dates", "end_date"),
+            ("dates", "endDateText"),
+            ("end_date",),
+            ("expiry_date",),
+            ("due_date",),
             ("invoice", "expiry_date"),
             ("invoice", "due_date"),
         )

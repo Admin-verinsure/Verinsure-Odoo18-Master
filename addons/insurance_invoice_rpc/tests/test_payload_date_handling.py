@@ -86,3 +86,33 @@ def test_get_payload_date_supports_nested_dates_object_with_text_fields():
 
     assert handler._get_payload_date(payload, ("dates", "start_date")) == date(2024, 8, 1)
     assert handler._get_payload_date(payload, ("dates", "end_date")) == date(2024, 9, 15)
+
+
+def test_get_payload_date_supports_day_first_policy_dates():
+    handler = module.InvoicePocPayload.__new__(module.InvoicePocPayload)
+
+    payload = {
+        "invoice_date": "2026-07-29",
+        "due_date": "2026-08-12",
+        "policy": {
+            "start_date": "01/08/2026",
+            "end_date": "15/08/2026",
+        },
+    }
+
+    assert handler._get_payload_date(payload, ("policy", "start_date"), ("invoice_date",)) == date(2026, 8, 1)
+    assert handler._get_payload_date(payload, ("policy", "end_date"), ("due_date",)) == date(2026, 8, 15)
+
+
+def test_get_payload_date_dates_fallback_respects_start_vs_end_context():
+    handler = module.InvoicePocPayload.__new__(module.InvoicePocPayload)
+
+    payload = {
+        "dates": {
+            "start_date": "2026-08-01",
+            "end_date": "2026-08-15",
+        }
+    }
+
+    assert handler._get_payload_date(payload, ("policy", "start_date")) == date(2026, 8, 1)
+    assert handler._get_payload_date(payload, ("policy", "end_date")) == date(2026, 8, 15)
