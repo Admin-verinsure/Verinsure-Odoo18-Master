@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="estate_page" name="Morris &amp; James Estate">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+
+                <!-- HERO / COVER -->
+                <section class="s_cover parallax s_parallax_is_fixed pt96 pb96"
+                         data-scroll-background-ratio="1"
+                         style="background-image:url('/estate_website/static/src/img/hero.jpg'); background-position: 50% 50%;">
+                    <div class="s_parallax_bg oe_img_bg" style="background-image:url('/estate_website/static/src/img/hero.jpg');"/>
+                    <div class="o_we_bg_filter bg-black-50"/>
+                    <div class="container">
+                        <h1 class="text-white">Morris &amp; James Estate</h1>
+                        <p class="lead text-white">A creative place shaped by clay</p>
+                        <p class="text-white">The original home of Morris &amp; James Pottery—now a gathering
+                            place for artisans, food, markets and independent enterprise in Matakana.</p>
+                        <a href="#explore" class="btn btn-primary mt-3">Explore the Estate</a>
+                        <a href="#visit" class="btn btn-outline-light mt-3">Plan Your Visit</a>
+                    </div>
+                </section>
+
+                <!-- INTRO -->
+                <section class="s_text_block pt64 pb64" id="explore">
+                    <div class="container">
+                        <h2>A Matakana landmark, reimagined</h2>
+                        <p>Morris &amp; James Estate is located at the original pottery at 48 Tongue Farm Road,
+                            Matakana, only a short distance from Matakana Village.</p>
+                        <p>The estate retains the courtyards, workshops, kilns, display spaces and substantial
+                            pottery buildings that grew around one of New Zealand's best-known ceramic
+                            enterprises.</p>
+                        <p>Rather than allowing these buildings to fall silent, the Morris family has given them
+                            a renewed purpose: providing a home where independent people can make, display,
+                            serve, sell and share their work.</p>
+                        <p>The result is not a conventional shopping centre. It is a working estate with an
+                            authentic history, a distinctive atmosphere and an evolving community of tenants.</p>
+                    </div>
+                </section>
+
+                <!-- STORY: TEXT + IMAGE -->
+                <section class="s_text_image pt64 pb64 o_cc o_cc2">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-lg-6 pt16 pb16 o_cc o_colored_level">
+                                <h2>The Morris &amp; James story</h2>
+                                <h5>From Matakana earth to New Zealand homes</h5>
+                                <p>Anthony "Ant" Morris was an artist and potter with an enduring fascination
+                                    for form, colour and the possibilities held within clay.</p>
+                                <p>Together with Sue James, he developed Morris &amp; James from its Matakana
+                                    beginnings into one of New Zealand's most recognisable pottery names. Local
+                                    clay was transformed into terracotta tiles, large garden pots, sculptural
+                                    ceramics and richly glazed pieces distinguished by their scale, colour and
+                                    individual character.</p>
+                                <p>This history is recorded in the 2010 book <strong>Mud and Colour Man: The
+                                    Morris &amp; James Story</strong>, written by Anthony Morris with Nick
+                                    Charlton and Barbara Reardon, published by HarperCollins.</p>
+                                <p>While commercial pottery production has ended, its creative legacy remains
+                                    embedded in the estate—in its buildings, kilns, courtyards, surviving
+                                    pottery and connection to Matakana.</p>
+                                <a href="#" class="btn btn-secondary">Discover the Story</a>
+                            </div>
+                            <div class="col-lg-6 pt16 pb16 o_cc o_colored_level">
+                                <img src="/estate_website/static/src/img/story.jpg" class="img img-fluid mx-auto rounded shadow" alt="Morris &amp; James pottery"/>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ESTATE TODAY: FOUR FEATURE COLUMNS -->
+                <section class="s_features pt64 pb64">
+                    <div class="container">
+                        <h2 class="text-center">Historic buildings. New activity.</h2>
+                        <p class="text-center lead">Morris &amp; James Estate is now home to a changing
+                            community of independent operators.</p>
+                        <div class="row mt32">
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <i class="fa fa-paint-brush fa-2x mb-2"/>
+                                <h5>Artisans and makers</h5>
+                                <p>Studios, workshops and display spaces occupied by people who value
+                                    originality, craftsmanship and thoughtful production.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <i class="fa fa-cutlery fa-2x mb-2"/>
+                                <h5>Café and hospitality</h5>
+                                <p>A relaxed place to meet, pause and enjoy food and refreshments within the
+                                    distinctive surroundings of the former pottery.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <i class="fa fa-shopping-basket fa-2x mb-2"/>
+                                <h5>Market tenants</h5>
+                                <p>Independent traders offering locally made, sourced, collected or carefully
+                                    selected products.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <i class="fa fa-lightbulb-o fa-2x mb-2"/>
+                                <h5>Creative and complementary enterprises</h5>
+                                <p>Businesses and organisations whose activities contribute to the life,
+                                    character and future of the estate.</p>
+                            </div>
+                        </div>
+                        <div class="text-center mt16">
+                            <a href="#" class="btn btn-primary">Meet Our Tenants</a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MORE THAN BUILDINGS: FOUR PILLARS -->
+                <section class="s_three_columns pt64 pb64 o_cc o_cc1">
+                    <div class="container">
+                        <h2 class="text-center">More than a collection of buildings</h2>
+                        <p class="text-center">The estate's next chapter respects that history without
+                            attempting to recreate the past.</p>
+                        <div class="row mt32">
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <h5>Making and enterprise</h5>
+                                <p>Supporting practical, creative and independent work.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <h5>Food and conversation</h5>
+                                <p>Providing welcoming spaces where people can meet and spend time.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <h5>Markets and discovery</h5>
+                                <p>Giving small businesses opportunities to present distinctive products
+                                    directly to visitors.</p>
+                            </div>
+                            <div class="col-lg-3 col-md-6 pt16 pb16">
+                                <h5>Continuity and renewal</h5>
+                                <p>Keeping an important Matakana place active, useful and connected to its
+                                    community.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VISIT / ADDRESS -->
+                <section class="s_text_block pt64 pb64" id="visit">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-lg-7">
+                                <h2>Visit Morris &amp; James Estate</h2>
+                                <p>Set among the landscape of the Matakana Coast, the estate is close to
+                                    Matakana Village, local markets, vineyards, beaches, galleries and food
+                                    producers.</p>
+                                <p>Come to meet the current tenants, explore the former pottery surroundings,
+                                    enjoy the café and experience the continuing life of this distinctive
+                                    Matakana property.</p>
+                                <address>
+                                    <strong>Morris &amp; James Estate</strong><br/>
+                                    48 Tongue Farm Road<br/>
+                                    Matakana, Auckland<br/>
+                                    New Zealand
+                                </address>
+                                <p><em>Individual businesses operate their own opening days and hours. Please
+                                    check the tenant directory or contact the business you intend to visit
+                                    before travelling.</em></p>
+                                <a href="#" class="btn btn-secondary me-2">View Tenant Directory</a>
+                                <a href="#" class="btn btn-outline-secondary">Find Us</a>
+                            </div>
+                            <div class="col-lg-5">
+                                <div class="s_map" data-mode-auto="true">
+                                    <iframe class="s_map_embedded o_not_editable" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"
+                                            src="https://maps.google.com/maps?q=48%20Tongue%20Farm%20Road%2C%20Matakana%2C%20Auckland%2C%20New%20Zealand&amp;t=m&amp;z=14&amp;output=embed&amp;iwloc=near"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- LEASING CALL TO ACTION -->
+                <section class="s_call_to_action pt64 pb64 o_cc o_cc5">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-lg-8 offset-lg-2 text-center">
+                                <h2>Become part of the estate</h2>
+                                <p>Spaces for artisans, traders and independent businesses</p>
+                                <p>Morris &amp; James Estate offers an alternative to anonymous commercial
+                                    premises. We are particularly interested in tenants who create distinctive
+                                    products, value quality and craftsmanship, contribute to the visitor
+                                    experience, operate responsibly, and respect the history and character of
+                                    the property.</p>
+                                <a href="/contactus" class="btn btn-primary btn-lg mt-2">Enquire About a Space</a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CLOSING STATEMENT -->
+                <section class="s_cover pt96 pb96 o_cc o_cc4"
+                          style="background-image:url('/estate_website/static/src/img/closing.jpg'); background-position: 50% 50%;">
+                    <div class="o_we_bg_filter bg-black-50"/>
+                    <div class="container text-center">
+                        <h2 class="text-white">The pottery has closed. The place continues.</h2>
+                        <p class="text-white lead">A place created from mud and colour is becoming a place for
+                            new makers, new enterprises and new possibilities.</p>
+                        <a href="#explore" class="btn btn-primary me-2">Explore the Estate</a>
+                        <a href="/contactus" class="btn btn-outline-light">Contact Us</a>
+                    </div>
+                </section>
+
+            </div>
+        </t>
+    </template>
+
+    <!-- Register as a real Website Page + menu entry -->
+    <record id="estate_page_website" model="website.page">
+        <field name="name">Morris &amp; James Estate</field>
+        <field name="type">qweb</field>
+        <field name="url">/estate</field>
+        <field name="website_indexed">True</field>
+        <field name="is_published">True</field>
+        <field name="key">estate_website.estate_page</field>
+        <field name="view_id" ref="estate_page"/>
+    </record>
+
+</odoo>
