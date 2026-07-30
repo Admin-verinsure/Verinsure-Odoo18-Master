@@ -7,6 +7,7 @@
     "data": [
         "views/estate_page_templates.xml",
     ],
+    "assets": {},
     "installable": True,
     "application": False,
 }
