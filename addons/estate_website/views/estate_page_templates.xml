@@ -61,9 +61,19 @@
                                 <a href="#" class="btn btn-secondary">Discover the Story</a>
                             </div>
                             <div class="col-lg-6 pt16 pb16 o_cc o_colored_level">
-                                <img src="/estate_website/static/src/img/story.jpg" class="img img-fluid mx-auto rounded shadow" alt="Morris &amp; James pottery"/>
+                                <img src="/estate_website/static/src/img/pottery-story.jpg" class="img img-fluid mx-auto rounded shadow" alt="Morris &amp; James pottery workshop"/>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- REAL SITE PHOTO: FULL-WIDTH BANNER -->
+                <section class="s_image_frame pt0 pb0">
+                    <div class="container-fluid p-0">
+                        <img src="/estate_website/static/src/img/courtyard-cafe.jpg" class="img img-fluid w-100" style="max-height: 560px; object-fit: cover;" alt="The courtyard and café at Morris &amp; James Estate"/>
+                    </div>
+                    <div class="container">
+                        <p class="text-center text-muted pt8 pb8 fst-italic">The courtyard, fountain and café terrace at the estate today</p>
                     </div>
                 </section>
 
@@ -105,8 +115,26 @@
                     </div>
                 </section>
 
+                <!-- IMAGE GALLERY -->
+                <section class="s_image_gallery pt64 pb64 o_cc o_cc1" id="gallery">
+                    <div class="container">
+                        <h2 class="text-center pb32">A glimpse of the estate</h2>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <img src="/estate_website/static/src/img/garden-pots.jpg" class="img img-fluid rounded shadow" alt="Glazed terracotta garden pots"/>
+                            </div>
+                            <div class="col-md-4">
+                                <img src="/estate_website/static/src/img/courtyard-cafe.jpg" class="img img-fluid rounded shadow" alt="Estate courtyard patio seating"/>
+                            </div>
+                            <div class="col-md-4">
+                                <img src="/estate_website/static/src/img/market.jpg" class="img img-fluid rounded shadow" alt="Market tenants and artisan stalls"/>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- MORE THAN BUILDINGS: FOUR PILLARS -->
-                <section class="s_three_columns pt64 pb64 o_cc o_cc1">
+                <section class="s_three_columns pt64 pb64">
                     <div class="container">
                         <h2 class="text-center">More than a collection of buildings</h2>
                         <p class="text-center">The estate's next chapter respects that history without
