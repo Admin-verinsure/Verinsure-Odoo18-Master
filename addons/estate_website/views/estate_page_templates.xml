@@ -8,8 +8,8 @@
                 <!-- HERO / COVER -->
                 <section class="s_cover parallax s_parallax_is_fixed pt96 pb96"
                          data-scroll-background-ratio="1"
-                         style="background-image:url('/estate_website/static/src/img/hero.jpg'); background-position: 50% 50%;">
-                    <div class="s_parallax_bg oe_img_bg" style="background-image:url('/estate_website/static/src/img/hero.jpg');"/>
+                         style="background-image:url('https://www.morrisandjames.co.nz/cdn/shop/files/Entrance_1.jpg?v=1766121034'); background-position: 50% 50%;">
+                    <div class="s_parallax_bg oe_img_bg" style="background-image:url('https://www.morrisandjames.co.nz/cdn/shop/files/Entrance_1.jpg?v=1766121034');"/>
                     <div class="o_we_bg_filter bg-black-50"/>
                     <div class="container">
                         <h1 class="text-white">Morris &amp; James Estate</h1>
@@ -61,7 +61,7 @@
                                 <a href="#" class="btn btn-secondary">Discover the Story</a>
                             </div>
                             <div class="col-lg-6 pt16 pb16 o_cc o_colored_level">
-                                <img src="/estate_website/static/src/img/pottery-story.jpg" class="img img-fluid mx-auto rounded shadow" alt="Morris &amp; James pottery workshop"/>
+                                <img src="https://morrisandjames.cafe/web/image/1978-79a75c32/img4.webp" class="img img-fluid mx-auto rounded shadow" alt="Morris &amp; James — over 45 years of craftsmanship"/>
                             </div>
                         </div>
                     </div>
@@ -121,14 +121,22 @@
                         <h2 class="text-center pb32">A glimpse of the estate</h2>
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <img src="/estate_website/static/src/img/garden-pots.jpg" class="img img-fluid rounded shadow" alt="Glazed terracotta garden pots"/>
+                                <img src="https://morrisandjames.cafe/web/image/1976-8345bf9d/img2.jpeg" class="img img-fluid rounded shadow" alt="Weddings and events at the estate"/>
                             </div>
                             <div class="col-md-4">
                                 <img src="/estate_website/static/src/img/courtyard-cafe.jpg" class="img img-fluid rounded shadow" alt="Estate courtyard patio seating"/>
                             </div>
                             <div class="col-md-4">
-                                <img src="/estate_website/static/src/img/market.jpg" class="img img-fluid rounded shadow" alt="Market tenants and artisan stalls"/>
+                                <img src="https://morrisandjames.cafe/web/image/1974-951f308b/cake1.webp" class="img img-fluid rounded shadow" alt="Gluten-free cakes at Cafe Nectar"/>
                             </div>
+                        </div>
+                        <div class="text-center pt32">
+                            <a href="https://www.facebook.com/morrisandjames/" target="_blank" class="btn btn-outline-secondary me-2">
+                                <i class="fa fa-facebook me-1"/> Follow on Facebook
+                            </a>
+                            <a href="https://www.instagram.com/morrisandjames/" target="_blank" class="btn btn-outline-secondary">
+                                <i class="fa fa-instagram me-1"/> Follow on Instagram
+                            </a>
                         </div>
                     </div>
                 </section>
@@ -216,7 +224,7 @@
 
                 <!-- CLOSING STATEMENT -->
                 <section class="s_cover pt96 pb96 o_cc o_cc4"
-                          style="background-image:url('/estate_website/static/src/img/closing.jpg'); background-position: 50% 50%;">
+                          style="background-image:url('https://morrisandjames.cafe/web/image/1975-df844d2d/img5.webp'); background-position: 50% 50%;">
                     <div class="o_we_bg_filter bg-black-50"/>
                     <div class="container text-center">
                         <h2 class="text-white">The pottery has closed. The place continues.</h2>
