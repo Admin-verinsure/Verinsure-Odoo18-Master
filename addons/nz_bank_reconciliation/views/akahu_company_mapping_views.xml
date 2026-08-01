@@ -7,7 +7,8 @@
             <list string="Inter-company Mappings" editable="top">
                 <field name="company_id"/>
                 <field name="partner_id"/>
-                <field name="counterpart_company_id"/>
+                <field name="counterpart_company_id"
+                       domain="[('id', 'in', allowed_counterpart_company_ids), ('id', '!=', company_id)]"/>
                 <field name="notes"/>
                 <field name="active"/>
             </list>
@@ -27,7 +28,8 @@
                         <group>
                             <field name="company_id"/>
                             <field name="partner_id"/>
-                            <field name="counterpart_company_id"/>
+                            <field name="counterpart_company_id"
+                                   domain="[('id', 'in', allowed_counterpart_company_ids), ('id', '!=', company_id)]"/>
                         </group>
                         <group>
                             <field name="active"/>

@@ -2,7 +2,7 @@
 import json
 import logging
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
@@ -125,14 +125,25 @@ class AutoReconciliationWizard(models.TransientModel):
                 elif rtype == 'intercompany':
                     line = MoveLine.browse(pair['line_id'])
                     counterpart = MoveLine.browse(pair['counterpart_line_id'])
-                    if not line.exists() or line.reconciled:
-                        skipped += 1; continue
-                    if not counterpart.exists() or counterpart.reconciled:
+                    if not line.exists() or not counterpart.exists():
+                        raise ValidationError(_(
+                            'Inter-company pair is invalid or no longer exists.'
+                        ))
+
+                    engine._validate_intercompany_pair_security(
+                        line,
+                        counterpart,
+                        allowed_company_ids=self.env.companies.ids,
+                    )
+
+                    if line.reconciled or counterpart.reconciled:
                         skipped += 1; continue
                     self.env['account.move.line'].sudo().browse(
                         [line.id, counterpart.id]
                     ).reconcile()
                     applied += 1
+            except ValidationError:
+                raise
             except Exception as e:
                 _logger.warning(
                     "Wizard confirm failed for %s pair %s: %s",
