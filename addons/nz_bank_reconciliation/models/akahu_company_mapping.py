@@ -84,20 +84,78 @@ class AkahuCompanyMapping(models.Model):
     def _get_allowed_counterpart_company_ids(self):
         return set(self.env.companies.ids)
 
-    def _validate_counterpart_company(self, counterpart_company_id, company_id=False):
-        if not counterpart_company_id:
-            return
-
-        allowed_ids = self._get_allowed_counterpart_company_ids()
-        if counterpart_company_id not in allowed_ids:
+    def _validate_mapping_chain(
+        self,
+        company_id,
+        partner_id,
+        counterpart_company_id,
+        allowed_company_ids=None,
+        expected_company_id=None,
+        expected_partner_id=None,
+        expected_counterpart_company_id=None,
+        mapping_label=None,
+    ):
+        """Single source of truth for mapping security validation."""
+        if not company_id or not partner_id or not counterpart_company_id:
             raise ValidationError(_(
-                'Selected Counterpart Company is not in your allowed companies.'
+                'Mapping must define company, partner and counterpart company.'
             ))
 
-        if company_id and counterpart_company_id == company_id:
+        if allowed_company_ids is None:
+            allowed_ids = self._get_allowed_counterpart_company_ids()
+        else:
+            allowed_ids = set(allowed_company_ids)
+
+        label = mapping_label or _('%s | %s → %s') % (
+            company_id,
+            partner_id,
+            counterpart_company_id,
+        )
+
+        if company_id not in allowed_ids:
+            raise ValidationError(_(
+                'Mapping %(mapping)s uses source company id %(company_id)s outside allowed companies.'
+            ) % {
+                'mapping': label,
+                'company_id': company_id,
+            })
+
+        if counterpart_company_id not in allowed_ids:
+            raise ValidationError(_(
+                'Mapping %(mapping)s uses counterpart company id %(company_id)s outside allowed companies.'
+            ) % {
+                'mapping': label,
+                'company_id': counterpart_company_id,
+            })
+
+        if company_id == counterpart_company_id:
             raise ValidationError(_(
                 'This Company and Counterpart Company must be different.'
             ))
+
+        if expected_company_id and company_id != expected_company_id:
+            raise ValidationError(_(
+                'Mapping %(mapping)s does not belong to expected company id %(company_id)s.'
+            ) % {
+                'mapping': label,
+                'company_id': expected_company_id,
+            })
+
+        if expected_partner_id and partner_id != expected_partner_id:
+            raise ValidationError(_(
+                'Mapping %(mapping)s does not match expected partner id %(partner_id)s.'
+            ) % {
+                'mapping': label,
+                'partner_id': expected_partner_id,
+            })
+
+        if expected_counterpart_company_id and counterpart_company_id != expected_counterpart_company_id:
+            raise ValidationError(_(
+                'Mapping %(mapping)s does not match expected counterpart company id %(company_id)s.'
+            ) % {
+                'mapping': label,
+                'company_id': expected_counterpart_company_id,
+            })
 
     def _assert_runtime_security(
         self,
@@ -121,76 +179,69 @@ class AkahuCompanyMapping(models.Model):
             allowed_ids = set(allowed_company_ids)
 
         for rec in self:
-            if expected_company_id and rec.company_id.id != expected_company_id:
-                raise ValidationError(_(
-                    'Mapping %(mapping)s does not belong to expected company id %(company_id)s.'
-                ) % {
-                    'mapping': rec.display_name,
-                    'company_id': expected_company_id,
-                })
-
-            if expected_partner_id and rec.partner_id.id != expected_partner_id:
-                raise ValidationError(_(
-                    'Mapping %(mapping)s does not match expected partner id %(partner_id)s.'
-                ) % {
-                    'mapping': rec.display_name,
-                    'partner_id': expected_partner_id,
-                })
-
-            if (
-                expected_counterpart_company_id
-                and rec.counterpart_company_id.id != expected_counterpart_company_id
-            ):
-                raise ValidationError(_(
-                    'Mapping %(mapping)s does not match expected counterpart company id %(company_id)s.'
-                ) % {
-                    'mapping': rec.display_name,
-                    'company_id': expected_counterpart_company_id,
-                })
-
-            if rec.company_id.id not in allowed_ids:
-                raise ValidationError(_(
-                    'Mapping %(mapping)s uses source company %(company)s outside allowed companies.'
-                ) % {
-                    'mapping': rec.display_name,
-                    'company': rec.company_id.display_name,
-                })
-
-            if rec.counterpart_company_id.id not in allowed_ids:
-                raise ValidationError(_(
-                    'Mapping %(mapping)s uses counterpart company %(company)s outside allowed companies.'
-                ) % {
-                    'mapping': rec.display_name,
-                    'company': rec.counterpart_company_id.display_name,
-                })
-
-            self._validate_counterpart_company(
-                rec.counterpart_company_id.id,
-                rec.company_id.id,
+            self._validate_mapping_chain(
+                company_id=rec.company_id.id,
+                partner_id=rec.partner_id.id,
+                counterpart_company_id=rec.counterpart_company_id.id,
+                allowed_company_ids=allowed_ids,
+                expected_company_id=expected_company_id,
+                expected_partner_id=expected_partner_id,
+                expected_counterpart_company_id=expected_counterpart_company_id,
+                mapping_label=rec.display_name,
             )
 
     @api.model_create_multi
     def create(self, vals_list):
+        allowed_ids = self._get_allowed_counterpart_company_ids()
         for vals in vals_list:
             company_id = vals.get('company_id') or self.env.company.id
+            partner_id = vals.get('partner_id')
             counterpart_company_id = vals.get('counterpart_company_id')
-            self._validate_counterpart_company(counterpart_company_id, company_id)
+            self._validate_mapping_chain(
+                company_id=company_id,
+                partner_id=partner_id,
+                counterpart_company_id=counterpart_company_id,
+                allowed_company_ids=allowed_ids,
+            )
         return super().create(vals_list)
 
     def write(self, vals):
+        allowed_ids = self._get_allowed_counterpart_company_ids()
         for rec in self:
-            company_id = vals.get('company_id', rec.company_id.id)
-            counterpart_company_id = vals.get(
-                'counterpart_company_id', rec.counterpart_company_id.id
+            current_company_id = rec.company_id.id
+            current_partner_id = rec.partner_id.id
+            current_counterpart_company_id = rec.counterpart_company_id.id
+
+            next_company_id = vals.get('company_id', current_company_id)
+            next_partner_id = vals.get('partner_id', current_partner_id)
+            next_counterpart_company_id = vals.get(
+                'counterpart_company_id', current_counterpart_company_id
             )
-            rec._validate_counterpart_company(counterpart_company_id, company_id)
+
+            rec._validate_mapping_chain(
+                company_id=next_company_id,
+                partner_id=next_partner_id,
+                counterpart_company_id=next_counterpart_company_id,
+                allowed_company_ids=allowed_ids,
+                expected_company_id=current_company_id,
+                expected_partner_id=current_partner_id,
+                expected_counterpart_company_id=current_counterpart_company_id,
+                mapping_label=rec.display_name,
+            )
         return super().write(vals)
 
     def action_confirm(self):
+        allowed_ids = self._get_allowed_counterpart_company_ids()
         for rec in self:
-            rec._validate_counterpart_company(
-                rec.counterpart_company_id.id,
-                rec.company_id.id,
+            rec._validate_mapping_chain(
+                company_id=rec.company_id.id,
+                partner_id=rec.partner_id.id,
+                counterpart_company_id=rec.counterpart_company_id.id,
+                allowed_company_ids=allowed_ids,
+                expected_company_id=rec.company_id.id,
+                expected_partner_id=rec.partner_id.id,
+                expected_counterpart_company_id=rec.counterpart_company_id.id,
+                mapping_label=rec.display_name,
             )
         return True
 
