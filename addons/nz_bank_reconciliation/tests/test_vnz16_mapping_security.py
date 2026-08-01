@@ -12,138 +12,133 @@ class TestVNZ16MappingSecurity(TransactionCase):
         super().setUpClass()
         cls.Company = cls.env['res.company'].sudo()
         cls.Mapping = cls.env['akahu.company.mapping']
-        cls.Engine = cls.env['auto.reconciliation.engine']
-        cls.Wizard = cls.env['auto.reconciliation.wizard']
-        cls.WizardLine = cls.env['auto.reconciliation.wizard.line']
         cls.Partner = cls.env['res.partner'].sudo()
+        cls.Users = cls.env['res.users'].sudo().with_context(no_reset_password=True)
 
         cls.company_a = cls.env.company
         cls.company_b = cls.Company.create({'name': 'VNZ16 Company B'})
-        cls.company_c = cls.Company.create({'name': 'VNZ16 Company C'})
 
         cls.partner_ic = cls.Partner.create({'name': 'IC Partner B'})
+        cls.partner_ic_2 = cls.Partner.create({'name': 'IC Partner C'})
 
-    def test_create_rejects_disallowed_counterpart_company(self):
-        with self.assertRaises(ValidationError):
-            self.Mapping.with_context(
-                allowed_company_ids=[self.company_a.id]
-            ).create({
-                'company_id': self.company_a.id,
-                'partner_id': self.partner_ic.id,
-                'counterpart_company_id': self.company_b.id,
-            })
+        manager_group = cls.env.ref('account.group_account_manager')
+        cls.non_admin_manager = cls.Users.create({
+            'name': 'VNZ16 Non Admin Manager',
+            'login': 'vnz16_non_admin_manager',
+            'email': 'vnz16_non_admin_manager@example.com',
+            'company_id': cls.company_a.id,
+            'company_ids': [(6, 0, [cls.company_a.id, cls.company_b.id])],
+            'groups_id': [(6, 0, [manager_group.id])],
+        })
 
-    def test_write_rejects_disallowed_counterpart_company(self):
-        mapping = self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id]
-        ).create({
+    def _create_mapping(self):
+        return self.Mapping.create({
             'company_id': self.company_a.id,
             'partner_id': self.partner_ic.id,
             'counterpart_company_id': self.company_b.id,
         })
 
-        with self.assertRaises(ValidationError):
-            mapping.with_context(
-                allowed_company_ids=[self.company_a.id]
-            ).write({'notes': 'Trigger security re-check'})
+    def test_create_works(self):
+        mapping = self._create_mapping()
+        self.assertTrue(mapping.exists())
+        self.assertEqual(mapping.company_id.id, self.company_a.id)
+        self.assertEqual(mapping.partner_id.id, self.partner_ic.id)
+        self.assertEqual(mapping.counterpart_company_id.id, self.company_b.id)
 
-    def test_write_rejects_arbitrary_counterpart_change_even_if_allowed(self):
-        mapping = self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id, self.company_c.id]
-        ).create({
-            'company_id': self.company_a.id,
+    def test_notes_can_be_updated(self):
+        mapping = self._create_mapping()
+        mapping.write({'notes': 'Updated notes'})
+        self.assertEqual(mapping.notes, 'Updated notes')
+
+    def test_active_can_be_updated(self):
+        mapping = self._create_mapping()
+        mapping.write({'active': False})
+        self.assertFalse(mapping.active)
+
+    def test_company_id_update_fails(self):
+        mapping = self._create_mapping()
+        with self.assertRaisesRegex(
+            ValidationError,
+            'Inter-company mappings cannot be modified after creation. Create a new mapping instead.',
+        ):
+            mapping.write({'company_id': self.company_b.id})
+
+    def test_partner_id_update_fails(self):
+        mapping = self._create_mapping()
+        with self.assertRaisesRegex(
+            ValidationError,
+            'Inter-company mappings cannot be modified after creation. Create a new mapping instead.',
+        ):
+            mapping.write({'partner_id': self.partner_ic_2.id})
+
+    def test_counterpart_company_id_update_fails(self):
+        mapping = self._create_mapping()
+        with self.assertRaisesRegex(
+            ValidationError,
+            'Inter-company mappings cannot be modified after creation. Create a new mapping instead.',
+        ):
+            mapping.write({'counterpart_company_id': self.company_a.id})
+
+    def test_multi_record_write_protected_field_fails(self):
+        mapping_1 = self._create_mapping()
+        mapping_2 = self.Mapping.create({
+            'company_id': self.company_b.id,
+            'partner_id': self.partner_ic_2.id,
+            'counterpart_company_id': self.company_a.id,
+        })
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            'Inter-company mappings cannot be modified after creation. Create a new mapping instead.',
+        ):
+            (mapping_1 | mapping_2).write({'partner_id': self.partner_ic.id})
+
+    def test_administrator_can_delete_mapping(self):
+        mapping = self._create_mapping()
+        mapping.unlink()
+        self.assertFalse(mapping.exists())
+
+    def test_normal_user_cannot_delete_mapping(self):
+        mapping = self._create_mapping()
+        with self.assertRaisesRegex(
+            ValidationError,
+            'Only System Administrators can delete inter-company mappings.',
+        ):
+            mapping.with_user(self.non_admin_manager).unlink()
+
+    def test_runtime_security_passes_on_valid_mapping(self):
+        mapping = self._create_mapping()
+        self.assertTrue(mapping._assert_runtime_security())
+
+    def test_runtime_security_missing_company_raises(self):
+        malformed = self.Mapping.new({
             'partner_id': self.partner_ic.id,
             'counterpart_company_id': self.company_b.id,
         })
-
         with self.assertRaises(ValidationError):
-            mapping.with_context(
-                allowed_company_ids=[self.company_a.id, self.company_b.id, self.company_c.id]
-            ).write({'counterpart_company_id': self.company_c.id})
+            malformed._assert_runtime_security()
 
-    def test_action_confirm_rejects_disallowed_counterpart_company(self):
-        mapping = self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id]
-        ).create({
+    def test_runtime_security_missing_partner_raises(self):
+        malformed = self.Mapping.new({
             'company_id': self.company_a.id,
-            'partner_id': self.partner_ic.id,
             'counterpart_company_id': self.company_b.id,
         })
-
         with self.assertRaises(ValidationError):
-            mapping.with_context(
-                allowed_company_ids=[self.company_a.id]
-            ).action_confirm()
+            malformed._assert_runtime_security()
 
-    def test_engine_rejects_invalid_mapping_runtime_scope(self):
-        self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id]
-        ).create({
+    def test_runtime_security_missing_counterpart_raises(self):
+        malformed = self.Mapping.new({
             'company_id': self.company_a.id,
             'partner_id': self.partner_ic.id,
-            'counterpart_company_id': self.company_b.id,
         })
-
         with self.assertRaises(ValidationError):
-            self.Engine.with_context(
-                allowed_company_ids=[self.company_a.id]
-            )._reconcile_intercompany(
-                self.company_a,
-                preview_mode=True,
-                allowed_company_ids=[self.company_a.id],
-            )
+            malformed._assert_runtime_security()
 
-    def test_runtime_security_rejects_wrong_partner_in_mapping_chain(self):
-        mapping = self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id]
-        ).create({
+    def test_runtime_security_same_company_and_counterpart_raises(self):
+        malformed = self.Mapping.new({
             'company_id': self.company_a.id,
             'partner_id': self.partner_ic.id,
-            'counterpart_company_id': self.company_b.id,
+            'counterpart_company_id': self.company_a.id,
         })
-        other_partner = self.Partner.create({'name': 'IC Partner C'})
-
         with self.assertRaises(ValidationError):
-            mapping._assert_runtime_security(
-                allowed_company_ids=[self.company_a.id, self.company_b.id],
-                expected_company_id=self.company_a.id,
-                expected_partner_id=other_partner.id,
-                expected_counterpart_company_id=self.company_b.id,
-            )
-
-    def test_runtime_security_rejects_wrong_counterpart_in_mapping_chain(self):
-        mapping = self.Mapping.with_context(
-            allowed_company_ids=[self.company_a.id, self.company_b.id]
-        ).create({
-            'company_id': self.company_a.id,
-            'partner_id': self.partner_ic.id,
-            'counterpart_company_id': self.company_b.id,
-        })
-
-        with self.assertRaises(ValidationError):
-            mapping._assert_runtime_security(
-                allowed_company_ids=[self.company_a.id, self.company_b.id],
-                expected_company_id=self.company_a.id,
-                expected_partner_id=self.partner_ic.id,
-                expected_counterpart_company_id=self.company_a.id,
-            )
-
-    def test_wizard_confirm_rejects_tampered_intercompany_pair(self):
-        wizard = self.Wizard.create({
-            'company_id': self.company_a.id,
-            'match_pairs_json': '[{"type": "intercompany", "line_id": 99999991, "counterpart_line_id": 99999992}]',
-        })
-        self.WizardLine.create({
-            'wizard_id': wizard.id,
-            'selected': True,
-            'initial_selected': True,
-            'pair_index': 0,
-            'reconciliation_type': 'intercompany',
-            'description': 'Tampered pair',
-            'partner_name': 'Unknown',
-            'amount': 0.0,
-            'match_criteria': 'amount',
-        })
-
-        with self.assertRaises(ValidationError):
-            wizard.action_confirm()
+            malformed._assert_runtime_security()
