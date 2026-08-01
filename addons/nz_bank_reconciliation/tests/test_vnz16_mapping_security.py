@@ -19,6 +19,7 @@ class TestVNZ16MappingSecurity(TransactionCase):
 
         cls.company_a = cls.env.company
         cls.company_b = cls.Company.create({'name': 'VNZ16 Company B'})
+        cls.company_c = cls.Company.create({'name': 'VNZ16 Company C'})
 
         cls.partner_ic = cls.Partner.create({'name': 'IC Partner B'})
 
@@ -45,6 +46,20 @@ class TestVNZ16MappingSecurity(TransactionCase):
             mapping.with_context(
                 allowed_company_ids=[self.company_a.id]
             ).write({'notes': 'Trigger security re-check'})
+
+    def test_write_rejects_arbitrary_counterpart_change_even_if_allowed(self):
+        mapping = self.Mapping.with_context(
+            allowed_company_ids=[self.company_a.id, self.company_b.id, self.company_c.id]
+        ).create({
+            'company_id': self.company_a.id,
+            'partner_id': self.partner_ic.id,
+            'counterpart_company_id': self.company_b.id,
+        })
+
+        with self.assertRaises(ValidationError):
+            mapping.with_context(
+                allowed_company_ids=[self.company_a.id, self.company_b.id, self.company_c.id]
+            ).write({'counterpart_company_id': self.company_c.id})
 
     def test_action_confirm_rejects_disallowed_counterpart_company(self):
         mapping = self.Mapping.with_context(
