@@ -3,7 +3,7 @@ import logging
 import re
 from datetime import timedelta
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_compare, float_round
 from ..utils.log_redaction import sanitize_log_value
 
@@ -159,6 +159,7 @@ class AutoReconciliationEngine(models.Model):
                     company,
                     preview_mode=preview_mode,
                     journal_ids=journal_ids,
+                    allowed_company_ids=(allowed_company_ids if allowed_company_ids is not None else companies.ids),
                 )
                 all_results[company.id] = results
             except Exception as e:
@@ -173,7 +174,7 @@ class AutoReconciliationEngine(models.Model):
             self._create_log_entries(all_results, triggered_by=triggered_by)
         return all_results
 
-    def _process_company(self, company, preview_mode=False, journal_ids=None):
+    def _process_company(self, company, preview_mode=False, journal_ids=None, allowed_company_ids=None):
         # sudo(): cron technical user has read-only group; sudo() needed to read config written by managers
         config = self.env['auto.reconciliation.config'].sudo().search([
             ('company_id', '=', company.id), ('active', '=', True),
@@ -190,8 +191,54 @@ class AutoReconciliationEngine(models.Model):
             'bank_statement':   run(self._reconcile_bank_statements,  'enable_bank',  journal_ids=journal_ids),
             'customer_payment': run(self._reconcile_customer_payments, 'enable_customer'),
             'vendor_payment':   run(self._reconcile_vendor_payments,   'enable_vendor'),
-            'intercompany':     run(self._reconcile_intercompany,      'enable_intercompany'),
+            'intercompany':     run(self._reconcile_intercompany,      'enable_intercompany', allowed_company_ids=allowed_company_ids),
         }
+
+    def _validate_intercompany_pair_security(self, line, counterpart, allowed_company_ids=None):
+        """Reject inter-company pair usage unless it matches a valid mapping.
+
+        This protects wizard/RPC and sudo flows from forged line IDs.
+        """
+        if not line.exists() or not counterpart.exists():
+            raise ValidationError(_('Selected inter-company pair no longer exists.'))
+
+        if not line.partner_id:
+            raise ValidationError(_('Inter-company source line must have a partner.'))
+
+        if allowed_company_ids is None:
+            allowed_ids = set(self.env.companies.ids)
+        else:
+            allowed_ids = set(allowed_company_ids)
+
+        # Read via sudo() because consumer paths also operate with sudo, but
+        # enforce the caller scope explicitly using _assert_runtime_security.
+        mapping = self.env['akahu.company.mapping'].sudo().search([
+            ('company_id', '=', line.company_id.id),
+            ('partner_id', '=', line.partner_id.id),
+            ('active', '=', True),
+        ], limit=1)
+
+        if not mapping:
+            raise ValidationError(_(
+                'No active inter-company mapping found for company %(company)s and partner %(partner)s.'
+            ) % {
+                'company': line.company_id.display_name,
+                'partner': line.partner_id.display_name,
+            })
+
+        mapping._assert_runtime_security(
+            allowed_company_ids=allowed_ids,
+            expected_company_id=line.company_id.id,
+            expected_partner_id=line.partner_id.id,
+            expected_counterpart_company_id=counterpart.company_id.id,
+        )
+
+        if counterpart.company_id.id not in allowed_ids:
+            raise ValidationError(_(
+                'Counterpart company %(company)s is outside allowed companies.'
+            ) % {
+                'company': counterpart.company_id.display_name,
+            })
 
     # ── BANK STATEMENTS ───────────────────────────────────────────────────────
     def _reconcile_bank_statements(self, company, preview_mode=False, config=None, journal_ids=None):
@@ -680,7 +727,7 @@ class AutoReconciliationEngine(models.Model):
             return False
 
     # ── INTER-COMPANY ─────────────────────────────────────────────────────────
-    def _reconcile_intercompany(self, company, preview_mode=False, config=None):
+    def _reconcile_intercompany(self, company, preview_mode=False, config=None, allowed_company_ids=None):
         matched = []
         applied_count = 0
         MoveLine = self.env['account.move.line'].sudo()
@@ -691,6 +738,11 @@ class AutoReconciliationEngine(models.Model):
         ])
         if not mappings:
             return {'matched': [], 'matched_count': 0}
+
+        mappings._assert_runtime_security(
+            allowed_company_ids=allowed_company_ids,
+            expected_company_id=company.id,
+        )
 
         partner_to_company = {m.partner_id.id: m.counterpart_company_id.id for m in mappings}
 
@@ -766,6 +818,11 @@ class AutoReconciliationEngine(models.Model):
                     candidates, key=lambda c: (abs((c.date - line.date).days) if c.date and line.date else 0, c.id)
                 )
             if counterpart:
+                self._validate_intercompany_pair_security(
+                    line,
+                    counterpart,
+                    allowed_company_ids=allowed_company_ids,
+                )
                 counterpart_ref_values, counterpart_ref_tokens = _get_move_line_reference_signals(counterpart)
                 exact_ref_match = bool(source_ref_values & counterpart_ref_values)
                 token_ref_match = bool(source_ref_tokens & counterpart_ref_tokens)
