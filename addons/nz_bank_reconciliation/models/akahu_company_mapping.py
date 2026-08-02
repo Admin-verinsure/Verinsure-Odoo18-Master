@@ -81,6 +81,42 @@ class AkahuCompanyMapping(models.Model):
             else:
                 rec.allowed_counterpart_company_ids = allowed_companies
 
+    def _get_current_user_allowed_company_ids(self):
+        return set(self.env.companies.ids)
+
+    def _validate_create_company_scope(self, company_id, counterpart_company_id):
+        allowed_company_ids = self._get_current_user_allowed_company_ids()
+
+        if company_id not in allowed_company_ids:
+            raise ValidationError(_(
+                'You are not allowed to create mappings for company id %(company_id)s.'
+            ) % {
+                'company_id': company_id,
+            })
+
+        if counterpart_company_id not in allowed_company_ids:
+            raise ValidationError(_(
+                'You are not allowed to use counterpart company id %(company_id)s.'
+            ) % {
+                'company_id': counterpart_company_id,
+            })
+
+        if company_id == counterpart_company_id:
+            raise ValidationError(_(
+                'This Company and Counterpart Company must be different.'
+            ))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            company_id = vals.get('company_id') or self.env.company.id
+            if 'counterpart_company_id' in vals:
+                self._validate_create_company_scope(
+                    company_id,
+                    vals['counterpart_company_id'],
+                )
+        return super().create(vals_list)
+
     def _assert_runtime_security(
         self,
         allowed_company_ids=None,
