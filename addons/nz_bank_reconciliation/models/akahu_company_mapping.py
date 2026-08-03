@@ -124,11 +124,19 @@ class AkahuCompanyMapping(models.Model):
         expected_partner_id=None,
         expected_counterpart_company_id=None,
     ):
-        """Lightweight integrity checks for runtime consumers.
-
-        This validates only record integrity and does not perform authorization
-        or company-scope enforcement.
         """
+        Validate runtime integrity and authorization for inter-company mappings.
+
+        In addition to structural integrity checks, this method optionally enforces:
+
+        - allowed company scope
+        - expected source company
+        - expected partner
+        - expected counterpart company
+
+        when those expectations are supplied by runtime callers.
+        """
+        allowed_ids = set(allowed_company_ids) if allowed_company_ids is not None else None
         for rec in self:
             if not rec.company_id:
                 raise ValidationError(_(
@@ -145,6 +153,34 @@ class AkahuCompanyMapping(models.Model):
             if rec.company_id == rec.counterpart_company_id:
                 raise ValidationError(_(
                     'Inter-company mapping is invalid: company and counterpart company must be different.'
+                ))
+
+            if allowed_ids is not None:
+                if rec.company_id.id not in allowed_ids:
+                    raise ValidationError(_(
+                        'Inter-company mapping is invalid for the current company scope.'
+                    ))
+                if rec.counterpart_company_id.id not in allowed_ids:
+                    raise ValidationError(_(
+                        'Inter-company mapping is invalid for the current company scope.'
+                    ))
+
+            if expected_company_id is not None and rec.company_id.id != expected_company_id:
+                raise ValidationError(_(
+                    'Inter-company mapping does not match the expected company.'
+                ))
+
+            if expected_partner_id is not None and rec.partner_id.id != expected_partner_id:
+                raise ValidationError(_(
+                    'Inter-company mapping does not match the expected partner.'
+                ))
+
+            if (
+                expected_counterpart_company_id is not None
+                and rec.counterpart_company_id.id != expected_counterpart_company_id
+            ):
+                raise ValidationError(_(
+                    'Inter-company mapping does not match the expected counterpart company.'
                 ))
         return True
 
