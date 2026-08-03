@@ -3,7 +3,7 @@ import functools
 import inspect
 import threading
 
-from werkzeug.wrappers import Response as WerkzeugResponse
+import odoo.http as http
 
 
 _PATCH_LOCK = threading.Lock()
@@ -12,7 +12,11 @@ _PATCH_LOCK = threading.Lock()
 def post_load_hook():
     """VNZ-17: harden session_id cookie defaults without touching core."""
     with _PATCH_LOCK:
-        original_set_cookie = getattr(WerkzeugResponse, 'set_cookie', None)
+        future_response = getattr(http, 'FutureResponse', None)
+        if not future_response:
+            return
+
+        original_set_cookie = getattr(future_response, 'set_cookie', None)
         if not original_set_cookie:
             return
 
@@ -43,4 +47,4 @@ def post_load_hook():
             return original_set_cookie(self, key, *args, **kwargs)
 
         set_cookie_hardened._vnz17_session_cookie_patch = True
-        WerkzeugResponse.set_cookie = set_cookie_hardened
+        future_response.set_cookie = set_cookie_hardened
