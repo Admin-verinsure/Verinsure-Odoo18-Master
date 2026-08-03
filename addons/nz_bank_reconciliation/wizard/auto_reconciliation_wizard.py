@@ -40,6 +40,19 @@ class AutoReconciliationWizard(models.TransientModel):
         for rec in self:
             rec.selected_count = sum(1 for l in rec.line_ids if l.selected)
 
+    def _validate_company_access(self, *records):
+        allowed_company_ids = set(self.env.companies.ids)
+        for record in records:
+            if not record:
+                continue
+            if not record.exists():
+                continue
+            company = getattr(record, 'company_id', False)
+            if company and company.id not in allowed_company_ids:
+                raise ValidationError(_(
+                    'You are not allowed to reconcile records from another company.'
+                ))
+
     def action_confirm(self):
         """
         Apply only the specific ID pairs from preview time that the user
@@ -92,6 +105,7 @@ class AutoReconciliationWizard(models.TransientModel):
                 if rtype == 'bank_statement':
                     stmt_line = BankLine.browse(pair['statement_line_id'])
                     move_line = MoveLine.browse(pair['move_line_id'])
+                    self._validate_company_access(stmt_line, move_line)
                     if not stmt_line.exists() or stmt_line.is_reconciled:
                         skipped += 1; continue
                     if not move_line.exists() or move_line.reconciled:
@@ -103,6 +117,7 @@ class AutoReconciliationWizard(models.TransientModel):
                 elif rtype == 'customer_payment':
                     payment = Payment.browse(pair['payment_id'])
                     invoice = Move.browse(pair['invoice_id'])
+                    self._validate_company_access(payment, invoice)
                     if not payment.exists() or payment.reconciled_invoice_ids:
                         skipped += 1; continue
                     if not invoice.exists() or invoice.payment_state == 'paid':
@@ -114,6 +129,7 @@ class AutoReconciliationWizard(models.TransientModel):
                 elif rtype == 'vendor_payment':
                     payment = Payment.browse(pair['payment_id'])
                     bill = Move.browse(pair['bill_id'])
+                    self._validate_company_access(payment, bill)
                     if not payment.exists() or payment.reconciled_bill_ids:
                         skipped += 1; continue
                     if not bill.exists() or bill.payment_state == 'paid':
