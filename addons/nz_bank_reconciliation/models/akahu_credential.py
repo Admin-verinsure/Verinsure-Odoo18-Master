@@ -70,6 +70,15 @@ def _get_encryption_key(env):
 # and left in plaintext (see migration script).
 _CIPHERTEXT_MARKER = 'gcm1:'
 
+_LEGACY_PLAINTEXT_PARAM_KEYS = (
+    'akahu.access_token',
+    'akahu.api_key',
+    'akahu.app_id',
+    'akahu.account_id',
+    'akahu.user_id',
+)
+_LEGACY_PLAINTEXT_CLEANUP_DONE_KEY = 'akahu.legacy_plaintext_cleanup_done'
+
 _KEY_FILE_NAME = 'akahu_token.key'
 _KEY_FILE_DIR = 'nz_bank_reconciliation'
 
@@ -171,42 +180,75 @@ def _decrypt_token_with_key(blob, key):
 def _migrate_legacy_db_key(env, active_key):
     """One-time migration: re-encrypt ciphertext from legacy DB key to active key."""
     ICP = env['ir.config_parameter'].sudo()
+
+    def _has_verified_encrypted_credentials():
+        has_encrypted_app_token = bool(
+            env['akahu.credential'].sudo().search([
+                ('app_token', '=like', _CIPHERTEXT_MARKER + '%'),
+            ], limit=1)
+        )
+
+        has_encrypted_user_token = bool(
+            env['akahu.account'].sudo().search([
+                ('user_token', '=like', _CIPHERTEXT_MARKER + '%'),
+            ], limit=1)
+        )
+
+        return has_encrypted_app_token and has_encrypted_user_token
+
+    def _cleanup_legacy_plaintext_params():
+        if ICP.get_param(_LEGACY_PLAINTEXT_CLEANUP_DONE_KEY) == '1':
+            return
+
+        legacy_params = ICP.search([('key', 'in', list(_LEGACY_PLAINTEXT_PARAM_KEYS))])
+        if not legacy_params:
+            ICP.set_param(_LEGACY_PLAINTEXT_CLEANUP_DONE_KEY, '1')
+            return
+
+        if not _has_verified_encrypted_credentials():
+            return
+
+        legacy_params.unlink()
+        ICP.set_param(_LEGACY_PLAINTEXT_CLEANUP_DONE_KEY, '1')
+        _logger.info('Removed obsolete plaintext configuration.')
+
     legacy_b64 = ICP.get_param('akahu.token_key')
-    if not legacy_b64:
-        return
 
-    legacy_key = _decode_key_material(legacy_b64, source_label='legacy database key')
+    if legacy_b64:
+        legacy_key = _decode_key_material(legacy_b64, source_label='legacy database key')
 
-    def _rewrite_table(table, fields_to_process):
-        select_cols = ', '.join(['id'] + fields_to_process)
-        env.cr.execute('SELECT %s FROM %s' % (select_cols, table))
-        rows = env.cr.fetchall()
-        for row in rows:
-            rec_id = row[0]
-            updates = {}
-            for idx, field_name in enumerate(fields_to_process, start=1):
-                value = row[idx]
-                if not value or not value.startswith(_CIPHERTEXT_MARKER):
-                    continue
-                try:
-                    plain = _decrypt_token_with_key(value, legacy_key)
-                except Exception:
-                    # Already migrated or encrypted with a different key.
-                    continue
-                updates[field_name] = _encrypt_token_with_key(plain, active_key)
+        def _rewrite_table(table, fields_to_process):
+            select_cols = ', '.join(['id'] + fields_to_process)
+            env.cr.execute('SELECT %s FROM %s' % (select_cols, table))
+            rows = env.cr.fetchall()
+            for row in rows:
+                rec_id = row[0]
+                updates = {}
+                for idx, field_name in enumerate(fields_to_process, start=1):
+                    value = row[idx]
+                    if not value or not value.startswith(_CIPHERTEXT_MARKER):
+                        continue
+                    try:
+                        plain = _decrypt_token_with_key(value, legacy_key)
+                    except Exception:
+                        # Already migrated or encrypted with a different key.
+                        continue
+                    updates[field_name] = _encrypt_token_with_key(plain, active_key)
 
-            if updates:
-                set_sql = ', '.join('%s = %%s' % k for k in updates.keys())
-                params = list(updates.values()) + [rec_id]
-                env.cr.execute(
-                    'UPDATE %s SET %s WHERE id = %%s' % (table, set_sql),
-                    params,
-                )
+                if updates:
+                    set_sql = ', '.join('%s = %%s' % k for k in updates.keys())
+                    params = list(updates.values()) + [rec_id]
+                    env.cr.execute(
+                        'UPDATE %s SET %s WHERE id = %%s' % (table, set_sql),
+                        params,
+                    )
 
-    _rewrite_table('akahu_credential', ['app_token', 'app_secret'])
-    _rewrite_table('akahu_account', ['user_token'])
-    ICP.search([('key', '=', 'akahu.token_key')]).unlink()
-    _logger.info('SEC-01/VNZ-06: migrated legacy DB encryption key to non-DB key source.')
+        _rewrite_table('akahu_credential', ['app_token', 'app_secret'])
+        _rewrite_table('akahu_account', ['user_token'])
+        ICP.search([('key', '=', 'akahu.token_key')]).unlink()
+        _logger.info('Migrated legacy Akahu credentials.')
+
+    _cleanup_legacy_plaintext_params()
 
 
 def _encrypt_token(env, plaintext):
