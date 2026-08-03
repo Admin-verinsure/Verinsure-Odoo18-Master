@@ -192,3 +192,47 @@ class TestVNZ16MappingSecurity(TransactionCase):
         })
         with self.assertRaises(ValidationError):
             malformed._assert_runtime_security()
+
+    def test_runtime_security_rejects_source_company_outside_allowed_scope(self):
+        mapping = self._create_mapping()
+        with self.assertRaises(ValidationError):
+            mapping._assert_runtime_security(
+                allowed_company_ids=[mapping.counterpart_company_id.id],
+            )
+
+    def test_runtime_security_rejects_counterpart_company_outside_allowed_scope(self):
+        mapping = self._create_mapping()
+        with self.assertRaises(ValidationError):
+            mapping._assert_runtime_security(
+                allowed_company_ids=[mapping.company_id.id],
+            )
+
+    def test_runtime_security_rejects_wrong_expected_company_id(self):
+        mapping = self._create_mapping()
+        with self.assertRaises(ValidationError):
+            mapping._assert_runtime_security(
+                expected_company_id=self.company_b.id,
+            )
+
+    def test_runtime_security_rejects_wrong_expected_partner_id(self):
+        mapping = self._create_mapping()
+        with self.assertRaises(ValidationError):
+            mapping._assert_runtime_security(
+                expected_partner_id=self.partner_ic_2.id,
+            )
+
+    def test_runtime_security_rejects_wrong_expected_counterpart_company_id(self):
+        mapping = self._create_mapping()
+        with self.assertRaises(ValidationError):
+            mapping._assert_runtime_security(
+                expected_counterpart_company_id=self.company_c.id,
+            )
+
+    def test_runtime_security_passes_with_all_runtime_expectations(self):
+        mapping = self._create_mapping()
+        self.assertTrue(mapping._assert_runtime_security(
+            allowed_company_ids=[self.company_a.id, self.company_b.id],
+            expected_company_id=self.company_a.id,
+            expected_partner_id=self.partner_ic.id,
+            expected_counterpart_company_id=self.company_b.id,
+        ))
