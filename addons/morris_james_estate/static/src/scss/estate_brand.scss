@@ -1,0 +1,184 @@
+// Morris & James Estate — brand tokens (from Brand Manual, section 12 COLOUR / 13 TYPOGRAPHY)
+// Core palette
+$clay-white:      #F3F1ED;  // primary ground
+$kiln-ink:        #22251F;  // text / contrast
+$estate-green:    #1B4D3D;  // stewardship / anchors
+$matakana-earth:  #A6543A;  // clay / calls to action
+$glaze-blue:      #325F73;  // pottery / navigation
+$aqua-glaze:      #4DA7A0;  // maker categories
+$kiln-gold:       #C08A2E;  // warm highlights
+
+// Glaze accents (way-finding / tenant categories) — use sparingly, per manual: "controlled flashes", not a rainbow
+$fired-red:       #D94C3D;  // events
+$orange-glaze:    #F1992E;  // markets
+$turquoise:       #3E9C99;  // artisans
+$cobalt:          #3E7CB2;  // history
+$purple-glaze:    #6E4B8B;  // culture
+$clay-brown:      #8C6A38;  // food
+
+// Type: Cormorant Garamond (word-mark, headings, editorial) + Source Sans 3 (body, UI, signage)
+$font-serif: 'Cormorant Garamond', Georgia, serif;
+$font-sans: 'Source Sans 3', -apple-system, 'Segoe UI', sans-serif;
+
+.o_estate_homepage {
+    background-color: $clay-white;
+    color: $kiln-ink;
+    font-family: $font-sans;
+
+    h1, h2, h3, .o_estate_serif {
+        font-family: $font-serif;
+        font-weight: 500;
+    }
+
+    // Hero
+    .o_estate_hero {
+        padding: 90px 0 110px;
+
+        .o_estate_eyebrow {
+            font-size: 11px;
+            letter-spacing: .24em;
+            font-weight: 700;
+            color: $estate-green;
+
+            .rule { width: 34px; height: 2px; background: $matakana-earth; display: inline-block; margin-right: 10px; }
+        }
+
+        h1 { font-size: 52px; line-height: 1.08; margin-bottom: 24px; }
+
+        .lede { font-size: 18px; line-height: 1.55; max-width: 520px; margin-bottom: 30px; }
+
+        .btn-estate-cta {
+            background-color: $matakana-earth;
+            color: $clay-white;
+            font-size: 13px;
+            letter-spacing: .14em;
+            font-weight: 700;
+            padding: 14px 28px;
+            border-radius: 2px;
+            border: none;
+
+            &:hover { background-color: darken($matakana-earth, 8%); color: $clay-white; }
+        }
+    }
+
+    // Story strip
+    .o_estate_story {
+        background-color: $estate-green;
+        color: $clay-white;
+        padding: 80px 0;
+        text-align: center;
+
+        blockquote { font-style: italic; font-size: 30px; max-width: 780px; margin: 0 auto 22px; }
+        p { color: #d9e3dc; max-width: 640px; margin: 0 auto; }
+        .bar { width: 60px; height: 3px; background: $kiln-gold; margin: 0 auto 26px; }
+    }
+
+    // Values
+    .o_estate_value_item {
+        border-top: 1px solid rgba($kiln-ink, .15);
+        padding-top: 22px;
+
+        .n { font-family: $font-serif; font-size: 28px; color: $matakana-earth; }
+    }
+
+    // Way-finding / tenant category tiles — one glaze colour per tile, per manual section 18
+    .o_estate_tile {
+        border-radius: 2px;
+        min-height: 150px;
+        color: $clay-white;
+        padding: 28px 22px;
+
+        span { font-size: 11px; letter-spacing: .16em; font-weight: 700; opacity: .85; }
+        h4 { font-family: $font-serif; font-size: 22px; margin: 0; }
+
+        &.t-events   { background-color: $fired-red; }
+        &.t-markets  { background-color: $orange-glaze; color: $kiln-ink; }
+        &.t-artisans { background-color: $turquoise; }
+        &.t-history  { background-color: $cobalt; }
+        &.t-culture  { background-color: $purple-glaze; }
+        &.t-food     { background-color: $clay-brown; }
+    }
+
+    footer.o_estate_footer {
+        background-color: $kiln-ink;
+        color: $clay-white;
+
+        a { color: #c9cbc2; }
+    }
+
+    .btn-outline-estate {
+        border: 1.5px solid $matakana-earth;
+        color: $matakana-earth;
+        font-size: 12.5px;
+        letter-spacing: .12em;
+        font-weight: 700;
+        padding: 12px 24px;
+        border-radius: 2px;
+        display: inline-block;
+
+        &:hover { background-color: $matakana-earth; color: $clay-white; }
+    }
+
+    .o_estate_eyebrow_gold {
+        font-size: 11px; letter-spacing: .24em; font-weight: 700; color: $kiln-gold;
+    }
+    .o_estate_eyebrow_earth {
+        font-size: 11px; letter-spacing: .24em; font-weight: 700; color: $matakana-earth;
+    }
+}
+
+// OUR STORY — full-bleed section, sits outside .o_estate_homepage's light background
+.o_estate_story_full {
+    background-color: $estate-green;
+    color: $clay-white;
+    padding: 90px 0;
+
+    h2 { font-family: $font-serif; font-size: 34px; margin-bottom: 22px; }
+
+    .o_estate_pullquote {
+        font-family: $font-serif;
+        font-style: italic;
+        font-size: 22px;
+        line-height: 1.5;
+        border-left: 3px solid $kiln-gold;
+        padding-left: 20px;
+        margin-bottom: 20px;
+    }
+
+    p { color: #d9e3dc; line-height: 1.75; }
+
+    .o_estate_story_link {
+        color: $kiln-gold;
+        font-size: 12px;
+        letter-spacing: .12em;
+        font-weight: 700;
+    }
+
+    .o_estate_swatch {
+        border-radius: 2px;
+        min-height: 110px;
+
+        &.s1 { background-color: $matakana-earth; }
+        &.s2 { background-color: $glaze-blue; }
+        &.s3 { background-color: $kiln-gold; }
+        &.s4 { background-color: $aqua-glaze; }
+    }
+}
+
+// VISIT US / MAP
+.o_estate_map_section {
+    .o_estate_map_info {
+        background-color: $clay-white;
+        padding: 56px 48px;
+
+        h2 { font-family: $font-serif; font-size: 28px; color: $estate-green; margin-bottom: 18px; }
+    }
+
+    .o_estate_map_embed {
+        width: 100%;
+        min-height: 420px;
+        border: 0;
+        display: block;
+        filter: grayscale(.15) saturate(.9);
+    }
+}

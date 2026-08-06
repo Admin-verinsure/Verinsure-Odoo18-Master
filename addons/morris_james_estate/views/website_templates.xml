@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Replaces the body of Odoo's default homepage template with the estate design.
+        Each block is wrapped in <div class="oe_structure"> so content editors can still
+        drag/drop snippets on top of it from the Website Builder.
+    -->
+    <template id="estate_homepage" name="Estate Homepage" inherit_id="website.homepage">
+        <xpath expr="//div[@id='wrap']" position="replace">
+            <div id="wrap" class="o_estate_homepage">
+
+                <!-- HERO -->
+                <section class="o_estate_hero container-fluid">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-lg-7">
+                                <div class="oe_structure oe_structure_solo">
+                                    <div class="o_estate_eyebrow mb-3">
+                                        <span class="rule"/>THE ORIGINAL HOME OF MORRIS &amp; JAMES POTTERY
+                                    </div>
+                                    <h1>A creative place<br/>shaped by clay.</h1>
+                                    <p class="lede">
+                                        The original home of Morris &amp; James Pottery — now a
+                                        gathering place for artisans, food, markets and independent
+                                        enterprise in Matakana.
+                                    </p>
+                                    <a href="/visit" class="btn btn-estate-cta">EXPLORE THE ESTATE</a>
+                                    <div class="mt-4 small text-muted">
+                                        EST. 1977 &#183; MADE HERE. MAKING ROOM FOR MORE.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STORY STRIP -->
+                <section class="o_estate_story">
+                    <div class="container oe_structure oe_structure_solo">
+                        <div class="bar"/>
+                        <blockquote>
+                            "The kilns have stopped, but the workshops, courtyards and spirit
+                            of practical creativity remain in use."
+                        </blockquote>
+                        <p>
+                            From 1977, Anthony Morris and Sue James built a large-scale pottery
+                            around Matakana clay, strong forms and exuberant colour. Commercial
+                            production has ended — the buildings, courtyards and kilns now house
+                            artisans, a café, market tenants and independent enterprise under
+                            family stewardship.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- VALUES -->
+                <section class="container py-5 oe_structure oe_structure_solo">
+                    <div class="mb-5" style="max-width:560px;">
+                        <div class="small fw-bold" style="color:#A6543A; letter-spacing:.2em;">
+                            FIVE VALUES, WITH EVIDENCE BEHIND THEM
+                        </div>
+                        <h2>What the estate carries forward</h2>
+                    </div>
+                    <div class="row">
+                        <t t-foreach="[
+                            ('01', 'From this earth', 'Place was raw material, not decoration — provenance, landscape and visible materiality.'),
+                            ('02', 'Make boldly', 'Confident work, strong colour, ambitious scale and enterprises that add originality.'),
+                            ('03', 'Solve by doing', 'Experimentation, adaptation, machinery, repair and practical problem-solving.'),
+                            ('04', 'Keep the human mark', 'Patina, evidence of work, honest materials and tenant individuality.'),
+                            ('05', 'Pass the place forward', 'Keeping the property active, useful and economically viable for another generation.'),
+                        ]" t-as="value">
+                            <div class="col-md-4 col-lg mb-4">
+                                <div class="o_estate_value_item h-100">
+                                    <div class="n" t-esc="value[0]"/>
+                                    <h3 class="h6 fw-bold mt-2" t-esc="value[1]"/>
+                                    <p class="small text-muted" t-esc="value[2]"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </section>
+
+                <!-- OUR STORY -->
+                <section class="o_estate_story_full">
+                    <div class="container oe_structure oe_structure_solo">
+                        <div class="row align-items-center">
+                            <div class="col-lg-6">
+                                <div class="o_estate_eyebrow_gold mb-2">OUR STORY</div>
+                                <h2>From an unusual partnership to an active estate.</h2>
+                                <blockquote class="o_estate_pullquote">
+                                    "The kilns have stopped, but the workshops, courtyards and
+                                    spirit of practical creativity remain in use."
+                                </blockquote>
+                                <p>
+                                    From 1977, Anthony Morris and Sue James built a large-scale
+                                    pottery around Matakana clay, strong forms and exuberant
+                                    colour. It was creative industry: practical, ambitious and
+                                    recognisably New Zealand.
+                                </p>
+                                <p>
+                                    Commercial pottery production has ended and Anthony Morris is
+                                    retired. The buildings, courtyards, kilns and accumulated
+                                    character remain — now home to artisans, a café, market
+                                    tenants and independent enterprise under family stewardship.
+                                </p>
+                                <a href="/story" class="o_estate_story_link">READ THE FULL STORY →</a>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="row g-3">
+                                    <t t-foreach="['s1', 's2', 's3', 's4']" t-as="swatch">
+                                        <div class="col-6">
+                                            <div t-attf-class="o_estate_swatch #{swatch}"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- WAY-FINDING / TENANT CATEGORIES -->
+                <section class="container pb-5 oe_structure oe_structure_solo">
+                    <div class="mb-4">
+                        <div class="small fw-bold" style="color:#A6543A; letter-spacing:.2em;">FIND YOUR WAY</div>
+                        <h2>Life of the estate</h2>
+                    </div>
+                    <div class="row g-3">
+                        <t t-foreach="[
+                            ('t-events', 'EVENTS', 'Gatherings &amp; courtyards'),
+                            ('t-markets', 'MARKETS', 'Weekend market'),
+                            ('t-artisans', 'ARTISANS', 'Workshops &amp; making'),
+                            ('t-history', 'HISTORY', 'Since 1977'),
+                            ('t-culture', 'CULTURE', 'Exhibitions'),
+                            ('t-food', 'FOOD', 'Cafe &amp; bar'),
+                        ]" t-as="tile">
+                            <div class="col-md-4">
+                                <div t-attf-class="o_estate_tile #{tile[0]}">
+                                    <span t-esc="tile[1]"/>
+                                    <h4 t-raw="tile[2]"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </section>
+
+                <!-- VISIT US / MAP -->
+                <section class="o_estate_map_section oe_structure oe_structure_solo">
+                    <div class="row g-0">
+                        <div class="col-lg-5 o_estate_map_info">
+                            <div class="o_estate_eyebrow_earth mb-2">VISIT US</div>
+                            <h2>Find the estate</h2>
+                            <div class="mb-3">
+                                <strong>Address: </strong>
+                                <span>[Street address], Matakana, Rodney, Auckland 0985, New Zealand</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Hours: </strong>
+                                <span>[Estate/café hours to confirm]</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Parking: </strong>
+                                <span>On-site parking available</span>
+                            </div>
+                            <a href="#" class="btn btn-outline-estate">GET DIRECTIONS</a>
+                            <p class="small text-muted mt-3">
+                                Address and hours are placeholders — replace with the estate's
+                                real details before publishing.
+                            </p>
+                        </div>
+                        <div class="col-lg-7">
+                            <iframe class="o_estate_map_embed"
+                                src="https://www.openstreetmap.org/export/embed.html?bbox=174.6934%2C-36.3934%2C174.7454%2C-36.3494&amp;layer=mapnik&amp;marker=-36.3714%2C174.7194"
+                                loading="lazy" title="Map - Matakana, New Zealand"/>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Primary navigation, matching Brand Manual section 19 -->
+    <record id="menu_estate_visit" model="website.menu">
+        <field name="name">VISIT</field>
+        <field name="url">/visit</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">10</field>
+    </record>
+    <record id="menu_estate_eat" model="website.menu">
+        <field name="name">EAT</field>
+        <field name="url">/eat</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">20</field>
+    </record>
+    <record id="menu_estate_make" model="website.menu">
+        <field name="name">MAKE</field>
+        <field name="url">/make</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">30</field>
+    </record>
+    <record id="menu_estate_discover" model="website.menu">
+        <field name="name">DISCOVER</field>
+        <field name="url">/discover</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">40</field>
+    </record>
+    <record id="menu_estate_market" model="website.menu">
+        <field name="name">MARKET</field>
+        <field name="url">/market</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">50</field>
+    </record>
+    <record id="menu_estate_lease" model="website.menu">
+        <field name="name">LEASE</field>
+        <field name="url">/lease</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">60</field>
+    </record>
+    <record id="menu_estate_story" model="website.menu">
+        <field name="name">STORY</field>
+        <field name="url">/story</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">70</field>
+    </record>
+    <record id="menu_estate_contact" model="website.menu">
+        <field name="name">CONTACT</field>
+        <field name="url">/contact</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence">80</field>
+    </record>
+
+</odoo>
