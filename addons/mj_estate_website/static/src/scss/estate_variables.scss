@@ -1,0 +1,57 @@
+// =============================================================
+// Morris & James.Estate — Brand Variables
+// Source: Morris & James.Estate Brand Manual, Revised Concept, Aug 2026
+// §12 Colour · §13 Typography
+// =============================================================
+
+// ---- Core palette (§12) ----
+$mj-matakana-earth:  #A6543A;  // clay / calls to action
+$mj-estate-green:    #1B4D3D;  // stewardship / anchors
+$mj-glaze-blue:       #325F73; // pottery / navigation
+$mj-aqua-glaze:       #4DA7A0; // maker categories
+$mj-kiln-gold:        #C08A2E; // warm highlights
+$mj-clay-white:       #F3F1ED; // primary ground
+$mj-kiln-ink:         #22251F; // text / contrast
+
+// ---- Glaze accents — controlled flashes only (§12) ----
+$mj-fired-red:        #D94C3D; // events
+$mj-orange-glaze:     #F1992E; // markets
+$mj-turquoise:        #3E9C99; // artisans
+$mj-cobalt:           #3E7CB2; // history
+$mj-purple-glaze:     #6E4B8B; // culture
+$mj-clay-brown:       #8C6A38; // food
+
+// ---- Functional aliases ----
+$mj-bg:               $mj-clay-white;
+$mj-text:             $mj-kiln-ink;
+$mj-text-muted:       rgba($mj-kiln-ink, 0.68);
+$mj-border-hairline:  rgba($mj-kiln-ink, 0.14);
+$mj-cta:              $mj-matakana-earth;
+$mj-cta-hover:        darken($mj-matakana-earth, 8%);
+
+// ---- Typography (§13) ----
+$mj-font-heading: "Cormorant Garamond", "Times New Roman", serif;
+$mj-font-body:    "Source Sans 3", "Aptos", -apple-system, "Segoe UI", sans-serif;
+
+// ---- Section rhythm ----
+$mj-section-pad-y:        9rem;
+$mj-section-pad-y-mobile: 4.5rem;
+$mj-container-max:        1360px;
+$mj-gutter:                clamp(1.5rem, 5vw, 5rem);
+
+// ---- Motion ----
+$mj-ease:      cubic-bezier(.22, .61, .36, 1);
+$mj-dur-fast:  .45s;
+$mj-dur-slow:  .9s;
+
+// ---- Glaze category map (used for tenant/section markers, §17) ----
+$mj-glaze-map: (
+  "visit":    $mj-glaze-blue,
+  "eat":      $mj-clay-brown,
+  "make":     $mj-turquoise,
+  "discover": $mj-cobalt,
+  "market":   $mj-orange-glaze,
+  "lease":    $mj-estate-green,
+  "events":   $mj-fired-red,
+  "culture":  $mj-purple-glaze,
+);

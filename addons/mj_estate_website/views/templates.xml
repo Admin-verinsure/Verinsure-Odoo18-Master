@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <template id="estate_homepage" name="Morris &amp; James.Estate — Homepage">
+    <t t-call="website.layout">
+      <t t-set="no_header" t-value="True"/>
+      <t t-set="no_footer" t-value="True"/>
+      <t t-set="pageName" t-value="'estate_homepage'"/>
+      <t t-set="additional_title">Morris &amp; James.Estate — Matakana</t>
+
+      <div id="wrap" class="mj-estate">
+
+        <!-- =========================================================
+             1. HEADER — transparent, sticky on scroll
+        ========================================================== -->
+        <header class="mj-header" data-mj="header">
+          <div class="mj-header__inner mj-container">
+            <a href="/estate" class="mj-header__brand">
+              <img src="/mj_estate_website/static/src/img/estate/logo.jpg"
+                   alt="Morris &amp; James.Estate art mark" class="mj-header__mark"/>
+              <span class="mj-header__wordmark">
+                <span class="mj-header__name">Morris &amp; James<span class="mj-header__dot">.</span>Estate</span>
+                <span class="mj-header__location">Estate &#8226; Matakana</span>
+              </span>
+            </a>
+
+            <nav class="mj-header__nav" aria-label="Primary">
+              <a href="/estate/visit">Visit</a>
+              <a href="/estate/eat">Eat</a>
+              <a href="/estate/make">Make</a>
+              <a href="/estate/discover">Discover</a>
+              <a href="/estate/market">Market</a>
+              <a href="/estate/lease">Lease</a>
+              <a href="#story">Story</a>
+              <a href="/estate/contact">Contact</a>
+            </nav>
+
+            <a href="#explore" class="mj-btn mj-btn--cta mj-header__cta">Explore the Estate</a>
+
+            <button type="button" class="mj-header__burger" data-mj="menu-toggle" aria-label="Open menu" aria-expanded="false">
+              <span/><span/><span/>
+            </button>
+          </div>
+
+          <nav class="mj-header__mobile" data-mj="mobile-menu" aria-label="Mobile">
+            <a href="/estate/visit">Visit</a>
+            <a href="/estate/eat">Eat</a>
+            <a href="/estate/make">Make</a>
+            <a href="/estate/discover">Discover</a>
+            <a href="/estate/market">Market</a>
+            <a href="/estate/lease">Lease</a>
+            <a href="#story">Story</a>
+            <a href="/estate/contact">Contact</a>
+            <a href="#explore" class="mj-btn mj-btn--cta">Explore the Estate</a>
+          </nav>
+        </header>
+
+        <!-- =========================================================
+             2. HERO — 100vh split
+        ========================================================== -->
+        <section class="mj-hero" id="explore" data-mj="parallax-section">
+          <div class="mj-hero__grid mj-container">
+            <div class="mj-hero__copy" data-mj="fade-up">
+              <p class="mj-eyebrow">Est. 1977 &#8226; Matakana</p>
+              <h1 class="mj-hero__title">Made here.<br/>Making room for more.</h1>
+              <p class="mj-hero__sub">
+                A creative place shaped by clay. The original home of Morris &amp;
+                James Pottery — now a gathering place for artisans, food, markets
+                and independent enterprise in Matakana.
+              </p>
+              <div class="mj-hero__actions">
+                <a href="/estate/visit" class="mj-btn mj-btn--cta">Explore the Estate</a>
+                <button type="button" class="mj-btn mj-btn--ghost" data-mj="scroll-to" data-target="#story">
+                  <span class="mj-play">&#9654;</span> Watch Our Story
+                </button>
+              </div>
+            </div>
+
+            <div class="mj-hero__visual" data-mj="fade-up" data-mj-delay="150">
+              <div class="mj-hero__frame">
+                <img src="/mj_estate_website/static/src/img/estate/hero-estate.jpg"
+                     alt="The Morris &amp; James.Estate buildings and kilns, Matakana" class="mj-hero__img" data-mj="parallax-img"/>
+                <div class="mj-hero__clay-overlay"/>
+              </div>
+              <img src="/mj_estate_website/static/src/img/estate/logo.jpg"
+                   alt="" aria-hidden="true" class="mj-hero__plate" data-mj="float"/>
+            </div>
+          </div>
+          <button type="button" class="mj-hero__scrollcue" data-mj="scroll-to" data-target="#story" aria-label="Scroll to story">
+            <span/>
+          </button>
+        </section>
+
+        <!-- =========================================================
+             3. BRAND STORY
+        ========================================================== -->
+        <section class="mj-story" id="story">
+          <div class="mj-container mj-story__grid">
+            <div class="mj-story__media" data-mj="fade-up">
+              <img src="/mj_estate_website/static/src/img/estate/brand-story.jpg"
+                   alt="Matakana clay and workshop materials at the estate"/>
+            </div>
+            <div class="mj-story__copy" data-mj="fade-up" data-mj-delay="120">
+              <p class="mj-eyebrow">The Story</p>
+              <h2 class="mj-h2">The pottery has closed.<br/>The making place continues.</h2>
+              <p class="mj-story__lead">
+                From 1977, Anthony Morris and Sue James built a large-scale pottery
+                around Matakana clay, strong forms and exuberant colour — practical,
+                ambitious and recognisably New Zealand.
+              </p>
+              <div class="mj-story__more" data-mj="expand-panel">
+                <p>
+                  Commercial pottery production has ended and Anthony Morris is
+                  retired. The buildings, courtyards, kilns and accumulated
+                  character remain. They now house artisans, a café, market
+                  tenants and independent enterprise under family stewardship.
+                </p>
+                <p>
+                  The kilns have stopped, but the workshops, courtyards and
+                  spirit of practical creativity remain in use.
+                </p>
+              </div>
+              <button type="button" class="mj-link-btn" data-mj="expand-trigger" aria-expanded="false">
+                <span data-mj="expand-label">Read Story</span>
+                <span class="mj-link-btn__arrow">&#8594;</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             4. HERITAGE TIMELINE
+        ========================================================== -->
+        <section class="mj-timeline">
+          <div class="mj-container">
+            <p class="mj-eyebrow mj-eyebrow--center">Heritage Timeline</p>
+            <h2 class="mj-h2 mj-h2--center">From Matakana earth to an active estate</h2>
+
+            <ol class="mj-timeline__rail">
+              <li data-mj="fade-up">
+                <span class="mj-timeline__year">1977</span>
+                <span class="mj-timeline__label">Pottery</span>
+                <p>Anthony Morris and Sue James found Morris &amp; James around
+                  Matakana clay, strong forms and exuberant colour.</p>
+              </li>
+              <li data-mj="fade-up" data-mj-delay="100">
+                <span class="mj-timeline__year">&#8595;</span>
+                <span class="mj-timeline__label">Creative Industry</span>
+                <p>Large-scale production grows into a recognisably New
+                  Zealand creative industry — practical and ambitious.</p>
+              </li>
+              <li data-mj="fade-up" data-mj-delay="200">
+                <span class="mj-timeline__year">&#8595;</span>
+                <span class="mj-timeline__label">Community</span>
+                <p>Buildings, courtyards and kilns accumulate character and
+                  begin to host more than the pottery alone.</p>
+              </li>
+              <li data-mj="fade-up" data-mj-delay="300">
+                <span class="mj-timeline__year">Today</span>
+                <span class="mj-timeline__label">Creative Estate</span>
+                <p>Commercial pottery has ended. Artisans, a café, market
+                  tenants and independent enterprise carry the place forward.</p>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             5. ESTATE EXPERIENCES
+        ========================================================== -->
+        <section class="mj-experiences">
+          <div class="mj-container">
+            <p class="mj-eyebrow mj-eyebrow--center">Estate Experiences</p>
+            <h2 class="mj-h2 mj-h2--center">Six reasons to spend a day here</h2>
+          </div>
+
+          <div class="mj-experiences__grid">
+            <t t-foreach="[
+              {'key':'visit','title':'Visit','img':'experience-visit.jpg','desc':'Walk the courtyards, kilns and workshop buildings that made this place — now open for a different kind of day out.','href':'/estate/visit'},
+              {'key':'eat','title':'Eat','img':'experience-eat.jpg','desc':'A café built into the working buildings, serving food shaped by the same practical, generous character as the estate.','href':'/estate/eat'},
+              {'key':'make','title':'Make','img':'experience-make.jpg','desc':'Working artisans and workshop space carry the making tradition forward, in clay and beyond.','href':'/estate/make'},
+              {'key':'discover','title':'Discover','img':'experience-discover.jpg','desc':'Dated images, factual captions and surviving pottery tell the history of the site accurately, on site.','href':'/estate/discover'},
+              {'key':'market','title':'Market','img':'experience-market.jpg','desc':'Seasonal markets bring stallholders and visitors into the courtyards the pottery once filled.','href':'/estate/market'},
+              {'key':'lease','title':'Lease','img':'experience-lease.jpg','desc':'Character space in the former pottery buildings, for independent enterprise that respects the site.','href':'/estate/lease'},
+            ]" t-as="exp">
+              <a t-att-href="exp['href']" t-attf-class="mj-exp-card mj-exp-card--#{exp['key']}" data-mj="fade-up">
+                <div class="mj-exp-card__img">
+                  <img t-attf-src="/mj_estate_website/static/src/img/estate/#{exp['img']}" t-attf-alt="#{exp['title']} at Morris &amp; James.Estate"/>
+                </div>
+                <div class="mj-exp-card__body">
+                  <span class="mj-exp-card__num" t-esc="'0' + str(exp_index + 1)"/>
+                  <h3 t-esc="exp['title']"/>
+                  <p t-esc="exp['desc']"/>
+                  <span class="mj-link-btn">Explore <span class="mj-link-btn__arrow">&#8594;</span></span>
+                </div>
+              </a>
+            </t>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             6. ESTATE HIGHLIGHTS
+        ========================================================== -->
+        <section class="mj-highlights">
+          <div class="mj-container">
+            <p class="mj-eyebrow mj-eyebrow--center">Estate Highlights</p>
+            <h2 class="mj-h2 mj-h2--center">What's on site</h2>
+
+            <div class="mj-highlights__grid">
+              <t t-foreach="[
+                {'title':'Café','img':'highlight-cafe.jpg','note':'Open daily, in the former pottery buildings.'},
+                {'title':'Workshop','img':'highlight-workshop.jpg','note':'Working artisan studios, active most days.'},
+                {'title':'Gallery','img':'highlight-gallery.jpg','note':'Surviving pottery and estate history on display.'},
+                {'title':'Courtyard','img':'highlight-courtyard.jpg','note':'The original working courtyards, now for gathering.'},
+                {'title':'Markets','img':'highlight-markets.jpg','note':'Seasonal stallholders across the estate grounds.'},
+                {'title':'Parking','img':'highlight-parking.jpg','note':'On-site parking, a short walk from central Matakana.'},
+              ]" t-as="hl">
+                <div class="mj-highlight-tile" data-mj="fade-up">
+                  <img t-attf-src="/mj_estate_website/static/src/img/estate/#{hl['img']}" t-attf-alt="#{hl['title']} at Morris &amp; James.Estate"/>
+                  <div class="mj-highlight-tile__caption">
+                    <h4 t-esc="hl['title']"/>
+                    <p t-esc="hl['note']"/>
+                  </div>
+                </div>
+              </t>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             7. BRAND VALUES
+        ========================================================== -->
+        <section class="mj-values">
+          <t t-foreach="[
+            {'num':'01','title':'From this Earth','body':'Place was raw material, not decoration. We favour provenance, landscape, local relationships and visible materiality.'},
+            {'num':'02','title':'Make Boldly','body':'We support confident work, strong colour, ambitious scale and enterprises that add originality rather than anonymity.'},
+            {'num':'03','title':'Solve by Doing','body':'We value experimentation, adaptation, machinery, repair, collaboration and practical problem-solving.'},
+            {'num':'04','title':'Keep the Human Mark','body':'We retain patina, evidence of work, honest materials, judgement and tenant individuality.'},
+            {'num':'05','title':'Pass the Place Forward','body':'We conserve significance by keeping the property active, useful and economically viable for another generation.'},
+          ]" t-as="val">
+            <div t-attf-class="mj-value-panel mj-value-panel--#{val['num']}" data-mj="fade-up">
+              <div class="mj-container mj-value-panel__inner">
+                <span class="mj-value-panel__num" t-esc="val['num']"/>
+                <h3 class="mj-value-panel__title" t-esc="val['title']"/>
+                <p class="mj-value-panel__body" t-esc="val['body']"/>
+              </div>
+            </div>
+          </t>
+        </section>
+
+        <!-- =========================================================
+             8. FEATURED ESTATE GALLERY — editorial masonry
+        ========================================================== -->
+        <section class="mj-gallery">
+          <div class="mj-container">
+            <p class="mj-eyebrow mj-eyebrow--center">Featured Estate Gallery</p>
+            <h2 class="mj-h2 mj-h2--center">Clay, buildings and the people who use them</h2>
+          </div>
+
+          <div class="mj-container mj-gallery__masonry">
+            <t t-foreach="[
+              {'img':'gallery-01.jpg','cap':'Clay'},
+              {'img':'gallery-02.jpg','cap':'Buildings'},
+              {'img':'gallery-03.jpg','cap':'Workshops'},
+              {'img':'gallery-04.jpg','cap':'Caf&#233;'},
+              {'img':'gallery-05.jpg','cap':'Markets'},
+              {'img':'gallery-06.jpg','cap':'Artisans'},
+              {'img':'gallery-07.jpg','cap':'Courtyards'},
+              {'img':'gallery-08.jpg','cap':'Visitors'},
+            ]" t-as="g">
+              <figure class="mj-gallery__item" data-mj="fade-up">
+                <img t-attf-src="/mj_estate_website/static/src/img/estate/#{g['img']}" t-attf-alt="#{g['cap']} at Morris &amp; James.Estate"/>
+                <figcaption t-raw="g['cap']"/>
+              </figure>
+            </t>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             9. UPCOMING EVENTS
+        ========================================================== -->
+        <section class="mj-events">
+          <div class="mj-container">
+            <div class="mj-events__head">
+              <div>
+                <p class="mj-eyebrow">Upcoming Events</p>
+                <h2 class="mj-h2">Markets, workshops and community</h2>
+              </div>
+              <a href="/estate/discover" class="mj-link-btn">All events <span class="mj-link-btn__arrow">&#8594;</span></a>
+            </div>
+
+            <div class="mj-events__grid">
+              <t t-foreach="[
+                {'img':'event-01.jpg','date':'Sat 6 Sep','tag':'Market','title':'Seasonal Estate Market','desc':'Stallholders across the courtyards — food, craft and produce from around Matakana.'},
+                {'img':'event-02.jpg','date':'Sat 20 Sep','tag':'Workshop','title':'Clay Workshop','desc':'A hands-on session in the working studios, led by an estate artisan.'},
+                {'img':'event-03.jpg','date':'Sun 5 Oct','tag':'Community','title':'Community Open Day','desc':'Estate history, tenant open studios and a look inside the original kilns.'},
+              ]" t-as="ev">
+                <article class="mj-event-card" data-mj="fade-up">
+                  <div class="mj-event-card__img">
+                    <img t-attf-src="/mj_estate_website/static/src/img/estate/#{ev['img']}" t-attf-alt="#{ev['title']}"/>
+                    <span class="mj-event-card__tag" t-esc="ev['tag']"/>
+                  </div>
+                  <div class="mj-event-card__body">
+                    <span class="mj-event-card__date" t-esc="ev['date']"/>
+                    <h3 t-esc="ev['title']"/>
+                    <p t-esc="ev['desc']"/>
+                  </div>
+                </article>
+              </t>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             10. FINAL CTA
+        ========================================================== -->
+        <section class="mj-final-cta" data-mj="parallax-section">
+          <img src="/mj_estate_website/static/src/img/estate/final-cta-bg.jpg"
+               alt="" aria-hidden="true" class="mj-final-cta__bg" data-mj="parallax-img"/>
+          <div class="mj-final-cta__scrim"/>
+          <div class="mj-container mj-final-cta__content" data-mj="fade-up">
+            <h2 class="mj-final-cta__title">Made here.<br/>Making room for more.</h2>
+            <a href="/estate/visit" class="mj-btn mj-btn--cta mj-btn--lg">Explore the Estate</a>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             11. FOOTER
+        ========================================================== -->
+        <footer class="mj-footer">
+          <div class="mj-container mj-footer__grid">
+            <div class="mj-footer__brand">
+              <img src="/mj_estate_website/static/src/img/estate/logo.jpg"
+                   alt="Morris &amp; James.Estate art mark" class="mj-footer__mark"/>
+              <p class="mj-footer__name">Morris &amp; James<span class="mj-header__dot">.</span>Estate</p>
+              <p class="mj-footer__desc">The original home of Morris &amp; James Pottery, Est.
+                1977 — now an active estate for artisans, hospitality, markets
+                and independent enterprise in Matakana.</p>
+              <div class="mj-footer__social">
+                <a href="#" aria-label="Instagram">IG</a>
+                <a href="#" aria-label="Facebook">FB</a>
+              </div>
+            </div>
+
+            <div class="mj-footer__nav">
+              <h5>Estate</h5>
+              <a href="/estate/visit">Visit</a>
+              <a href="/estate/eat">Eat</a>
+              <a href="/estate/make">Make</a>
+              <a href="/estate/discover">Discover</a>
+              <a href="/estate/market">Market</a>
+              <a href="/estate/lease">Lease</a>
+              <a href="#story">Story</a>
+              <a href="/estate/contact">Contact</a>
+            </div>
+
+            <div class="mj-footer__address">
+              <h5>Visit</h5>
+              <address>
+                Morris &amp; James.Estate<br/>
+                Matakana, New Zealand
+              </address>
+              <p class="mj-footer__mgmt">Morris &amp; James Cafe Bar Limited</p>
+            </div>
+
+            <div class="mj-footer__news">
+              <h5>Stay Connected</h5>
+              <p>Estate news, market dates and workshop openings.</p>
+              <form class="mj-newsletter" data-mj="newsletter" onsubmit="return false;">
+                <input type="email" required="required" placeholder="Email address" aria-label="Email address"/>
+                <button type="submit" class="mj-btn mj-btn--cta">Sign Up</button>
+              </form>
+              <p class="mj-newsletter__note" data-mj="newsletter-note"/>
+            </div>
+          </div>
+
+          <div class="mj-container mj-footer__bottom">
+            <p>&#169; <span t-esc="current_year"/> Morris &amp; James.Estate. Owner: The Morris Waka Trust No. 1.</p>
+            <p class="mj-footer__heritage">The original home of Morris &amp; James Pottery</p>
+          </div>
+        </footer>
+
+      </div>
+    </t>
+  </template>
+
+</odoo>
