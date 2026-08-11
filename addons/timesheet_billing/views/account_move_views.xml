@@ -24,7 +24,7 @@
         <field name="model">account.move</field>
         <field name="priority" eval="100"/>
         <field name="arch" type="xml">
-            <list string="Timesheet Billing Invoices">
+            <tree string="Timesheet Billing Invoices">
                 <field name="name"/>
                 <field name="invoice_date"/>
                 <field name="partner_id"/>
@@ -34,7 +34,7 @@
                 <field name="amount_total" sum="Total"/>
                 <field name="state" widget="badge"/>
                 <field name="payment_state" widget="badge" optional="show"/>
-            </list>
+            </tree>
         </field>
     </record>
 

@@ -18,7 +18,7 @@
         <field name="model">account.analytic.line</field>
         <field name="priority" eval="100"/>
         <field name="arch" type="xml">
-            <list string="Billable Timesheets" decoration-muted="billing_status == 'invoiced'"
+            <tree string="Billable Timesheets" decoration-muted="billing_status == 'invoiced'"
                   decoration-success="approved and billing_status != 'invoiced'">
                 <field name="date"/>
                 <field name="employee_id"/>
@@ -38,7 +38,7 @@
                 <button name="action_approve_timesheets" type="object" string="Approve"
                         icon="fa-check" invisible="approved"
                         groups="timesheet_billing.group_timesheet_manager"/>
-            </list>
+            </tree>
         </field>
     </record>
 
