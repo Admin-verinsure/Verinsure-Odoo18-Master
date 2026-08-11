@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_timesheet_billing_root"
+              name="Billing"
+              parent="project.menu_main_pm"
+              sequence="60"
+              groups="timesheet_billing.group_timesheet_user"/>
+
+    <menuitem id="menu_timesheet_billing_generate_invoice"
+              name="Generate Invoice"
+              parent="menu_timesheet_billing_root"
+              action="timesheet_billing.action_timesheet_billing_invoice_wizard"
+              sequence="10"
+              groups="timesheet_billing.group_billing_manager"/>
+
+    <menuitem id="menu_timesheet_billing_lines"
+              name="Billable Timesheets"
+              parent="menu_timesheet_billing_root"
+              action="timesheet_billing.action_timesheet_billing_lines"
+              sequence="15"
+              groups="timesheet_billing.group_timesheet_user"/>
+
+    <menuitem id="menu_timesheet_billing_invoice_history"
+              name="Invoice History"
+              parent="menu_timesheet_billing_root"
+              action="timesheet_billing.action_timesheet_billing_invoice_history"
+              sequence="20"
+              groups="timesheet_billing.group_timesheet_manager"/>
+
+    <menuitem id="menu_timesheet_billing_dashboard"
+              name="Billing Dashboard"
+              parent="menu_timesheet_billing_root"
+              action="timesheet_billing.action_timesheet_billing_dashboard"
+              sequence="30"
+              groups="timesheet_billing.group_timesheet_manager"/>
+</odoo>

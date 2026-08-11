@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_task_form_timesheet_billing" model="ir.ui.view">
+        <field name="name">project.task.form.timesheet.billing</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Billing" name="timesheet_billing">
+                    <group>
+                        <group>
+                            <field name="billable"/>
+                            <field name="hourly_rate"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="estimated_hours" widget="float_time"/>
+                            <field name="actual_hours" widget="float_time" readonly="1"/>
+                            <field name="remaining_hours" widget="float_time" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_task_tree_timesheet_billing" model="ir.ui.view">
+        <field name="name">project.task.list.timesheet.billing</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="billable" optional="hide"/>
+                <field name="remaining_hours" widget="float_time" optional="hide"/>
+            </field>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_timesheet_billing_invoice_wizard_billing_manager,timesheet.billing.invoice.wizard billing manager,model_timesheet_billing_invoice_wizard,group_billing_manager,1,1,1,1
+access_timesheet_billing_invoice_wizard_timesheet_manager,timesheet.billing.invoice.wizard timesheet manager read,model_timesheet_billing_invoice_wizard,group_timesheet_manager,1,0,0,0
