@@ -3,6 +3,7 @@
     <record id="view_timesheet_billing_invoice_wizard_form" model="ir.ui.view">
         <field name="name">timesheet.billing.invoice.wizard.form</field>
         <field name="model">timesheet.billing.invoice.wizard</field>
+        <field name="type">form</field>
         <field name="arch" type="xml">
             <form string="Generate Timesheet Invoice">
                 <group>
