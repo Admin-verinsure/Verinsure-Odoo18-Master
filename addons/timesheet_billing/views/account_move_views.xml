@@ -22,10 +22,10 @@
     <record id="view_timesheet_billing_invoice_history_list" model="ir.ui.view">
         <field name="name">account.move.list.timesheet.billing.history</field>
         <field name="model">account.move</field>
-        <field name="type">tree</field>
+        <field name="type">list</field>
         <field name="priority" eval="100"/>
         <field name="arch" type="xml">
-            <tree string="Timesheet Billing Invoices">
+            <list string="Timesheet Billing Invoices">
                 <field name="name"/>
                 <field name="invoice_date"/>
                 <field name="partner_id"/>
@@ -35,7 +35,7 @@
                 <field name="amount_total" sum="Total"/>
                 <field name="state" widget="badge"/>
                 <field name="payment_state" widget="badge" optional="show"/>
-            </tree>
+            </list>
         </field>
     </record>
 
