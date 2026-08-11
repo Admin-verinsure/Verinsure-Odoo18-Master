@@ -3,6 +3,7 @@
     <record id="view_timesheet_billing_dashboard_pivot" model="ir.ui.view">
         <field name="name">account.analytic.line.pivot.timesheet.billing.dashboard</field>
         <field name="model">account.analytic.line</field>
+        <field name="type">pivot</field>
         <field name="arch" type="xml">
             <pivot string="Billing Dashboard">
                 <field name="project_id" type="row"/>
@@ -16,6 +17,7 @@
     <record id="view_timesheet_billing_dashboard_graph" model="ir.ui.view">
         <field name="name">account.analytic.line.graph.timesheet.billing.dashboard</field>
         <field name="model">account.analytic.line</field>
+        <field name="type">graph</field>
         <field name="arch" type="xml">
             <graph string="Billing Dashboard" type="bar" stacked="True">
                 <field name="project_id"/>
@@ -28,6 +30,7 @@
     <record id="view_timesheet_billing_dashboard_search" model="ir.ui.view">
         <field name="name">account.analytic.line.search.timesheet.billing.dashboard</field>
         <field name="model">account.analytic.line</field>
+        <field name="type">search</field>
         <field name="arch" type="xml">
             <search string="Billing Dashboard">
                 <field name="project_id"/>

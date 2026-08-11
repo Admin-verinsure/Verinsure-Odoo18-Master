@@ -16,6 +16,7 @@
     <record id="view_timesheet_billing_line_list" model="ir.ui.view">
         <field name="name">account.analytic.line.list.timesheet.billing.standalone</field>
         <field name="model">account.analytic.line</field>
+        <field name="type">tree</field>
         <field name="priority" eval="100"/>
         <field name="arch" type="xml">
             <tree string="Billable Timesheets" decoration-muted="billing_status == 'invoiced'"
@@ -45,6 +46,7 @@
     <record id="view_timesheet_billing_line_search" model="ir.ui.view">
         <field name="name">account.analytic.line.search.timesheet.billing</field>
         <field name="model">account.analytic.line</field>
+        <field name="type">search</field>
         <field name="arch" type="xml">
             <search string="Billable Timesheets">
                 <field name="employee_id"/>

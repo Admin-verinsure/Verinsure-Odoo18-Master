@@ -22,6 +22,7 @@
     <record id="view_timesheet_billing_invoice_history_list" model="ir.ui.view">
         <field name="name">account.move.list.timesheet.billing.history</field>
         <field name="model">account.move</field>
+        <field name="type">tree</field>
         <field name="priority" eval="100"/>
         <field name="arch" type="xml">
             <tree string="Timesheet Billing Invoices">
