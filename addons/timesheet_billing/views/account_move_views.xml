@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_timesheet_billing" model="ir.ui.view">
+        <field name="name">account.move.form.timesheet.billing</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button name="action_view_billed_timesheets" type="object"
+                        class="oe_stat_button" icon="fa-clock-o"
+                        invisible="timesheet_count == 0">
+                    <field name="timesheet_count" widget="statinfo" string="Timesheets"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Own dedicated list view for the Invoice History menu, rather
+         than inheriting core account.move views whose exact ids can
+         differ across Community builds - avoids any risk of aborting
+         module install over a missing inherit_id. -->
+    <record id="view_timesheet_billing_invoice_history_list" model="ir.ui.view">
+        <field name="name">account.move.list.timesheet.billing.history</field>
+        <field name="model">account.move</field>
+        <field name="priority" eval="100"/>
+        <field name="arch" type="xml">
+            <list string="Timesheet Billing Invoices">
+                <field name="name"/>
+                <field name="invoice_date"/>
+                <field name="partner_id"/>
+                <field name="timesheet_billing_project_id"/>
+                <field name="timesheet_billing_sale_order_id"/>
+                <field name="timesheet_count"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="state" widget="badge"/>
+                <field name="payment_state" widget="badge" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_timesheet_billing_invoice_history" model="ir.actions.act_window">
+        <field name="name">Invoice History</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('timesheet_billing_project_id', '!=', False)]</field>
+        <field name="context">{'default_move_type': 'out_invoice'}</field>
+    </record>
+    <record id="action_timesheet_billing_invoice_history_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_timesheet_billing_invoice_history_list"/>
+        <field name="act_window_id" ref="action_timesheet_billing_invoice_history"/>
+    </record>
+</odoo>

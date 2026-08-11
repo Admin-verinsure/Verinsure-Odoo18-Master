@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="demo_service_product" model="product.product">
+        <field name="name">Consulting Services (Timesheet Billing Demo)</field>
+        <field name="type">service</field>
+        <field name="invoice_policy">order</field>
+        <field name="list_price">120.0</field>
+        <field name="timesheet_hourly_rate">120.0</field>
+    </record>
+
+    <record id="demo_sale_order" model="sale.order">
+        <field name="partner_id" ref="base.res_partner_2"/>
+        <field name="order_line" eval="[(0, 0, {
+            'product_id': ref('demo_service_product'),
+            'product_uom_qty': 40,
+            'price_unit': 120.0,
+        })]"/>
+    </record>
+
+    <record id="demo_project" model="project.project">
+        <field name="name">Timesheet Billing Demo Project</field>
+        <field name="partner_id" ref="base.res_partner_2"/>
+        <field name="sale_order_id" ref="demo_sale_order"/>
+        <field name="service_product_id" ref="demo_service_product"/>
+        <field name="billing_type">hourly</field>
+        <field name="hourly_rate">120.0</field>
+        <field name="allow_timesheets">True</field>
+    </record>
+
+    <record id="demo_task_frontend" model="project.task">
+        <field name="name">Frontend Development</field>
+        <field name="project_id" ref="demo_project"/>
+        <field name="billable">True</field>
+        <field name="estimated_hours">20.0</field>
+    </record>
+
+    <record id="demo_task_backend" model="project.task">
+        <field name="name">Backend Development</field>
+        <field name="project_id" ref="demo_project"/>
+        <field name="billable">True</field>
+        <field name="estimated_hours">20.0</field>
+    </record>
+
+    <record id="demo_timesheet_approved_1" model="account.analytic.line">
+        <field name="name">Implemented dashboard widgets</field>
+        <field name="project_id" ref="demo_project"/>
+        <field name="task_id" ref="demo_task_frontend"/>
+        <field name="employee_id" ref="hr.employee_admin"/>
+        <field name="date" eval="(DateTime.today() - timedelta(days=3)).strftime('%Y-%m-%d')"/>
+        <field name="unit_amount">6.0</field>
+        <field name="approved">True</field>
+        <field name="approved_by" ref="base.user_admin"/>
+        <field name="approved_date" eval="DateTime.now()"/>
+    </record>
+
+    <record id="demo_timesheet_approved_2" model="account.analytic.line">
+        <field name="name">API integration work</field>
+        <field name="project_id" ref="demo_project"/>
+        <field name="task_id" ref="demo_task_backend"/>
+        <field name="employee_id" ref="hr.employee_admin"/>
+        <field name="date" eval="(DateTime.today() - timedelta(days=2)).strftime('%Y-%m-%d')"/>
+        <field name="unit_amount">8.0</field>
+        <field name="approved">True</field>
+        <field name="approved_by" ref="base.user_admin"/>
+        <field name="approved_date" eval="DateTime.now()"/>
+    </record>
+
+    <record id="demo_timesheet_pending_1" model="account.analytic.line">
+        <field name="name">Bug fixes and code review</field>
+        <field name="project_id" ref="demo_project"/>
+        <field name="task_id" ref="demo_task_frontend"/>
+        <field name="employee_id" ref="hr.employee_admin"/>
+        <field name="date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
+        <field name="unit_amount">3.5</field>
+        <field name="approved">False</field>
+    </record>
+</odoo>

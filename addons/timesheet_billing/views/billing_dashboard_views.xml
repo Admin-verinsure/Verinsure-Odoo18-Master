@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_timesheet_billing_dashboard_pivot" model="ir.ui.view">
+        <field name="name">account.analytic.line.pivot.timesheet.billing.dashboard</field>
+        <field name="model">account.analytic.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Billing Dashboard">
+                <field name="project_id" type="row"/>
+                <field name="billing_status" type="col"/>
+                <field name="unit_amount" type="measure" widget="float_time"/>
+                <field name="bill_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_timesheet_billing_dashboard_graph" model="ir.ui.view">
+        <field name="name">account.analytic.line.graph.timesheet.billing.dashboard</field>
+        <field name="model">account.analytic.line</field>
+        <field name="arch" type="xml">
+            <graph string="Billing Dashboard" type="bar" stacked="True">
+                <field name="project_id"/>
+                <field name="billing_status"/>
+                <field name="bill_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_timesheet_billing_dashboard_search" model="ir.ui.view">
+        <field name="name">account.analytic.line.search.timesheet.billing.dashboard</field>
+        <field name="model">account.analytic.line</field>
+        <field name="arch" type="xml">
+            <search string="Billing Dashboard">
+                <field name="project_id"/>
+                <field name="project_id" string="Customer" filter_domain="[('project_id.customer_id', 'ilike', self)]"/>
+                <field name="employee_id"/>
+                <filter string="Billable" name="filter_billable" domain="[('billable', '=', True)]"/>
+                <filter string="Non-Billable" name="filter_non_billable" domain="[('billable', '=', False)]"/>
+                <filter string="Approved" name="filter_approved" domain="[('approved', '=', True)]"/>
+                <filter string="Pending Approval" name="filter_pending" domain="[('approved', '=', False)]"/>
+                <separator/>
+                <filter string="To Invoice" name="filter_to_invoice"
+                        domain="[('billing_status', 'in', ('to_invoice', 'partially_invoiced'))]"/>
+                <filter string="Invoiced" name="filter_invoiced" domain="[('billing_status', '=', 'invoiced')]"/>
+                <separator/>
+                <filter string="Project" name="group_project" context="{'group_by': 'project_id'}"/>
+                <filter string="Customer" name="group_customer" context="{'group_by': 'project_id'}"/>
+                <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                <filter string="Billing Status" name="group_status" context="{'group_by': 'billing_status'}"/>
+                <filter string="Date: Week" name="group_week" context="{'group_by': 'date:week'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_timesheet_billing_dashboard" model="ir.actions.act_window">
+        <field name="name">Billing Dashboard</field>
+        <field name="res_model">account.analytic.line</field>
+        <field name="view_mode">pivot,graph</field>
+        <field name="domain">[('billable', '=', True)]</field>
+        <field name="context">{'search_default_filter_billable': 1}</field>
+        <field name="search_view_id" ref="view_timesheet_billing_dashboard_search"/>
+    </record>
+    <record id="action_timesheet_billing_dashboard_view_pivot" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">pivot</field>
+        <field name="view_id" ref="view_timesheet_billing_dashboard_pivot"/>
+        <field name="act_window_id" ref="action_timesheet_billing_dashboard"/>
+    </record>
+    <record id="action_timesheet_billing_dashboard_view_graph" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">graph</field>
+        <field name="view_id" ref="view_timesheet_billing_dashboard_graph"/>
+        <field name="act_window_id" ref="action_timesheet_billing_dashboard"/>
+    </record>
+</odoo>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_project_form_timesheet_billing" model="ir.ui.view">
+        <field name="name">project.project.form.timesheet.billing</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button name="action_view_timesheet_billing_invoices" type="object"
+                        class="oe_stat_button" icon="fa-pencil-square-o"
+                        invisible="not sale_order_id">
+                    <field name="invoice_count" widget="statinfo" string="Invoices"/>
+                </button>
+                <button name="action_view_timesheet_billing_timesheets" type="object"
+                        class="oe_stat_button" icon="fa-clock-o">
+                    <div class="o_stat_info">
+                        <field name="billable_hours" widget="float_time"/>
+                        <span class="o_stat_text">Billable Hours</span>
+                    </div>
+                </button>
+                <button name="action_view_timesheet_billing_sale_order" type="object"
+                        class="oe_stat_button" icon="fa-file-text-o"
+                        invisible="not sale_order_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Sales Order</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//sheet" position="inside">
+                <group string="Timesheet Billing" name="timesheet_billing">
+                    <group>
+                        <field name="billing_type"/>
+                        <field name="sale_order_id"/>
+                        <field name="service_product_id"/>
+                        <field name="hourly_rate"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group>
+                        <field name="billable_hours" widget="float_time" readonly="1"/>
+                        <field name="invoiced_hours" widget="float_time" readonly="1"/>
+                        <field name="remaining_hours" widget="float_time" readonly="1"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_project_list_timesheet_billing" model="ir.ui.view">
+        <field name="name">project.project.list.timesheet.billing</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project"/>
+        <field name="arch" type="xml">
+            <field name="user_id" position="after">
+                <field name="billing_type" optional="show"/>
+                <field name="remaining_hours" widget="float_time" optional="hide"/>
+            </field>
+        </field>
+    </record>
+</odoo>

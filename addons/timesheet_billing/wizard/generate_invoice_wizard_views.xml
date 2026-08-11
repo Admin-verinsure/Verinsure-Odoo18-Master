@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_timesheet_billing_invoice_wizard_form" model="ir.ui.view">
+        <field name="name">timesheet.billing.invoice.wizard.form</field>
+        <field name="model">timesheet.billing.invoice.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Timesheet Invoice">
+                <group>
+                    <group>
+                        <field name="partner_id"/>
+                        <field name="project_id"/>
+                        <field name="sale_order_id"/>
+                    </group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="invoice_date"/>
+                    </group>
+                </group>
+                <group>
+                    <group>
+                        <field name="grouping"/>
+                        <field name="action_after" widget="radio"/>
+                    </group>
+                    <group string="Preview">
+                        <field name="currency_id" invisible="1"/>
+                        <field name="timesheet_count"/>
+                        <field name="total_hours" widget="float_time"/>
+                        <field name="total_amount"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_generate_invoice" type="object"
+                            string="Generate Invoice" class="btn-primary"
+                            invisible="timesheet_count == 0"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_timesheet_billing_invoice_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Timesheet Invoice</field>
+        <field name="res_model">timesheet.billing.invoice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

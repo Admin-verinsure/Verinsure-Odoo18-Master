@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mail_template_unapproved_timesheets" model="mail.template">
+        <field name="name">Timesheet Billing: Unapproved Timesheets Reminder</field>
+        <field name="model_id" ref="project.model_project_project"/>
+        <field name="subject">Unapproved timesheets on {{ object.name }}</field>
+        <field name="email_to">{{ object.user_id.email or '' }}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+<div>
+    <p>Hello,</p>
+    <p>
+        Project <strong t-out="object.name"/> has billable timesheet lines that are still
+        waiting for approval before they can be invoiced.
+    </p>
+    <p>Please review and approve them from the Timesheet Billing menu.</p>
+</div>
+        </field>
+    </record>
+
+    <record id="mail_template_uninvoiced_hours" model="mail.template">
+        <field name="name">Timesheet Billing: Uninvoiced Hours Reminder</field>
+        <field name="model_id" ref="project.model_project_project"/>
+        <field name="subject">Uninvoiced approved hours on {{ object.name }}</field>
+        <field name="email_to">{{ object.user_id.email or '' }}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+<div>
+    <p>Hello,</p>
+    <p>
+        Project <strong t-out="object.name"/> has approved, billable hours that have not
+        been invoiced yet. Consider running the Generate Timesheet Invoice wizard for this
+        project.
+    </p>
+</div>
+        </field>
+    </record>
+</odoo>
