@@ -197,75 +197,6 @@ class AkahuAccount(models.Model):
             'context': {'default_account_id': self.id},
         }
 
-    def _get_available_akahu_accounts(self):
-        """
-        Fetch available Akahu accounts for this credential and exclude accounts
-        already linked in Odoo under the same credential.
-        Returns list of dicts with:
-          id, bank_name, account_number, account_name, status, balance_available, refreshed
-        """
-        self.ensure_one()
-        if not self.credential_id:
-            raise UserError(_('Please select Akahu Credentials first.'))
-
-        cred = self.credential_id
-        try:
-            data = cred._api_get(self._get_user_token(), '/accounts')
-        except Exception as e:
-            raise UserError(_('Failed to fetch Akahu accounts: %s') % str(e))
-
-        items = data.get('items', [])
-        linked_ids = set(self.sudo().search([
-            ('credential_id', '=', self.credential_id.id),
-            ('id', '!=', self.id),
-            ('akahu_account_id', '!=', False),
-        ]).mapped('akahu_account_id'))
-
-        available = []
-        for item in items:
-            akahu_id = item.get('_id')
-            if not akahu_id or akahu_id in linked_ids:
-                continue
-            available.append({
-                'id': akahu_id,
-                'bank_name': item.get('connection', {}).get('name') or '',
-                'account_number': item.get('formatted_account') or '',
-                'account_name': item.get('name') or '',
-                'status': item.get('status') or 'UNKNOWN',
-                'balance_available': item.get('balance', {}).get('available', 0.0),
-                'refreshed': item.get('refreshed', {}).get('transactions') or '',
-            })
-        return available
-
-    def action_open_available_accounts_wizard(self):
-        """
-        Open picker wizard to bind this Odoo record to one unlinked Akahu account.
-        """
-        if not self.env.user.has_group('base.group_erp_manager'):
-            raise AccessError(_('This action is restricted to ERP Managers.'))
-
-        self.ensure_one()
-        if self.akahu_account_id:
-            raise UserError(_('This record is already linked to an Akahu Account ID.'))
-
-        available = self._get_available_akahu_accounts()
-        if not available:
-            raise UserError(_(
-                'No unlinked Akahu accounts are available for these credentials.'
-            ))
-
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Select Akahu Account'),
-            'res_model': 'akahu.account.select.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_account_id': self.id,
-                'akahu_available_accounts': available,
-            },
-        }
-
     def action_refresh_account_info(self):
         """
         Calls GET /accounts and updates account metadata & status.
@@ -361,7 +292,7 @@ class AkahuAccount(models.Model):
 
         self.ensure_one()
         engine = self.env['akahu.sync.engine']
-        result = engine.sync_account(self)
+        result = engine.sync_account(self, trigger_source='manual_account')
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
