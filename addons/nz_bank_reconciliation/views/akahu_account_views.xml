@@ -44,13 +44,6 @@
                             <field name="company_id"/>
                             <field name="credential_id"/>
                             <field name="journal_id"/>
-                            <button name="action_open_available_accounts_wizard"
-                                    string="Fetch Available Accounts"
-                                    type="object"
-                                    class="btn-secondary"
-                                    icon="fa-search"
-                                    groups="base.group_erp_manager"
-                                    invisible="not credential_id or akahu_account_id"/>
                             <div class="alert alert-info" role="alert">
                                 User Access Token is managed in Akahu API Credentials.
                             </div>
@@ -61,8 +54,7 @@
                             <field name="bank_name"/>
                             <field name="akahu_formatted_account"/>
                             <field name="akahu_account_name"/>
-                            <field name="akahu_account_id"
-                                readonly="akahu_account_id != False"/>
+                            <field name="akahu_account_id"/>
                             <field name="akahu_status"
                                    widget="badge"
                                    decoration-success="akahu_status == 'ACTIVE'"

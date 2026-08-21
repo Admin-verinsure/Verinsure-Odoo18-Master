@@ -26,6 +26,66 @@ class AccountBankStatementLine(models.Model):
         help='Set by bank-feed integrations (including Akahu sync) to '
              'deduplicate imported transactions. Not user-editable.',
     )
+    akahu_transaction_id = fields.Char(
+        string='Akahu Transaction ID',
+        copy=False,
+        index=True,
+    )
+    akahu_account_id = fields.Char(
+        string='Akahu Account ID',
+        copy=False,
+        index=True,
+    )
+    akahu_connection_id = fields.Char(
+        string='Akahu Connection ID',
+        copy=False,
+        index=True,
+    )
+    akahu_migrated_from = fields.Char(
+        string='Akahu Migrated From',
+        copy=False,
+        index=True,
+    )
+    akahu_migrated_account = fields.Char(
+        string='Akahu Migrated Account',
+        copy=False,
+        index=True,
+    )
+    akahu_transaction_fingerprint = fields.Char(
+        string='Akahu Transaction Fingerprint',
+        copy=False,
+        index=True,
+    )
+    akahu_identity_confidence = fields.Selection([
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+        ('unknown', 'Unknown'),
+    ], string='Akahu Identity Confidence', default='unknown', copy=False, index=True)
+    akahu_identity_match_type = fields.Selection([
+        ('exact_id', 'Exact ID'),
+        ('lineage', 'Lineage'),
+        ('fingerprint_high', 'Fingerprint (High Confidence)'),
+        ('possible_fingerprint', 'Possible Fingerprint'),
+        ('new', 'New'),
+        ('identity_conflict', 'Identity Conflict'),
+    ], string='Akahu Identity Match Type', default='new', copy=False, index=True)
+    akahu_identity_last_seen_at = fields.Datetime(
+        string='Akahu Identity Last Seen At',
+        copy=False,
+        index=True,
+    )
+    akahu_identity_note = fields.Text(
+        string='Akahu Identity Note',
+        copy=False,
+    )
+    akahu_sync_run_id = fields.Many2one(
+        'akahu.sync.run',
+        string='Akahu Sync Run',
+        copy=False,
+        index=True,
+        ondelete='set null',
+    )
 
     _sql_constraints = [
         (

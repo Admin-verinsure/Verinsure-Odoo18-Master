@@ -6,6 +6,16 @@ access_akahu_account_user,akahu.account user,model_akahu_account,account.group_a
 access_akahu_sync_engine_manager,akahu.sync.engine manager,model_akahu_sync_engine,account.group_account_manager,1,1,1,1
 access_akahu_sync_log_manager,akahu.sync.log manager,model_akahu_sync_log,account.group_account_manager,1,1,1,0
 access_akahu_sync_log_user,akahu.sync.log user,model_akahu_sync_log,account.group_account_user,1,0,0,0
+access_akahu_sync_state_manager,akahu.sync.state manager,model_akahu_sync_state,account.group_account_manager,1,1,1,0
+access_akahu_sync_state_user,akahu.sync.state user,model_akahu_sync_state,account.group_account_user,1,0,0,0
+access_akahu_sync_run_manager,akahu.sync.run manager,model_akahu_sync_run,account.group_account_manager,1,1,1,0
+access_akahu_sync_run_user,akahu.sync.run user,model_akahu_sync_run,account.group_account_user,1,0,0,0
+access_akahu_transaction_identity_manager,akahu.transaction.identity manager,model_akahu_transaction_identity,account.group_account_manager,1,1,1,0
+access_akahu_transaction_identity_user,akahu.transaction.identity user,model_akahu_transaction_identity,account.group_account_user,1,0,0,0
+access_akahu_duplicate_finding_batch_manager,akahu.duplicate.finding.batch manager,model_akahu_duplicate_finding_batch,account.group_account_manager,1,0,0,0
+access_akahu_duplicate_finding_batch_user,akahu.duplicate.finding.batch user,model_akahu_duplicate_finding_batch,account.group_account_user,1,0,0,0
+access_akahu_duplicate_finding_manager,akahu.duplicate.finding manager,model_akahu_duplicate_finding,account.group_account_manager,1,0,0,0
+access_akahu_duplicate_finding_user,akahu.duplicate.finding user,model_akahu_duplicate_finding,account.group_account_user,1,0,0,0
 access_auto_reconciliation_engine_manager,auto.reconciliation.engine manager,model_auto_reconciliation_engine,account.group_account_manager,1,1,1,1
 access_auto_reconciliation_engine_user,auto.reconciliation.engine user,model_auto_reconciliation_engine,account.group_account_user,1,0,0,0
 access_auto_reconciliation_log_manager,auto.reconciliation.log manager,model_auto_reconciliation_log,account.group_account_manager,1,1,1,0
@@ -19,4 +29,3 @@ access_akahu_company_mapping_user,akahu.company.mapping user,model_akahu_company
 access_akahu_credential_revoke_wizard_manager,akahu.credential.revoke.wizard manager,model_akahu_credential_revoke_wizard,account.group_account_manager,1,1,1,1
 access_akahu_credential_replace_wizard_erp_manager,akahu.credential.replace.wizard erp manager,model_akahu_credential_replace_wizard,base.group_erp_manager,1,1,1,1
 access_akahu_account_replace_token_wizard_erp_manager,akahu.account.replace.token.wizard erp manager,model_akahu_account_replace_token_wizard,base.group_erp_manager,1,1,1,1
-access_akahu_account_select_wizard_erp_manager,akahu.account.select.wizard erp manager,model_akahu_account_select_wizard,base.group_erp_manager,1,1,1,1

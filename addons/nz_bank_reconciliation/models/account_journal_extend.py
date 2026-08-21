@@ -170,7 +170,10 @@ class AccountJournalAkahuExtend(models.Model):
 
         for akahu_account in active_accounts:
             try:
-                result = sync_engine.sync_account(akahu_account)
+                result = sync_engine.sync_account(
+                    akahu_account,
+                    trigger_source='manual_journal',
+                )
                 total_imported += result.get('imported', 0)
                 company_ids_synced.add(akahu_account.company_id.id)
                 _logger.info(
