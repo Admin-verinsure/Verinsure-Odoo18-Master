@@ -19,3 +19,4 @@ access_akahu_company_mapping_user,akahu.company.mapping user,model_akahu_company
 access_akahu_credential_revoke_wizard_manager,akahu.credential.revoke.wizard manager,model_akahu_credential_revoke_wizard,account.group_account_manager,1,1,1,1
 access_akahu_credential_replace_wizard_erp_manager,akahu.credential.replace.wizard erp manager,model_akahu_credential_replace_wizard,base.group_erp_manager,1,1,1,1
 access_akahu_account_replace_token_wizard_erp_manager,akahu.account.replace.token.wizard erp manager,model_akahu_account_replace_token_wizard,base.group_erp_manager,1,1,1,1
+access_akahu_account_select_wizard_erp_manager,akahu.account.select.wizard erp manager,model_akahu_account_select_wizard,base.group_erp_manager,1,1,1,1
