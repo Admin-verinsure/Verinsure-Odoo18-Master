@@ -12,7 +12,6 @@ Conservative behavior:
 import logging
 import hashlib
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from datetime import date, datetime
 
 _logger = logging.getLogger(__name__)
 
@@ -35,39 +34,6 @@ def _normalize_amount(value):
     except (InvalidOperation, ValueError, TypeError):
         return ''
     return format(dec_value, 'f')
-
-
-def _normalize_date(value):
-    if not value:
-        return ''
-    if isinstance(value, datetime):
-        return value.date().isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
-    text = str(value).strip()
-    if not text:
-        return ''
-    # Postgres date columns arrive as YYYY-MM-DD; keep only date segment deterministically.
-    return text.split(' ')[0].split('T')[0]
-
-
-def _build_legacy_bootstrap_fingerprint(journal_id, tx_date, amount, payment_ref, partner_name):
-    """
-    PATCH 4 Phase 2 legacy/bootstrap fingerprint.
-
-    This hash is for historical lookup/forensics bootstrap only and MUST NOT be
-    treated as high-confidence duplicate proof. Phase 3 introduces stronger
-    runtime identity evaluation.
-    """
-    fields_ordered = [
-        str(journal_id or ''),
-        _normalize_date(tx_date),
-        _normalize_amount(amount),
-        _normalize_str(payment_ref),
-        _normalize_str(partner_name),
-    ]
-    payload = '|'.join(fields_ordered)
-    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
 
 def _table_exists(cr, table_name):
@@ -112,34 +78,8 @@ def _backfill_statement_line_identity(cr):
         cr.rowcount,
     )
 
-    cr.execute(
-        """
-        SELECT id, journal_id, date, amount, payment_ref, partner_name
-          FROM account_bank_statement_line
-         WHERE akahu_transaction_fingerprint IS NULL
-           AND journal_id IS NOT NULL
-        """
-    )
-    rows = cr.fetchall()
-    for row in rows:
-        fingerprint = _build_legacy_bootstrap_fingerprint(
-            row[1],
-            row[2],
-            row[3],
-            row[4],
-            row[5],
-        )
-        cr.execute(
-            """
-            UPDATE account_bank_statement_line
-               SET akahu_transaction_fingerprint = %s
-             WHERE id = %s
-            """,
-            (fingerprint, row[0]),
-        )
     _logger.info(
-        'Migration 18.0.1.6.0: backfilled legacy SHA-256 bootstrap fingerprint for %s statement line(s).',
-        len(rows),
+        'Migration 18.0.1.6.0: skipped legacy bootstrap fingerprinting because account_bank_statement_line has no reliable stored transaction date source.',
     )
 
     cr.execute(
@@ -307,12 +247,6 @@ def _create_supporting_indexes(cr):
             'name': 'absl_journal_fingerprint_idx',
             'table': 'account_bank_statement_line',
             'columns': ['journal_id', 'akahu_transaction_fingerprint'],
-            'optional': False,
-        },
-        {
-            'name': 'absl_journal_date_amount_idx',
-            'table': 'account_bank_statement_line',
-            'columns': ['journal_id', 'date', 'amount'],
             'optional': False,
         },
         {
