@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import controllers
 from . import models
 from . import wizard
 from .models.akahu_credential import _read_or_create_file_key
