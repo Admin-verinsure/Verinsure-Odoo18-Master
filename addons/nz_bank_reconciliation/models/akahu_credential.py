@@ -6,6 +6,7 @@ import os
 import time
 import requests
 from pathlib import Path
+from urllib.parse import urlencode
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
@@ -356,6 +357,11 @@ class AkahuCredential(models.Model):
         help='Your Akahu App Secret. Stored encrypted. '
              'Visible to ERP Managers only — never sent to regular users.',
     )
+    oauth_redirect_uri = fields.Char(
+        string='OAuth Redirect URI',
+        groups='base.group_erp_manager',
+        help='Registered Akahu OAuth callback URI. Must exactly match the URI configured in Akahu.',
+    )
 
     active = fields.Boolean(default=True)
     connection_status = fields.Selection([
@@ -368,14 +374,22 @@ class AkahuCredential(models.Model):
     has_credentials = fields.Boolean(
         compute='_compute_has_credentials',
     )
+    has_app_token = fields.Boolean(
+        compute='_compute_has_credential_flags',
+    )
+    has_user_token = fields.Boolean(
+        compute='_compute_has_credential_flags',
+    )
 
     _sql_constraints = [
         ('company_unique', 'UNIQUE(company_id)', 'Only one Akahu credential per company is allowed.'),
     ]
 
     @api.depends('app_token', 'user_access_token')
-    def _compute_has_credentials(self):
+    def _compute_has_credential_flags(self):
         for rec in self:
+            rec.has_app_token = bool(rec.app_token)
+            rec.has_user_token = bool(rec.user_access_token)
             rec.has_credentials = bool(rec.app_token and rec.user_access_token)
 
     # -------------------------------------------------------------------------
@@ -477,6 +491,84 @@ class AkahuCredential(models.Model):
             'target': 'new',
             'context': {'default_credential_id': self.id},
         }
+
+    def action_connect_akahu_oauth(self):
+        """Start the server-side Akahu OAuth flow."""
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('Connecting Akahu is restricted to ERP Managers.'))
+
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/nz_bank_reconciliation/akahu/oauth/start/%s' % self.id,
+            'target': 'self',
+        }
+
+    def _build_oauth_authorization_url(self, state, redirect_uri=None):
+        self.ensure_one()
+        app_token = self._get_app_token()
+        redirect_uri = redirect_uri or self.oauth_redirect_uri
+        if not app_token:
+            raise ValidationError(_('App Token is required before connecting Akahu.'))
+        if not redirect_uri:
+            raise ValidationError(_('OAuth Redirect URI is required before connecting Akahu.'))
+
+        params = {
+            'response_type': 'code',
+            'client_id': app_token,
+            'redirect_uri': redirect_uri,
+            'scope': 'ENDURING_CONSENT',
+            'state': state,
+        }
+        return 'https://oauth.akahu.nz?%s' % urlencode(params)
+
+    def _exchange_oauth_code(self, authorization_code, redirect_uri=None):
+        self.ensure_one()
+        if not authorization_code:
+            raise ValidationError(_('Missing Akahu authorization code.'))
+
+        redirect_uri = redirect_uri or self.oauth_redirect_uri
+        if not redirect_uri:
+            raise ValidationError(_('OAuth Redirect URI is required before exchanging the code.'))
+
+        payload = {
+            'grant_type': 'authorization_code',
+            'code': authorization_code,
+            'redirect_uri': redirect_uri,
+            'client_id': self._get_app_token(),
+            'client_secret': self._get_app_secret(),
+        }
+        try:
+            resp = requests.post(
+                'https://api.akahu.io/v1/token',
+                data=payload,
+                timeout=30,
+            )
+        except requests.exceptions.RequestException as e:
+            raise UserError(_('Akahu token exchange failed: %s') % str(e))
+
+        if resp.status_code >= 400:
+            raw = resp.text[:120] if resp.text else ''
+            safe_msg = _redact_secret(raw)
+            raise UserError(_(
+                'Akahu token exchange failed with HTTP %s. Detail: %s'
+            ) % (resp.status_code, safe_msg))
+
+        try:
+            data = resp.json()
+        except ValueError:
+            raise UserError(_('Akahu token exchange returned a non-JSON response.'))
+
+        access_token = data.get('access_token') or data.get('token') or data.get('user_token')
+        if not access_token:
+            raise UserError(_('Akahu token exchange did not return a user access token.'))
+        return access_token
+
+    def _fetch_oauth_accounts(self, user_access_token):
+        self.ensure_one()
+        data = self._api_get(user_access_token, '/accounts')
+        return data.get('items', [])
 
     # -------------------------------------------------------------------------
     # API HELPERS
