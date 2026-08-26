@@ -372,7 +372,7 @@ class AkahuCredential(models.Model):
     last_tested = fields.Datetime(string='Last Tested', readonly=True)
     error_message = fields.Char(string='Last Error', readonly=True)
     has_credentials = fields.Boolean(
-        compute='_compute_has_credentials',
+        compute='_compute_has_credential_flags',
     )
     has_app_token = fields.Boolean(
         compute='_compute_has_credential_flags',
@@ -508,9 +508,12 @@ class AkahuCredential(models.Model):
     def _build_oauth_authorization_url(self, state, redirect_uri=None):
         self.ensure_one()
         app_token = self._get_app_token()
+        app_secret = self._get_app_secret()
         redirect_uri = redirect_uri or self.oauth_redirect_uri
         if not app_token:
             raise ValidationError(_('App Token is required before connecting Akahu.'))
+        if not app_secret:
+            raise ValidationError(_('App Secret is required before connecting Akahu.'))
         if not redirect_uri:
             raise ValidationError(_('OAuth Redirect URI is required before connecting Akahu.'))
 
@@ -531,13 +534,16 @@ class AkahuCredential(models.Model):
         redirect_uri = redirect_uri or self.oauth_redirect_uri
         if not redirect_uri:
             raise ValidationError(_('OAuth Redirect URI is required before exchanging the code.'))
+        app_secret = self._get_app_secret()
+        if not app_secret:
+            raise ValidationError(_('App Secret is required before exchanging the code.'))
 
         payload = {
             'grant_type': 'authorization_code',
             'code': authorization_code,
             'redirect_uri': redirect_uri,
             'client_id': self._get_app_token(),
-            'client_secret': self._get_app_secret(),
+            'client_secret': app_secret,
         }
         try:
             resp = requests.post(

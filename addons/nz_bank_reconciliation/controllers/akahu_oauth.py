@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import secrets
+from html import escape
 from urllib.parse import quote, urlparse
 
 from odoo import fields, http, _
@@ -160,6 +161,7 @@ class AkahuOAuthController(http.Controller):
                 'bank_name': item.get('connection', {}).get('name') or '',
                 'account_name': item.get('name') or '',
                 'formatted_account': item.get('formatted_account') or '',
+                'akahu_status': item.get('status') or 'UNKNOWN',
             }))
         if not option_values:
             request.session.pop(OAUTH_STATE_SESSION_KEY, None)
@@ -173,5 +175,8 @@ class AkahuOAuthController(http.Controller):
         return redirect('/web#id=%s&model=akahu.oauth.account.select.wizard&view_type=form' % wizard.id)
 
     def _render_message(self, title, message):
-        body = '<html><body><h3>%s</h3><p>%s</p><p><a href="/web">Return to Odoo</a></p></body></html>' % (title, message)
+        body = '<html><body><h3>%s</h3><p>%s</p><p><a href="/web">Return to Odoo</a></p></body></html>' % (
+            escape(title or ''),
+            escape(message or ''),
+        )
         return request.make_response(body, headers=[('Content-Type', 'text/html; charset=utf-8')])

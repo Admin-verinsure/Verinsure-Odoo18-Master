@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from unittest import mock
-from datetime import timedelta
 
 from odoo import fields
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
+from odoo.exceptions import ValidationError
 
 from odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth import AkahuOAuthController, OAUTH_STATE_SESSION_KEY
 
@@ -101,6 +101,16 @@ class TestPatch5AkahuOAuth(TransactionCase):
         self.assertEqual(captured['data']['client_id'], credential._get_app_token())
         self.assertEqual(captured['data']['client_secret'], credential._get_app_secret())
 
+    def test_oauth_authorization_requires_app_secret(self):
+        credential = self.credential.copy({
+            'company_id': self.company.id,
+            'app_token': 'app_token_patch5_secret_required',
+            'app_secret': '',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/akahu/oauth/callback',
+        })
+        with self.assertRaisesRegex(Exception, 'App Secret is required'):
+            credential._build_oauth_authorization_url('state123')
+
     def test_existing_encrypted_token_storage_is_reused(self):
         credential = self.Credential.create({
             'company_id': self.company.id,
@@ -148,14 +158,16 @@ class TestPatch5AkahuOAuth(TransactionCase):
             'bank_name': 'ANZ',
             'account_name': 'Everyday',
             'formatted_account': '12-3456-7890123-00',
+            'akahu_status': 'ACTIVE',
         })
         wizard.write({'selected_option_id': option.id})
 
-        with mock.patch.object(type(account), 'action_refresh_account_info', return_value=True) as refresh_mock:
-            wizard.action_save()
-
-        refresh_mock.assert_called_once()
+        wizard.action_save()
         self.assertEqual(account.akahu_account_id, 'acc_selected_123')
+        self.assertEqual(account.bank_name, 'ANZ')
+        self.assertEqual(account.akahu_account_name, 'Everyday')
+        self.assertEqual(account.akahu_formatted_account, '12-3456-7890123-00')
+        self.assertEqual(account.akahu_status, 'ACTIVE')
 
     def test_authorization_url_does_not_expose_secret_values(self):
         url = self.credential._build_oauth_authorization_url('state-secret')
@@ -228,6 +240,36 @@ class TestPatch5AkahuOAuth(TransactionCase):
 
         self.assertIn('Akahu OAuth cancelled', response)
 
+    def test_callback_response_escapes_html(self):
+        controller = AkahuOAuthController()
+        fake_request = mock.MagicMock()
+        fake_request.session = self._FakeSession(self.env.uid)
+        fake_request.session[OAUTH_STATE_SESSION_KEY] = {
+            'state': 'expected-state',
+            'credential_id': self.credential.id,
+            'company_id': self.company.id,
+            'user_id': self.env.uid,
+            'redirect_uri': self.credential.oauth_redirect_uri,
+            'created_at': fields.Datetime.now(),
+        }
+        credential_record = mock.MagicMock()
+        credential_record.exists.return_value = credential_record
+        credential_record.company_id.id = self.company.id
+        fake_env = mock.MagicMock()
+        fake_env.__getitem__.return_value.sudo.return_value.browse.return_value = credential_record
+        fake_request.env = fake_env
+        fake_request.make_response.side_effect = lambda body, headers=None: body
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            response = controller.akahu_oauth_callback(
+                state='expected-state',
+                error='bad',
+                error_description='<script>alert(1)</script>',
+            )
+
+        self.assertNotIn('<script>', response)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', response)
+
     def test_callback_rejects_expired_state(self):
         controller = AkahuOAuthController()
         fake_request = mock.MagicMock()
@@ -279,3 +321,23 @@ class TestPatch5AkahuOAuth(TransactionCase):
                     response = controller.akahu_oauth_callback(state='expected-state', code='code123')
 
         self.assertIn('did not return any connected accounts', response)
+
+    def test_wizard_rejects_option_from_other_wizard(self):
+        account = self._make_account('foreign_option')
+        wizard_a = self.WizardModel.create({
+            'credential_id': self.credential.id,
+            'account_id': account.id,
+        })
+        wizard_b = self.WizardModel.create({
+            'credential_id': self.credential.id,
+            'account_id': account.id,
+        })
+        foreign_option = self.OptionModel.create({
+            'wizard_id': wizard_b.id,
+            'akahu_account_id': 'acc_foreign_123',
+            'display_name': 'Foreign option',
+        })
+        wizard_a.write({'selected_option_id': foreign_option.id})
+
+        with self.assertRaisesRegex(ValidationError, 'does not belong to this OAuth session'):
+            wizard_a.action_save()

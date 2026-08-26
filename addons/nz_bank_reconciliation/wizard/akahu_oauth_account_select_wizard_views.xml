@@ -16,12 +16,12 @@
                         </group>
                         <group string="Available Akahu Accounts">
                             <field name="option_ids" nolabel="1">
-                                <tree editable="false">
+                                <list>
                                     <field name="display_name"/>
                                     <field name="bank_name"/>
                                     <field name="formatted_account"/>
                                     <field name="account_name"/>
-                                </tree>
+                                </list>
                             </field>
                         </group>
                     </sheet>

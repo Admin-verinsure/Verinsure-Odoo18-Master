@@ -16,9 +16,13 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
         string='New App Token',
         required=True,
     )
-    new_user_access_token = fields.Char(
-        string='New User Access Token',
+    new_app_secret = fields.Char(
+        string='New App Secret',
         required=True,
+    )
+    new_user_access_token = fields.Char(
+        string='Legacy User Access Token',
+        required=False,
     )
 
     def action_save(self):
@@ -28,13 +32,16 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
 
         self.ensure_one()
         credential = self.credential_id.sudo()
-        credential.write({
+        vals = {
             'app_token': self.new_app_token,
-            'user_access_token': self.new_user_access_token,
+            'app_secret': self.new_app_secret,
             'connection_status': 'untested',
             'last_tested': False,
             'error_message': False,
-        })
+        }
+        if self.new_user_access_token:
+            vals['user_access_token'] = self.new_user_access_token
+        credential.write(vals)
 
         return {
             'type': 'ir.actions.client',

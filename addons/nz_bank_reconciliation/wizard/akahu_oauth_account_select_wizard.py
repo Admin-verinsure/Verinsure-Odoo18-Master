@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
+from odoo import fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 
@@ -43,6 +43,8 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
         self.ensure_one()
         if not self.selected_option_id:
             raise UserError(_('Please select an Akahu bank account.'))
+        if self.selected_option_id.wizard_id != self:
+            raise ValidationError(_('The selected Akahu account option does not belong to this OAuth session.'))
 
         account = self.account_id.sudo()
         if account.company_id.id != self.credential_id.company_id.id:
@@ -50,8 +52,13 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
         if account.credential_id.id != self.credential_id.id:
             raise ValidationError(_('The selected account must use the same Akahu credential.'))
 
-        account.write({'akahu_account_id': self.selected_option_id.akahu_account_id})
-        account.action_refresh_account_info()
+        account.write({
+            'akahu_account_id': self.selected_option_id.akahu_account_id,
+            'bank_name': self.selected_option_id.bank_name,
+            'akahu_account_name': self.selected_option_id.account_name,
+            'akahu_formatted_account': self.selected_option_id.formatted_account,
+            'akahu_status': self.selected_option_id.akahu_status or 'UNKNOWN',
+        })
 
         return {
             'type': 'ir.actions.client',

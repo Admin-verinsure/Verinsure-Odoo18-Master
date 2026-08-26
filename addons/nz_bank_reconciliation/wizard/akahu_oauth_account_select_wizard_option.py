@@ -17,3 +17,4 @@ class AkahuOAuthAccountSelectWizardOption(models.TransientModel):
     bank_name = fields.Char(readonly=True)
     account_name = fields.Char(readonly=True)
     formatted_account = fields.Char(readonly=True)
+    akahu_status = fields.Char(readonly=True)
