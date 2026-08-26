@@ -4,7 +4,7 @@ from odoo import models, fields, _
 
 class AkahuCredentialReplaceWizard(models.TransientModel):
     _name = 'akahu.credential.replace.wizard'
-    _description = 'Replace Akahu Credentials'
+    _description = 'Configure Akahu App Credentials'
 
     credential_id = fields.Many2one(
         'akahu.credential',
@@ -20,9 +20,9 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
         string='New App Secret',
         required=True,
     )
-    new_user_access_token = fields.Char(
-        string='Legacy User Access Token',
-        required=False,
+    new_oauth_redirect_uri = fields.Char(
+        string='OAuth Redirect URI',
+        required=True,
     )
 
     def action_save(self):
@@ -35,20 +35,19 @@ class AkahuCredentialReplaceWizard(models.TransientModel):
         vals = {
             'app_token': self.new_app_token,
             'app_secret': self.new_app_secret,
+            'oauth_redirect_uri': self.new_oauth_redirect_uri,
             'connection_status': 'untested',
             'last_tested': False,
             'error_message': False,
         }
-        if self.new_user_access_token:
-            vals['user_access_token'] = self.new_user_access_token
         credential.write(vals)
 
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Credentials Updated'),
-                'message': _('Akahu credentials were replaced successfully.'),
+                'title': _('App Credentials Updated'),
+                'message': _('Akahu application credentials were updated successfully.'),
                 'type': 'success',
             },
         }
