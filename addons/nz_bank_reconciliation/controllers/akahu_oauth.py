@@ -58,7 +58,7 @@ class AkahuOAuthController(http.Controller):
                 'user_id': request.env.uid,
                 'redirect_uri': redirect_uri,
                 'flow_kind': flow_kind,
-                'created_at': fields.Datetime.now(),
+                'created_at': fields.Datetime.to_string(fields.Datetime.now()),
             }
 
             auth_url = credential._build_oauth_authorization_url(state, redirect_uri=redirect_uri)
