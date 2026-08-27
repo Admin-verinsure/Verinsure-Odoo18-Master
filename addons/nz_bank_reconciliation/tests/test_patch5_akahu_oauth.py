@@ -35,14 +35,14 @@ class TestPatch5AkahuOAuth(TransactionCase):
                 'app_token': 'app_token_patch5_test',
                 'user_access_token': 'user_token_patch5_test',
                 'app_secret': 'app_secret_patch5_test',
-                'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/akahu/oauth/callback',
+                'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
             })
         else:
             cls.credential.write({
                 'app_token': 'app_token_patch5_test',
                 'user_access_token': 'user_token_patch5_test',
                 'app_secret': 'app_secret_patch5_test',
-                'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/akahu/oauth/callback',
+                'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
             })
 
     def _make_account(self, suffix='base'):
@@ -101,7 +101,7 @@ class TestPatch5AkahuOAuth(TransactionCase):
         self.credential.write({'oauth_redirect_uri': 'https://example.nz/wrong/callback'})
         with self.assertRaisesRegex(ValidationError, OAUTH_CALLBACK_PATH):
             self.credential._get_oauth_redirect_uri()
-        self.credential.write({'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/akahu/oauth/callback'})
+        self.credential.write({'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect'})
 
     def test_oauth_state_is_generated_securely(self):
         from odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth import _generate_oauth_state
@@ -150,7 +150,7 @@ class TestPatch5AkahuOAuth(TransactionCase):
             'app_token': 'app_token_patch5_encrypt',
             'user_access_token': 'user_token_patch5_encrypt',
             'app_secret': 'app_secret_patch5_encrypt',
-            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/akahu/oauth/callback',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
         })
         self.assertTrue(credential.app_token.startswith('gcm1:'))
         self.assertTrue(credential.user_access_token.startswith('gcm1:'))

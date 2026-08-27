@@ -15,7 +15,7 @@ from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
 
-OAUTH_CALLBACK_PATH = '/nz_bank_reconciliation/akahu/oauth/callback'
+OAUTH_CALLBACK_PATH = '/nz_bank_reconciliation/oauth/api_redirect'
 
 # VNZ-19 FIX: shared redaction helper so every place that stores/returns
 # error text uses the same denylist consistently. This is defense-in-depth,

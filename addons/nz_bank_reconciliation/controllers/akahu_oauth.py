@@ -86,7 +86,7 @@ class AkahuOAuthController(http.Controller):
                 safe_message or _('Akahu rejected the authorization request. Please verify the configured Redirect URI and Akahu application settings.'),
             )
 
-    @http.route('/nz_bank_reconciliation/akahu/oauth/callback', type='http', auth='public', methods=['GET'], csrf=False)
+    @http.route('/nz_bank_reconciliation/oauth/api_redirect', type='http', auth='public', methods=['GET'], csrf=False)
     def akahu_oauth_callback(self, **kwargs):
         session_state = request.session.get(OAUTH_STATE_SESSION_KEY) or {}
         error = kwargs.get('error')
