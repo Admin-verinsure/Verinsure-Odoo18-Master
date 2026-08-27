@@ -2,14 +2,13 @@
 import logging
 import secrets
 from html import escape
-from urllib.parse import quote, urlparse
 
 from odoo import fields, http, _
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 from werkzeug.utils import redirect
 
-from ..models.akahu_credential import _redact_secret
+from ..models.akahu_credential import OAUTH_CALLBACK_PATH, _redact_secret
 
 
 _logger = logging.getLogger(__name__)
@@ -20,20 +19,6 @@ OAUTH_STATE_TTL_SECONDS = 900
 
 def _generate_oauth_state():
     return secrets.token_urlsafe(32)
-
-
-def _build_authorization_url(app_token, redirect_uri, state):
-    return 'https://oauth.akahu.nz?response_type=code&client_id=%s&redirect_uri=%s&scope=ENDURING_CONSENT&state=%s' % (
-        quote(app_token, safe=''),
-        quote(redirect_uri, safe=''),
-        quote(state, safe=''),
-    )
-
-
-def _is_https_callback(redirect_uri):
-    parsed = urlparse(redirect_uri or '')
-    return parsed.scheme == 'https'
-
 
 def _format_account_label(item):
     parts = [
@@ -52,36 +37,56 @@ class AkahuOAuthController(http.Controller):
 
     @http.route('/nz_bank_reconciliation/akahu/oauth/start/<int:credential_id>', type='http', auth='user', methods=['GET'], csrf=False)
     def akahu_oauth_start(self, credential_id, **kwargs):
+        flow_kind = kwargs.get('flow_kind') or 'connect'
         credential = request.env['akahu.credential'].sudo().browse(credential_id).exists()
-        if not credential:
-            raise UserError(_('Akahu credential not found.'))
-        if not request.env.user.has_group('base.group_erp_manager'):
-            raise AccessError(_('Connecting Akahu is restricted to ERP Managers.'))
-        if request.session.uid != request.env.uid:
-            raise AccessError(_('Your session is not valid for Akahu OAuth.'))
-        if not _user_has_company_access(request.env.user, credential.company_id.id):
-            raise AccessError(_('You do not have access to this company credential.'))
+        try:
+            if not credential:
+                raise UserError(_('Akahu credential not found.'))
+            if not request.env.user.has_group('base.group_erp_manager'):
+                raise AccessError(_('Connecting Akahu is restricted to ERP Managers.'))
+            if request.session.uid != request.env.uid:
+                raise AccessError(_('Your session is not valid for Akahu OAuth.'))
+            if not _user_has_company_access(request.env.user, credential.company_id.id):
+                raise AccessError(_('You do not have access to this company credential.'))
 
-        redirect_uri = credential.oauth_redirect_uri
-        if not redirect_uri:
-            raise UserError(_('Please configure the Akahu OAuth Redirect URI before connecting.'))
-        if not _is_https_callback(redirect_uri) and not redirect_uri.startswith('http://localhost'):
-            raise UserError(_('Akahu OAuth Redirect URI must use HTTPS in production.'))
+            redirect_uri = credential._get_oauth_redirect_uri()
+            state = _generate_oauth_state()
+            request.session[OAUTH_STATE_SESSION_KEY] = {
+                'state': state,
+                'credential_id': credential.id,
+                'company_id': credential.company_id.id,
+                'user_id': request.env.uid,
+                'redirect_uri': redirect_uri,
+                'flow_kind': flow_kind,
+                'created_at': fields.Datetime.now(),
+            }
 
-        state = _generate_oauth_state()
-        request.session[OAUTH_STATE_SESSION_KEY] = {
-            'state': state,
-            'credential_id': credential.id,
-            'company_id': credential.company_id.id,
-            'user_id': request.env.uid,
-            'redirect_uri': redirect_uri,
-            'created_at': fields.Datetime.now(),
-        }
+            auth_url = credential._build_oauth_authorization_url(state, redirect_uri=redirect_uri)
+            _logger.info(
+                'Akahu OAuth start for credential_id=%s company_id=%s flow_kind=%s redirect_uri=%s callback_path=%s authorization_url=%s',
+                credential.id,
+                credential.company_id.id,
+                flow_kind,
+                redirect_uri,
+                OAUTH_CALLBACK_PATH,
+                auth_url,
+            )
+            return redirect(auth_url)
+        except (AccessError, UserError, ValidationError) as exc:
+            safe_message = _redact_secret(str(exc)[:256])
+            _logger.warning(
+                'Akahu OAuth start rejected for credential_id=%s company_id=%s flow_kind=%s: %s',
+                credential.id if credential else False,
+                credential.company_id.id if credential else False,
+                flow_kind,
+                safe_message,
+            )
+            return self._render_message(
+                _('Akahu OAuth failed'),
+                safe_message or _('Akahu rejected the authorization request. Please verify the configured Redirect URI and Akahu application settings.'),
+            )
 
-        auth_url = credential._build_oauth_authorization_url(state, redirect_uri=redirect_uri)
-        return redirect(auth_url)
-
-    @http.route('/nz_bank_reconciliation/akahu/oauth/callback', type='http', auth='public', methods=['GET'], csrf=False)
+    @http.route('/nz_bank_reconciliation/oauth/api_redirect', type='http', auth='public', methods=['GET'], csrf=False)
     def akahu_oauth_callback(self, **kwargs):
         session_state = request.session.get(OAUTH_STATE_SESSION_KEY) or {}
         error = kwargs.get('error')
@@ -121,6 +126,14 @@ class AkahuOAuthController(http.Controller):
             message = error_description or error
             if error in ('access_denied', 'user_cancelled', 'cancelled'):
                 message = _('Akahu authorization was cancelled or denied.')
+            _logger.warning(
+                'Akahu OAuth callback returned error for credential_id=%s company_id=%s flow_kind=%s error=%s detail=%s',
+                credential.id,
+                credential.company_id.id,
+                session_state.get('flow_kind') or 'connect',
+                error,
+                _redact_secret((error_description or '')[:256]),
+            )
             return self._render_message(_('Akahu OAuth cancelled'), message)
 
         if not code:
@@ -138,7 +151,13 @@ class AkahuOAuthController(http.Controller):
             accounts = credential._fetch_oauth_accounts(user_token)
         except Exception as exc:
             safe_exc = _redact_secret(str(exc)[:256])
-            _logger.warning('Akahu OAuth callback failed for credential_id=%s: %s', credential.id, safe_exc)
+            _logger.warning(
+                'Akahu OAuth callback failed for credential_id=%s company_id=%s flow_kind=%s: %s',
+                credential.id,
+                credential.company_id.id,
+                session_state.get('flow_kind') or 'connect',
+                safe_exc,
+            )
             credential.sudo().write({
                 'connection_status': 'error',
                 'last_tested': fields.Datetime.now(),
@@ -172,6 +191,13 @@ class AkahuOAuthController(http.Controller):
         if first_option:
             wizard.write({'selected_option_id': first_option.id})
         request.session.pop(OAUTH_STATE_SESSION_KEY, None)
+        _logger.info(
+            'Akahu OAuth callback succeeded for credential_id=%s company_id=%s flow_kind=%s accounts_returned=%s',
+            credential.id,
+            credential.company_id.id,
+            session_state.get('flow_kind') or 'connect',
+            len(option_values),
+        )
         return redirect('/web#id=%s&model=akahu.oauth.account.select.wizard&view_type=form' % wizard.id)
 
     def _render_message(self, title, message):

@@ -11,7 +11,7 @@
                         <group>
                             <field name="credential_id" invisible="1"/>
                             <field name="company_id" readonly="1"/>
-                            <field name="account_id"/>
+                            <field name="journal_id"/>
                             <field name="selected_option_id"/>
                         </group>
                         <group string="Available Akahu Accounts">

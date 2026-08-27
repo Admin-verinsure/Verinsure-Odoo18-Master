@@ -17,11 +17,11 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
         related='credential_id.company_id',
         readonly=True,
     )
-    account_id = fields.Many2one(
-        'akahu.account',
-        string='Odoo Bank Account Configuration',
+    journal_id = fields.Many2one(
+        'account.journal',
+        string='Odoo Bank Journal',
         required=True,
-        domain="[('company_id', '=', company_id), ('credential_id', '=', credential_id)]",
+        domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]",
     )
     option_ids = fields.One2many(
         'akahu.oauth.account.select.wizard.option',
@@ -46,19 +46,39 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
         if self.selected_option_id.wizard_id != self:
             raise ValidationError(_('The selected Akahu account option does not belong to this OAuth session.'))
 
-        account = self.account_id.sudo()
-        if account.company_id.id != self.credential_id.company_id.id:
-            raise ValidationError(_('The selected account must belong to the same company as the credential.'))
-        if account.credential_id.id != self.credential_id.id:
-            raise ValidationError(_('The selected account must use the same Akahu credential.'))
+        if self.journal_id.company_id.id != self.credential_id.company_id.id:
+            raise ValidationError(_('The selected journal must belong to the same company as the credential.'))
 
-        account.write({
+        account_model = self.env['akahu.account'].sudo()
+        existing_for_journal = account_model.search([
+            ('company_id', '=', self.credential_id.company_id.id),
+            ('journal_id', '=', self.journal_id.id),
+        ], limit=1)
+        existing_for_akahu = account_model.search([
+            ('company_id', '=', self.credential_id.company_id.id),
+            ('akahu_account_id', '=', self.selected_option_id.akahu_account_id),
+        ], limit=1)
+
+        if existing_for_akahu and existing_for_journal and existing_for_akahu != existing_for_journal:
+            raise ValidationError(_('This Akahu account is already linked to another Odoo bank configuration.'))
+        if existing_for_akahu and existing_for_akahu.journal_id and existing_for_akahu.journal_id != self.journal_id:
+            raise ValidationError(_('This Akahu account is already linked to another Odoo journal.'))
+
+        target_account = existing_for_journal or existing_for_akahu
+        vals = {
+            'company_id': self.credential_id.company_id.id,
+            'credential_id': self.credential_id.id,
+            'journal_id': self.journal_id.id,
             'akahu_account_id': self.selected_option_id.akahu_account_id,
             'bank_name': self.selected_option_id.bank_name,
             'akahu_account_name': self.selected_option_id.account_name,
             'akahu_formatted_account': self.selected_option_id.formatted_account,
             'akahu_status': self.selected_option_id.akahu_status or 'UNKNOWN',
-        })
+        }
+        if target_account:
+            target_account.write(vals)
+        else:
+            target_account = account_model.create(vals)
 
         return {
             'type': 'ir.actions.client',
@@ -67,6 +87,12 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
                 'title': _('Akahu Connected'),
                 'message': _('The selected Akahu bank account has been saved.'),
                 'type': 'success',
-                'next': {'type': 'ir.actions.act_window_close'},
+                'next': {
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'akahu.account',
+                    'res_id': target_account.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                },
             },
         }

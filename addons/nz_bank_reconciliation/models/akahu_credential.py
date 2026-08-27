@@ -6,7 +6,7 @@ import os
 import time
 import requests
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
@@ -14,6 +14,8 @@ from odoo.tools import config as odoo_config
 from ..utils.log_redaction import sanitize_log_value
 
 _logger = logging.getLogger(__name__)
+
+OAUTH_CALLBACK_PATH = '/nz_bank_reconciliation/oauth/api_redirect'
 
 # VNZ-19 FIX: shared redaction helper so every place that stores/returns
 # error text uses the same denylist consistently. This is defense-in-depth,
@@ -377,6 +379,9 @@ class AkahuCredential(models.Model):
     has_app_token = fields.Boolean(
         compute='_compute_has_credential_flags',
     )
+    has_app_secret = fields.Boolean(
+        compute='_compute_has_credential_flags',
+    )
     has_user_token = fields.Boolean(
         compute='_compute_has_credential_flags',
     )
@@ -385,10 +390,11 @@ class AkahuCredential(models.Model):
         ('company_unique', 'UNIQUE(company_id)', 'Only one Akahu credential per company is allowed.'),
     ]
 
-    @api.depends('app_token', 'user_access_token')
+    @api.depends('app_token', 'app_secret', 'user_access_token')
     def _compute_has_credential_flags(self):
         for rec in self:
             rec.has_app_token = bool(rec.app_token)
+            rec.has_app_secret = bool(rec.app_secret)
             rec.has_user_token = bool(rec.user_access_token)
             rec.has_credentials = bool(rec.app_token and rec.user_access_token)
 
@@ -477,7 +483,7 @@ class AkahuCredential(models.Model):
         }
 
     def action_open_replace_credentials_wizard(self):
-        """Open wizard to replace stored App Token and App Secret."""
+        """Open wizard to configure stored App Token / App Secret settings."""
         if not self.env.user.has_group('base.group_erp_manager'):
             from odoo.exceptions import AccessError
             raise AccessError(_('Replacing credentials is restricted to ERP Managers.'))
@@ -492,6 +498,16 @@ class AkahuCredential(models.Model):
             'context': {'default_credential_id': self.id},
         }
 
+    def _build_oauth_start_action(self, flow_kind='connect'):
+        self.ensure_one()
+        if flow_kind not in ('connect', 'reauthorize'):
+            flow_kind = 'connect'
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/nz_bank_reconciliation/akahu/oauth/start/%s?flow_kind=%s' % (self.id, flow_kind),
+            'target': 'self',
+        }
+
     def action_connect_akahu_oauth(self):
         """Start the server-side Akahu OAuth flow."""
         if not self.env.user.has_group('base.group_erp_manager'):
@@ -499,23 +515,43 @@ class AkahuCredential(models.Model):
             raise AccessError(_('Connecting Akahu is restricted to ERP Managers.'))
 
         self.ensure_one()
-        return {
-            'type': 'ir.actions.act_url',
-            'url': '/nz_bank_reconciliation/akahu/oauth/start/%s' % self.id,
-            'target': 'self',
-        }
+        return self._build_oauth_start_action(flow_kind='connect')
+
+    def action_reauthorize_akahu_oauth(self):
+        """Restart Akahu OAuth without clearing the existing token first."""
+        if not self.env.user.has_group('base.group_erp_manager'):
+            from odoo.exceptions import AccessError
+            raise AccessError(_('Replacing credentials is restricted to ERP Managers.'))
+
+        self.ensure_one()
+        return self._build_oauth_start_action(flow_kind='reauthorize')
+
+    def _get_oauth_redirect_uri(self):
+        self.ensure_one()
+        redirect_uri = (self.oauth_redirect_uri or '').strip()
+        if not redirect_uri:
+            raise ValidationError(_('OAuth Redirect URI is required before connecting Akahu.'))
+
+        parsed = urlparse(redirect_uri)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValidationError(_('OAuth Redirect URI must be an absolute URL.'))
+        if parsed.query or parsed.params or parsed.fragment:
+            raise ValidationError(_('OAuth Redirect URI must not contain query parameters, params, or fragments.'))
+        if parsed.path != OAUTH_CALLBACK_PATH:
+            raise ValidationError(_('OAuth Redirect URI must exactly match %s') % OAUTH_CALLBACK_PATH)
+        if parsed.scheme != 'https' and not redirect_uri.startswith('http://localhost'):
+            raise ValidationError(_('OAuth Redirect URI must use HTTPS in production.'))
+        return redirect_uri
 
     def _build_oauth_authorization_url(self, state, redirect_uri=None):
         self.ensure_one()
         app_token = self._get_app_token()
         app_secret = self._get_app_secret()
-        redirect_uri = redirect_uri or self.oauth_redirect_uri
+        redirect_uri = redirect_uri or self._get_oauth_redirect_uri()
         if not app_token:
             raise ValidationError(_('App Token is required before connecting Akahu.'))
         if not app_secret:
             raise ValidationError(_('App Secret is required before connecting Akahu.'))
-        if not redirect_uri:
-            raise ValidationError(_('OAuth Redirect URI is required before connecting Akahu.'))
 
         params = {
             'response_type': 'code',
@@ -531,9 +567,7 @@ class AkahuCredential(models.Model):
         if not authorization_code:
             raise ValidationError(_('Missing Akahu authorization code.'))
 
-        redirect_uri = redirect_uri or self.oauth_redirect_uri
-        if not redirect_uri:
-            raise ValidationError(_('OAuth Redirect URI is required before exchanging the code.'))
+        redirect_uri = redirect_uri or self._get_oauth_redirect_uri()
         app_secret = self._get_app_secret()
         if not app_secret:
             raise ValidationError(_('App Secret is required before exchanging the code.'))
