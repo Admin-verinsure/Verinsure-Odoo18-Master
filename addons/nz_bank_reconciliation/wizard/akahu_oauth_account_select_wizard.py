@@ -20,7 +20,7 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
     journal_id = fields.Many2one(
         'account.journal',
         string='Odoo Bank Journal',
-        required=True,
+        required=False,
         domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]",
     )
     option_ids = fields.One2many(
@@ -32,7 +32,7 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
     selected_option_id = fields.Many2one(
         'akahu.oauth.account.select.wizard.option',
         string='Akahu Bank Account',
-        required=True,
+        required=False,
         domain="[('wizard_id', '=', id)]",
     )
 
@@ -41,6 +41,8 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
             raise AccessError(_('Connecting Akahu is restricted to ERP Managers.'))
 
         self.ensure_one()
+        if not self.journal_id:
+            raise UserError(_('Please select an Odoo bank journal.'))
         if not self.selected_option_id:
             raise UserError(_('Please select an Akahu bank account.'))
         if self.selected_option_id.wizard_id != self:
@@ -50,13 +52,23 @@ class AkahuOAuthAccountSelectWizard(models.TransientModel):
             raise ValidationError(_('The selected journal must belong to the same company as the credential.'))
 
         account_model = self.env['akahu.account'].sudo()
+        foreign_for_journal = account_model.search([
+            ('company_id', '=', self.credential_id.company_id.id),
+            ('journal_id', '=', self.journal_id.id),
+            ('credential_id', '!=', self.credential_id.id),
+        ], limit=1)
+        if foreign_for_journal:
+            raise ValidationError(_('This Odoo journal is already linked to another Akahu credential configuration.'))
+
         existing_for_journal = account_model.search([
             ('company_id', '=', self.credential_id.company_id.id),
             ('journal_id', '=', self.journal_id.id),
+            ('credential_id', '=', self.credential_id.id),
         ], limit=1)
         existing_for_akahu = account_model.search([
             ('company_id', '=', self.credential_id.company_id.id),
             ('akahu_account_id', '=', self.selected_option_id.akahu_account_id),
+            ('credential_id', '=', self.credential_id.id),
         ], limit=1)
 
         if existing_for_akahu and existing_for_journal and existing_for_akahu != existing_for_journal:

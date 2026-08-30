@@ -18,6 +18,7 @@
                             <field name="option_ids" nolabel="1">
                                 <list>
                                     <field name="display_name"/>
+                                    <field name="akahu_account_id"/>
                                     <field name="bank_name"/>
                                     <field name="formatted_account"/>
                                     <field name="account_name"/>

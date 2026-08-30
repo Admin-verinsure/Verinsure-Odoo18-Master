@@ -311,8 +311,8 @@ def _decrypt_token(env, blob):
 
 class AkahuCredential(models.Model):
     """
-    Stores the Akahu App Token and User Access Token for each company.
-    One record per company.
+    Stores one Akahu App configuration (App Token/App Secret/User token set).
+    Multiple independent credential records may exist per company.
 
     SEC-01 FIX: sensitive tokens are encrypted before being written to the
     database (AES-256-GCM). The raw values are never stored as plaintext.
@@ -385,10 +385,6 @@ class AkahuCredential(models.Model):
     has_user_token = fields.Boolean(
         compute='_compute_has_credential_flags',
     )
-
-    _sql_constraints = [
-        ('company_unique', 'UNIQUE(company_id)', 'Only one Akahu credential per company is allowed.'),
-    ]
 
     @api.depends('app_token', 'app_secret', 'user_access_token')
     def _compute_has_credential_flags(self):
