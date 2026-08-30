@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'NZ Bank Reconciliation (Akahu)',
-    'version': '18.0.1.6.0',
+    'version': '18.0.1.7.0',
     'category': 'Accounting/Accounting',
     'summary': 'Akahu NZ open banking sync + automatic multi-type reconciliation for Odoo 18',
     'description': """
@@ -10,7 +10,7 @@ NZ Bank Reconciliation — Akahu Integration + Auto Reconciliation
 A single unified module that:
 
 AKAHU SYNC
-- Store App Token + App Secret securely per company
+- Store App Token + App Secret securely per credential configuration
 - Connect multiple NZ bank accounts via User Access Tokens
 - Pull settled transactions → Odoo bank statement lines (hourly cron)
 - Paginated sync with cursor support (incremental, no duplicates)

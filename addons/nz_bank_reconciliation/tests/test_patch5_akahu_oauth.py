@@ -74,7 +74,7 @@ class TestPatch5AkahuOAuth(TransactionCase):
             'user_id': self.env.uid,
             'redirect_uri': self.credential.oauth_redirect_uri,
             'flow_kind': 'connect',
-            'created_at': fields.Datetime.now(),
+            'created_at': fields.Datetime.to_string(fields.Datetime.now()),
         }
         values.update(overrides)
         return values
@@ -357,6 +357,7 @@ class TestPatch5AkahuOAuth(TransactionCase):
     def test_callback_handles_zero_accounts(self):
         controller = AkahuOAuthController()
         fake_request = self._mock_request(self._callback_state())
+        before_count = self.WizardModel.search_count([])
 
         with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
             with mock.patch.object(type(self.credential), '_exchange_oauth_code', return_value='user_token_x'):
@@ -364,6 +365,80 @@ class TestPatch5AkahuOAuth(TransactionCase):
                     response = controller.akahu_oauth_callback(state='expected-state', code='code123')
 
         self.assertIn('did not return any connected accounts', response)
+        self.assertEqual(self.WizardModel.search_count([]), before_count)
+
+    def test_callback_one_account_reuses_existing_mapping(self):
+        account = self._make_account('reuse_one')
+        account.write({'akahu_account_id': 'acc_reuse_1'})
+        controller = AkahuOAuthController()
+        fake_request = self._mock_request(self._callback_state())
+        before_count = self.WizardModel.search_count([])
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            with mock.patch.object(type(self.credential), '_exchange_oauth_code', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_fetch_oauth_accounts', return_value=[{
+                    '_id': 'acc_reuse_1',
+                    'name': 'Business',
+                    'formatted_account': '12-0000-0000001-00',
+                    'connection': {'name': 'ASB'},
+                    'status': 'ACTIVE',
+                }]):
+                    response = controller.akahu_oauth_callback(state='expected-state', code='code123')
+
+        self.assertIn('model=akahu.account', response)
+        self.assertEqual(self.WizardModel.search_count([]), before_count)
+
+    def test_callback_one_account_creates_mapping_wizard_with_selection(self):
+        controller = AkahuOAuthController()
+        fake_request = self._mock_request(self._callback_state())
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            with mock.patch.object(type(self.credential), '_exchange_oauth_code', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_fetch_oauth_accounts', return_value=[{
+                    '_id': 'acc_one_1',
+                    'name': 'Business',
+                    'formatted_account': '12-0000-0000002-00',
+                    'connection': {'name': 'ASB'},
+                    'status': 'ACTIVE',
+                }]):
+                    response = controller.akahu_oauth_callback(state='expected-state', code='code123')
+
+        self.assertIn('model=akahu.oauth.account.select.wizard', response)
+        wizard = self.WizardModel.search([('credential_id', '=', self.credential.id)], order='id desc', limit=1)
+        self.assertTrue(wizard)
+        self.assertEqual(len(wizard.option_ids), 1)
+        self.assertTrue(wizard.selected_option_id)
+        self.assertEqual(wizard.selected_option_id.akahu_account_id, 'acc_one_1')
+
+    def test_callback_multiple_accounts_creates_wizard_without_auto_selection(self):
+        controller = AkahuOAuthController()
+        fake_request = self._mock_request(self._callback_state())
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            with mock.patch.object(type(self.credential), '_exchange_oauth_code', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_fetch_oauth_accounts', return_value=[
+                    {
+                        '_id': 'acc_multi_1',
+                        'name': 'ASB Business',
+                        'formatted_account': '12-0000-0000003-00',
+                        'connection': {'name': 'ASB'},
+                        'status': 'ACTIVE',
+                    },
+                    {
+                        '_id': 'acc_multi_2',
+                        'name': 'BNZ Working',
+                        'formatted_account': '02-0000-0000004-00',
+                        'connection': {'name': 'BNZ'},
+                        'status': 'ACTIVE',
+                    },
+                ]):
+                    response = controller.akahu_oauth_callback(state='expected-state', code='code123')
+
+        self.assertIn('model=akahu.oauth.account.select.wizard', response)
+        wizard = self.WizardModel.search([('credential_id', '=', self.credential.id)], order='id desc', limit=1)
+        self.assertTrue(wizard)
+        self.assertEqual(len(wizard.option_ids), 2)
+        self.assertFalse(wizard.selected_option_id)
 
     def test_token_exchange_failure_is_safe(self):
         controller = AkahuOAuthController()
@@ -395,3 +470,110 @@ class TestPatch5AkahuOAuth(TransactionCase):
 
         with self.assertRaisesRegex(ValidationError, 'does not belong to this OAuth session'):
             wizard_a.action_save()
+
+    def test_multiple_credentials_can_exist_for_same_company(self):
+        credential_b = self.Credential.create({
+            'company_id': self.company.id,
+            'app_token': 'app_token_patch5_second_cfg',
+            'app_secret': 'app_secret_patch5_second_cfg',
+            'user_access_token': 'user_token_patch5_second_cfg',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
+        })
+
+        self.assertTrue(credential_b)
+        self.assertEqual(credential_b.company_id.id, self.company.id)
+
+    def test_wizard_does_not_overwrite_other_credential_mapping(self):
+        journal = self._make_journal('isolation')
+        account_a = self.AccountModel.create({
+            'company_id': self.company.id,
+            'credential_id': self.credential.id,
+            'journal_id': journal.id,
+            'akahu_account_id': 'acc_cfg_a',
+        })
+        credential_b = self.Credential.create({
+            'company_id': self.company.id,
+            'app_token': 'app_token_patch5_isolation_b',
+            'app_secret': 'app_secret_patch5_isolation_b',
+            'user_access_token': 'user_token_patch5_isolation_b',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
+        })
+        wizard_b = self.WizardModel.create({
+            'credential_id': credential_b.id,
+            'journal_id': journal.id,
+        })
+        option_b = self.OptionModel.create({
+            'wizard_id': wizard_b.id,
+            'akahu_account_id': 'acc_cfg_b',
+            'display_name': 'Isolated Account B',
+        })
+        wizard_b.write({'selected_option_id': option_b.id})
+
+        with self.assertRaisesRegex(ValidationError, 'already linked to another Akahu credential configuration'):
+            wizard_b.action_save()
+
+        account_a = self.AccountModel.browse(account_a.id)
+        self.assertEqual(account_a.credential_id.id, self.credential.id)
+        self.assertEqual(account_a.akahu_account_id, 'acc_cfg_a')
+
+    def test_oauth_callback_for_credential_b_does_not_modify_credential_a(self):
+        credential_a = self.credential
+        credential_a.write({'user_access_token': 'user_token_credential_a_before'})
+
+        credential_b = self.Credential.create({
+            'company_id': self.company.id,
+            'app_token': 'app_token_patch5_cb_isolation_b',
+            'app_secret': 'app_secret_patch5_cb_isolation_b',
+            'user_access_token': 'user_token_credential_b_before',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
+        })
+        journal_b = self._make_journal('cb_isolation_b')
+        account_b = self.AccountModel.create({
+            'company_id': self.company.id,
+            'credential_id': credential_b.id,
+            'journal_id': journal_b.id,
+            'akahu_account_id': 'acc_cfg_b_only',
+        })
+
+        controller = AkahuOAuthController()
+        state_b = self._callback_state(
+            credential_id=credential_b.id,
+            redirect_uri=credential_b.oauth_redirect_uri,
+        )
+        fake_request = self._mock_request(state_b)
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            with mock.patch.object(type(self.credential), '_exchange_oauth_code', return_value='user_token_credential_b_after'):
+                with mock.patch.object(type(self.credential), '_fetch_oauth_accounts', return_value=[{
+                    '_id': 'acc_cfg_b_only',
+                    'name': 'BNZ B1',
+                    'formatted_account': '02-0000-0000005-00',
+                    'connection': {'name': 'BNZ'},
+                    'status': 'ACTIVE',
+                }]):
+                    response = controller.akahu_oauth_callback(state='expected-state', code='code123')
+
+        self.assertIn('model=akahu.account', response)
+        credential_a = self.Credential.browse(credential_a.id)
+        credential_b = self.Credential.browse(credential_b.id)
+        account_b = self.AccountModel.browse(account_b.id)
+        self.assertEqual(credential_a._get_user_access_token(), 'user_token_credential_a_before')
+        self.assertEqual(credential_b._get_user_access_token(), 'user_token_credential_b_after')
+        self.assertEqual(account_b.credential_id.id, credential_b.id)
+
+    def test_replace_credentials_action_remains_credential_scoped(self):
+        credential_b = self.Credential.create({
+            'company_id': self.company.id,
+            'app_token': 'app_token_patch5_replace_scope_b',
+            'app_secret': 'app_secret_patch5_replace_scope_b',
+            'user_access_token': 'user_token_patch5_replace_scope_b',
+            'oauth_redirect_uri': 'https://example.nz/nz_bank_reconciliation/oauth/api_redirect',
+        })
+
+        action_a = self.credential.action_open_replace_credentials_wizard()
+        action_b = credential_b.action_open_replace_credentials_wizard()
+
+        self.assertEqual(action_a.get('res_model'), 'akahu.credential.replace.wizard')
+        self.assertEqual(action_b.get('res_model'), 'akahu.credential.replace.wizard')
+        self.assertEqual(action_a.get('context', {}).get('default_credential_id'), self.credential.id)
+        self.assertEqual(action_b.get('context', {}).get('default_credential_id'), credential_b.id)

@@ -26,7 +26,9 @@ def _format_account_label(item):
         item.get('name') or '',
         item.get('formatted_account') or '',
     ]
-    return ' - '.join(part for part in parts if part) or (item.get('_id') or _('Akahu Account'))
+    label = ' - '.join(part for part in parts if part) or _('Akahu Account')
+    account_id = item.get('_id') or ''
+    return '%s [%s]' % (label, account_id) if account_id else label
 
 
 def _user_has_company_access(user, company_id):
@@ -166,9 +168,6 @@ class AkahuOAuthController(http.Controller):
             request.session.pop(OAUTH_STATE_SESSION_KEY, None)
             return self._render_message(_('Akahu OAuth failed'), _('Akahu OAuth completed but the token exchange or account retrieval failed.'))
 
-        wizard = request.env['akahu.oauth.account.select.wizard'].sudo().create({
-            'credential_id': credential.id,
-        })
         option_values = []
         for item in accounts:
             account_id = item.get('_id') or ''
@@ -186,17 +185,47 @@ class AkahuOAuthController(http.Controller):
             request.session.pop(OAUTH_STATE_SESSION_KEY, None)
             return self._render_message(_('Akahu OAuth failed'), _('Akahu did not return any connected accounts for this token.'))
 
-        wizard.write({'option_ids': option_values})
-        first_option = wizard.option_ids[:1]
-        if first_option:
-            wizard.write({'selected_option_id': first_option.id})
+        account_model = request.env['akahu.account'].sudo()
+        if len(option_values) == 1:
+            selected_payload = option_values[0][2]
+            existing_mappings = account_model.search([
+                ('credential_id', '=', credential.id),
+                ('company_id', '=', credential.company_id.id),
+                ('akahu_account_id', '=', selected_payload.get('akahu_account_id')),
+            ], limit=2)
+            if len(existing_mappings) == 1:
+                existing_mapping = existing_mappings[0]
+                existing_mapping.write({
+                    'bank_name': selected_payload.get('bank_name') or existing_mapping.bank_name,
+                    'akahu_account_name': selected_payload.get('account_name') or existing_mapping.akahu_account_name,
+                    'akahu_formatted_account': selected_payload.get('formatted_account') or existing_mapping.akahu_formatted_account,
+                    'akahu_status': selected_payload.get('akahu_status') or existing_mapping.akahu_status,
+                })
+                request.session.pop(OAUTH_STATE_SESSION_KEY, None)
+                _logger.info(
+                    'Akahu OAuth callback reused existing mapping credential_id=%s company_id=%s account_id=%s mapping_id=%s',
+                    credential.id,
+                    credential.company_id.id,
+                    selected_payload.get('akahu_account_id'),
+                    existing_mapping.id,
+                )
+                return redirect('/web#id=%s&model=akahu.account&view_type=form' % existing_mapping.id)
+
+        wizard = request.env['akahu.oauth.account.select.wizard'].sudo().create({
+            'credential_id': credential.id,
+            'option_ids': option_values,
+        })
+        if len(option_values) == 1 and wizard.option_ids:
+            wizard.write({'selected_option_id': wizard.option_ids[0].id})
+
         request.session.pop(OAUTH_STATE_SESSION_KEY, None)
         _logger.info(
-            'Akahu OAuth callback succeeded for credential_id=%s company_id=%s flow_kind=%s accounts_returned=%s',
+            'Akahu OAuth callback succeeded for credential_id=%s company_id=%s flow_kind=%s accounts_returned=%s wizard_id=%s',
             credential.id,
             credential.company_id.id,
             session_state.get('flow_kind') or 'connect',
             len(option_values),
+            wizard.id,
         )
         return redirect('/web#id=%s&model=akahu.oauth.account.select.wizard&view_type=form' % wizard.id)
 
