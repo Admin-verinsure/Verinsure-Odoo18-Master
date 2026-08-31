@@ -117,6 +117,35 @@ class TestPatch4IdentityResolver(TransactionCase):
         })
         return line, identity
 
+    def _create_legacy_line_without_identity(
+        self,
+        journal,
+        tx_date='2026-08-12',
+        amount=-1250.0,
+        tx_type='TRANSFER',
+        description='Invoice payment',
+        meta=None,
+    ):
+        meta = meta or {}
+        payment_ref = self.Resolver._build_payment_ref(description, meta)
+        tx_date_obj = fields.Date.from_string(tx_date)
+        line_vals = {
+            'journal_id': journal.id,
+            'company_id': self.company.id,
+            'date': tx_date_obj,
+            'amount': amount,
+            'payment_ref': payment_ref,
+            'partner_name': meta.get('other_account') or False,
+            'unique_import_id': False,
+            'akahu_transaction_id': False,
+            'akahu_account_id': False,
+            'akahu_connection_id': False,
+            'akahu_transaction_fingerprint': False,
+        }
+        if 'transaction_type' in self.Line._fields:
+            line_vals['transaction_type'] = tx_type
+        return self.Line.create(line_vals)
+
     def _create_sync_state(self, journal, window_days=7):
         return self.SyncState.create({
             'journal_id': journal.id,
@@ -514,4 +543,47 @@ class TestPatch4IdentityResolver(TransactionCase):
         )
 
         self.assertIn(result['resolution_type'], ('possible_duplicate', 'identity_conflict', 'new'))
+        self.assertNotEqual(result['resolution_type'], 'fingerprint_high')
+
+    def test_legacy_line_without_identity_can_match_high_confidence(self):
+        journal = self._next_journal('legacy-high')
+        meta = {
+            'particulars': 'Client A',
+            'code': 'INV',
+            'reference': 'R-1001',
+            'other_account': 'Counterparty A',
+        }
+        line = self._create_legacy_line_without_identity(
+            journal,
+            tx_date='2026-08-12',
+            amount=-1250.0,
+            meta=meta,
+            description='Invoice payment',
+        )
+
+        result = self.Resolver.resolve_transaction_identity(
+            journal,
+            self._tx('new_tx_legacy_001', tx_date='2026-08-12', amount=-1250.0, meta=meta, description='Invoice payment'),
+        )
+
+        self.assertEqual(result['resolution_type'], 'fingerprint_high')
+        self.assertEqual(result['confidence'], 'high')
+        self.assertEqual(result['existing_statement_line_id'], line.id)
+
+    def test_legacy_line_without_identity_not_strong_enough_is_not_high(self):
+        journal = self._next_journal('legacy-not-strong')
+        self._create_legacy_line_without_identity(
+            journal,
+            tx_date='2026-08-12',
+            amount=-1250.0,
+            meta={},
+            description='Recurring payment',
+        )
+
+        result = self.Resolver.resolve_transaction_identity(
+            journal,
+            self._tx('new_tx_legacy_002', tx_date='2026-08-12', amount=-1250.0, meta={}, description='Recurring payment'),
+        )
+
+        self.assertIn(result['resolution_type'], ('possible_duplicate', 'new', 'identity_conflict'))
         self.assertNotEqual(result['resolution_type'], 'fingerprint_high')

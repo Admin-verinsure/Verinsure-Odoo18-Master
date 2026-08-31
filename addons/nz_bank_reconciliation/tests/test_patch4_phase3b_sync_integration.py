@@ -393,3 +393,50 @@ class TestPatch4Phase3BSyncIntegration(TransactionCase):
         self.assertEqual(self._line_count(account.journal_id), 2)
         run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
         self.assertEqual(run.possible_duplicates, 1)
+
+    def test_legacy_existing_line_is_claimed_not_duplicated(self):
+        account = self._make_account('legacy-claim')
+        legacy_vals = {
+            'journal_id': account.journal_id.id,
+            'company_id': self.company.id,
+            'date': fields.Date.from_string('2026-08-12'),
+            'amount': -1250.0,
+            'payment_ref': 'Payment | Client | PAY | PAYMENT',
+            'partner_name': 'ABC',
+            'unique_import_id': False,
+            'akahu_transaction_id': False,
+            'akahu_account_id': False,
+            'akahu_connection_id': False,
+            'akahu_transaction_fingerprint': False,
+        }
+        if 'transaction_type' in self.LineModel._fields:
+            legacy_vals['transaction_type'] = 'TRANSFER'
+        legacy_line = self.LineModel.create(legacy_vals)
+
+        tx = self._tx('tx_legacy_claim')
+        payload = self._payload([tx], current='cur_legacy_claim')
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('imported'), 0)
+        self.assertEqual(self.LineModel.search_count([('journal_id', '=', account.journal_id.id)]), 1)
+
+        legacy_line.invalidate_recordset([
+            'akahu_transaction_id',
+            'unique_import_id',
+            'akahu_identity_match_type',
+            'akahu_identity_confidence',
+        ])
+        self.assertEqual(legacy_line.akahu_transaction_id, 'tx_legacy_claim')
+        self.assertEqual(legacy_line.unique_import_id, 'akahu-tx_legacy_claim')
+        self.assertEqual(legacy_line.akahu_identity_match_type, 'fingerprint_high')
+        self.assertEqual(legacy_line.akahu_identity_confidence, 'high')
+
+        identity = self.IdentityModel.search([
+            ('journal_id', '=', account.journal_id.id),
+            ('akahu_transaction_id', '=', 'tx_legacy_claim'),
+        ], limit=1)
+        self.assertTrue(identity)
+        self.assertEqual(identity.statement_line_id.id, legacy_line.id)

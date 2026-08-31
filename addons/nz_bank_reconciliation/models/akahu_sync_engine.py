@@ -524,16 +524,23 @@ class AkahuSyncEngine(models.Model):
             if run_mode == 'normal':
                 params['cursor'] = committed_cursor
             elif run_mode == 'recovery':
-                if not state.last_successful_transaction_date:
+                checkpoint_candidates = [
+                    self._normalize_datetime_utc(state.last_successful_fetch_at),
+                    self._normalize_datetime_utc(state.last_successful_transaction_date),
+                    self._normalize_datetime_utc(state.last_successful_sync_at),
+                ]
+                checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
+                checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
+
+                if not checkpoint_dt:
                     raise UserError(_(
-                        'Cursor recovery is required for %s, but no historical checkpoint date is available. '
+                        'Cursor recovery is required for %s, but no historical checkpoint is available. '
                         'Refusing unbounded historical import.'
                     ) % akahu_account.name)
 
                 overlap_days = sync_cfg['recovery_overlap_days']
                 max_days = sync_cfg['max_recovery_days']
                 recovery_end = self._normalize_datetime_utc(fields.Datetime.now())
-                checkpoint_dt = self._normalize_datetime_utc(state.last_successful_transaction_date)
                 recovery_start = checkpoint_dt - timedelta(days=overlap_days)
                 total_span = recovery_end - recovery_start
                 if total_span.total_seconds() > (max_days * 86400):
@@ -565,6 +572,7 @@ class AkahuSyncEngine(models.Model):
                 'cursor_before': cursor_before,
                 'sync_mode': state.sync_mode or self._map_run_mode_to_sync_mode(run_mode),
                 'run_mode': run_mode,
+                'recovery_boundary_start': checkpoint_dt if run_mode == 'recovery' else False,
                 'recovery_start': recovery_start,
                 'recovery_end': recovery_end,
                 'recovery_overlap_days': sync_cfg['recovery_overlap_days'] if run_mode == 'recovery' else 0,
@@ -738,6 +746,17 @@ class AkahuSyncEngine(models.Model):
                                     reason=resolution.get('reason') or '',
                                     incoming_akahu_account_id=akahu_account.akahu_account_id,
                                     incoming_akahu_connection_id=state.current_akahu_connection_id,
+                                )
+                                self._claim_statement_line_identity(
+                                    existing_line,
+                                    destination_journal,
+                                    tx,
+                                    resolution_type=resolution_type,
+                                    confidence=resolution.get('confidence') or 'high',
+                                    reason=resolution.get('reason') or '',
+                                    incoming_akahu_account_id=akahu_account.akahu_account_id,
+                                    incoming_akahu_connection_id=state.current_akahu_connection_id,
+                                    sync_run=sync_run,
                                 )
 
                                 if resolution_type == 'lineage':
@@ -1184,6 +1203,68 @@ class AkahuSyncEngine(models.Model):
                 ('journal_id', '=', journal.id),
                 ('akahu_transaction_id', '=', tx_id),
             ], limit=1)
+
+    def _claim_statement_line_identity(
+        self,
+        statement_line,
+        journal,
+        tx,
+        resolution_type,
+        confidence,
+        reason,
+        incoming_akahu_account_id=False,
+        incoming_akahu_connection_id=False,
+        sync_run=False,
+    ):
+        """
+        Claim a legacy statement line with Akahu identity fields after a
+        high-confidence or lineage match, preventing future duplicate imports.
+        """
+        if not statement_line or not statement_line.exists():
+            return
+
+        tx_id = (tx or {}).get('_id')
+        if not tx_id:
+            return
+
+        resolver = self.env['akahu.identity.resolver']
+        incoming_sig = resolver._build_incoming_signature(
+            journal,
+            tx,
+            incoming_akahu_account_id=incoming_akahu_account_id,
+            incoming_akahu_connection_id=incoming_akahu_connection_id,
+        )
+
+        vals = {
+            'akahu_identity_match_type': resolution_type,
+            'akahu_identity_confidence': confidence if confidence in ('high', 'medium', 'low', 'unknown') else 'unknown',
+            'akahu_identity_last_seen_at': fields.Datetime.now(),
+            'akahu_identity_note': reason or False,
+        }
+        if sync_run:
+            vals['akahu_sync_run_id'] = sync_run.id
+
+        if not statement_line.akahu_transaction_id:
+            vals['akahu_transaction_id'] = tx_id
+
+        if not statement_line.unique_import_id:
+            target_import_id = 'akahu-%s' % tx_id
+            collision = self.env['account.bank.statement.line'].sudo().search([
+                ('journal_id', '=', statement_line.journal_id.id),
+                ('unique_import_id', '=', target_import_id),
+                ('id', '!=', statement_line.id),
+            ], limit=1)
+            if not collision:
+                vals['unique_import_id'] = target_import_id
+
+        if incoming_akahu_account_id and not statement_line.akahu_account_id:
+            vals['akahu_account_id'] = incoming_akahu_account_id
+        if incoming_akahu_connection_id and not statement_line.akahu_connection_id:
+            vals['akahu_connection_id'] = incoming_akahu_connection_id
+        if incoming_sig.get('legacy_fingerprint') and not statement_line.akahu_transaction_fingerprint:
+            vals['akahu_transaction_fingerprint'] = incoming_sig.get('legacy_fingerprint')
+
+        statement_line.sudo().write(vals)
 
     def _create_forensic_finding(self, akahu_account, journal, tx, incoming_line, resolution, sync_run, resolver_version):
         existing_line = self.env['account.bank.statement.line'].sudo().browse(

@@ -131,6 +131,74 @@ class AkahuIdentityResolver(models.AbstractModel):
             filtered.append((identity, line, comparison))
 
         if not filtered:
+            legacy_candidates, legacy_overflow, legacy_total = self._search_legacy_statement_line_candidates(
+                journal_id=journal.id,
+                date_min=date_min,
+                date_max=date_max,
+                amount_norm=incoming_sig['amount_norm'],
+            )
+
+            if legacy_overflow:
+                return self._result(
+                    resolution_type='possible_duplicate',
+                    confidence='low',
+                    incoming_transaction_id=tx_id,
+                    reason='legacy_candidate_overflow_requires_manual_review',
+                    candidate_count=legacy_total,
+                )
+
+            legacy_filtered = []
+            for line in legacy_candidates:
+                comparison = self._compare_candidate(incoming_sig, line)
+                legacy_filtered.append((line, comparison))
+
+            if legacy_filtered:
+                if len(legacy_filtered) > 1:
+                    all_conflicts = sorted({field for _, cmp_data in legacy_filtered for field in cmp_data['conflicting_fields']})
+                    return self._result(
+                        resolution_type='identity_conflict' if all_conflicts else 'possible_duplicate',
+                        confidence='low',
+                        incoming_transaction_id=tx_id,
+                        conflicting_fields=all_conflicts,
+                        reason='multiple_plausible_legacy_statement_line_candidates',
+                        candidate_count=len(legacy_filtered),
+                    )
+
+                line, cmp_data = legacy_filtered[0]
+                if cmp_data['conflicting_fields']:
+                    return self._result(
+                        resolution_type='identity_conflict',
+                        confidence='low',
+                        existing_statement_line_id=line.id,
+                        incoming_transaction_id=tx_id,
+                        matched_fields=cmp_data['matched_fields'],
+                        conflicting_fields=cmp_data['conflicting_fields'],
+                        reason='legacy_statement_line_has_strong_field_conflicts',
+                        candidate_count=1,
+                    )
+
+                if cmp_data['sufficient_identifying_metadata']:
+                    return self._result(
+                        resolution_type='fingerprint_high',
+                        confidence='high',
+                        existing_statement_line_id=line.id,
+                        incoming_transaction_id=tx_id,
+                        matched_fields=cmp_data['matched_fields'],
+                        reason='legacy_statement_line_high_confidence_match',
+                        candidate_count=1,
+                    )
+
+                return self._result(
+                    resolution_type='possible_duplicate',
+                    confidence='medium',
+                    existing_statement_line_id=line.id,
+                    incoming_transaction_id=tx_id,
+                    matched_fields=cmp_data['matched_fields'],
+                    conflicting_fields=cmp_data['conflicting_fields'],
+                    reason='legacy_statement_line_not_strong_enough',
+                    candidate_count=1,
+                )
+
             reason = 'no_candidate_after_window_amount_fingerprint_filter'
             if incoming_sig['migrated_account'] and not incoming_sig['migrated_from']:
                 reason = 'migrated_account_without_explicit_lineage'
@@ -244,6 +312,26 @@ class AkahuIdentityResolver(models.AbstractModel):
             return self.env['akahu.transaction.identity'], True, total
 
         return Identity.search(domain, limit=self._MAX_FINGERPRINT_CANDIDATES), False, total
+
+    def _search_legacy_statement_line_candidates(self, journal_id, date_min, date_max, amount_norm):
+        try:
+            amount_value = float(amount_norm)
+        except Exception:
+            return self.env['account.bank.statement.line'], False, 0
+
+        Line = self.env['account.bank.statement.line'].sudo()
+        domain = [
+            ('journal_id', '=', journal_id),
+            ('date', '>=', date_min),
+            ('date', '<=', date_max),
+            ('amount', '=', amount_value),
+            ('akahu_transaction_id', '=', False),
+        ]
+        total = Line.search_count(domain)
+        overflow = total > self._MAX_FINGERPRINT_CANDIDATES
+        if overflow:
+            return self.env['account.bank.statement.line'], True, total
+        return Line.search(domain, limit=self._MAX_FINGERPRINT_CANDIDATES), False, total
 
     def _get_identity_window_days(self, journal, sync_state=False):
         if sync_state:

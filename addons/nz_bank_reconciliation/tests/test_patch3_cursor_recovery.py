@@ -585,3 +585,34 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertEqual(state.committed_cursor, 'cur_cron_1')
         self.assertEqual(state.checkpoint_status, 'committed')
         self.assertEqual(account.sync_failure_count, 1)
+
+    def test_recovery_prefers_recent_fetch_timestamp_over_old_transaction_date(self):
+        self._default_cfg()
+        account = self._make_account('recovery-anchor-fetch', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2025-09-28 09:16:19',
+            'last_successful_fetch_at': '2026-08-30 12:00:00',
+            'last_successful_sync_at': '2026-08-30 12:00:00',
+            'last_successful_transaction_id': 'old_tx_anchor',
+        })
+
+        payload = self._payload([self._tx('trans_patch3_anchor')], current='cur_anchor')
+        calls = []
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return payload
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertTrue(calls)
+        self.assertIn('2026-08-28', calls[0].get('start', ''))
+
+        run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
+        self.assertEqual(run.run_mode, 'recovery')
+        self.assertEqual(fields.Datetime.to_string(run.recovery_boundary_start), '2026-08-30 12:00:00')
