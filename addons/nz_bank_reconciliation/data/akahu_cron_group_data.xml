@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="group_akahu_cron_technical" model="res.groups">
+            <field name="users" eval="[(4, ref('nz_bank_reconciliation.user_akahu_cron'))]"/>
+        </record>
+
+    </data>
+</odoo>
