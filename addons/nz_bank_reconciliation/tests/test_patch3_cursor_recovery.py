@@ -69,14 +69,17 @@ class TestPatch3CursorRecovery(TransactionCase):
             'type': 'TRANSFER',
         }
 
-    def _payload(self, items, current='cur_patch3_current', nxt=None):
-        return {
+    def _payload(self, items, current='cur_patch3_current', nxt=None, include_cursor=True):
+        payload = {
             'items': items,
-            'cursor': {
-                'current': current,
-                'next': nxt,
-            },
         }
+        if include_cursor:
+            cursor = {}
+            if current is not None:
+                cursor['current'] = current
+            cursor['next'] = nxt
+            payload['cursor'] = cursor
+        return payload
 
     def _default_cfg(self):
         self.Config.set_param('nz_bank_reconciliation.recovery_overlap_days', '2')
@@ -616,3 +619,124 @@ class TestPatch3CursorRecovery(TransactionCase):
         run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
         self.assertEqual(run.run_mode, 'recovery')
         self.assertEqual(fields.Datetime.to_string(run.recovery_boundary_start), '2026-08-30 12:00:00')
+
+    def test_recovery_empty_response_with_cursor_advances_durable_fetch_checkpoint(self):
+        self._default_cfg()
+        account = self._make_account('empty-with-cursor', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'empty_with_cursor_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+        })
+
+        fixed_now = '2026-08-20 10:00:00'
+        payload = self._payload([], current='cur_empty_recovery', nxt=None)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value=fixed_now):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 0)
+        self.assertEqual(state.committed_cursor, 'cur_empty_recovery')
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_fetch_at), fixed_now)
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_sync_at), fixed_now)
+        self.assertEqual(state.checkpoint_status, 'committed')
+
+    def test_recovery_empty_response_without_cursor_does_not_advance_durable_checkpoint(self):
+        self._default_cfg()
+        account = self._make_account('empty-no-cursor', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'empty_no_cursor_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+        })
+
+        fixed_now = '2026-08-20 10:00:00'
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value=fixed_now):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 0)
+        self.assertFalse(state.committed_cursor)
+        self.assertFalse(state.last_successful_fetch_at)
+        self.assertFalse(state.last_successful_sync_at)
+        self.assertEqual(state.checkpoint_status, 'ready')
+
+    def test_recovery_non_empty_response_with_cursor_advances_durable_checkpoint(self):
+        self._default_cfg()
+        account = self._make_account('non-empty-with-cursor', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'non_empty_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+        })
+
+        fixed_now = '2026-08-20 10:00:00'
+        payload = self._payload([self._tx('trans_patch3_non_empty_cursor')], current='cur_non_empty_recovery', nxt=None)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value=fixed_now):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 1)
+        self.assertEqual(state.committed_cursor, 'cur_non_empty_recovery')
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_fetch_at), fixed_now)
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_sync_at), fixed_now)
+        self.assertEqual(state.checkpoint_status, 'committed')
+
+    def test_recovery_empty_response_without_cursor_preserves_next_recovery_start(self):
+        self._default_cfg()
+        account = self._make_account('empty-no-cursor-retry', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'empty_no_cursor_retry_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+        })
+
+        calls = []
+        responses = [
+            self._payload([], current=None, nxt=None, include_cursor=False),
+            self._payload([self._tx('trans_patch3_retry_after_empty')], current='cur_retry_after_empty', nxt=None),
+        ]
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return responses.pop(0)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-08-20 10:00:00'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                    first = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-08-21 10:00:00'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                    second = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(first.get('failed'), 0)
+        self.assertEqual(first.get('imported'), 0)
+        self.assertEqual(second.get('failed'), 0)
+        self.assertEqual(second.get('imported'), 1)
+        self.assertEqual(len(calls), 2)
+        self.assertIn('2026-08-10', calls[0].get('start', ''))
+        self.assertIn('2026-08-10', calls[1].get('start', ''))

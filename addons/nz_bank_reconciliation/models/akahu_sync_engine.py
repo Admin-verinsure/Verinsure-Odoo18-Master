@@ -439,6 +439,7 @@ class AkahuSyncEngine(models.Model):
         lock_contention = False
         recovery_limit_hit = False
         failure_reason = False
+        durable_recovery_checkpoint = False
 
         try:
             lock_acquired = self._try_acquire_journal_lock(akahu_account.journal_id.id)
@@ -800,6 +801,7 @@ class AkahuSyncEngine(models.Model):
                         pages_processed += 1
                         checkpoint_cursor = page_committed_cursor or state.committed_cursor or akahu_account.sync_cursor
                         page_last_dt, page_last_tx_id = self._extract_last_checkpoint(items)
+                        tx_checkpoint_advanced = False
 
                         if page_last_dt and (
                             not pending_last_successful_date
@@ -807,21 +809,33 @@ class AkahuSyncEngine(models.Model):
                         ):
                             pending_last_successful_date = page_last_dt
                             pending_last_successful_tx_id = page_last_tx_id
+                            tx_checkpoint_advanced = True
+
+                        # Recovery without a cursor can only advance durably if
+                        # the latest transaction checkpoint moves forward.
+                        page_has_durable_recovery_checkpoint = bool(
+                            page_committed_cursor or tx_checkpoint_advanced
+                        )
 
                         state_vals = {
                             'inflight_cursor': checkpoint_cursor,
                             'inflight_page_no': page_count,
                             'last_successful_transaction_date': pending_last_successful_date,
                             'last_successful_transaction_id': pending_last_successful_tx_id,
-                            'last_successful_fetch_at': fields.Datetime.now(),
                             'checkpoint_status': 'committed',
                             'checkpoint_updated_at': fields.Datetime.now(),
                         }
+                        if run_mode != 'recovery' or page_has_durable_recovery_checkpoint:
+                            state_vals['last_successful_fetch_at'] = fields.Datetime.now()
+                        else:
+                            state_vals['checkpoint_status'] = 'ready'
                         if checkpoint_cursor:
                             state_vals['committed_cursor'] = checkpoint_cursor
                         state.sudo().write(state_vals)
                         if checkpoint_cursor:
                             akahu_account.sudo().write({'sync_cursor': checkpoint_cursor})
+                        if run_mode == 'recovery' and page_has_durable_recovery_checkpoint:
+                            durable_recovery_checkpoint = True
 
                         if page_savepoint:
                             self.env.cr.execute('RELEASE SAVEPOINT %s' % page_savepoint)
@@ -851,7 +865,7 @@ class AkahuSyncEngine(models.Model):
             sync_ok = total_failed == 0
             now = fields.Datetime.now()
 
-            if sync_ok and run_mode == 'recovery':
+            if sync_ok and run_mode == 'recovery' and durable_recovery_checkpoint:
                 state.sudo().write({
                     'checkpoint_status': 'committed',
                     'checkpoint_updated_at': now,
@@ -863,13 +877,17 @@ class AkahuSyncEngine(models.Model):
             akahu_account.sudo().write(account_write_vals)
 
             if sync_ok:
-                state.sudo().write({
+                state_vals = {
                     'state_status': 'ready',
-                    'last_successful_sync_at': now,
-                    'checkpoint_status': 'committed',
                     'checkpoint_updated_at': now,
                     'recovery_reason': False if run_mode != 'recovery' else state.recovery_reason,
-                })
+                }
+                if run_mode == 'recovery' and not durable_recovery_checkpoint:
+                    state_vals['checkpoint_status'] = 'ready'
+                else:
+                    state_vals['last_successful_sync_at'] = now
+                    state_vals['checkpoint_status'] = 'committed'
+                state.sudo().write(state_vals)
             else:
                 checkpoint_status = 'failed'
                 if run_mode == 'recovery' and state.committed_cursor:
