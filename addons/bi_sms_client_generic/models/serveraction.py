@@ -21,7 +21,7 @@
 ##############################################################################
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 import time
 import logging
 
@@ -45,81 +45,113 @@ class ServerAction(models.Model):
 
     @api.model
     def run(self):
-        context = self._context
-        if self._context is None:
-            self._context = {}
-        act_ids = []
-        for action in self:
-            obj_pool = self.env[action.model_id.model]
-            obj = obj_pool.browse(self._context.get('active_id', False))
-            email_template_obj = self.env['mail.template']
-            cxt = {
-                'context': self._context,
-                'object': obj,
-                'time': time,
-                'cr': self._cr,
-                'pool': self.env,
-                'uid': self._uid,
-            }
-            expr = eval(str(action.condition), cxt)
-            if not expr:
+        res = False
+        actions = {action.id: action for action in self}
+        for sudo_action in self.sudo():
+            action = actions.get(sudo_action.id, self.browse(sudo_action.id))
+            if sudo_action.state == 'sms':
+                res = action._run_sms_action(sudo_action) or res
                 continue
-            if action.state == 'sms':
-                _logger.info('Send SMS')
-                sms_pool = self.env['sms.smsclient']
-                queue_obj = self.env['sms.smsclient.queue']
-                mobile = str(action.mobile)
-                to = None
-                try:
-                    cxt.update({'gateway': action.sms_server})
-                    gateway = action.sms_template_id.gateway_id
-                    if mobile:
-                        to = eval(action.mobile, cxt)
-                    res_id = self._context.get('active_id')
-                    template = email_template_obj.get_email_template(action.sms_template_id.id, res_id, self._context)
-                    values = {}
-                    for field in ['subject', 'body_html', 'email_from',
-                                  'email_to', 'email_recipients', 'email_cc', 'reply_to']:
-                        values[field] = email_template_obj.render_template( getattr(template, field),
-                                                             template.model, res_id, context=context) \
-                                                             or False
-                    vals ={
-                        'name': gateway.url,
-                        'gateway_id': gateway.id,
-                        'state': 'draft',
-                        'mobile': to,
-                        'msg': values['body_html'],
-                        'validity': gateway.validity, 
-                        'classes': gateway.classes, 
-                        'deferred': gateway.deferred, 
-                        'priority': gateway.priority, 
-                        'coding': gateway.coding,
-                        'tag': gateway.tag, 
-                        'nostop': gateway.nostop,
-                    }
-                    sms_in_q = queue_obj.search(cr, uid,[
-                        ('name','=',gateway.url),
-                        ('gateway_id','=',gateway.id),
-                        ('state','=','draft'),
-                        ('mobile','=',to),
-                        ('msg','=',values['body_html']),
-                        ('validity','=',gateway.validity), 
-                        ('classes','=',gateway.classes), 
-                        ('deferred','=',gateway.deferred), 
-                        ('priority','=',gateway.priority), 
-                        ('coding','=',gateway.coding),
-                        ('tag','=',gateway.tag), 
-                        ('nostop','=',gateway.nostop)
-                        ])
-                    if not sms_in_q:
-                        queue_obj.create( vals, context=context)
-                        _logger.info('SMS successfully send to : %s' % (to))
-                except Exception:
-                    _logger.error('Failed to send SMS : %s' % repr(e))
-            else:
-                act_ids.append(action.id)
-        if act_ids:
-            return super(ServerAction, self).run(act_ids, context=context)
-        return super(ServerAction, self).run()
+            res = super(ServerAction, action).run() or res
+        return res
+
+    def _run_sms_action(self, sudo_action):
+        self.ensure_one()
+
+        action_groups = sudo_action.groups_id
+        if action_groups:
+            if not (action_groups & self.env.user.groups_id):
+                raise AccessError(_("You don't have enough access rights to run this action."))
+        else:
+            model_name = sudo_action.model_id.model
+            try:
+                self.env[model_name].check_access("write")
+            except AccessError:
+                _logger.warning(
+                    "Forbidden server action %r executed while the user %s does not have access to %s.",
+                    sudo_action.name, self.env.user.login, model_name,
+                )
+                raise
+
+        eval_context = self._get_eval_context(sudo_action)
+        records = eval_context.get('record') or eval_context['model']
+        records |= eval_context.get('records') or eval_context['model']
+        if not action_groups and records.ids:
+            try:
+                records.check_access('write')
+            except AccessError:
+                _logger.warning(
+                    "Forbidden server action %r executed while the user %s does not have access to %s.",
+                    sudo_action.name, self.env.user.login, records,
+                )
+                raise
+
+        context = self.env.context
+        obj_pool = self.env[sudo_action.model_id.model]
+        obj = obj_pool.browse(context.get('active_id', False))
+        email_template_obj = self.env['mail.template']
+        cxt = {
+            'context': context,
+            'object': obj,
+            'time': time,
+            'cr': self._cr,
+            'pool': self.env,
+            'uid': self._uid,
+        }
+        expr = eval(str(sudo_action.condition), cxt)
+        if not expr:
+            return False
+
+        _logger.info('Send SMS')
+        queue_obj = self.env['sms.smsclient.queue']
+        mobile = str(sudo_action.mobile)
+        to = None
+        try:
+            cxt.update({'gateway': sudo_action.sms_server})
+            gateway = sudo_action.sms_template_id.gateway_id
+            if mobile:
+                to = eval(sudo_action.mobile, cxt)
+            res_id = context.get('active_id')
+            template = email_template_obj.get_email_template(sudo_action.sms_template_id.id, res_id, context)
+            values = {}
+            for field in ['subject', 'body_html', 'email_from',
+                          'email_to', 'email_recipients', 'email_cc', 'reply_to']:
+                values[field] = email_template_obj.render_template(
+                    getattr(template, field), template.model, res_id, context=context,
+                ) or False
+            vals = {
+                'name': gateway.url,
+                'gateway_id': gateway.id,
+                'state': 'draft',
+                'mobile': to,
+                'msg': values['body_html'],
+                'validity': gateway.validity,
+                'classes': gateway.classes,
+                'deferred': gateway.deferred,
+                'priority': gateway.priority,
+                'coding': gateway.coding,
+                'tag': gateway.tag,
+                'nostop': gateway.nostop,
+            }
+            sms_in_q = queue_obj.search([
+                ('name', '=', gateway.url),
+                ('gateway_id', '=', gateway.id),
+                ('state', '=', 'draft'),
+                ('mobile', '=', to),
+                ('msg', '=', values['body_html']),
+                ('validity', '=', gateway.validity),
+                ('classes', '=', gateway.classes),
+                ('deferred', '=', gateway.deferred),
+                ('priority', '=', gateway.priority),
+                ('coding', '=', gateway.coding),
+                ('tag', '=', gateway.tag),
+                ('nostop', '=', gateway.nostop),
+            ], limit=1)
+            if not sms_in_q:
+                queue_obj.create(vals)
+                _logger.info('SMS successfully send to : %s' % (to))
+        except Exception as e:
+            _logger.error('Failed to send SMS : %s' % repr(e))
+        return False
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
