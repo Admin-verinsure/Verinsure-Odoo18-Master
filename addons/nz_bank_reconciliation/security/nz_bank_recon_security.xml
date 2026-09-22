@@ -2,6 +2,11 @@
 <odoo>
     <data>
 
+        <record id="group_akahu_cron_technical" model="res.groups">
+            <field name="name">Akahu Cron Technical</field>
+            <field name="category_id" ref="base.module_category_hidden"/>
+        </record>
+
         <!-- ── Akahu multi-company rules ───────────────────────────────────── -->
         <record id="akahu_credential_company_rule" model="ir.rule">
             <field name="name">Akahu Credential: Multi-company</field>

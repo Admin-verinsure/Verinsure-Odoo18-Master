@@ -39,10 +39,11 @@ UX
     ],
     'data': [
         # Security
-        'security/ir.model.access.csv',
         'security/nz_bank_recon_security.xml',
+        'security/ir.model.access.csv',
         # Data / Crons
         'data/ir_cron_data.xml',
+        'data/akahu_cron_group_data.xml',
         # Views — Akahu
         'views/akahu_credential_views.xml',
         'views/akahu_account_views.xml',
