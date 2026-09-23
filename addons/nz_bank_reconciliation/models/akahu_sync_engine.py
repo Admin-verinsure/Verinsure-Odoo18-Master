@@ -513,40 +513,67 @@ class AkahuSyncEngine(models.Model):
             cursor_before = committed_cursor or akahu_account.sync_cursor or False
 
             explicit_recovery = bool(self.env.context.get('akahu_force_recovery'))
+            explicit_recovery_start = self.env.context.get('akahu_recovery_start') if explicit_recovery else False
+            explicit_recovery_end = self.env.context.get('akahu_recovery_end') if explicit_recovery else False
             run_mode = self._determine_sync_mode(
                 state,
                 akahu_account,
                 account_changed=account_changed,
                 explicit_recovery=explicit_recovery,
             )
+            checkpoint_dt = False
             recovery_start = False
             recovery_end = False
 
             if run_mode == 'normal':
                 params['cursor'] = committed_cursor
             elif run_mode == 'recovery':
-                checkpoint_candidates = [
-                    self._normalize_datetime_utc(state.last_successful_fetch_at),
-                    self._normalize_datetime_utc(state.last_successful_transaction_date),
-                    self._normalize_datetime_utc(state.last_successful_sync_at),
-                ]
-                checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
-                checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
-
-                if not checkpoint_dt:
-                    raise UserError(_(
-                        'Cursor recovery is required for %s, but no historical checkpoint is available. '
-                        'Refusing unbounded historical import.'
-                    ) % akahu_account.name)
-
-                overlap_days = sync_cfg['recovery_overlap_days']
                 max_days = sync_cfg['max_recovery_days']
-                recovery_end = self._normalize_datetime_utc(fields.Datetime.now())
-                recovery_start = checkpoint_dt - timedelta(days=overlap_days)
+                overlap_days = sync_cfg['recovery_overlap_days']
+
+                if explicit_recovery and explicit_recovery_start and explicit_recovery_end:
+                    recovery_start = self._normalize_datetime_utc(explicit_recovery_start)
+                    recovery_end = self._normalize_datetime_utc(explicit_recovery_end)
+                    if not recovery_start or not recovery_end:
+                        raise UserError(_(
+                            'Explicit recovery for %s requires valid akahu_recovery_start and akahu_recovery_end values.'
+                        ) % akahu_account.name)
+                    if recovery_end <= recovery_start:
+                        raise UserError(_(
+                            'Explicit recovery for %s requires akahu_recovery_end to be later than akahu_recovery_start.'
+                        ) % akahu_account.name)
+                    _logger.info(
+                        'Akahu explicit recovery: account=%s start=%s end=%s',
+                        sanitize_log_value(akahu_account.name),
+                        sanitize_log_value(recovery_start),
+                        sanitize_log_value(recovery_end),
+                    )
+                else:
+                    checkpoint_candidates = [
+                        self._normalize_datetime_utc(state.last_successful_fetch_at),
+                        self._normalize_datetime_utc(state.last_successful_transaction_date),
+                        self._normalize_datetime_utc(state.last_successful_sync_at),
+                    ]
+                    checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
+                    checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
+
+                    if not checkpoint_dt:
+                        raise UserError(_(
+                            'Cursor recovery is required for %s, but no historical checkpoint is available. '
+                            'Refusing unbounded historical import.'
+                        ) % akahu_account.name)
+
+                    recovery_end = self._normalize_datetime_utc(fields.Datetime.now())
+                    recovery_start = checkpoint_dt - timedelta(days=overlap_days)
+
                 total_span = recovery_end - recovery_start
                 if total_span.total_seconds() > (max_days * 86400):
                     recovery_limit_hit = True
                     failure_reason = 'max_days_limit'
+                    if explicit_recovery and explicit_recovery_start and explicit_recovery_end:
+                        raise UserError(_(
+                            'Explicit recovery window for %s spans %.6f days which exceeds the configured maximum of %d days.'
+                        ) % (akahu_account.name, total_span.total_seconds() / 86400.0, max_days))
                     raise UserError(_(
                         'Recovery window for %s spans %.6f days which exceeds the configured maximum of %d days. '
                         'Refusing unbounded recovery import.'
@@ -556,7 +583,7 @@ class AkahuSyncEngine(models.Model):
                 params['end'] = self._to_akahu_iso(recovery_end)
 
                 state.sudo().write({
-                    'recovery_reason': 'cursor_missing_or_inconsistent',
+                    'recovery_reason': 'explicit_window' if explicit_recovery and explicit_recovery_start and explicit_recovery_end else 'cursor_missing_or_inconsistent',
                     'recovery_window_start': recovery_start,
                     'recovery_window_end': recovery_end,
                     'recovery_overlap_days': overlap_days,
