@@ -550,23 +550,31 @@ class AkahuSyncEngine(models.Model):
                         sanitize_log_value(recovery_end),
                     )
                 else:
-                    checkpoint_candidates = [
-                        self._normalize_datetime_utc(state.last_successful_fetch_at),
-                        self._normalize_datetime_utc(state.last_successful_transaction_date),
-                        self._normalize_datetime_utc(state.last_successful_sync_at),
-                        self._normalize_datetime_utc(state.recovery_covered_through),
-                    ]
-                    checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
-                    checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
+                    recovery_covered_through = self._normalize_datetime_utc(state.recovery_covered_through)
+                    if recovery_covered_through:
+                        checkpoint_dt = recovery_covered_through
+                        recovery_start = checkpoint_dt - timedelta(days=overlap_days)
+                        recovery_end = min(
+                            recovery_start + timedelta(days=max_days),
+                            self._normalize_datetime_utc(fields.Datetime.now()),
+                        )
+                    else:
+                        checkpoint_candidates = [
+                            self._normalize_datetime_utc(state.last_successful_fetch_at),
+                            self._normalize_datetime_utc(state.last_successful_transaction_date),
+                            self._normalize_datetime_utc(state.last_successful_sync_at),
+                        ]
+                        checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
+                        checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
 
-                    if not checkpoint_dt:
-                        raise UserError(_(
-                            'Cursor recovery is required for %s, but no historical checkpoint is available. '
-                            'Refusing unbounded historical import.'
-                        ) % akahu_account.name)
+                        if not checkpoint_dt:
+                            raise UserError(_(
+                                'Cursor recovery is required for %s, but no historical checkpoint is available. '
+                                'Refusing unbounded historical import.'
+                            ) % akahu_account.name)
 
-                    recovery_end = self._normalize_datetime_utc(fields.Datetime.now())
-                    recovery_start = checkpoint_dt - timedelta(days=overlap_days)
+                        recovery_end = self._normalize_datetime_utc(fields.Datetime.now())
+                        recovery_start = checkpoint_dt - timedelta(days=overlap_days)
 
                 total_span = recovery_end - recovery_start
                 if total_span.total_seconds() > (max_days * 86400):

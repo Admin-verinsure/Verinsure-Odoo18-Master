@@ -824,6 +824,40 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertEqual(run.run_mode, 'recovery')
         self.assertEqual(fields.Datetime.to_string(run.recovery_boundary_start), '2026-08-30 12:00:00')
 
+    def test_recovery_covered_through_uses_bounded_automatic_chunk(self):
+        self._default_cfg()
+        account = self._make_account('recovery-covered-chunk', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_anchor_prev',
+            'last_successful_fetch_at': '2026-09-24 05:22:18',
+            'last_successful_sync_at': '2026-09-24 05:22:18',
+            'recovery_covered_through': '2026-09-09 05:22:18',
+        })
+
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+        calls = []
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return payload
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-09-24 05:22:18'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertTrue(calls)
+        self.assertIn('2026-09-07', calls[0].get('start', ''))
+        self.assertIn('2026-09-14', calls[0].get('end', ''))
+        run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
+        self.assertEqual(fields.Datetime.to_string(run.recovery_boundary_start), '2026-09-09 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(run.recovery_start), '2026-09-07 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(run.recovery_end), '2026-09-14 05:22:18')
+
     def test_recovery_empty_response_with_cursor_advances_durable_fetch_checkpoint(self):
         self._default_cfg()
         account = self._make_account('empty-with-cursor', sync_cursor=False)
@@ -877,6 +911,36 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertFalse(state.last_successful_fetch_at)
         self.assertFalse(state.last_successful_sync_at)
         self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), fixed_now)
+        self.assertEqual(state.checkpoint_status, 'ready')
+
+    def test_recovery_covered_empty_chunk_advances_only_one_bounded_chunk(self):
+        self._default_cfg()
+        account = self._make_account('covered-empty-chunk', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_empty_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+            'recovery_covered_through': '2026-09-09 05:22:18',
+        })
+
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-09-24 05:22:18'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 0)
+        self.assertFalse(state.committed_cursor)
+        self.assertFalse(state.last_successful_fetch_at)
+        self.assertFalse(state.last_successful_sync_at)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-14 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(state.recovery_window_start), '2026-09-07 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(state.recovery_window_end), '2026-09-14 05:22:18')
         self.assertEqual(state.checkpoint_status, 'ready')
 
     def test_recovery_non_empty_response_with_cursor_advances_durable_checkpoint(self):
@@ -947,6 +1011,92 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertIn('2026-08-18', calls[1].get('start', ''))
         self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-08-20 10:00:00')
 
+    def test_recovery_covered_through_second_run_starts_from_new_chunk_with_overlap(self):
+        self._default_cfg()
+        account = self._make_account('covered-second-run', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_second_prev',
+            'recovery_covered_through': '2026-09-09 05:22:18',
+        })
+
+        calls = []
+        responses = [
+            self._payload([], current=None, nxt=None, include_cursor=False),
+            self._payload([], current=None, nxt=None, include_cursor=False),
+        ]
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return responses.pop(0)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-09-24 05:22:18'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                    first = self.Engine.sync_account(account, trigger_source='manual_account')
+                    second = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(first.get('failed'), 0)
+        self.assertEqual(second.get('failed'), 0)
+        self.assertEqual(len(calls), 2)
+        self.assertIn('2026-09-07', calls[0].get('start', ''))
+        self.assertIn('2026-09-14', calls[0].get('end', ''))
+        self.assertIn('2026-09-12', calls[1].get('start', ''))
+        self.assertIn('2026-09-19', calls[1].get('end', ''))
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-19 05:22:18')
+
+    def test_recovery_covered_through_final_chunk_stops_at_now(self):
+        self._default_cfg()
+        account = self._make_account('covered-final-now', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_final_prev',
+            'recovery_covered_through': '2026-09-19 05:22:18',
+        })
+
+        calls = []
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return payload
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-09-24 05:22:18'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertTrue(calls)
+        self.assertIn('2026-09-17', calls[0].get('start', ''))
+        self.assertIn('2026-09-24', calls[0].get('end', ''))
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-24 05:22:18')
+
+    def test_recovery_covered_through_prevents_max_days_limit_when_far_behind_now(self):
+        self._default_cfg()
+        account = self._make_account('covered-no-max-days', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_limit_prev',
+            'recovery_covered_through': '2026-09-09 05:22:18',
+        })
+
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value='2026-10-02 05:22:18'):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-14 05:22:18')
+
     def test_recovery_covered_through_never_moves_backwards(self):
         self._default_cfg()
         account = self._make_account('covered-through-monotonic', sync_cursor=False)
@@ -981,7 +1131,7 @@ class TestPatch3CursorRecovery(TransactionCase):
             'committed_cursor': False,
             'last_successful_transaction_date': '2026-08-12 00:00:00',
             'last_successful_transaction_id': 'covered_page_prev',
-            'recovery_covered_through': False,
+            'recovery_covered_through': '2026-09-09 05:22:18',
         })
 
         tx1 = self._tx('trans_patch3_covered_page_tx1')
@@ -999,4 +1149,4 @@ class TestPatch3CursorRecovery(TransactionCase):
                 result = self.Engine.sync_account(account, trigger_source='manual_account')
 
         self.assertEqual(result.get('failed'), 1)
-        self.assertFalse(state.recovery_covered_through)
+    self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-09 05:22:18')
