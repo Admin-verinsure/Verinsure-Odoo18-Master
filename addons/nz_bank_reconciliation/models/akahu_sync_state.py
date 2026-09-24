@@ -34,6 +34,7 @@ class AkahuSyncState(models.Model):
     last_successful_transaction_date = fields.Datetime(string='Last Successful Transaction Date')
     last_successful_fetch_at = fields.Datetime(string='Last Successful Fetch At')
     last_successful_sync_at = fields.Datetime(string='Last Successful Sync At')
+    recovery_covered_through = fields.Datetime(string='Recovery Covered Through')
 
     checkpoint_status = fields.Selection([
         ('ready', 'Ready'),
