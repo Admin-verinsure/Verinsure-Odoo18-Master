@@ -145,6 +145,148 @@ class TestPatch3CursorRecovery(TransactionCase):
         run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
         self.assertEqual(run.run_mode, 'recovery')
 
+    def test_explicit_recovery_valid_window_uses_supplied_start_end_without_cursor(self):
+        self._default_cfg()
+        account = self._make_account('explicit-valid', sync_cursor='cur_should_not_be_used')
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-01 00:00:00',
+            'last_successful_fetch_at': '2026-08-01 00:00:00',
+            'last_successful_sync_at': '2026-08-01 00:00:00',
+        })
+
+        calls = []
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return self._payload([self._tx('trans_patch3_explicit_valid')], current='cur_explicit_valid')
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                result = self.Engine.with_context(
+                    akahu_force_recovery=True,
+                    akahu_recovery_start='2026-09-02 00:00:00',
+                    akahu_recovery_end='2026-09-09 00:00:00',
+                ).sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertTrue(calls)
+        self.assertIn('2026-09-02', calls[0].get('start', ''))
+        self.assertIn('2026-09-09', calls[0].get('end', ''))
+        self.assertFalse(calls[0].get('cursor'))
+        run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
+        self.assertEqual(run.run_mode, 'recovery')
+        self.assertEqual(fields.Datetime.to_string(run.recovery_start), '2026-09-02 00:00:00')
+        self.assertEqual(fields.Datetime.to_string(run.recovery_end), '2026-09-09 00:00:00')
+
+    def test_explicit_recovery_window_over_limit_raises_without_api_call(self):
+        self._default_cfg()
+        account = self._make_account('explicit-over-limit', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-01 00:00:00',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+        })
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get') as api_get:
+                with self.assertRaises(UserError):
+                    self.Engine.with_context(
+                        akahu_force_recovery=True,
+                        akahu_recovery_start='2026-09-02 00:00:00',
+                        akahu_recovery_end='2026-09-10 00:00:01',
+                    ).sync_account(account, trigger_source='manual_account')
+
+        api_get.assert_not_called()
+        self.assertFalse(state.committed_cursor)
+        self.assertFalse(state.last_successful_fetch_at)
+        self.assertFalse(state.last_successful_sync_at)
+
+    def test_explicit_recovery_end_not_after_start_raises_without_api_call(self):
+        self._default_cfg()
+        account = self._make_account('explicit-bad-order', sync_cursor=False)
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get') as api_get:
+                with self.assertRaises(UserError):
+                    self.Engine.with_context(
+                        akahu_force_recovery=True,
+                        akahu_recovery_start='2026-09-09 00:00:00',
+                        akahu_recovery_end='2026-09-09 00:00:00',
+                    ).sync_account(account, trigger_source='manual_account')
+
+        api_get.assert_not_called()
+
+    def test_explicit_recovery_dates_without_force_are_ignored(self):
+        self._default_cfg()
+        account = self._make_account('explicit-ignored', sync_cursor='cur_existing_normal')
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({'committed_cursor': 'cur_existing_normal'})
+
+        calls = []
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return self._payload([self._tx('trans_patch3_explicit_ignored')], current='cur_existing_new')
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                result = self.Engine.with_context(
+                    akahu_recovery_start='2026-09-02 00:00:00',
+                    akahu_recovery_end='2026-09-09 00:00:00',
+                ).sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertTrue(calls)
+        self.assertEqual(calls[0].get('cursor'), 'cur_existing_normal')
+        self.assertFalse(calls[0].get('start'))
+        self.assertFalse(calls[0].get('end'))
+
+    def test_explicit_recovery_empty_response_without_cursor_keeps_nondurable_checkpoint(self):
+        self._default_cfg()
+        account = self._make_account('explicit-empty-no-cursor', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-01 00:00:00',
+            'last_successful_transaction_id': 'explicit_empty_prev',
+            'last_successful_fetch_at': '2026-09-02 05:22:18',
+            'last_successful_sync_at': '2026-09-02 05:22:18',
+        })
+
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', return_value=payload) as api_get:
+                result = self.Engine.with_context(
+                    akahu_force_recovery=True,
+                    akahu_recovery_start='2026-09-02 00:00:00',
+                    akahu_recovery_end='2026-09-09 00:00:00',
+                ).sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 0)
+        self.assertEqual(self._line_count_for_journal(account.journal_id), 0)
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_fetch_at), '2026-09-02 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_sync_at), '2026-09-02 05:22:18')
+        self.assertFalse(state.committed_cursor)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_window_start), '2026-09-02 00:00:00')
+        self.assertEqual(fields.Datetime.to_string(state.recovery_window_end), '2026-09-09 00:00:00')
+        self.assertEqual(state.checkpoint_status, 'ready')
+        self.assertEqual(state.recovery_reason, 'explicit_window')
+
+        api_params = api_get.call_args.kwargs.get('params') if api_get.call_args.kwargs else api_get.call_args.args[2]
+        self.assertIn('2026-09-02', api_params.get('start', ''))
+        self.assertIn('2026-09-09', api_params.get('end', ''))
+        self.assertFalse(api_params.get('cursor'))
+
+        run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
+        self.assertEqual(run.status, 'success')
+        self.assertFalse(run.cursor_after)
+
     def test_cursor_missing_without_checkpoint_is_first_sync(self):
         self._default_cfg()
         account = self._make_account('firstsync', sync_cursor=False)
