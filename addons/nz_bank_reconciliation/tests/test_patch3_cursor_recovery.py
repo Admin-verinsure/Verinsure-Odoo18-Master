@@ -119,6 +119,34 @@ class TestPatch3CursorRecovery(TransactionCase):
         run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
         self.assertEqual(run.run_mode, 'normal')
 
+    def test_normal_cursor_next_paginates_and_commits_last_current_cursor(self):
+        self._default_cfg()
+        account = self._make_account('normal-paged', sync_cursor='cur_old_paged')
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({'committed_cursor': 'cur_old_paged'})
+
+        calls = []
+        responses = [
+            self._payload([self._tx('trans_patch3_normal_page1')], current='cur_normal_page1', nxt='cur_next_page_2'),
+            self._payload([self._tx('trans_patch3_normal_page2')], current='cur_normal_page2', nxt=None),
+        ]
+
+        def _api(user_token, path, params=None):
+            calls.append(params.copy() if params else {})
+            return responses.pop(0)
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 2)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0].get('cursor'), 'cur_old_paged')
+        self.assertEqual(calls[1].get('cursor'), 'cur_next_page_2')
+        self.assertEqual(state.committed_cursor, 'cur_normal_page2')
+        self.assertEqual(account.sync_cursor, 'cur_normal_page2')
+
     def test_cursor_missing_with_checkpoint_enters_recovery(self):
         self._default_cfg()
         account = self._make_account('recover1', sync_cursor=False)
@@ -144,6 +172,37 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertTrue(calls[0].get('end'))
         run = self.SyncRun.search([('journal_id', '=', account.journal_id.id)], order='id desc', limit=1)
         self.assertEqual(run.run_mode, 'recovery')
+
+    def test_recovery_with_transactions_and_no_cursor_advances_transaction_checkpoint_not_cursor(self):
+        self._default_cfg()
+        account = self._make_account('recover-no-cursor-items', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'trans_prev_no_cursor',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+            'recovery_covered_through': False,
+        })
+
+        fixed_now = '2026-08-20 10:00:00'
+        payload = self._payload([
+            self._tx('trans_patch3_recovery_no_cursor', dt_iso='2026-08-15T01:02:03.000Z')
+        ], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch('odoo.fields.Datetime.now', return_value=fixed_now):
+            with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+                with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                    result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(result.get('imported'), 1)
+        self.assertFalse(state.committed_cursor)
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_transaction_date), '2026-08-15 01:02:03')
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_fetch_at), fixed_now)
+        self.assertEqual(fields.Datetime.to_string(state.last_successful_sync_at), fixed_now)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), fixed_now)
 
     def test_explicit_recovery_valid_window_uses_supplied_start_end_without_cursor(self):
         self._default_cfg()
@@ -245,7 +304,7 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertFalse(calls[0].get('start'))
         self.assertFalse(calls[0].get('end'))
 
-    def test_explicit_recovery_empty_response_without_cursor_keeps_nondurable_checkpoint(self):
+    def test_explicit_recovery_empty_response_without_cursor_marks_window_covered_without_cursor_checkpoint(self):
         self._default_cfg()
         account = self._make_account('explicit-empty-no-cursor', sync_cursor=False)
         state = self.Engine._get_or_create_sync_state(account)
@@ -255,6 +314,7 @@ class TestPatch3CursorRecovery(TransactionCase):
             'last_successful_transaction_id': 'explicit_empty_prev',
             'last_successful_fetch_at': '2026-09-02 05:22:18',
             'last_successful_sync_at': '2026-09-02 05:22:18',
+            'recovery_covered_through': False,
         })
 
         payload = self._payload([], current=None, nxt=None, include_cursor=False)
@@ -272,6 +332,7 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertEqual(self._line_count_for_journal(account.journal_id), 0)
         self.assertEqual(fields.Datetime.to_string(state.last_successful_fetch_at), '2026-09-02 05:22:18')
         self.assertEqual(fields.Datetime.to_string(state.last_successful_sync_at), '2026-09-02 05:22:18')
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-09 00:00:00')
         self.assertFalse(state.committed_cursor)
         self.assertEqual(fields.Datetime.to_string(state.recovery_window_start), '2026-09-02 00:00:00')
         self.assertEqual(fields.Datetime.to_string(state.recovery_window_end), '2026-09-09 00:00:00')
@@ -412,6 +473,7 @@ class TestPatch3CursorRecovery(TransactionCase):
 
         self.assertFalse(state.committed_cursor)
         self.assertEqual(fields.Datetime.to_string(state.last_successful_transaction_date), prev_date)
+        self.assertFalse(state.recovery_covered_through)
 
     def test_recovery_success_commits_new_checkpoint(self):
         self._default_cfg()
@@ -814,6 +876,7 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertFalse(state.committed_cursor)
         self.assertFalse(state.last_successful_fetch_at)
         self.assertFalse(state.last_successful_sync_at)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), fixed_now)
         self.assertEqual(state.checkpoint_status, 'ready')
 
     def test_recovery_non_empty_response_with_cursor_advances_durable_checkpoint(self):
@@ -881,4 +944,59 @@ class TestPatch3CursorRecovery(TransactionCase):
         self.assertEqual(second.get('imported'), 1)
         self.assertEqual(len(calls), 2)
         self.assertIn('2026-08-10', calls[0].get('start', ''))
-        self.assertIn('2026-08-10', calls[1].get('start', ''))
+        self.assertIn('2026-08-18', calls[1].get('start', ''))
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-08-20 10:00:00')
+
+    def test_recovery_covered_through_never_moves_backwards(self):
+        self._default_cfg()
+        account = self._make_account('covered-through-monotonic', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_prev',
+            'last_successful_fetch_at': False,
+            'last_successful_sync_at': False,
+            'recovery_covered_through': '2026-09-09 00:00:00',
+        })
+
+        payload = self._payload([], current=None, nxt=None, include_cursor=False)
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', return_value=payload):
+                result = self.Engine.with_context(
+                    akahu_force_recovery=True,
+                    akahu_recovery_start='2026-09-02 00:00:00',
+                    akahu_recovery_end='2026-09-05 00:00:00',
+                ).sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 0)
+        self.assertEqual(fields.Datetime.to_string(state.recovery_covered_through), '2026-09-09 00:00:00')
+
+    def test_recovery_page1_success_page2_failure_does_not_advance_recovery_covered_through(self):
+        self._default_cfg()
+        account = self._make_account('covered-page-fail', sync_cursor=False)
+        state = self.Engine._get_or_create_sync_state(account)
+        state.write({
+            'committed_cursor': False,
+            'last_successful_transaction_date': '2026-08-12 00:00:00',
+            'last_successful_transaction_id': 'covered_page_prev',
+            'recovery_covered_through': False,
+        })
+
+        tx1 = self._tx('trans_patch3_covered_page_tx1')
+        tx2_dup = self._tx('trans_patch3_covered_page_tx1')
+        responses = [
+            self._payload([tx1], current='cur_covered_page_1', nxt='cursor_covered_page_2'),
+            self._payload([tx2_dup], current='cur_covered_page_2', nxt=None),
+        ]
+
+        def _api(user_token, path, params=None):
+            return responses.pop(0)
+
+        with mock.patch.object(type(account), '_get_user_token', return_value='user_token_x'):
+            with mock.patch.object(type(self.credential), '_api_get', side_effect=_api):
+                result = self.Engine.sync_account(account, trigger_source='manual_account')
+
+        self.assertEqual(result.get('failed'), 1)
+        self.assertFalse(state.recovery_covered_through)

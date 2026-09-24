@@ -266,6 +266,7 @@ class AkahuSyncEngine(models.Model):
             or state.last_successful_transaction_id
             or state.last_successful_fetch_at
             or state.last_successful_sync_at
+            or state.recovery_covered_through
         )
         has_inflight_checkpoint = bool(state.inflight_cursor or state.inflight_page_no)
         has_completed_history = bool(has_checkpoint or state.committed_cursor or has_inflight_checkpoint)
@@ -553,6 +554,7 @@ class AkahuSyncEngine(models.Model):
                         self._normalize_datetime_utc(state.last_successful_fetch_at),
                         self._normalize_datetime_utc(state.last_successful_transaction_date),
                         self._normalize_datetime_utc(state.last_successful_sync_at),
+                        self._normalize_datetime_utc(state.recovery_covered_through),
                     ]
                     checkpoint_candidates = [dt for dt in checkpoint_candidates if dt]
                     checkpoint_dt = max(checkpoint_candidates) if checkpoint_candidates else None
@@ -909,6 +911,10 @@ class AkahuSyncEngine(models.Model):
                     'checkpoint_updated_at': now,
                     'recovery_reason': False if run_mode != 'recovery' else state.recovery_reason,
                 }
+                if run_mode == 'recovery' and recovery_end:
+                    existing_recovery_covered_through = self._normalize_datetime_utc(state.recovery_covered_through)
+                    if not existing_recovery_covered_through or recovery_end > existing_recovery_covered_through:
+                        state_vals['recovery_covered_through'] = recovery_end
                 if run_mode == 'recovery' and not durable_recovery_checkpoint:
                     state_vals['checkpoint_status'] = 'ready'
                 else:
