@@ -559,7 +559,8 @@ class SmartFormTable(http.Controller):
                     "<tr style='background:" + bg + ";border-bottom:1px solid #eef0f3;'>"
                     "<td style='padding:9px 14px;font-weight:600;color:#374151;font-size:0.85rem;"
                     "width:35%;white-space:nowrap;vertical-align:top;'>" + esc(label) + "</td>"
-                    "<td style='padding:9px 14px;color:#1a202c;font-size:0.875rem;vertical-align:top;'>" + val + "</td>"
+                    "<td style='padding:9px 14px;color:#1a202c;font-size:0.875rem;vertical-align:top;"
+                    "word-break:break-word;white-space:pre-wrap;'>" + val + "</td>"
                     "</tr>"
                 )
 
@@ -594,9 +595,9 @@ class SmartFormTable(http.Controller):
                       "<div style='font-size:0.8rem;color:#6b7280;'>" + esc(dt) + key_badge + "</div>"
                     "</div>"
                   "</div>"
-                  "<div style='border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;"
+                                    "<div style='border-radius:10px;overflow-x:auto;overflow-y:hidden;border:1px solid #e5e7eb;"
                   "box-shadow:0 1px 4px rgba(0,0,0,0.06);'>"
-                    "<table style='width:100%;border-collapse:collapse;'>"
+                                        "<table style='width:100%;min-width:640px;border-collapse:collapse;'>"
                       "<tbody>" + (rows or no_data_row) + "</tbody>"
                     "</table>"
                   "</div>"
