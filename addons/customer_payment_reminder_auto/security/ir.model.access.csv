@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_customer_payment_reminder_log_account_user,customer.payment.reminder.log account user,model_customer_payment_reminder_log,account.group_account_user,1,0,0,0
+access_customer_payment_reminder_log_system,customer.payment.reminder.log system,model_customer_payment_reminder_log,base.group_system,1,1,1,1

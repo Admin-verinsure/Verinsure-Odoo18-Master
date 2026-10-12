@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_customer_payment_reminder" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.customer.payment.reminder</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='invoicing_settings']" position="inside">
+                <setting id="payment_reminder_enabled" help="Enable automated payment reminders for the current company.">
+                    <field name="payment_reminder_enabled"/>
+                </setting>
+                <setting id="payment_reminder_min_outstanding" help="Minimum net receivable balance required before sending a reminder.">
+                    <field name="payment_reminder_min_outstanding"/>
+                </setting>
+                <setting id="payment_reminder_cooldown_days" help="Minimum delay between reminders for the same customer.">
+                    <field name="payment_reminder_cooldown_days"/>
+                </setting>
+                <setting id="payment_reminder_dry_run" help="Log eligible reminders without sending emails while testing.">
+                    <field name="payment_reminder_dry_run"/>
+                </setting>
+                <setting id="payment_reminder_template_id" help="Optional email template override for payment reminders.">
+                    <field name="payment_reminder_template_id"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
