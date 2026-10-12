@@ -1,0 +1,453 @@
+import logging
+import uuid
+from collections import defaultdict
+from datetime import timedelta
+from email.utils import parseaddr
+
+from odoo import _, api, fields, models
+from odoo.tools.float_utils import float_compare, float_is_zero
+
+_logger = logging.getLogger(__name__)
+
+
+class CustomerPaymentReminderService(models.Model):
+    _name = 'customer.payment.reminder.service'
+    _description = 'Customer Payment Reminder Service'
+
+    @api.model
+    def _payment_reminder_posted_field(self):
+        aml_model = self.env['account.move.line']
+        return 'parent_state' if 'parent_state' in aml_model._fields else 'move_id.state'
+
+    @api.model
+    def _payment_reminder_amount_rounding(self, company):
+        return company.currency_id.rounding or 0.01
+
+    @api.model
+    def _payment_reminder_template(self, company):
+        return company.payment_reminder_template_id or self.env.ref(
+            'customer_payment_reminder_auto.mail_template_customer_payment_reminder',
+            raise_if_not_found=False,
+        )
+
+    @api.model
+    def _payment_reminder_email_from(self, company):
+        return company.email or self.env.user.email or False
+
+    @api.model
+    def _payment_reminder_normalize_email(self, email_value):
+        name, address = parseaddr(email_value or '')
+        del name
+        normalized = (address or '').strip().lower()
+        if not normalized or '@' not in normalized:
+            return False
+        return normalized
+
+    @api.model
+    def _payment_reminder_format_amount(self, company, amount):
+        rounded_amount = company.currency_id.round(amount)
+        symbol = company.currency_id.symbol or company.currency_id.name or ''
+        return f'{symbol}{rounded_amount:,.2f}' if symbol else f'{rounded_amount:,.2f}'
+
+    @api.model
+    def _payment_reminder_advisory_lock_key(self):
+        return 180120261012
+
+    @api.model
+    def _payment_reminder_try_lock(self):
+        self.env.cr.execute(
+            'SELECT pg_try_advisory_xact_lock(%s)',
+            [self._payment_reminder_advisory_lock_key()],
+        )
+        row = self.env.cr.fetchone()
+        return bool(row and row[0])
+
+    @api.model
+    def _payment_reminder_base_domain(self, company, commercial_partner=None):
+        aml_model = self.env['account.move.line']
+        domain = [
+            ('company_id', '=', company.id),
+            ('partner_id', '!=', False),
+            ('account_id.account_type', '=', 'asset_receivable'),
+            ('amount_residual', '!=', 0),
+            (self._payment_reminder_posted_field(), '=', 'posted'),
+        ]
+        if 'reconciled' in aml_model._fields:
+            domain.append(('reconciled', '=', False))
+        if commercial_partner:
+            domain.append(('partner_id', 'child_of', commercial_partner.id))
+        return domain
+
+    @api.model
+    def _payment_reminder_collect_balances(self, company, commercial_partner=None):
+        aml_model = self.env['account.move.line'].sudo().with_company(company)
+        domain = self._payment_reminder_base_domain(company, commercial_partner=commercial_partner)
+        lines = aml_model.search(domain)
+
+        balances = defaultdict(float)
+        partners = self.env['res.partner']
+        for line in lines:
+            partner = line.partner_id.commercial_partner_id
+            if not partner:
+                continue
+            partners |= partner
+            balances[partner.id] += line.amount_residual
+
+        if commercial_partner and commercial_partner.id not in balances:
+            partners |= commercial_partner
+            balances[commercial_partner.id] = 0.0
+
+        return [(partner, balances.get(partner.id, 0.0)) for partner in partners]
+
+    @api.model
+    def _payment_reminder_last_sent(self, company, partner):
+        return self.env['customer.payment.reminder.log'].sudo().search([
+            ('company_id', '=', company.id),
+            ('commercial_partner_id', '=', partner.id),
+            ('status', '=', 'sent'),
+            ('is_dry_run', '=', False),
+        ], order='reminder_datetime desc, id desc', limit=1)
+
+    @api.model
+    def _payment_reminder_skip_reason(self, company, partner, outstanding_amount):
+        rounding = self._payment_reminder_amount_rounding(company)
+        rounded_outstanding = company.currency_id.round(outstanding_amount)
+        if not partner.active:
+            return _('Partner is inactive.'), False
+        if not partner.payment_reminder_enabled:
+            return _('Automatic payment reminders are disabled for this customer.'), False
+        if float_compare(rounded_outstanding, 0.0, precision_rounding=rounding) <= 0:
+            return _('Customer does not have a net receivable balance.'), False
+        if float_compare(
+            rounded_outstanding,
+            company.payment_reminder_min_outstanding,
+            precision_rounding=rounding,
+        ) < 0:
+            return _(
+                'Outstanding balance %(amount)s is below the threshold %(threshold)s.',
+                amount=self._payment_reminder_format_amount(company, rounded_outstanding),
+                threshold=self._payment_reminder_format_amount(
+                    company,
+                    company.payment_reminder_min_outstanding,
+                ),
+            ), False
+
+        recipient_email = self._payment_reminder_normalize_email(
+            partner.payment_reminder_email_override or partner.email
+        )
+        if not recipient_email:
+            return _('Customer does not have a valid reminder email address.'), False
+
+        cooldown_days = max(company.payment_reminder_cooldown_days or 0, 0)
+        if cooldown_days:
+            latest_log = self._payment_reminder_last_sent(company, partner)
+            if latest_log:
+                latest_dt = fields.Datetime.to_datetime(latest_log.reminder_datetime)
+                now_dt = fields.Datetime.to_datetime(fields.Datetime.now())
+                if latest_dt and now_dt and latest_dt + timedelta(days=cooldown_days) > now_dt:
+                    return _(
+                        'Reminder cooldown is active until %(date)s.',
+                        date=fields.Datetime.to_string(latest_dt + timedelta(days=cooldown_days)),
+                    ), recipient_email
+
+        return False, recipient_email
+
+    @api.model
+    def _payment_reminder_log(self, company, partner, outstanding_amount, status, run_token,
+                              recipient_email=False, reason=False, is_dry_run=False,
+                              mail_mail=False):
+        return self.env['customer.payment.reminder.log'].sudo().create({
+            'reminder_datetime': fields.Datetime.now(),
+            'commercial_partner_id': partner.id,
+            'company_id': company.id,
+            'currency_id': company.currency_id.id,
+            'outstanding_amount': company.currency_id.round(outstanding_amount),
+            'recipient_email': recipient_email,
+            'status': status,
+            'reason': reason,
+            'run_token': run_token,
+            'is_dry_run': is_dry_run,
+            'mail_mail_id': mail_mail.id if mail_mail else False,
+        })
+
+    @api.model
+    def _payment_reminder_send(self, company, partner, outstanding_amount, recipient_email):
+        template = self._payment_reminder_template(company)
+        if not template:
+            return False, _('Payment reminder template is not configured.'), False
+
+        email_from = self._payment_reminder_email_from(company)
+        if not email_from:
+            return False, _('No sender email is configured for the company or current user.'), False
+
+        email_values = {
+            'email_to': recipient_email,
+            'email_from': email_from,
+            'auto_delete': False,
+        }
+        ctx = dict(
+            self.env.context,
+            payment_reminder_email_from=email_from,
+            payment_reminder_email_to=recipient_email,
+            payment_reminder_customer_name=partner.name,
+            payment_reminder_company_name=company.name,
+            payment_reminder_amount=company.currency_id.round(outstanding_amount),
+            payment_reminder_amount_display=self._payment_reminder_format_amount(
+                company,
+                outstanding_amount,
+            ),
+        )
+
+        try:
+            mail_id = template.sudo().with_company(company).with_context(ctx).send_mail(
+                partner.id,
+                force_send=True,
+                email_values=email_values,
+            )
+        except Exception as exc:
+            return False, str(exc), False
+
+        mail_mail = self.env['mail.mail'].sudo().browse(mail_id) if mail_id else False
+        mail_state = getattr(mail_mail, 'state', False) if mail_mail else False
+        if mail_state == 'sent':
+            return True, False, mail_mail
+
+        failure_reason = False
+        if mail_mail:
+            failure_reason = getattr(mail_mail, 'failure_reason', False) or _(
+                'Mail was not sent successfully. Final state: %(state)s.',
+                state=mail_state or 'unknown',
+            )
+        else:
+            failure_reason = _('Mail record was not created.')
+        return False, failure_reason, mail_mail
+
+    @api.model
+    def _payment_reminder_process_partner(self, company, partner, outstanding_amount, run_token,
+                                          dry_run=False):
+        outstanding_amount = company.currency_id.round(outstanding_amount)
+        skip_reason, recipient_email = self._payment_reminder_skip_reason(
+            company,
+            partner,
+            outstanding_amount,
+        )
+        if skip_reason:
+            _logger.info(
+                'Payment reminder skipped: customer=%s company=%s amount=%s reason=%s',
+                partner.display_name,
+                company.name,
+                outstanding_amount,
+                skip_reason,
+            )
+            self._payment_reminder_log(
+                company=company,
+                partner=partner,
+                outstanding_amount=outstanding_amount,
+                status='skipped',
+                run_token=run_token,
+                recipient_email=recipient_email,
+                reason=skip_reason,
+                is_dry_run=dry_run,
+            )
+            return 'skipped', False
+
+        if dry_run:
+            reason = _('Dry run mode: eligible reminder was evaluated but not sent.')
+            _logger.info(
+                'Payment reminder dry run: customer=%s company=%s amount=%s recipient=%s',
+                partner.display_name,
+                company.name,
+                outstanding_amount,
+                recipient_email,
+            )
+            self._payment_reminder_log(
+                company=company,
+                partner=partner,
+                outstanding_amount=outstanding_amount,
+                status='skipped',
+                run_token=run_token,
+                recipient_email=recipient_email,
+                reason=reason,
+                is_dry_run=True,
+            )
+            return 'eligible_dry_run', True
+
+        sent, failure_reason, mail_mail = self._payment_reminder_send(
+            company,
+            partner,
+            outstanding_amount,
+            recipient_email,
+        )
+        if sent:
+            _logger.info(
+                'Payment reminder sent: customer=%s company=%s amount=%s recipient=%s',
+                partner.display_name,
+                company.name,
+                outstanding_amount,
+                recipient_email,
+            )
+            self._payment_reminder_log(
+                company=company,
+                partner=partner,
+                outstanding_amount=outstanding_amount,
+                status='sent',
+                run_token=run_token,
+                recipient_email=recipient_email,
+                mail_mail=mail_mail,
+            )
+            return 'sent', True
+
+        _logger.warning(
+            'Payment reminder failed: customer=%s company=%s amount=%s recipient=%s reason=%s',
+            partner.display_name,
+            company.name,
+            outstanding_amount,
+            recipient_email,
+            failure_reason,
+        )
+        self._payment_reminder_log(
+            company=company,
+            partner=partner,
+            outstanding_amount=outstanding_amount,
+            status='failed',
+            run_token=run_token,
+            recipient_email=recipient_email,
+            reason=failure_reason,
+            mail_mail=mail_mail,
+        )
+        return 'failed', True
+
+    @api.model
+    def _payment_reminder_run_company(self, company, dry_run=False, commercial_partner=None,
+                                      run_token=None):
+        run_token = run_token or str(uuid.uuid4())
+        balances = self._payment_reminder_collect_balances(
+            company,
+            commercial_partner=commercial_partner,
+        )
+        rounding = self._payment_reminder_amount_rounding(company)
+        stats = {
+            'company_id': company.id,
+            'company_name': company.name,
+            'dry_run': bool(dry_run),
+            'evaluated': 0,
+            'eligible': 0,
+            'sent': 0,
+            'skipped': 0,
+            'failed': 0,
+        }
+
+        processed_partner_ids = set()
+        for partner, outstanding_amount in balances:
+            if partner.id in processed_partner_ids:
+                continue
+            processed_partner_ids.add(partner.id)
+            stats['evaluated'] += 1
+
+            try:
+                result, was_eligible = self._payment_reminder_process_partner(
+                    company=company,
+                    partner=partner,
+                    outstanding_amount=outstanding_amount,
+                    run_token=run_token,
+                    dry_run=dry_run,
+                )
+            except Exception as exc:
+                stats['failed'] += 1
+                _logger.exception(
+                    'Payment reminder processing crashed: customer=%s company=%s amount=%s',
+                    partner.display_name,
+                    company.name,
+                    outstanding_amount,
+                )
+                self._payment_reminder_log(
+                    company=company,
+                    partner=partner,
+                    outstanding_amount=outstanding_amount,
+                    status='failed',
+                    run_token=run_token,
+                    recipient_email=self._payment_reminder_normalize_email(
+                        partner.payment_reminder_email_override or partner.email
+                    ),
+                    reason=str(exc),
+                    is_dry_run=dry_run,
+                )
+                continue
+
+            if was_eligible:
+                stats['eligible'] += 1
+
+            if result == 'sent':
+                stats['sent'] += 1
+            elif result == 'failed':
+                stats['failed'] += 1
+            else:
+                stats['skipped'] += 1
+
+        _logger.info(
+            'Payment reminder company summary: company=%s evaluated=%s eligible=%s sent=%s skipped=%s failed=%s dry_run=%s',
+            company.name,
+            stats['evaluated'],
+            stats['eligible'],
+            stats['sent'],
+            stats['skipped'],
+            stats['failed'],
+            dry_run,
+        )
+        return stats
+
+    @api.model
+    def cron_process_payment_reminders(self):
+        service = self.sudo()
+        if not service._payment_reminder_try_lock():
+            _logger.warning('Payment reminder cron skipped because another execution already holds the advisory lock.')
+            return {
+                'evaluated': 0,
+                'eligible': 0,
+                'sent': 0,
+                'skipped': 0,
+                'failed': 0,
+                'locked': True,
+            }
+
+        companies = self.env['res.company'].sudo().search([
+            ('payment_reminder_enabled', '=', True),
+        ])
+        totals = {
+            'evaluated': 0,
+            'eligible': 0,
+            'sent': 0,
+            'skipped': 0,
+            'failed': 0,
+            'locked': False,
+        }
+        for company in companies:
+            company_stats = service._payment_reminder_run_company(
+                company=company,
+                dry_run=company.payment_reminder_dry_run,
+                run_token=f'cron:{company.id}:{uuid.uuid4()}',
+            )
+            for key in ('evaluated', 'eligible', 'sent', 'skipped', 'failed'):
+                totals[key] += company_stats[key]
+
+        _logger.info(
+            'Payment reminder cron summary: evaluated=%s eligible=%s sent=%s skipped=%s failed=%s companies=%s',
+            totals['evaluated'],
+            totals['eligible'],
+            totals['sent'],
+            totals['skipped'],
+            totals['failed'],
+            len(companies),
+        )
+        return totals
+
+    @api.model
+    def run_manual_payment_reminder(self, partner_id, company_id=None, dry_run=True):
+        partner = self.env['res.partner'].browse(partner_id).commercial_partner_id
+        company = self.env['res.company'].browse(company_id) if company_id else self.env.company
+        return self.sudo()._payment_reminder_run_company(
+            company=company,
+            dry_run=dry_run,
+            commercial_partner=partner,
+            run_token=f'manual:{company.id}:{partner.id}:{uuid.uuid4()}',
+        )

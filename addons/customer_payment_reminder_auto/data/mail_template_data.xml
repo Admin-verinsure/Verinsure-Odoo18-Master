@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="mail_template_customer_payment_reminder" model="mail.template">
+            <field name="name">Customer Payment Reminder</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="email_from">{{ (ctx.get('payment_reminder_email_from') or user.email or '') | safe }}</field>
+            <field name="email_to">{{ (ctx.get('payment_reminder_email_to') or object.email or '') | safe }}</field>
+            <field name="subject">Payment Reminder – Outstanding Balance</field>
+            <field name="lang">{{ object.lang }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+<div style="font-family: Arial, Helvetica, sans-serif; max-width: 640px; margin: 0 auto; color: #222222;">
+    <p>Dear Customer,</p>
+
+    <p>
+        This is a friendly reminder that our records currently show an outstanding payment of
+        <strong><t t-esc="ctx.get('payment_reminder_amount_display')"/></strong>.
+    </p>
+
+    <p>
+        The invoice and statement have already been shared with you.
+    </p>
+
+    <p>
+        If you have not received the invoice, please reply to this email with the correct email address so that we can update our records and assist you accordingly.
+    </p>
+
+    <p>
+        If you have already made the payment, please ignore this reminder. If the payment was made recently, it may still be pending reconciliation in our system.
+    </p>
+
+    <p>
+        Kind regards,<br/>
+        Accounts Team
+    </p>
+</div>
+            </field>
+        </record>
+    </data>
+</odoo>
