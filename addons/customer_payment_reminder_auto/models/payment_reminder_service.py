@@ -380,6 +380,23 @@ class CustomerPaymentReminderService(models.AbstractModel):
             if partner.id in processed_partner_ids:
                 continue
             processed_partner_ids.add(partner.id)
+
+            # Batch runs only deal with customers who actually owe at least the
+            # threshold: zero/negative (credit) balances and balances below the
+            # threshold are left out entirely instead of being logged as skipped.
+            # Targeted runs (a given customer) still log the reason.
+            if not commercial_partner:
+                rounded_outstanding = company.currency_id.round(outstanding_amount)
+                if (
+                    float_compare(rounded_outstanding, 0.0, precision_rounding=rounding) <= 0
+                    or float_compare(
+                        rounded_outstanding,
+                        company.payment_reminder_min_outstanding,
+                        precision_rounding=rounding,
+                    ) < 0
+                ):
+                    continue
+
             stats['evaluated'] += 1
 
             try:

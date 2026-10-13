@@ -17,7 +17,7 @@ class ResCompany(models.Model):
     )
     payment_reminder_cooldown_days = fields.Integer(
         string='Reminder Cooldown (Days)',
-        default=7,
+        default=8,
         help='Minimum number of days between reminders for the same customer and company.',
     )
     payment_reminder_dry_run = fields.Boolean(
