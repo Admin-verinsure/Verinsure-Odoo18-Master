@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-    <data noupdate="1">
+    <data>
         <!-- Email template for daily task report.-->
         <record id="email_template_daily_report" model="mail.template">
             <field name="name">Daily Task Report</field>
