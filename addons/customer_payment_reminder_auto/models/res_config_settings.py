@@ -17,6 +17,10 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.payment_reminder_cooldown_days',
         readonly=False,
     )
+    payment_reminder_include_followers = fields.Boolean(
+        related='company_id.payment_reminder_include_followers',
+        readonly=False,
+    )
     payment_reminder_dry_run = fields.Boolean(
         related='company_id.payment_reminder_dry_run',
         readonly=False,
