@@ -10,33 +10,56 @@
             <field name="lang">{{ object.lang }}</field>
             <field name="auto_delete" eval="False"/>
             <field name="body_html" type="html">
-<div style="font-family: Arial, Helvetica, sans-serif; max-width: 640px; margin: 0 auto; color: #222222;">
-    <p>Dear Customer,</p>
-
-    <p>
-        This is a friendly reminder that our records currently show an outstanding payment of
-        <strong><t t-esc="ctx.get('payment_reminder_amount_display')"/></strong>.
+<div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; color: #2b2f36; font-size: 15px; line-height: 1.6;">
+    <p style="margin: 0 0 16px 0;">
+        Dear <t t-out="ctx.get('payment_reminder_customer_name') or 'Customer'">Customer</t>,
     </p>
 
-    <p>
-        The invoice and statement have already been shared with you.
+    <p style="margin: 0 0 16px 0;">
+        This is a friendly reminder that our records show an outstanding balance on your account.
     </p>
 
-    <p>
-        When making the payment, please quote the <strong>invoice number</strong> as the payment reference.
+    <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px 0;">
+        <tr>
+            <td style="padding: 16px 20px; background-color: #f4f6f9; border-left: 4px solid #1f5fbf;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280;">Outstanding balance</div>
+                <div style="font-size: 26px; font-weight: bold; color: #1f2937;"><t t-out="ctx.get('payment_reminder_amount_display')"/></div>
+            </td>
+        </tr>
+    </table>
+
+    <p style="margin: 0 0 16px 0;">
+        The invoice and statement have already been shared with you. When making the payment,
+        please quote the <strong>invoice number</strong> as the payment reference.
     </p>
 
-    <p>
-        If you have not received the invoice, please reply to this email with the correct email address so that we can update our records and assist you accordingly.
+    <p style="margin: 0 0 8px 0;">How can we help?</p>
+    <table style="border-collapse: separate; border-spacing: 0; margin: 0 0 20px 0;">
+        <tr>
+            <td style="padding: 0 10px 8px 0;">
+                <a t-attf-href="mailto:#{ctx.get('payment_reminder_email_from')}?subject=Payment%20made"
+                   style="display: inline-block; padding: 10px 18px; background-color: #1f5fbf; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: bold;">
+                    I have already paid
+                </a>
+            </td>
+            <td style="padding: 0 0 8px 0;">
+                <a t-attf-href="mailto:#{ctx.get('payment_reminder_email_from')}?subject=Invoice%20not%20received"
+                   style="display: inline-block; padding: 9px 17px; background-color: #ffffff; color: #1f5fbf; text-decoration: none; border: 1px solid #1f5fbf; border-radius: 4px; font-size: 14px; font-weight: bold;">
+                    I did not receive the invoice
+                </a>
+            </td>
+        </tr>
+    </table>
+
+    <p style="margin: 0 0 16px 0; color: #4b5563; font-size: 14px;">
+        If you have not received the invoice, please reply with the correct email address so we can update our records.
+        If you have already made the payment, please ignore this reminder, as it may still be pending reconciliation.
     </p>
 
-    <p>
-        If you have already made the payment, please ignore this reminder. If the payment was made recently, it may still be pending reconciliation in our system.
-    </p>
-
-    <p>
+    <p style="margin: 24px 0 0 0;">
         Kind regards,<br/>
-        Accounts Team
+        <strong>Accounts Team</strong><br/>
+        Verinsure Ltd
     </p>
 </div>
             </field>
