@@ -7,7 +7,7 @@
             <field name="model_id" ref="analytic.model_account_analytic_line"/>
             <field name="email_from">{{ctx["from_email"]}}</field>
             <field name="email_to">{{ctx["to_email"]}}</field>
-            <field name="subject">Daily Work Report_{{ ctx["employee"] }}</field>
+            <field name="subject">Daily Work Report_{{ ctx.get("employee", "") }}</field>
             <field name="body_html" type="html">
                 <div style="margin: 0px; padding: 0px;">
                     <table border="1" width="100%" cellpadding="0"
@@ -17,7 +17,7 @@
                             <tr>
                                 <th colspan="5" style="text-align:center;">
                                     <strong>Daily Work Report_<span
-                                                t-out="ctx['employee'] or ''"/>
+                                                t-out="ctx.get('employee', '')"/>
                                     </strong>
                                 </th>
                             </tr>
@@ -43,7 +43,7 @@
                             </tr>
                             <!-- CONTENT -->
                             <t t-set="i" t-value="1"/>
-                            <t t-foreach="ctx['data']" t-as="datas">
+                            <t t-foreach="ctx.get('data', [])" t-as="datas">
                                 <tr>
                                     <td align="center"
                                         style="min-width: 100px;">
@@ -80,7 +80,7 @@
             <field name="model_id" ref="analytic.model_account_analytic_line"/>
             <field name="email_from">{{ctx["from_email"]}}</field>
             <field name="email_to">{{ctx["to_email"]}}</field>
-            <field name="subject">Weekly Work Report-{{ctx["employee"]}}-{{datetime.datetime.today().date()}}</field>
+            <field name="subject">Weekly Work Report-{{ ctx.get("employee", "") }}-{{ datetime.datetime.today().date() }}</field>
             <field name="body_html" type="html">
                 <div style="margin: 0px; padding: 0px;">
                     <table border="1" width="100%" cellpadding="0"
@@ -90,8 +90,8 @@
                             <tr>
                                 <th colspan="5" style="text-align:center;">
                                     <strong>Weekly Work Report_<span
-                                            t-out="ctx['week']"/>_<span
-                                                t-out="ctx['employee'] or ''"/>
+                                            t-out="ctx.get('week', '')"/>_<span
+                                                t-out="ctx.get('employee', '')"/>
                                     </strong>
                                 </th>
                             </tr>
@@ -115,7 +115,7 @@
                                 </td>
                             </tr>
                             <t t-set="i" t-value="1"/>
-                            <t t-foreach="ctx['data']" t-as="datas">
+                            <t t-foreach="ctx.get('data', [])" t-as="datas">
                                 <tr>
                                     <td align="center"
                                         style="min-width: 100px;">
