@@ -1,13 +1,19 @@
 import logging
+import re
 import uuid
 from collections import defaultdict
 from datetime import timedelta
-from email.utils import parseaddr
+from email.utils import getaddresses, parseaddr
 
 from odoo import _, api, fields, models
 from odoo.tools.float_utils import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
+
+# Single, syntactically complete address: name@domain.tld (no spaces/commas, TLD of 2+ letters).
+_EMAIL_RE = re.compile(
+    r'^[^@\s,;<>()]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$'
+)
 
 
 class CustomerPaymentReminderService(models.AbstractModel):
@@ -39,9 +45,114 @@ class CustomerPaymentReminderService(models.AbstractModel):
         name, address = parseaddr(email_value or '')
         del name
         normalized = (address or '').strip().lower()
-        if not normalized or '@' not in normalized:
+        if not normalized or not _EMAIL_RE.match(normalized):
             return False
         return normalized
+
+    @api.model
+    def _payment_reminder_overdue_invoices(self, company, partner):
+        return self.env['account.move'].sudo().with_company(company).search([
+            ('company_id', '=', company.id),
+            ('commercial_partner_id', '=', partner.id),
+            ('move_type', 'in', ('out_invoice', 'out_receipt')),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ('not_paid', 'partial')),
+            ('invoice_date_due', '<', fields.Date.context_today(self)),
+        ])
+
+    @api.model
+    def _payment_reminder_unique_emails(self, raw_values):
+        emails = []
+        for value in raw_values:
+            for _name, address in getaddresses([(value or '').replace(';', ',')]):
+                email = self._payment_reminder_normalize_email(address)
+                if email and email not in emails:
+                    emails.append(email)
+        return emails
+
+    @api.model
+    def _payment_reminder_customer_moves(self, company, partner):
+        """All posted invoices, credit notes and receipts of the customer (any
+        payment state): the invoice / statement mail may sit on any of them."""
+        return self.env['account.move'].sudo().with_company(company).search([
+            ('company_id', '=', company.id),
+            ('commercial_partner_id', '=', partner.id),
+            ('move_type', 'in', ('out_invoice', 'out_refund', 'out_receipt')),
+            ('state', '=', 'posted'),
+        ])
+
+    @api.model
+    def _payment_reminder_chain_emails(self, moves, latest_only=False):
+        """Recipients of the emails already sent from these documents (the mails
+        that shared the invoice and statement with the customer).
+
+        The recipients are the partners the mail was addressed to plus every
+        partner Odoo actually emailed for it (the delivery records shown by the
+        envelope icon in the chatter). With ``latest_only`` only the most recent
+        mail is used, so old, outdated recipients are not picked up.
+        """
+        if not moves:
+            return []
+        messages = self.env['mail.message'].sudo().search([
+            ('model', '=', 'account.move'),
+            ('res_id', 'in', moves.ids),
+            ('message_type', 'in', ('comment', 'email_outgoing')),
+            ('subtype_id', '!=', False),
+            ('subtype_id.internal', '=', False),
+        ], order='date desc, id desc')
+        if latest_only:
+            messages = messages[:1]
+        if not messages:
+            return []
+        raw = [partner.email for partner in messages.partner_ids]
+        notifications = self.env['mail.notification'].sudo().search([
+            ('mail_message_id', 'in', messages.ids),
+            ('notification_type', '=', 'email'),
+            ('notification_status', '!=', 'canceled'),
+        ])
+        raw += notifications.res_partner_id.mapped('email')
+        # Mails that still exist may also carry plain addresses (not partners).
+        for mail in self.env['mail.mail'].sudo().search([('mail_message_id', 'in', messages.ids)]):
+            raw += [mail.email_to, mail.email_cc]
+        return self._payment_reminder_unique_emails(raw)
+
+    @api.model
+    def _payment_reminder_follower_emails(self, moves):
+        followers = moves.sudo().message_follower_ids.partner_id.filtered('active')
+        return self._payment_reminder_unique_emails(followers.mapped('email'))
+
+    @api.model
+    def _payment_reminder_recipients(self, company, partner):
+        """Who receives the reminder for a customer:
+
+        1. the recipients of the emails already sent from the customer's overdue
+           invoices (invoice / statement mails);
+        2. if there are none, the followers of those invoices (when enabled);
+        3. if there are still none, the customer's own address.
+        A reminder email override set on the customer is always included.
+        """
+        recipients = []
+        override = self._payment_reminder_normalize_email(partner.payment_reminder_email_override)
+        if override:
+            recipients.append(override)
+
+        moves = self._payment_reminder_overdue_invoices(company, partner)
+        found = self._payment_reminder_chain_emails(moves)
+        if not found:
+            # The mail may sit on an already paid invoice or on a credit note.
+            found = self._payment_reminder_chain_emails(
+                self._payment_reminder_customer_moves(company, partner),
+                latest_only=True,
+            )
+        if not found and company.payment_reminder_include_followers:
+            found = self._payment_reminder_follower_emails(moves)
+        if not found and not override:
+            found = self._payment_reminder_unique_emails([partner.email])
+
+        for email in found:
+            if email not in recipients:
+                recipients.append(email)
+        return recipients
 
     @api.model
     def _payment_reminder_format_amount(self, company, amount):
@@ -153,11 +264,10 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 ),
             ), False
 
-        recipient_email = self._payment_reminder_normalize_email(
-            partner.payment_reminder_email_override or partner.email
-        )
-        if not recipient_email:
+        recipients = self._payment_reminder_recipients(company, partner)
+        if not recipients:
             return _('Customer does not have a valid reminder email address.'), False
+        recipient_email = ', '.join(recipients)
 
         cooldown_days = max(company.payment_reminder_cooldown_days or 0, 0)
         if cooldown_days:
@@ -424,9 +534,9 @@ class CustomerPaymentReminderService(models.AbstractModel):
                     outstanding_amount=outstanding_amount,
                     status='failed',
                     run_token=run_token,
-                    recipient_email=self._payment_reminder_normalize_email(
-                        partner.payment_reminder_email_override or partner.email
-                    ),
+                    recipient_email=', '.join(
+                        self._payment_reminder_recipients(company, partner)
+                    ) or False,
                     reason=str(exc),
                     is_dry_run=dry_run,
                 )

@@ -20,6 +20,12 @@ class ResCompany(models.Model):
         default=8,
         help='Minimum number of days between reminders for the same customer and company.',
     )
+    payment_reminder_include_followers = fields.Boolean(
+        string='Fall Back to Invoice Followers',
+        default=True,
+        help='When no earlier invoice email can be found, send the reminder to the '
+             'followers of the customer\'s overdue invoices.',
+    )
     payment_reminder_dry_run = fields.Boolean(
         string='Dry Run Mode',
         default=True,

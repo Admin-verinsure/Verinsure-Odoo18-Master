@@ -52,6 +52,12 @@ class CustomerPaymentReminderLog(models.Model):
     run_token = fields.Char(string='Run Token', index=True)
     is_dry_run = fields.Boolean(string='Dry Run', default=False, index=True)
     mail_mail_id = fields.Many2one('mail.mail', string='Mail')
+    mail_state = fields.Selection(
+        related='mail_mail_id.state',
+        string='Mail Status',
+        help='Live status of the email. "Sent" only means the mail server accepted it; '
+             'a wrong but well-formed address is only reported later by a bounce.',
+    )
 
     _sql_constraints = [
         (
