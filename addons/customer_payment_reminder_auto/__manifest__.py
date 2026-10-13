@@ -1,6 +1,6 @@
 {
     'name': 'Customer Payment Reminder Automation',
-    'version': '18.0.1.0.0',
+    'version': '18.0.1.1.0',
     'category': 'Accounting',
     'summary': 'Automated customer payment reminders based on outstanding receivables.',
     'description': """
@@ -24,6 +24,7 @@ with configurable threshold, cooldown, dry-run mode, and reminder history.
         'views/res_config_settings_views.xml',
         'views/res_partner_views.xml',
         'views/payment_reminder_log_views.xml',
+        'views/payment_reminder_wizard_views.xml',
     ],
     'installable': True,
     'application': False,

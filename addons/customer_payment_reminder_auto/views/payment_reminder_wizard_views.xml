@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_customer_payment_reminder_wizard_form" model="ir.ui.view">
+        <field name="name">customer.payment.reminder.wizard.form</field>
+        <field name="model">customer.payment.reminder.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Send Payment Reminders">
+                <group>
+                    <field name="company_id" groups="base.group_multi_company" options="{'no_create': True, 'no_open': True}"/>
+                    <field name="dry_run"/>
+                    <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"
+                           placeholder="All customers with an overdue balance"/>
+                </group>
+                <div class="alert alert-info" role="alert" invisible="not dry_run">
+                    Dry run: reminders are evaluated and logged, but no email is sent.
+                </div>
+                <div class="alert alert-warning" role="alert" invisible="dry_run">
+                    Emails will really be sent to every eligible customer.
+                </div>
+                <footer>
+                    <button name="action_run" type="object" string="Run Dry Run"
+                            class="btn-primary" data-hotkey="q" invisible="not dry_run"/>
+                    <button name="action_run" type="object" string="Send Reminders"
+                            class="btn-primary" data-hotkey="q" invisible="dry_run"
+                            confirm="Emails will be sent to every eligible customer. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_customer_payment_reminder_wizard" model="ir.actions.act_window">
+        <field name="name">Send Payment Reminders</field>
+        <field name="res_model">customer.payment.reminder.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_customer_payment_reminder_send"
+              name="Send Payment Reminders"
+              parent="account.menu_finance_receivables"
+              action="action_customer_payment_reminder_wizard"
+              groups="account.group_account_user"
+              sequence="20"/>
+
+    <menuitem id="menu_customer_payment_reminder_logs"
+              name="Payment Reminder Logs"
+              parent="account.menu_finance_receivables"
+              action="action_customer_payment_reminder_log"
+              groups="account.group_account_user"
+              sequence="21"/>
+</odoo>

@@ -10,7 +10,7 @@ from odoo.tools.float_utils import float_compare, float_is_zero
 _logger = logging.getLogger(__name__)
 
 
-class CustomerPaymentReminderService(models.Model):
+class CustomerPaymentReminderService(models.AbstractModel):
     _name = 'customer.payment.reminder.service'
     _description = 'Customer Payment Reminder Service'
 
@@ -63,6 +63,19 @@ class CustomerPaymentReminderService(models.Model):
         return bool(row and row[0])
 
     @api.model
+    def _payment_reminder_commit_and_relock(self):
+        """Persist the work done so far (logs + already-sent mails) and re-take the
+        advisory lock for the next transaction. Returns False when another run has
+        taken the lock in the meantime, in which case the caller must stop."""
+        if self.env.registry.in_test_mode():
+            return True
+        self.env.cr.commit()
+        if not self._payment_reminder_try_lock():
+            _logger.warning('Payment reminder run stopped: advisory lock was taken by another execution.')
+            return False
+        return True
+
+    @api.model
     def _payment_reminder_base_domain(self, company, commercial_partner=None):
         aml_model = self.env['account.move.line']
         domain = [
@@ -71,11 +84,16 @@ class CustomerPaymentReminderService(models.Model):
             ('account_id.account_type', '=', 'asset_receivable'),
             ('amount_residual', '!=', 0),
             (self._payment_reminder_posted_field(), '=', 'posted'),
+            # Only overdue items count: not-yet-due invoices must not trigger or
+            # inflate a reminder. Lines without a maturity date are treated as due.
+            '|',
+            ('date_maturity', '<', fields.Date.context_today(self)),
+            ('date_maturity', '=', False),
         ]
         if 'reconciled' in aml_model._fields:
             domain.append(('reconciled', '=', False))
         if commercial_partner:
-            domain.append(('partner_id', 'child_of', commercial_partner.id))
+            domain.append(('partner_id', 'child_of', commercial_partner.ids))
         return domain
 
     @api.model
@@ -93,9 +111,12 @@ class CustomerPaymentReminderService(models.Model):
             partners |= partner
             balances[partner.id] += line.amount_residual
 
-        if commercial_partner and commercial_partner.id not in balances:
-            partners |= commercial_partner
-            balances[commercial_partner.id] = 0.0
+        # `commercial_partner` may be one or several partners: make sure each of them
+        # is evaluated (and logged) even when it has no open receivable line.
+        for requested_partner in commercial_partner or []:
+            if requested_partner.id not in balances:
+                partners |= requested_partner
+                balances[requested_partner.id] = 0.0
 
         return [(partner, balances.get(partner.id, 0.0)) for partner in partners]
 
@@ -319,7 +340,7 @@ class CustomerPaymentReminderService(models.Model):
 
     @api.model
     def _payment_reminder_run_company(self, company, dry_run=False, commercial_partner=None,
-                                      run_token=None):
+                                      run_token=None, commit=False):
         run_token = run_token or str(uuid.uuid4())
         balances = self._payment_reminder_collect_balances(
             company,
@@ -335,6 +356,7 @@ class CustomerPaymentReminderService(models.Model):
             'sent': 0,
             'skipped': 0,
             'failed': 0,
+            'lock_lost': False,
         }
 
         processed_partner_ids = set()
@@ -345,13 +367,16 @@ class CustomerPaymentReminderService(models.Model):
             stats['evaluated'] += 1
 
             try:
-                result, was_eligible = self._payment_reminder_process_partner(
-                    company=company,
-                    partner=partner,
-                    outstanding_amount=outstanding_amount,
-                    run_token=run_token,
-                    dry_run=dry_run,
-                )
+                # Savepoint: a DB-level error for one customer must not poison the
+                # transaction (and the log writes) for all remaining customers.
+                with self.env.cr.savepoint():
+                    result, was_eligible = self._payment_reminder_process_partner(
+                        company=company,
+                        partner=partner,
+                        outstanding_amount=outstanding_amount,
+                        run_token=run_token,
+                        dry_run=dry_run,
+                    )
             except Exception as exc:
                 stats['failed'] += 1
                 _logger.exception(
@@ -372,6 +397,11 @@ class CustomerPaymentReminderService(models.Model):
                     reason=str(exc),
                     is_dry_run=dry_run,
                 )
+                # Commit per customer so a later crash cannot roll back the logs of
+                # mails that were already sent (which would cause duplicate mails).
+                if commit and not dry_run and not self._payment_reminder_commit_and_relock():
+                    stats['lock_lost'] = True
+                    break
                 continue
 
             if was_eligible:
@@ -383,6 +413,10 @@ class CustomerPaymentReminderService(models.Model):
                 stats['failed'] += 1
             else:
                 stats['skipped'] += 1
+
+            if commit and not dry_run and not self._payment_reminder_commit_and_relock():
+                stats['lock_lost'] = True
+                break
 
         _logger.info(
             'Payment reminder company summary: company=%s evaluated=%s eligible=%s sent=%s skipped=%s failed=%s dry_run=%s',
@@ -426,9 +460,13 @@ class CustomerPaymentReminderService(models.Model):
                 company=company,
                 dry_run=company.payment_reminder_dry_run,
                 run_token=f'cron:{company.id}:{uuid.uuid4()}',
+                commit=True,
             )
             for key in ('evaluated', 'eligible', 'sent', 'skipped', 'failed'):
                 totals[key] += company_stats[key]
+            if company_stats['lock_lost']:
+                totals['locked'] = True
+                break
 
         _logger.info(
             'Payment reminder cron summary: evaluated=%s eligible=%s sent=%s skipped=%s failed=%s companies=%s',
@@ -451,3 +489,30 @@ class CustomerPaymentReminderService(models.Model):
             commercial_partner=partner,
             run_token=f'manual:{company.id}:{partner.id}:{uuid.uuid4()}',
         )
+
+    @api.model
+    def run_manual_payment_reminders(self, company_id, dry_run=True, partner_ids=None):
+        """Manual trigger used by the "Send Payment Reminders" wizard.
+
+        :param partner_ids: optional customers to restrict the run to; when empty,
+            every customer of the company with an open receivable is evaluated.
+        """
+        service = self.sudo()
+        company = self.env['res.company'].browse(company_id)
+        run_token = f'manual:{company.id}:{uuid.uuid4()}'
+        if not dry_run and not service._payment_reminder_try_lock():
+            return {
+                'evaluated': 0, 'eligible': 0, 'sent': 0, 'skipped': 0, 'failed': 0,
+                'locked': True, 'run_token': run_token,
+            }
+        partners = self.env['res.partner'].browse(partner_ids or []).commercial_partner_id
+        stats = service._payment_reminder_run_company(
+            company=company,
+            dry_run=dry_run,
+            commercial_partner=partners or None,
+            run_token=run_token,
+            commit=True,
+        )
+        stats['locked'] = bool(stats.get('lock_lost'))
+        stats['run_token'] = run_token
+        return stats
