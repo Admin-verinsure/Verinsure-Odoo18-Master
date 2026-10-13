@@ -144,7 +144,10 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 self._payment_reminder_customer_moves(company, partner),
                 latest_only=True,
             )
-        if not found and company.payment_reminder_include_followers:
+        followers_disabled = self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.disable_follower_fallback'
+        )
+        if not found and not followers_disabled:
             found = self._payment_reminder_follower_emails(moves)
         if not found and not override:
             found = self._payment_reminder_unique_emails([partner.email])

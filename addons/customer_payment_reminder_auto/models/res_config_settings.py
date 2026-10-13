@@ -17,9 +17,14 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.payment_reminder_cooldown_days',
         readonly=False,
     )
-    payment_reminder_include_followers = fields.Boolean(
-        related='company_id.payment_reminder_include_followers',
-        readonly=False,
+    # Stored as a system parameter (no new column on res.company, so upgrading from
+    # the Apps screen works). Inverted on purpose: Odoo deletes a boolean parameter
+    # when it is switched off, so "unset" has to mean the default behaviour.
+    payment_reminder_disable_followers = fields.Boolean(
+        string='Do Not Use Invoice Followers',
+        config_parameter='customer_payment_reminder_auto.disable_follower_fallback',
+        help='By default, when no earlier invoice email is found, the reminder goes to '
+             'the followers of the overdue invoices. Tick to turn that fallback off.',
     )
     payment_reminder_dry_run = fields.Boolean(
         related='company_id.payment_reminder_dry_run',

@@ -15,8 +15,8 @@
                 <setting id="payment_reminder_cooldown_days" help="Minimum delay between reminders for the same customer.">
                     <field name="payment_reminder_cooldown_days"/>
                 </setting>
-                <setting id="payment_reminder_include_followers" help="When no earlier invoice email is found, email the followers of the customer's overdue invoices.">
-                    <field name="payment_reminder_include_followers"/>
+                <setting id="payment_reminder_disable_followers" help="Tick to stop using the followers of the overdue invoices when no earlier invoice email is found.">
+                    <field name="payment_reminder_disable_followers"/>
                 </setting>
                 <setting id="payment_reminder_dry_run" help="Log eligible reminders without sending emails while testing.">
                     <field name="payment_reminder_dry_run"/>
