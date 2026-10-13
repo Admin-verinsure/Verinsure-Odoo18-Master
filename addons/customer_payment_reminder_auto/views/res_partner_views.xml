@@ -17,7 +17,8 @@
                         class="btn-secondary"
                         invisible="customer_rank == 0"/>
             </xpath>
-            <xpath expr="//field[@name='email']" position="after">
+            <!-- Bottom of the contact details group (below Tags), not in the middle of it -->
+            <xpath expr="//field[@name='category_id']" position="after">
                 <field name="payment_reminder_enabled" invisible="customer_rank == 0"/>
                 <field name="payment_reminder_email_override" invisible="customer_rank == 0"/>
             </xpath>
