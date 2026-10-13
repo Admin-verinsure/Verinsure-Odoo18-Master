@@ -219,16 +219,32 @@ class CustomerPaymentReminderService(models.AbstractModel):
             ),
         )
 
+        # Only the subject and body are rendered from the template. Sender and
+        # recipient come from Python (above), so a stale or customised value in the
+        # template's email_from / email_to / reply_to fields can never break sending
+        # (mail.template.send_mail would render every one of those fields).
         try:
-            mail_id = template.sudo().with_company(company).with_context(ctx).send_mail(
-                partner.id,
-                force_send=True,
-                email_values=email_values,
-            )
+            rendering_template = template.sudo().with_company(company).with_context(ctx)
+            subject = rendering_template._render_field(
+                'subject', [partner.id], compute_lang=True,
+            )[partner.id]
+            body_html = rendering_template._render_field(
+                'body_html', [partner.id], compute_lang=True,
+            )[partner.id]
+            mail_mail = self.env['mail.mail'].sudo().create({
+                'subject': subject,
+                'body_html': body_html,
+                'body': body_html,
+                'model': 'res.partner',
+                'res_id': partner.id,
+                'mail_server_id': template.mail_server_id.id or False,
+                **email_values,
+            })
+            mail_mail.send(raise_exception=False)
         except Exception as exc:
             return False, str(exc), False
 
-        mail_mail = self.env['mail.mail'].sudo().browse(mail_id) if mail_id else False
+        mail_id = mail_mail.id
         mail_state = getattr(mail_mail, 'state', False) if mail_mail else False
         if mail_state == 'sent':
             return True, False, mail_mail
