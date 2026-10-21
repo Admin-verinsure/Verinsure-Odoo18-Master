@@ -26,6 +26,12 @@ class ResConfigSettings(models.TransientModel):
         help='By default, when no earlier invoice email is found, the reminder goes to '
              'the followers of the overdue invoices. Tick to turn that fallback off.',
     )
+    payment_reminder_disable_statement = fields.Boolean(
+        string='Do Not Attach Statement',
+        config_parameter='customer_payment_reminder_auto.disable_statement_attachment',
+        help='By default the up-to-date Customer Statement PDF is generated and attached '
+             'to every reminder. Tick to send reminders without it.',
+    )
     payment_reminder_dry_run = fields.Boolean(
         related='company_id.payment_reminder_dry_run',
         readonly=False,

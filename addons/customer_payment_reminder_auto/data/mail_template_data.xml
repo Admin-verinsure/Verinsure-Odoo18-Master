@@ -12,7 +12,7 @@
             <field name="body_html" type="html">
 <div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; color: #2b2f36; font-size: 15px; line-height: 1.6;">
     <p style="margin: 0 0 16px 0;">
-        Dear <t t-out="ctx.get('payment_reminder_customer_name') or 'Customer'">Customer</t>,
+        Dear <t t-out="object.name">Customer</t>,
     </p>
 
     <p style="margin: 0 0 16px 0;">
@@ -28,7 +28,11 @@
         </tr>
     </table>
 
-    <p style="margin: 0 0 16px 0;">
+    <p t-if="ctx.get('payment_reminder_statement_attached')" style="margin: 0 0 16px 0;">
+        Your updated statement of account is attached for your reference. When making the payment,
+        please quote the <strong>invoice number</strong> as the payment reference.
+    </p>
+    <p t-else="" style="margin: 0 0 16px 0;">
         The invoice and statement have already been shared with you. When making the payment,
         please quote the <strong>invoice number</strong> as the payment reference.
     </p>

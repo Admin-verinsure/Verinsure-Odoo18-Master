@@ -18,6 +18,9 @@
                 <setting id="payment_reminder_disable_followers" help="Tick to stop using the followers of the overdue invoices when no earlier invoice email is found.">
                     <field name="payment_reminder_disable_followers"/>
                 </setting>
+                <setting id="payment_reminder_disable_statement" help="Tick to send reminders without the up-to-date Customer Statement PDF attached.">
+                    <field name="payment_reminder_disable_statement"/>
+                </setting>
                 <setting id="payment_reminder_dry_run" help="Log eligible reminders without sending emails while testing.">
                     <field name="payment_reminder_dry_run"/>
                 </setting>
