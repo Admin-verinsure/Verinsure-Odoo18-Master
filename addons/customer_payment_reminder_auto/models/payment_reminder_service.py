@@ -304,24 +304,64 @@ class CustomerPaymentReminderService(models.AbstractModel):
         )
 
     @api.model
+    def _payment_reminder_statement_report(self):
+        """The Customer Statement report to use: ``tk_statements`` (preferred) or
+        the older ``tk_customer_statements``. Returns ``(report, is_current_api)``."""
+        report = self.env.ref(
+            'tk_statements.customer_report_template_action', raise_if_not_found=False,
+        )
+        if report:
+            return report, True
+        report = self.env.ref(
+            'tk_customer_statements.customer_report_template_action', raise_if_not_found=False,
+        )
+        return report, False
+
+    @api.model
     def _payment_reminder_statement_pdfs(self, company, partner):
         """Generate the up-to-date Customer Statement PDF(s) for a customer.
 
-        Uses the report of the ``tk_customer_statements`` module, run as of today
-        from the date of the customer's oldest open invoice. Returns a list of
-        ``(filename, pdf_bytes)`` (one per invoicing contact of the customer).
-        Raises ``UserError`` when the statement cannot be produced.
+        Runs the report of the Customer Statement module as of today. Returns a
+        list of ``(filename, pdf_bytes)``. Raises ``UserError`` when the statement
+        cannot be produced.
         """
-        report = self.env.ref(
-            'tk_customer_statements.customer_report_template_action',
-            raise_if_not_found=False,
-        )
+        report, current_api = self._payment_reminder_statement_report()
         if not report or 'customer.statement.wizard' not in self.env:
             raise UserError(_(
-                'The Customer Statement module (tk_customer_statements) is not installed.'
+                'The Customer Statement module (tk_statements) is not installed.'
             ))
         today = fields.Date.context_today(self)
-        open_invoices = self.env['account.move'].sudo().with_company(company).search([
+        moves = self.env['account.move'].sudo().with_company(company)
+        report = report.sudo().with_company(company)
+        Wizard = self.env['customer.statement.wizard'].sudo().with_company(company)
+
+        if current_api:
+            # tk_statements keeps a running balance and takes "opening balance" from the
+            # current residuals, so the period must start at the customer's first posted
+            # invoice or credit note for the balance to be consistent. One statement for
+            # the whole company (it already includes all the customer's contacts).
+            first = moves.search([
+                ('company_id', '=', company.id),
+                ('commercial_partner_id', '=', partner.id),
+                ('move_type', 'in', ('out_invoice', 'out_refund')),
+                ('state', '=', 'posted'),
+                ('invoice_date', '!=', False),
+            ], order='invoice_date asc, id asc', limit=1)
+            if not first:
+                raise UserError(_('No posted invoice was found to build the statement from.'))
+            wizard = Wizard.create({
+                'start_date': first.invoice_date,
+                'end_date': today,
+                'partner_id': partner.id,
+            })
+            pdf_content, _report_format = report._render_qweb_pdf(
+                report.report_name, wizard.ids, data={'wizard_id': wizard.id},
+            )
+            label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
+            return [(f'Statement - {label} - {today}.pdf', pdf_content)]
+
+        # Older tk_customer_statements: invoices of one exact contact between two dates.
+        open_invoices = moves.search([
             ('company_id', '=', company.id),
             ('commercial_partner_id', '=', partner.id),
             ('move_type', '=', 'out_invoice'),
@@ -330,20 +370,17 @@ class CustomerPaymentReminderService(models.AbstractModel):
         ])
         if not open_invoices:
             raise UserError(_('No open invoice was found to build the statement from.'))
-
         pdfs = []
         for invoice_partner in open_invoices.partner_id:
             invoices = open_invoices.filtered(lambda move: move.partner_id == invoice_partner)
             start_dates = [date for date in invoices.mapped('invoice_date') if date]
-            wizard = self.env['customer.statement.wizard'].sudo().with_company(company).create({
+            wizard = Wizard.create({
                 'start_date': min(start_dates) if start_dates else today,
                 'end_date': today,
                 'partner_id': invoice_partner.id,
             })
-            pdf_content, _report_format = report.sudo().with_company(company)._render_qweb_pdf(
-                report.report_name,
-                wizard.ids,
-                data={'form_data': wizard.read()[0]},
+            pdf_content, _report_format = report._render_qweb_pdf(
+                report.report_name, wizard.ids, data={'form_data': wizard.read()[0]},
             )
             label = re.sub(r'[\\/:*?"<>|]+', '-', invoice_partner.name or partner.name or 'Customer')
             pdfs.append((f'Statement - {label} - {today}.pdf', pdf_content))
