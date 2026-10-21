@@ -6,6 +6,7 @@ from datetime import timedelta
 from email.utils import getaddresses, parseaddr
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
@@ -287,6 +288,68 @@ class CustomerPaymentReminderService(models.AbstractModel):
         return False, recipient_email
 
     @api.model
+    def _payment_reminder_safe_recipient_label(self, company, partner):
+        """Recipients for a log line; never raises (used while logging a failure)."""
+        try:
+            with self.env.cr.savepoint():
+                return ', '.join(self._payment_reminder_recipients(company, partner)) or False
+        except Exception:
+            return False
+
+    @api.model
+    def _payment_reminder_statements_enabled(self):
+        # Inverted parameter: Odoo deletes a boolean parameter when it is switched off.
+        return not self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.disable_statement_attachment'
+        )
+
+    @api.model
+    def _payment_reminder_statement_pdfs(self, company, partner):
+        """Generate the up-to-date Customer Statement PDF(s) for a customer.
+
+        Uses the report of the ``tk_customer_statements`` module, run as of today
+        from the date of the customer's oldest open invoice. Returns a list of
+        ``(filename, pdf_bytes)`` (one per invoicing contact of the customer).
+        Raises ``UserError`` when the statement cannot be produced.
+        """
+        report = self.env.ref(
+            'tk_customer_statements.customer_report_template_action',
+            raise_if_not_found=False,
+        )
+        if not report or 'customer.statement.wizard' not in self.env:
+            raise UserError(_(
+                'The Customer Statement module (tk_customer_statements) is not installed.'
+            ))
+        today = fields.Date.context_today(self)
+        open_invoices = self.env['account.move'].sudo().with_company(company).search([
+            ('company_id', '=', company.id),
+            ('commercial_partner_id', '=', partner.id),
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ('not_paid', 'partial')),
+        ])
+        if not open_invoices:
+            raise UserError(_('No open invoice was found to build the statement from.'))
+
+        pdfs = []
+        for invoice_partner in open_invoices.partner_id:
+            invoices = open_invoices.filtered(lambda move: move.partner_id == invoice_partner)
+            start_dates = [date for date in invoices.mapped('invoice_date') if date]
+            wizard = self.env['customer.statement.wizard'].sudo().with_company(company).create({
+                'start_date': min(start_dates) if start_dates else today,
+                'end_date': today,
+                'partner_id': invoice_partner.id,
+            })
+            pdf_content, _report_format = report.sudo().with_company(company)._render_qweb_pdf(
+                report.report_name,
+                wizard.ids,
+                data={'form_data': wizard.read()[0]},
+            )
+            label = re.sub(r'[\\/:*?"<>|]+', '-', invoice_partner.name or partner.name or 'Customer')
+            pdfs.append((f'Statement - {label} - {today}.pdf', pdf_content))
+        return pdfs
+
+    @api.model
     def _payment_reminder_log(self, company, partner, outstanding_amount, status, run_token,
                               recipient_email=False, reason=False, is_dry_run=False,
                               mail_mail=False):
@@ -319,8 +382,19 @@ class CustomerPaymentReminderService(models.AbstractModel):
             'email_from': email_from,
             'auto_delete': False,
         }
+        statement_pdfs = []
+        if self._payment_reminder_statements_enabled():
+            try:
+                statement_pdfs = self._payment_reminder_statement_pdfs(company, partner)
+            except Exception as exc:
+                return False, _(
+                    'The updated statement could not be generated, so the reminder was not sent: %(error)s',
+                    error=str(exc),
+                ), False
+
         ctx = dict(
             self.env.context,
+            payment_reminder_statement_attached=bool(statement_pdfs),
             payment_reminder_email_from=email_from,
             payment_reminder_email_to=recipient_email,
             payment_reminder_customer_name=partner.name,
@@ -353,6 +427,16 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 'mail_server_id': template.mail_server_id.id or False,
                 **email_values,
             })
+            if statement_pdfs:
+                attachments = self.env['ir.attachment'].sudo().create([{
+                    'name': filename,
+                    'type': 'binary',
+                    'raw': pdf_content,
+                    'mimetype': 'application/pdf',
+                    'res_model': 'mail.message',
+                    'res_id': mail_mail.mail_message_id.id,
+                } for filename, pdf_content in statement_pdfs])
+                mail_mail.write({'attachment_ids': [(6, 0, attachments.ids)]})
             mail_mail.send(raise_exception=False)
         except Exception as exc:
             return False, str(exc), False
@@ -537,9 +621,7 @@ class CustomerPaymentReminderService(models.AbstractModel):
                     outstanding_amount=outstanding_amount,
                     status='failed',
                     run_token=run_token,
-                    recipient_email=', '.join(
-                        self._payment_reminder_recipients(company, partner)
-                    ) or False,
+                    recipient_email=self._payment_reminder_safe_recipient_label(company, partner),
                     reason=str(exc),
                     is_dry_run=dry_run,
                 )
