@@ -37,7 +37,11 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='customer_payment_reminder_auto.require_shared_documents',
         help='Only remind customers who were already emailed an invoice and a statement.',
     )
-    payment_reminder_shared_docs_since = fields.Date(
+    # Odoo's res.config.settings validation only accepts a narrow set of field
+    # types for config_parameter-backed settings. Date fields raise the RPC error,
+    # so we keep the semantic date value as a datetime field and convert it when it
+    # is used elsewhere.
+    payment_reminder_shared_docs_since = fields.Datetime(
         string='Emails Sent On Or After',
         config_parameter='customer_payment_reminder_auto.shared_documents_since',
         help='Only emails sent on or after this date are searched for the invoice and '
@@ -54,7 +58,7 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='customer_payment_reminder_auto.statement_recent_days',
         default=5,
     )
-    payment_reminder_statement_start = fields.Date(
+    payment_reminder_statement_start = fields.Datetime(
         string='Default Statement From',
         config_parameter='customer_payment_reminder_auto.statement_default_start',
         help='Start date of the statement attached to reminders when no date is chosen. '
