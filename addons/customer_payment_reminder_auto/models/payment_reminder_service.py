@@ -250,6 +250,34 @@ class CustomerPaymentReminderService(models.AbstractModel):
         ], order='reminder_datetime desc, id desc', limit=1)
 
     @api.model
+    def _payment_reminder_last_invoice_email_sent(self, company, partner):
+        """Return the latest invoice-email send date for the customer within the company,
+        or False when no invoice email is recorded. This is used as a safety gate: if
+        there has been no invoice email in the last 45 days, the customer is skipped.
+        """
+        moves = self.env['account.move'].sudo().with_company(company).search([
+            ('company_id', '=', company.id),
+            ('commercial_partner_id', '=', partner.id),
+            ('move_type', 'in', ('out_invoice', 'out_receipt')),
+            ('state', '=', 'posted'),
+        ])
+        if not moves:
+            return False
+        message = self.env['mail.message'].sudo().search([
+            ('model', '=', 'account.move'),
+            ('res_id', 'in', moves.ids),
+            ('message_type', 'in', ('comment', 'email', 'email_outgoing')),
+            ('subtype_id', '!=', False),
+            ('subtype_id.internal', '=', False),
+        ], order='date desc, id desc', limit=1)
+        if not message:
+            return False
+        date_value = message.date or message.create_date or False
+        if not date_value:
+            return False
+        return fields.Datetime.to_datetime(date_value)
+
+    @api.model
     def _payment_reminder_skip_reason(self, company, partner, outstanding_amount):
         rounding = self._payment_reminder_amount_rounding(company)
         rounded_outstanding = company.currency_id.round(outstanding_amount)
@@ -277,6 +305,18 @@ class CustomerPaymentReminderService(models.AbstractModel):
         if not recipients:
             return _('Customer does not have a valid reminder email address.'), False
         recipient_email = ', '.join(recipients)
+
+        last_invoice_email = self._payment_reminder_last_invoice_email_sent(company, partner)
+        if last_invoice_email:
+            cutoff = fields.Datetime.to_datetime(fields.Datetime.now()) - timedelta(days=45)
+            if last_invoice_email < cutoff:
+                return _(
+                    'The latest invoice email for this customer is older than 45 days, so the reminder is skipped.'
+                ), recipient_email
+        elif not last_invoice_email:
+            return _(
+                'The customer has no invoice email sent in Odoo within the last 45 days, so the reminder is skipped.'
+            ), recipient_email
 
         cooldown_days = max(company.payment_reminder_cooldown_days or 0, 0)
         if cooldown_days:
