@@ -32,6 +32,34 @@ class ResConfigSettings(models.TransientModel):
         help='By default the up-to-date Customer Statement PDF is generated and attached '
              'to every reminder. Tick to send reminders without it.',
     )
+    payment_reminder_require_shared_docs = fields.Boolean(
+        string='Require Earlier Invoice and Statement Email',
+        config_parameter='customer_payment_reminder_auto.require_shared_documents',
+        help='Only remind customers who were already emailed an invoice and a statement.',
+    )
+    payment_reminder_shared_docs_since = fields.Date(
+        string='Emails Sent On Or After',
+        config_parameter='customer_payment_reminder_auto.shared_documents_since',
+        help='Only emails sent on or after this date are searched for the invoice and '
+             'statement. Leave empty to search all earlier emails.',
+    )
+    payment_reminder_require_recent_statement = fields.Boolean(
+        string='Require Recently Generated Statement',
+        config_parameter='customer_payment_reminder_auto.require_recent_statement',
+        help='Only remind customers whose statement was generated (from the Customer '
+             'Statement screen) within the number of days below.',
+    )
+    payment_reminder_statement_recent_days = fields.Integer(
+        string='Statement Generated Within (days)',
+        config_parameter='customer_payment_reminder_auto.statement_recent_days',
+        default=5,
+    )
+    payment_reminder_statement_start = fields.Date(
+        string='Default Statement From',
+        config_parameter='customer_payment_reminder_auto.statement_default_start',
+        help='Start date of the statement attached to reminders when no date is chosen. '
+             'Defaults to 1 March 2026.',
+    )
     payment_reminder_dry_run = fields.Boolean(
         related='company_id.payment_reminder_dry_run',
         readonly=False,

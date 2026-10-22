@@ -29,8 +29,7 @@ class CustomerPaymentReminderWizard(models.TransientModel):
     statement_start_date = fields.Date(
         string='Statement From',
         help='Start date of the statement attached to each reminder (it always ends today). '
-             'Leave empty to let the module choose the start date automatically; '
-             'when set, the statement is attached exactly as generated from that date.',
+             'Leave empty to use the default date from Settings (1 March 2026 unless changed).',
     )
 
     @api.onchange('company_id')

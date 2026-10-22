@@ -9,7 +9,7 @@
                     <field name="company_id" groups="base.group_multi_company" options="{'no_create': True, 'no_open': True}"/>
                     <field name="dry_run"/>
                     <field name="statement_start_date"
-                           placeholder="Automatic"/>
+                           placeholder="Default (see Settings)"/>
                     <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"
                            placeholder="All customers with an overdue balance"/>
                 </group>

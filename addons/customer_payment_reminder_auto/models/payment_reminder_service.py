@@ -250,34 +250,6 @@ class CustomerPaymentReminderService(models.AbstractModel):
         ], order='reminder_datetime desc, id desc', limit=1)
 
     @api.model
-    def _payment_reminder_last_invoice_email_sent(self, company, partner):
-        """Return the latest invoice-email send date for the customer within the company,
-        or False when no invoice email is recorded. This is used as a safety gate: if
-        there has been no invoice email in the last 45 days, the customer is skipped.
-        """
-        moves = self.env['account.move'].sudo().with_company(company).search([
-            ('company_id', '=', company.id),
-            ('commercial_partner_id', '=', partner.id),
-            ('move_type', 'in', ('out_invoice', 'out_receipt')),
-            ('state', '=', 'posted'),
-        ])
-        if not moves:
-            return False
-        message = self.env['mail.message'].sudo().search([
-            ('model', '=', 'account.move'),
-            ('res_id', 'in', moves.ids),
-            ('message_type', 'in', ('comment', 'email', 'email_outgoing')),
-            ('subtype_id', '!=', False),
-            ('subtype_id.internal', '=', False),
-        ], order='date desc, id desc', limit=1)
-        if not message:
-            return False
-        date_value = message.date or message.create_date or False
-        if not date_value:
-            return False
-        return fields.Datetime.to_datetime(date_value)
-
-    @api.model
     def _payment_reminder_skip_reason(self, company, partner, outstanding_amount):
         rounding = self._payment_reminder_amount_rounding(company)
         rounded_outstanding = company.currency_id.round(outstanding_amount)
@@ -301,22 +273,27 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 ),
             ), False
 
+        if self._payment_reminder_recent_statement_required():
+            days = self._payment_reminder_recent_statement_days()
+            latest = self._payment_reminder_latest_statement(company, partner)
+            if not latest or fields.Datetime.now() - latest > timedelta(days=days):
+                return _(
+                    'No statement was generated for this customer in the last %(days)s days '
+                    '(latest: %(latest)s), so no reminder was sent.',
+                    days=days,
+                    latest=fields.Datetime.to_string(latest) if latest else _('none'),
+                ), False
+        if (self._payment_reminder_shared_documents_check_enabled()
+                and not self._payment_reminder_documents_already_shared(company, partner)):
+            return _(
+                'The invoice and statement were not both found in earlier emails sent to this '
+                'customer, so no reminder was sent.'
+            ), False
+
         recipients = self._payment_reminder_recipients(company, partner)
         if not recipients:
             return _('Customer does not have a valid reminder email address.'), False
         recipient_email = ', '.join(recipients)
-
-        last_invoice_email = self._payment_reminder_last_invoice_email_sent(company, partner)
-        if last_invoice_email:
-            cutoff = fields.Datetime.to_datetime(fields.Datetime.now()) - timedelta(days=45)
-            if last_invoice_email < cutoff:
-                return _(
-                    'The latest invoice email for this customer is older than 45 days, so the reminder is skipped.'
-                ), recipient_email
-        elif not last_invoice_email:
-            return _(
-                'The customer has no invoice email sent in Odoo within the last 45 days, so the reminder is skipped.'
-            ), recipient_email
 
         cooldown_days = max(company.payment_reminder_cooldown_days or 0, 0)
         if cooldown_days:
@@ -362,6 +339,87 @@ class CustomerPaymentReminderService(models.AbstractModel):
         )
         return report, False
 
+    _STATEMENT_DEFAULT_START = '2026-03-01'
+    # An invoice (invoice / INV) and a statement must both have been sent. RINV and
+    # credit notes are neither required nor counted.
+    _INVOICE_RE = re.compile(r'(?<![a-z])(?:inv(?![a-z])|invoice)')
+    _STATEMENT_RE = re.compile(r'statement')
+
+    @api.model
+    def _payment_reminder_statement_default_start(self):
+        value = self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.statement_default_start',
+        ) or self._STATEMENT_DEFAULT_START
+        return fields.Date.to_date(value)
+
+    @api.model
+    def _payment_reminder_shared_documents_check_enabled(self):
+        return bool(self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.require_shared_documents',
+        ))
+
+    @api.model
+    def _payment_reminder_recent_statement_required(self):
+        return bool(self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.require_recent_statement',
+        ))
+
+    @api.model
+    def _payment_reminder_recent_statement_days(self):
+        value = self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.statement_recent_days',
+        )
+        try:
+            return max(int(value), 0) if value else 5
+        except ValueError:
+            return 5
+
+    @api.model
+    def _payment_reminder_latest_statement(self, company, partner):
+        log = self.env['customer.statement.generation.log'].sudo().search([
+            ('company_id', '=', company.id),
+            ('partner_id', 'child_of', partner.id),
+        ], order='generated_at desc, id desc', limit=1)
+        return log.generated_at or False
+
+    @api.model
+    def _payment_reminder_documents_already_shared(self, company, partner):
+        """True when an invoice and a statement (attachment name or subject) were already
+        emailed from the customer's documents or from the customer, in the same or in
+        different emails."""
+        moves = self._payment_reminder_customer_moves(company, partner)
+        partners = partner | partner.child_ids
+        domain = ['|', '&', ('model', '=', 'account.move'), ('res_id', 'in', moves.ids),
+                  '&', ('model', '=', 'res.partner'), ('res_id', 'in', partners.ids)]
+        since = self.env['ir.config_parameter'].sudo().get_param(
+            'customer_payment_reminder_auto.shared_documents_since',
+        )
+        if since:
+            domain = ['&', ('date', '>=', fields.Date.to_date(since))] + domain
+        messages = self.env['mail.message'].sudo().search(domain + [
+            ('message_type', 'in', ('comment', 'email_outgoing')),
+            ('subtype_id', '!=', False),
+            ('subtype_id.internal', '=', False),
+        ])
+        invoice_shared = statement_shared = False
+        for message in messages:
+            notifications = self.env['mail.notification'].sudo().search([
+                ('mail_message_id', '=', message.id),
+                ('notification_type', '=', 'email'),
+            ])
+            if notifications and all(
+                n.notification_status in ('exception', 'bounce', 'canceled') for n in notifications
+            ):
+                continue  # the mail never reached the customer
+            texts = [message.subject or ''] + message.attachment_ids.mapped('name')
+            for text in texts:
+                normalized = re.sub(r'[_\-./\\]+', ' ', (text or '').lower())
+                invoice_shared = invoice_shared or bool(self._INVOICE_RE.search(normalized))
+                statement_shared = statement_shared or bool(self._STATEMENT_RE.search(normalized))
+            if invoice_shared and statement_shared:
+                return True
+        return False
+
     @api.model
     def _payment_reminder_statement_pdfs(self, company, partner):
         """Generate the up-to-date Customer Statement PDF(s) for a customer.
@@ -384,85 +442,33 @@ class CustomerPaymentReminderService(models.AbstractModel):
         Wizard = self.env['customer.statement.wizard'].sudo().with_company(company).with_context(**scope)
 
         if current_api:
-            custom_start = self.env.context.get('payment_reminder_statement_start')
-            if custom_start:
-                # Start date chosen by the user in the Send Payment Reminders wizard: the
-                # statement is generated exactly as it would be manually from that date.
-                wizard = Wizard.create({
-                    'start_date': fields.Date.to_date(custom_start),
-                    'end_date': today,
-                    'partner_id': partner.id,
-                    'include_zero_balance': True,
-                })
-                pdf_content, _report_format = report._render_qweb_pdf(
-                    report.report_name, wizard.ids, data={'wizard_id': wizard.id},
-                )
-                label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
-                result = _StatementPdfs([(f'Statement - {label} - {today}.pdf', pdf_content)])
-                result.total = wizard._get_statement_data()['net_balance']
-                return result
-            # tk_statements builds its balance as: opening (current residuals of documents
-            # before the start date) + invoices - credit notes - inbound payment records in
-            # the period. Settlements that are not payment records (bank lines matched
-            # directly, credit notes outside the period...) are not deducted, so the total
-            # depends on the start date. The statement is therefore only attached when its
-            # total equals the customer's real open balance; two start dates are tried
-            # (oldest open document, then first document ever).
-            docs = moves.search([
-                ('company_id', '=', company.id),
-                ('partner_id', 'child_of', partner.id),
-                ('move_type', 'in', ('out_invoice', 'out_refund')),
-                ('state', '=', 'posted'),
-            ])
-            dated = docs.filtered('invoice_date')
-            if not dated:
-                raise UserError(_('No posted invoice was found to build the statement from.'))
-            rounding = company.currency_id.rounding or 0.01
-            expected = company.currency_id.round(sum(
-                doc.amount_residual if doc.move_type == 'out_invoice' else -doc.amount_residual
-                for doc in docs
-            ))
-            open_dates = [
-                doc.invoice_date for doc in dated
-                if not float_is_zero(doc.amount_residual, precision_rounding=rounding)
-            ]
-            candidates = []
-            for start in ([min(open_dates)] if open_dates else []) + [min(dated.mapped('invoice_date'))]:
-                if start not in candidates:
-                    candidates.append(start)
+            # Start date: the one chosen in the Send Payment Reminders wizard, otherwise the
+            # default from Settings (1 March 2026 when not configured). Settled invoices and
+            # credit notes are included, so the statement lists invoices, credit notes and
+            # paid invoices alike. The email shows this statement's net balance.
+            start = (
+                fields.Date.to_date(self.env.context.get('payment_reminder_statement_start'))
+                or self._payment_reminder_statement_default_start()
+            )
+            wizard = Wizard.create({
+                'start_date': min(start, today),
+                'end_date': today,
+                'partner_id': partner.id,
+                'include_zero_balance': True,
+            })
+            pdf_content, _report_format = report._render_qweb_pdf(
+                report.report_name, wizard.ids, data={'wizard_id': wizard.id},
+            )
+            label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
+            result = _StatementPdfs([(f'Statement - {label} - {today}.pdf', pdf_content)])
+            result.total = wizard._get_statement_data()['net_balance']
+            return result
 
-            tried = []
-            for start in candidates:
-                wizard = Wizard.create({
-                    'start_date': start,
-                    'end_date': today,
-                    'partner_id': partner.id,
-                    'include_zero_balance': True,
-                })
-                net = wizard._get_statement_data()['net_balance']
-                if abs(net - expected) <= rounding * 1.5:
-                    pdf_content, _report_format = report._render_qweb_pdf(
-                        report.report_name, wizard.ids, data={'wizard_id': wizard.id},
-                    )
-                    label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
-                    return [(f'Statement - {label} - {today}.pdf', pdf_content)]
-                tried.append(f'{start}: {net}')
-            raise UserError(_(
-                'The statement total does not match the customer\'s open balance '
-                '(open balance %(expected)s; statement totals by start date: %(tried)s), '
-                'so it was not attached.',
-                expected=expected,
-                tried='; '.join(tried),
-            ))
-
-        # Older tk_customer_statements: open customer documents of one exact contact
-        # between two dates. Credit notes must stay in the statement as negative entries,
-        # otherwise the attached PDF can omit them entirely even though they are part of
-        # the customer's real balance.
+        # Older tk_customer_statements: invoices of one exact contact between two dates.
         open_invoices = moves.search([
             ('company_id', '=', company.id),
             ('commercial_partner_id', '=', partner.id),
-            ('move_type', 'in', ('out_invoice', 'out_refund')),
+            ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('payment_state', 'in', ('not_paid', 'partial')),
         ])
@@ -476,7 +482,6 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 'start_date': min(start_dates) if start_dates else today,
                 'end_date': today,
                 'partner_id': invoice_partner.id,
-                'include_zero_balance': True,
             })
             pdf_content, _report_format = report._render_qweb_pdf(
                 report.report_name, wizard.ids, data={'form_data': wizard.read()[0]},

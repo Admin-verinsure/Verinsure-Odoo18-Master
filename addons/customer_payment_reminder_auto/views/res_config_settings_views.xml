@@ -18,6 +18,22 @@
                 <setting id="payment_reminder_disable_followers" help="Tick to stop using the followers of the overdue invoices when no earlier invoice email is found.">
                     <field name="payment_reminder_disable_followers"/>
                 </setting>
+                <setting id="payment_reminder_statement_start" help="Start date of the statement attached to reminders when none is chosen (default 1 March 2026).">
+                    <field name="payment_reminder_statement_start"/>
+                </setting>
+                <setting id="payment_reminder_require_shared_docs" help="Only remind customers who were already emailed an invoice and a statement.">
+                    <field name="payment_reminder_require_shared_docs"/>
+                    <div class="content-group mt-2" invisible="not payment_reminder_require_shared_docs">
+                        <label for="payment_reminder_shared_docs_since" class="o_light_label me-2"/>
+                        <field name="payment_reminder_shared_docs_since" class="oe_inline"/>
+                    </div>
+                </setting>
+                <setting id="payment_reminder_require_recent_statement" help="Only remind customers whose statement was generated from the Customer Statement screen within the days set here.">
+                    <field name="payment_reminder_require_recent_statement"/>
+                    <div class="content-group mt-2" invisible="not payment_reminder_require_recent_statement">
+                        <field name="payment_reminder_statement_recent_days" class="oe_inline"/> days
+                    </div>
+                </setting>
                 <setting id="payment_reminder_disable_statement" help="Tick to send reminders without the up-to-date Customer Statement PDF attached.">
                     <field name="payment_reminder_disable_statement"/>
                 </setting>
