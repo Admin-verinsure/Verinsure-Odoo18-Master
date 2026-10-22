@@ -352,6 +352,7 @@ class CustomerPaymentReminderService(models.AbstractModel):
                     'start_date': fields.Date.to_date(custom_start),
                     'end_date': today,
                     'partner_id': partner.id,
+                    'include_zero_balance': True,
                 })
                 pdf_content, _report_format = report._render_qweb_pdf(
                     report.report_name, wizard.ids, data={'wizard_id': wizard.id},
@@ -396,6 +397,7 @@ class CustomerPaymentReminderService(models.AbstractModel):
                     'start_date': start,
                     'end_date': today,
                     'partner_id': partner.id,
+                    'include_zero_balance': True,
                 })
                 net = wizard._get_statement_data()['net_balance']
                 if abs(net - expected) <= rounding * 1.5:
@@ -413,11 +415,14 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 tried='; '.join(tried),
             ))
 
-        # Older tk_customer_statements: invoices of one exact contact between two dates.
+        # Older tk_customer_statements: open customer documents of one exact contact
+        # between two dates. Credit notes must stay in the statement as negative entries,
+        # otherwise the attached PDF can omit them entirely even though they are part of
+        # the customer's real balance.
         open_invoices = moves.search([
             ('company_id', '=', company.id),
             ('commercial_partner_id', '=', partner.id),
-            ('move_type', '=', 'out_invoice'),
+            ('move_type', 'in', ('out_invoice', 'out_refund')),
             ('state', '=', 'posted'),
             ('payment_state', 'in', ('not_paid', 'partial')),
         ])
@@ -431,6 +436,7 @@ class CustomerPaymentReminderService(models.AbstractModel):
                 'start_date': min(start_dates) if start_dates else today,
                 'end_date': today,
                 'partner_id': invoice_partner.id,
+                'include_zero_balance': True,
             })
             pdf_content, _report_format = report._render_qweb_pdf(
                 report.report_name, wizard.ids, data={'form_data': wizard.read()[0]},
