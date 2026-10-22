@@ -17,6 +17,11 @@ _EMAIL_RE = re.compile(
 )
 
 
+class _StatementPdfs(list):
+    """List of (filename, pdf) that also carries the statement's net balance."""
+    total = None
+
+
 class CustomerPaymentReminderService(models.AbstractModel):
     _name = 'customer.payment.reminder.service'
     _description = 'Customer Payment Reminder Service'
@@ -339,6 +344,22 @@ class CustomerPaymentReminderService(models.AbstractModel):
         Wizard = self.env['customer.statement.wizard'].sudo().with_company(company).with_context(**scope)
 
         if current_api:
+            custom_start = self.env.context.get('payment_reminder_statement_start')
+            if custom_start:
+                # Start date chosen by the user in the Send Payment Reminders wizard: the
+                # statement is generated exactly as it would be manually from that date.
+                wizard = Wizard.create({
+                    'start_date': fields.Date.to_date(custom_start),
+                    'end_date': today,
+                    'partner_id': partner.id,
+                })
+                pdf_content, _report_format = report._render_qweb_pdf(
+                    report.report_name, wizard.ids, data={'wizard_id': wizard.id},
+                )
+                label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
+                result = _StatementPdfs([(f'Statement - {label} - {today}.pdf', pdf_content)])
+                result.total = wizard._get_statement_data()['net_balance']
+                return result
             # tk_statements builds its balance as: opening (current residuals of documents
             # before the start date) + invoices - credit notes - inbound payment records in
             # the period. Settlements that are not payment records (bank lines matched
@@ -461,6 +482,15 @@ class CustomerPaymentReminderService(models.AbstractModel):
                     error=str(exc),
                 ), False
 
+        # With a user-chosen "Statement From" date the email shows the statement's net
+        # balance, so the amount in the mail always equals the attached statement.
+        statement_total = getattr(statement_pdfs, 'total', None)
+        if statement_total is not None:
+            outstanding_amount = statement_total
+            result_box = self.env.context.get('payment_reminder_result')
+            if isinstance(result_box, dict):
+                result_box['amount'] = statement_total
+
         ctx = dict(
             self.env.context,
             payment_reminder_statement_attached=bool(statement_pdfs),
@@ -575,7 +605,10 @@ class CustomerPaymentReminderService(models.AbstractModel):
             )
             return 'eligible_dry_run', True
 
-        sent, failure_reason, mail_mail = self._payment_reminder_send(
+        result_box = {}
+        sent, failure_reason, mail_mail = self.with_context(
+            payment_reminder_result=result_box,
+        )._payment_reminder_send(
             company,
             partner,
             outstanding_amount,
@@ -592,7 +625,7 @@ class CustomerPaymentReminderService(models.AbstractModel):
             self._payment_reminder_log(
                 company=company,
                 partner=partner,
-                outstanding_amount=outstanding_amount,
+                outstanding_amount=result_box.get('amount', outstanding_amount),
                 status='sent',
                 run_token=run_token,
                 recipient_email=recipient_email,
@@ -788,13 +821,17 @@ class CustomerPaymentReminderService(models.AbstractModel):
         )
 
     @api.model
-    def run_manual_payment_reminders(self, company_id, dry_run=True, partner_ids=None):
+    def run_manual_payment_reminders(self, company_id, dry_run=True, partner_ids=None,
+                                     statement_start_date=None):
         """Manual trigger used by the "Send Payment Reminders" wizard.
 
         :param partner_ids: optional customers to restrict the run to; when empty,
             every customer of the company with an open receivable is evaluated.
         """
         service = self.sudo()
+        if statement_start_date:
+            service = service.with_context(
+                payment_reminder_statement_start=fields.Date.to_string(statement_start_date))
         company = self.env['res.company'].browse(company_id)
         run_token = f'manual:{company.id}:{uuid.uuid4()}'
         if not dry_run and not service._payment_reminder_try_lock():
