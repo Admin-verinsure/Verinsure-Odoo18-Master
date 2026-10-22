@@ -332,33 +332,65 @@ class CustomerPaymentReminderService(models.AbstractModel):
             ))
         today = fields.Date.context_today(self)
         moves = self.env['account.move'].sudo().with_company(company)
-        report = report.sudo().with_company(company)
-        Wizard = self.env['customer.statement.wizard'].sudo().with_company(company)
+        # The statement module does not filter by company and sudo bypasses record rules,
+        # so the company is passed in the context and applied by statement_company_scope.
+        scope = {'payment_reminder_company_id': company.id}
+        report = report.sudo().with_company(company).with_context(**scope)
+        Wizard = self.env['customer.statement.wizard'].sudo().with_company(company).with_context(**scope)
 
         if current_api:
-            # tk_statements keeps a running balance and takes "opening balance" from the
-            # current residuals, so the period must start at the customer's first posted
-            # invoice or credit note for the balance to be consistent. One statement for
-            # the whole company (it already includes all the customer's contacts).
-            first = moves.search([
+            # tk_statements builds its balance as: opening (current residuals of documents
+            # before the start date) + invoices - credit notes - inbound payment records in
+            # the period. Settlements that are not payment records (bank lines matched
+            # directly, credit notes outside the period...) are not deducted, so the total
+            # depends on the start date. The statement is therefore only attached when its
+            # total equals the customer's real open balance; two start dates are tried
+            # (oldest open document, then first document ever).
+            docs = moves.search([
                 ('company_id', '=', company.id),
-                ('commercial_partner_id', '=', partner.id),
+                ('partner_id', 'child_of', partner.id),
                 ('move_type', 'in', ('out_invoice', 'out_refund')),
                 ('state', '=', 'posted'),
-                ('invoice_date', '!=', False),
-            ], order='invoice_date asc, id asc', limit=1)
-            if not first:
+            ])
+            dated = docs.filtered('invoice_date')
+            if not dated:
                 raise UserError(_('No posted invoice was found to build the statement from.'))
-            wizard = Wizard.create({
-                'start_date': first.invoice_date,
-                'end_date': today,
-                'partner_id': partner.id,
-            })
-            pdf_content, _report_format = report._render_qweb_pdf(
-                report.report_name, wizard.ids, data={'wizard_id': wizard.id},
-            )
-            label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
-            return [(f'Statement - {label} - {today}.pdf', pdf_content)]
+            rounding = company.currency_id.rounding or 0.01
+            expected = company.currency_id.round(sum(
+                doc.amount_residual if doc.move_type == 'out_invoice' else -doc.amount_residual
+                for doc in docs
+            ))
+            open_dates = [
+                doc.invoice_date for doc in dated
+                if not float_is_zero(doc.amount_residual, precision_rounding=rounding)
+            ]
+            candidates = []
+            for start in ([min(open_dates)] if open_dates else []) + [min(dated.mapped('invoice_date'))]:
+                if start not in candidates:
+                    candidates.append(start)
+
+            tried = []
+            for start in candidates:
+                wizard = Wizard.create({
+                    'start_date': start,
+                    'end_date': today,
+                    'partner_id': partner.id,
+                })
+                net = wizard._get_statement_data()['net_balance']
+                if abs(net - expected) <= rounding * 1.5:
+                    pdf_content, _report_format = report._render_qweb_pdf(
+                        report.report_name, wizard.ids, data={'wizard_id': wizard.id},
+                    )
+                    label = re.sub(r'[\\/:*?"<>|]+', '-', partner.name or 'Customer')
+                    return [(f'Statement - {label} - {today}.pdf', pdf_content)]
+                tried.append(f'{start}: {net}')
+            raise UserError(_(
+                'The statement total does not match the customer\'s open balance '
+                '(open balance %(expected)s; statement totals by start date: %(tried)s), '
+                'so it was not attached.',
+                expected=expected,
+                tried='; '.join(tried),
+            ))
 
         # Older tk_customer_statements: invoices of one exact contact between two dates.
         open_invoices = moves.search([

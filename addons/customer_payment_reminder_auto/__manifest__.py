@@ -1,6 +1,6 @@
 {
     'name': 'Customer Payment Reminder Automation',
-    'version': '18.0.1.3.0',
+    'version': '18.0.1.3.1',
     'category': 'Accounting',
     'summary': 'Automated customer payment reminders based on outstanding receivables.',
     'description': """
