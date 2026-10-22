@@ -26,6 +26,13 @@ class CustomerPaymentReminderWizard(models.TransientModel):
              'reminders enabled on the customer).',
     )
 
+    statement_start_date = fields.Date(
+        string='Statement From',
+        help='Start date of the statement attached to each reminder (it always ends today). '
+             'Leave empty to let the module choose the start date automatically; '
+             'when set, the statement is attached exactly as generated from that date.',
+    )
+
     @api.onchange('company_id')
     def _onchange_company_id(self):
         if self.company_id:
@@ -35,6 +42,8 @@ class CustomerPaymentReminderWizard(models.TransientModel):
         self.ensure_one()
         if not self.env.user.has_group('account.group_account_user'):
             raise AccessError(_('Only accountants can trigger payment reminders.'))
+        if self.statement_start_date and self.statement_start_date > fields.Date.context_today(self):
+            raise UserError(_('The statement start date cannot be in the future.'))
         if self.company_id not in self.env.companies:
             raise UserError(_('You can only run reminders for the companies you are currently allowed to access.'))
 
@@ -42,6 +51,7 @@ class CustomerPaymentReminderWizard(models.TransientModel):
             company_id=self.company_id.id,
             dry_run=self.dry_run,
             partner_ids=self.partner_ids.ids,
+            statement_start_date=self.statement_start_date,
         )
         if stats.get('locked'):
             raise UserError(_(
