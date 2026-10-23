@@ -128,34 +128,35 @@ class CustomerPaymentReminderService(models.AbstractModel):
         return self._payment_reminder_unique_emails(followers.mapped('email'))
 
     @api.model
+    def _payment_reminder_customer_contact_emails(self, partner):
+        """All email addresses linked to the customer partner itself and its
+        active contacts. This is the preferred reminder recipient source, rather
+        than infering recipients from historical mail chains."""
+        addresses = []
+        if partner:
+            addresses += [partner.email]
+            addresses += partner.child_ids.filtered('active').mapped('email')
+        return self._payment_reminder_unique_emails(addresses)
+
+    @api.model
     def _payment_reminder_recipients(self, company, partner):
         """Who receives the reminder for a customer:
 
-        1. the recipients of the emails already sent from the customer's overdue
-           invoices (invoice / statement mails);
-        2. if there are none, the followers of those invoices (when enabled);
-        3. if there are still none, the customer's own address.
-        A reminder email override set on the customer is always included.
+        1. a direct override email on the customer, if configured;
+        2. all active contact emails linked to the customer account;
+        3. the customer's own email address.
+
+        Historical mail-chain recipients are intentionally ignored so the reminder
+        follows the actual customer contact records instead of previous outbound
+        communication history.
         """
         recipients = []
         override = self._payment_reminder_normalize_email(partner.payment_reminder_email_override)
         if override:
             recipients.append(override)
 
-        moves = self._payment_reminder_overdue_invoices(company, partner)
-        found = self._payment_reminder_chain_emails(moves)
+        found = self._payment_reminder_customer_contact_emails(partner)
         if not found:
-            # The mail may sit on an already paid invoice or on a credit note.
-            found = self._payment_reminder_chain_emails(
-                self._payment_reminder_customer_moves(company, partner),
-                latest_only=True,
-            )
-        followers_disabled = self.env['ir.config_parameter'].sudo().get_param(
-            'customer_payment_reminder_auto.disable_follower_fallback'
-        )
-        if not found and not followers_disabled:
-            found = self._payment_reminder_follower_emails(moves)
-        if not found and not override:
             found = self._payment_reminder_unique_emails([partner.email])
 
         for email in found:
