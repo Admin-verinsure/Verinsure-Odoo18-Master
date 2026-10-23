@@ -28,10 +28,15 @@
                         <field name="payment_reminder_shared_docs_since" class="oe_inline"/>
                     </div>
                 </setting>
-                <setting id="payment_reminder_require_recent_statement" help="Only remind customers whose statement was generated from the Customer Statement screen within the days set here.">
+                <setting id="payment_reminder_require_recent_statement" help="Only remind customers when the latest statement is older than the number of days set here.">
                     <field name="payment_reminder_require_recent_statement"/>
                     <div class="content-group mt-2" invisible="not payment_reminder_require_recent_statement">
                         <field name="payment_reminder_statement_recent_days" class="oe_inline"/> days
+                        <div class="mt-2">
+                            <field name="payment_reminder_skip_first_statement_check" class="oe_inline"/>
+                            <label for="payment_reminder_skip_first_statement_check" class="o_light_label ms-2"/>
+                            Ignore this rule on the first reminder
+                        </div>
                     </div>
                 </setting>
                 <setting id="payment_reminder_disable_statement" help="Tick to send reminders without the up-to-date Customer Statement PDF attached.">

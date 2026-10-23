@@ -48,15 +48,22 @@ class ResConfigSettings(models.TransientModel):
              'statement. Leave empty to search all earlier emails.',
     )
     payment_reminder_require_recent_statement = fields.Boolean(
-        string='Require Recently Generated Statement',
+        string='Require Statement Older Than',
         config_parameter='customer_payment_reminder_auto.require_recent_statement',
-        help='Only remind customers whose statement was generated (from the Customer '
-             'Statement screen) within the number of days below.',
+        help='Only remind customers when the latest generated customer statement is '
+             'older than the number of days set below.',
     )
     payment_reminder_statement_recent_days = fields.Integer(
-        string='Statement Generated Within (days)',
+        string='Statement Older Than (days)',
         config_parameter='customer_payment_reminder_auto.statement_recent_days',
         default=5,
+    )
+    payment_reminder_skip_first_statement_check = fields.Boolean(
+        string='Ignore This Rule On First Reminder',
+        config_parameter='customer_payment_reminder_auto.skip_first_statement_check',
+        default=True,
+        help='When enabled, the statement age rule is ignored for a customer\'s first '
+             'reminder. It is still enforced on later reminders.',
     )
     payment_reminder_statement_start = fields.Datetime(
         string='Default Statement From',

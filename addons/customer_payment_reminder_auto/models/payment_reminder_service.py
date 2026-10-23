@@ -292,7 +292,11 @@ class CustomerPaymentReminderService(models.AbstractModel):
             days = max(int(self.env['ir.config_parameter'].sudo().get_param(
                 'customer_payment_reminder_auto.statement_recent_days') or 5), 0)
             prior_reminder = bool(self._payment_reminder_last_sent(company, partner))
-            if prior_reminder:
+            skip_first_reminder = self.env['ir.config_parameter'].sudo().get_param(
+                'customer_payment_reminder_auto.skip_first_statement_check', default='True'
+            )
+            skip_first_reminder = str(skip_first_reminder).lower() not in ('false', '0', 'no', 'off')
+            if not (not prior_reminder and skip_first_reminder):
                 latest_statement = self._payment_reminder_last_statement_generation(company, partner)
                 if latest_statement:
                     latest_dt = fields.Datetime.to_datetime(latest_statement.generated_at)
