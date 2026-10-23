@@ -398,11 +398,14 @@ class CustomerPaymentReminderService(models.AbstractModel):
             if custom_start:
                 # Start date chosen by the user in the Send Payment Reminders wizard: the
                 # statement is generated exactly as it would be manually from that date.
-                wizard = Wizard.create({
+                wizard_values = {
                     'start_date': fields.Date.to_date(custom_start),
                     'end_date': today,
                     'partner_id': partner.id,
-                })
+                }
+                if 'include_zero_balance' in Wizard._fields:
+                    wizard_values['include_zero_balance'] = True
+                wizard = Wizard.create(wizard_values)
                 pdf_content, _report_format = report._render_qweb_pdf(
                     report.report_name, wizard.ids, data={'wizard_id': wizard.id},
                 )
@@ -449,11 +452,14 @@ class CustomerPaymentReminderService(models.AbstractModel):
 
             tried = []
             for start in candidates:
-                wizard = Wizard.create({
+                wizard_values = {
                     'start_date': start,
                     'end_date': today,
                     'partner_id': partner.id,
-                })
+                }
+                if 'include_zero_balance' in Wizard._fields:
+                    wizard_values['include_zero_balance'] = True
+                wizard = Wizard.create(wizard_values)
                 net = wizard._get_statement_data()['net_balance']
                 if abs(net - expected) <= rounding * 1.5:
                     pdf_content, _report_format = report._render_qweb_pdf(
@@ -491,11 +497,14 @@ class CustomerPaymentReminderService(models.AbstractModel):
         for invoice_partner in open_invoices.partner_id:
             invoices = open_invoices.filtered(lambda move: move.partner_id == invoice_partner)
             start_dates = [date for date in invoices.mapped('invoice_date') if date]
-            wizard = Wizard.create({
+            wizard_values = {
                 'start_date': min(start_dates) if start_dates else today,
                 'end_date': today,
                 'partner_id': invoice_partner.id,
-            })
+            }
+            if 'include_zero_balance' in Wizard._fields:
+                wizard_values['include_zero_balance'] = True
+            wizard = Wizard.create(wizard_values)
             pdf_content, _report_format = report._render_qweb_pdf(
                 report.report_name, wizard.ids, data={'form_data': wizard.read()[0]},
             )
