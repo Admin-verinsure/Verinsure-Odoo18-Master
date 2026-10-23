@@ -291,15 +291,17 @@ class CustomerPaymentReminderService(models.AbstractModel):
         if require_recent_statement:
             days = max(int(self.env['ir.config_parameter'].sudo().get_param(
                 'customer_payment_reminder_auto.statement_recent_days') or 5), 0)
-            latest_statement = self._payment_reminder_last_statement_generation(company, partner)
-            if latest_statement:
-                latest_dt = fields.Datetime.to_datetime(latest_statement.generated_at)
-                now_dt = fields.Datetime.to_datetime(fields.Datetime.now())
-                if latest_dt and now_dt and now_dt - latest_dt <= timedelta(days=days):
-                    return _(
-                        'The customer statement was generated too recently (within %(days)s days), so the reminder is skipped.',
-                        days=days,
-                    ), recipient_email
+            prior_reminder = bool(self._payment_reminder_last_sent(company, partner))
+            if prior_reminder:
+                latest_statement = self._payment_reminder_last_statement_generation(company, partner)
+                if latest_statement:
+                    latest_dt = fields.Datetime.to_datetime(latest_statement.generated_at)
+                    now_dt = fields.Datetime.to_datetime(fields.Datetime.now())
+                    if latest_dt and now_dt and now_dt - latest_dt <= timedelta(days=days):
+                        return _(
+                            'The customer statement was generated too recently (within %(days)s days), so the reminder is skipped.',
+                            days=days,
+                        ), recipient_email
 
         cooldown_days = max(company.payment_reminder_cooldown_days or 0, 0)
         if cooldown_days:
