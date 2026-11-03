@@ -4,13 +4,15 @@
     <field name="name">link.existing.contacts.wizard.form</field>
     <field name="model">link.existing.contacts.wizard</field>
     <field name="arch" type="xml">
-      <form string="Link Existing Contact(s)">
+      <form string="Manage Linked Contacts">
         <group>
+          <field name="mode" invisible="1"/>
           <field name="company_id" readonly="1"/>
           <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"/>
         </group>
         <footer>
-          <button name="action_link" type="object" class="btn-primary" string="Link"/>
+          <button name="action_link" type="object" class="btn-primary" string="Link" attrs="{'invisible':[('mode','!=','link')]}"/>
+          <button name="action_unlink" type="object" class="btn-primary" string="Unlink" attrs="{'invisible':[('mode','!=','unlink')]}"/>
           <button special="cancel" class="btn-secondary" string="Cancel"/>
         </footer>
       </form>
@@ -22,6 +24,14 @@
     <field name="res_model">link.existing.contacts.wizard</field>
     <field name="view_mode">form</field>
     <field name="target">new</field>
-    <field name="context">{'default_company_id': active_id}</field>
+    <field name="context">{'default_company_id': active_id, 'default_mode': 'link'}</field>
+  </record>
+
+  <record id="action_unlink_linked_contacts_wizard" model="ir.actions.act_window">
+    <field name="name">Unlink Linked Contact(s)</field>
+    <field name="res_model">link.existing.contacts.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+    <field name="context">{'default_company_id': active_id, 'default_mode': 'unlink'}</field>
   </record>
 </odoo>
