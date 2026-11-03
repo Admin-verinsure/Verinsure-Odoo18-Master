@@ -7,7 +7,14 @@
     <field name="model">res.partner</field>
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
-      <!-- Insert buttons just before the child contacts one2many field -->
+      <xpath expr="//form/header" position="inside">
+        <button name="action_unlink_from_parent"
+                type="object"
+                string="Unlink from Parent"
+                class="btn-secondary"
+                invisible="not parent_id or is_company"/>
+      </xpath>
+      <!-- Keep the parent-side helper buttons too -->
       <xpath expr="//field[@name='child_ids']" position="before">
         <button name="%(action_link_existing_contacts_wizard)d"
                 type="action"
