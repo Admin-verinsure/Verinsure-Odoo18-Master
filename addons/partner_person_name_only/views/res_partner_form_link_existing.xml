@@ -7,7 +7,8 @@
     <field name="model">res.partner</field>
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
-      <xpath expr="//form/header" position="inside">
+      <!-- Show on the linked child contact form itself, right next to the parent field -->
+      <xpath expr="//field[@name='parent_id']" position="after">
         <button name="action_unlink_from_parent"
                 type="object"
                 string="Unlink from Parent"
