@@ -11,8 +11,8 @@
           <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"/>
         </group>
         <footer>
-          <button name="action_link" type="object" class="btn-primary" string="Link" attrs="{'invisible':[('mode','!=','link')]}"/>
-          <button name="action_unlink" type="object" class="btn-primary" string="Unlink" attrs="{'invisible':[('mode','!=','unlink')]}"/>
+          <button name="action_link" type="object" class="btn-primary" string="Link" invisible="mode != 'link'"/>
+          <button name="action_unlink" type="object" class="btn-primary" string="Unlink" invisible="mode != 'unlink'"/>
           <button special="cancel" class="btn-secondary" string="Cancel"/>
         </footer>
       </form>
