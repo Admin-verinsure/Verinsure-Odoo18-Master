@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+  <!-- Add a button near the Contacts & Addresses children list to link existing contacts.
+       Standard 'Add' creates a new record; this action re-uses existing ones by setting parent_id. -->
   <record id="res_partner_form_link_existing_contacts_button" model="ir.ui.view">
     <field name="name">res.partner.form.link.existing.contacts.button</field>
     <field name="model">res.partner</field>
     <field name="inherit_id" ref="base.view_partner_form"/>
     <field name="arch" type="xml">
-      <xpath expr="//field[@name='parent_id']" position="after">
-        <button name="action_unlink_from_parent"
-                type="object"
-                string="Unlink"
+      <!-- Insert button just before the child contacts one2many field -->
+      <xpath expr="//field[@name='child_ids']" position="before">
+        <button name="%(action_link_existing_contacts_wizard)d"
+                type="action"
+                string="Link Existing Contact(s)"
+                class="btn-secondary"/>
+        <button name="%(action_unlink_existing_contacts_wizard)d"
+                type="action"
+                string="Unlink Contact(s)"
                 class="btn-secondary"
-                invisible="not parent_id or is_company"/>
+                invisible="not child_ids"/>
       </xpath>
     </field>
   </record>

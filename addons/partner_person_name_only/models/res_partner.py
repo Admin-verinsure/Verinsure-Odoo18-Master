@@ -1,16 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import api, models
 
-
 class ResPartner(models.Model):
     _inherit = "res.partner"
-
-    def action_unlink_from_parent(self):
-        """Safely remove this contact from its parent without deleting the record."""
-        self.ensure_one()
-        if self.parent_id and not self.is_company:
-            self.write({'parent_id': False})
-        return True
 
     @api.depends('name', 'parent_id', 'is_company')
     def _compute_display_name(self):
