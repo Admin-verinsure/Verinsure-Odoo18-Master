@@ -88,7 +88,7 @@ class AccountJournalAkahuExtend(models.Model):
     def _compute_akahu_bank_feeds_disabled(self):
         for journal in self:
             active_accounts = journal.akahu_account_ids.filtered(
-                lambda a: a.active and a.akahu_status != 'INACTIVE'
+                lambda a: a.active and a.akahu_status not in ('INACTIVE', 'DISCONNECTED')
             )
             journal.akahu_bank_feeds_disabled = bool(active_accounts)
 
@@ -147,7 +147,7 @@ class AccountJournalAkahuExtend(models.Model):
 
         # ── Guard: must have active Akahu account linked ───────────────────────
         active_accounts = self.akahu_account_ids.filtered(
-            lambda a: a.active and a.akahu_status != 'INACTIVE'
+            lambda a: a.active and a.akahu_status not in ('INACTIVE', 'DISCONNECTED')
         )
         if not active_accounts:
             return {

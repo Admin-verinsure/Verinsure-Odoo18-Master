@@ -4,7 +4,7 @@ from unittest import mock
 from odoo import fields
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 from odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth import AkahuOAuthController, OAUTH_STATE_SESSION_KEY
 from odoo.addons.nz_bank_reconciliation.models.akahu_credential import OAUTH_CALLBACK_PATH
@@ -254,10 +254,69 @@ class TestPatch5AkahuOAuth(TransactionCase):
         with self.assertRaisesRegex(ValidationError, 'already linked to another Odoo journal'):
             wizard.action_save()
 
+    def test_authorization_url_includes_login_hint(self):
+        self.env.user.email = 'ops@example.nz'
+        url = self.credential._build_oauth_authorization_url('state-secret')
+        self.assertIn('login_hint=ops%40example.nz', url)
+
     def test_authorization_url_does_not_expose_secret_values(self):
         url = self.credential._build_oauth_authorization_url('state-secret')
         self.assertNotIn('app_secret_patch5', url)
         self.assertNotIn('user_token_patch5', url)
+
+    def test_old_token_is_revoked_when_akahu_user_identity_changes(self):
+        self.credential.write({'user_access_token': 'user_token_old_identity'})
+        self.credential._set_known_akahu_user_id('user_old_123')
+        captured = {}
+
+        class Response:
+            status_code = 204
+            text = ''
+
+        with mock.patch.object(type(self.credential), '_fetch_akahu_current_user', return_value={'_id': 'user_new_456'}):
+            with mock.patch.object(type(self.credential), '_get_user_access_token', return_value='user_token_old_identity'):
+                with mock.patch('requests.delete', return_value=Response()) as delete_mock:
+                    with self.assertRaisesRegex(UserError, 'user identity changed'):
+                        self.credential._check_akahu_user_identity('user_token_new_identity')
+
+        delete_mock.assert_called_once()
+        self.assertEqual(self.credential.connection_status, 'error')
+
+    def test_failed_me_lookup_does_not_overwrite_valid_identity(self):
+        self.credential._set_known_akahu_user_id('user_stable_001')
+        with mock.patch.object(type(self.credential), '_fetch_akahu_current_user', side_effect=UserError('down')):
+            self.credential._check_akahu_user_identity('user_token_stable')
+        self.assertEqual(self.credential._get_known_akahu_user_id(), 'user_stable_001')
+
+    def test_oauth_callback_handles_revoked_access(self):
+        self.credential.write({'user_access_token': 'user_token_pre_revoke'})
+        account = self._make_account('revoke')
+        account.write({'user_token': 'account_token_pre_revoke'})
+        controller = AkahuOAuthController()
+        fake_request = self._mock_request(self._callback_state())
+
+        with mock.patch('odoo.addons.nz_bank_reconciliation.controllers.akahu_oauth.request', fake_request):
+            response = controller.akahu_oauth_callback(state='expected-state', event='REVOKE')
+
+        self.assertIn('Akahu access revoked', response)
+        self.assertFalse(self.credential._get_user_access_token())
+        self.assertEqual(account.user_token, '')
+        self.assertEqual(account.akahu_status, 'DISCONNECTED')
+
+    def test_401_response_invalidates_user_access(self):
+        self.credential.write({'user_access_token': 'user_token_stale'})
+
+        class Response:
+            status_code = 401
+            text = '{"error": "revoked"}'
+            headers = {}
+
+        with mock.patch('requests.get', return_value=Response()):
+            with self.assertRaisesRegex(UserError, 'Akahu authentication failed'):
+                self.credential._api_get('user_token_stale', '/accounts')
+
+        self.assertFalse(self.credential._get_user_access_token())
+        self.assertEqual(self.credential.connection_status, 'error')
 
     def test_test_connection_uses_stored_token_not_oauth(self):
         with mock.patch.object(type(self.credential), '_api_get', return_value={'items': []}) as api_mock:
@@ -434,11 +493,198 @@ class TestPatch5AkahuOAuth(TransactionCase):
                 ]):
                     response = controller.akahu_oauth_callback(state='expected-state', code='code123')
 
-        self.assertIn('model=akahu.oauth.account.select.wizard', response)
+        self.assertEqual(response.get('type'), 'ir.actions.act_window')
+        self.assertEqual(response.get('target'), 'new')
+        self.assertEqual(response.get('res_model'), 'akahu.oauth.account.select.wizard')
         wizard = self.WizardModel.search([('credential_id', '=', self.credential.id)], order='id desc', limit=1)
         self.assertTrue(wizard)
         self.assertEqual(len(wizard.option_ids), 2)
         self.assertFalse(wizard.selected_option_id)
+
+    def test_multiple_selected_accounts_can_be_saved_in_one_session(self):
+        journal_one = self._make_journal('multi_one')
+        journal_two = self._make_journal('multi_two')
+        wizard = self.WizardModel.create({'credential_id': self.credential.id})
+        wizard.write({'option_ids': [
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': journal_one.id,
+                'akahu_account_id': 'acc_multi_one',
+                'display_name': 'ANZ - Multi One',
+                'bank_name': 'ANZ',
+                'account_name': 'Multi One',
+                'formatted_account': '12-0000-0000007-00',
+                'akahu_status': 'ACTIVE',
+            }),
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': journal_two.id,
+                'akahu_account_id': 'acc_multi_two',
+                'display_name': 'BNZ - Multi Two',
+                'bank_name': 'BNZ',
+                'account_name': 'Multi Two',
+                'formatted_account': '02-0000-0000008-00',
+                'akahu_status': 'ACTIVE',
+            }),
+        ]})
+
+        wizard.action_save()
+
+        self.assertEqual(self.AccountModel.search_count([
+            ('credential_id', '=', self.credential.id),
+            ('akahu_account_id', 'in', ['acc_multi_one', 'acc_multi_two'])
+        ]), 2)
+
+    def test_only_selected_accounts_are_saved_and_unselected_accounts_remain_available(self):
+        journal_one = self._make_journal('selected_one')
+        journal_two = self._make_journal('selected_two')
+        wizard = self.WizardModel.create({'credential_id': self.credential.id})
+        wizard.write({'option_ids': [
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': journal_one.id,
+                'akahu_account_id': 'acc_selected_only',
+                'display_name': 'ASB - Selected',
+                'bank_name': 'ASB',
+                'account_name': 'Selected',
+                'formatted_account': '12-0000-0000009-00',
+                'akahu_status': 'ACTIVE',
+            }),
+            (0, 0, {
+                'selected': False,
+                'company_id': self.company.id,
+                'journal_id': journal_two.id,
+                'akahu_account_id': 'acc_not_selected',
+                'display_name': 'BNZ - Not Selected',
+                'bank_name': 'BNZ',
+                'account_name': 'Not Selected',
+                'formatted_account': '02-0000-0000009-00',
+                'akahu_status': 'ACTIVE',
+            }),
+        ]})
+
+        wizard.action_save()
+
+        self.assertEqual(self.AccountModel.search_count([('credential_id', '=', self.credential.id), ('akahu_account_id', '=', 'acc_selected_only')]), 1)
+        self.assertEqual(self.AccountModel.search_count([('credential_id', '=', self.credential.id), ('akahu_account_id', '=', 'acc_not_selected')]), 0)
+        self.assertEqual(len(wizard.option_ids), 2)
+        self.assertFalse(wizard.option_ids.filtered(lambda r: r.akahu_account_id == 'acc_not_selected').selected)
+
+    def test_multi_account_mapping_rejects_duplicate_akahu_accounts(self):
+        journal_one = self._make_journal('duplicate_a')
+        journal_two = self._make_journal('duplicate_b')
+        wizard = self.WizardModel.create({'credential_id': self.credential.id})
+        wizard.write({'option_ids': [
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': journal_one.id,
+                'akahu_account_id': 'acc_duplicate_same',
+                'display_name': 'Duplicate A',
+                'bank_name': 'ANZ',
+                'account_name': 'Same',
+                'formatted_account': '12-0000-0000010-00',
+                'akahu_status': 'ACTIVE',
+            }),
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': journal_two.id,
+                'akahu_account_id': 'acc_duplicate_same',
+                'display_name': 'Duplicate B',
+                'bank_name': 'BNZ',
+                'account_name': 'Same',
+                'formatted_account': '02-0000-0000010-00',
+                'akahu_status': 'ACTIVE',
+            }),
+        ]})
+
+        with self.assertRaisesRegex(ValidationError, 'selected more than once'):
+            wizard.action_save()
+
+    def test_multi_account_mapping_rejects_invalid_company_and_journal_combination(self):
+        other_company = self.env['res.company'].sudo().create({'name': 'PATCH5 Multi Company'})
+        wrong_journal = self.JournalModel.create({
+            'name': 'PATCH5 Wrong Company Journal',
+            'code': 'PCWJ',
+            'type': 'bank',
+            'company_id': other_company.id,
+        })
+        wizard = self.WizardModel.create({'credential_id': self.credential.id})
+        wizard.write({'option_ids': [
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': wrong_journal.id,
+                'akahu_account_id': 'acc_wrong_company',
+                'display_name': 'Wrong Company',
+                'bank_name': 'Kiwibank',
+                'account_name': 'Wrong',
+                'formatted_account': '12-0000-0000011-00',
+                'akahu_status': 'ACTIVE',
+            }),
+        ]})
+
+        with self.assertRaisesRegex(ValidationError, 'must belong to the selected Odoo company'):
+            wizard.action_save()
+
+    def test_multi_account_mapping_preserves_existing_mappings_when_one_selected_row_fails(self):
+        existing_journal = self._make_journal('existing_keep')
+        existing_account = self.AccountModel.create({
+            'company_id': self.company.id,
+            'credential_id': self.credential.id,
+            'journal_id': existing_journal.id,
+            'akahu_account_id': 'acc_keep_existing',
+            'bank_name': 'ASB',
+            'akahu_account_name': 'Existing',
+            'akahu_formatted_account': '12-0000-0000012-00',
+            'akahu_status': 'ACTIVE',
+        })
+        valid_journal = self._make_journal('valid_keep')
+        wizard = self.WizardModel.create({'credential_id': self.credential.id})
+        wizard.write({'option_ids': [
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': existing_journal.id,
+                'akahu_account_id': 'acc_keep_existing_other',
+                'display_name': 'Will Fail',
+                'bank_name': 'ASB',
+                'account_name': 'Other',
+                'formatted_account': '12-0000-0000013-00',
+                'akahu_status': 'ACTIVE',
+            }),
+            (0, 0, {
+                'selected': True,
+                'company_id': self.company.id,
+                'journal_id': valid_journal.id,
+                'akahu_account_id': 'acc_keep_valid',
+                'display_name': 'Will Pass',
+                'bank_name': 'ANZ',
+                'account_name': 'Valid',
+                'formatted_account': '12-0000-0000014-00',
+                'akahu_status': 'ACTIVE',
+            }),
+        ]})
+
+        with self.assertRaisesRegex(ValidationError, 'already linked to a different Akahu account'):
+            wizard.action_save()
+
+        existing_account = self.AccountModel.browse(existing_account.id)
+        self.assertEqual(existing_account.akahu_account_id, 'acc_keep_existing')
+        self.assertEqual(self.AccountModel.search_count([('credential_id', '=', self.credential.id), ('akahu_account_id', '=', 'acc_keep_valid')]), 0)
+
+    def test_sync_marks_account_disconnected_on_404(self):
+        account = self._make_account('not_found')
+        account.write({'akahu_status': 'ACTIVE'})
+        sync_engine = self.env['akahu.sync.engine'].sudo()
+        with mock.patch.object(type(self.credential), '_api_get', side_effect=UserError('Akahu resource not found (404). The account may have been disconnected or removed.')):
+            result = sync_engine.sync_account(account, trigger_source='manual_account')
+        self.assertEqual(result.get('skipped_disconnected'), True)
+        self.assertEqual(account.akahu_status, 'DISCONNECTED')
 
     def test_token_exchange_failure_is_safe(self):
         controller = AkahuOAuthController()

@@ -96,6 +96,21 @@ class AkahuOAuthController(http.Controller):
         state = kwargs.get('state')
         code = kwargs.get('code')
 
+        event = (kwargs.get('event') or '').upper()
+        if event == 'REVOKE':
+            credential = request.env['akahu.credential'].sudo().browse(session_state.get('credential_id') if session_state else False).exists()
+            request.session.pop(OAUTH_STATE_SESSION_KEY, None)
+            if credential:
+                credential.sudo().write({
+                    'user_access_token': '',
+                    'connection_status': 'error',
+                    'error_message': _('Akahu access was revoked by the user. Reconnect to resume sync.'),
+                })
+                credential.env['akahu.account'].sudo().search([
+                    ('credential_id', '=', credential.id),
+                ]).write({'user_token': '', 'akahu_status': 'DISCONNECTED'})
+            return self._render_message(_('Akahu access revoked'), _('Your Akahu connection was revoked. Reconnect to resume bank sync.'))
+
         if not session_state:
             return self._render_message(_('Akahu OAuth failed'), _('No pending OAuth session was found. Please try again from Odoo.'))
         if state != session_state.get('state'):
@@ -174,48 +189,26 @@ class AkahuOAuthController(http.Controller):
             if not account_id:
                 continue
             option_values.append((0, 0, {
+                'company_id': credential.company_id.id,
                 'akahu_account_id': account_id,
                 'display_name': _format_account_label(item),
                 'bank_name': item.get('connection', {}).get('name') or '',
                 'account_name': item.get('name') or '',
                 'formatted_account': item.get('formatted_account') or '',
                 'akahu_status': item.get('status') or 'UNKNOWN',
+                'selected': len(option_values) == 0,
             }))
         if not option_values:
             request.session.pop(OAUTH_STATE_SESSION_KEY, None)
             return self._render_message(_('Akahu OAuth failed'), _('Akahu did not return any connected accounts for this token.'))
 
         account_model = request.env['akahu.account'].sudo()
-        if len(option_values) == 1:
-            selected_payload = option_values[0][2]
-            existing_mappings = account_model.search([
-                ('credential_id', '=', credential.id),
-                ('company_id', '=', credential.company_id.id),
-                ('akahu_account_id', '=', selected_payload.get('akahu_account_id')),
-            ], limit=2)
-            if len(existing_mappings) == 1:
-                existing_mapping = existing_mappings[0]
-                existing_mapping.write({
-                    'bank_name': selected_payload.get('bank_name') or existing_mapping.bank_name,
-                    'akahu_account_name': selected_payload.get('account_name') or existing_mapping.akahu_account_name,
-                    'akahu_formatted_account': selected_payload.get('formatted_account') or existing_mapping.akahu_formatted_account,
-                    'akahu_status': selected_payload.get('akahu_status') or existing_mapping.akahu_status,
-                })
-                request.session.pop(OAUTH_STATE_SESSION_KEY, None)
-                _logger.info(
-                    'Akahu OAuth callback reused existing mapping credential_id=%s company_id=%s account_id=%s mapping_id=%s',
-                    credential.id,
-                    credential.company_id.id,
-                    selected_payload.get('akahu_account_id'),
-                    existing_mapping.id,
-                )
-                return redirect('/web#id=%s&model=akahu.account&view_type=form' % existing_mapping.id)
-
         wizard = request.env['akahu.oauth.account.select.wizard'].sudo().create({
             'credential_id': credential.id,
             'option_ids': option_values,
         })
         if len(option_values) == 1 and wizard.option_ids:
+            wizard.option_ids[0].write({'selected': True})
             wizard.write({'selected_option_id': wizard.option_ids[0].id})
 
         request.session.pop(OAUTH_STATE_SESSION_KEY, None)
@@ -227,7 +220,16 @@ class AkahuOAuthController(http.Controller):
             len(option_values),
             wizard.id,
         )
-        return redirect('/web#id=%s&model=akahu.oauth.account.select.wizard&view_type=form' % wizard.id)
+        view_id = request.env.ref('nz_bank_reconciliation.view_akahu_oauth_account_select_wizard_form')
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'akahu.oauth.account.select.wizard',
+            'res_id': wizard.id,
+            'view_mode': 'form',
+            'view_id': view_id.id if view_id else False,
+            'target': 'new',
+            'context': {'default_credential_id': credential.id},
+        }
 
     def _render_message(self, title, message):
         body = '<html><body><h3>%s</h3><p>%s</p><p><a href="/web">Return to Odoo</a></p></body></html>' % (

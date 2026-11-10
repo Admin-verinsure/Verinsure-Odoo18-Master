@@ -12,6 +12,17 @@ class AkahuOAuthAccountSelectWizardOption(models.TransientModel):
         required=True,
         ondelete='cascade',
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Odoo Company',
+        required=False,
+    )
+    journal_id = fields.Many2one(
+        'account.journal',
+        string='Odoo Bank Journal',
+        domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]",
+    )
+    selected = fields.Boolean(string='Map this account', default=False)
     akahu_account_id = fields.Char(required=True)
     display_name = fields.Char(required=True)
     bank_name = fields.Char(readonly=True)

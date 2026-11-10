@@ -90,6 +90,7 @@ class AkahuAccount(models.Model):
     akahu_status = fields.Selection([
         ('ACTIVE', 'Active'),
         ('INACTIVE', 'Inactive'),
+        ('DISCONNECTED', 'Disconnected'),
         ('UNKNOWN', 'Unknown'),
     ], string='Akahu Status', default='UNKNOWN', readonly=True)
     balance_available = fields.Float(string='Available Balance (NZD)', readonly=True)
@@ -178,9 +179,13 @@ class AkahuAccount(models.Model):
             rec.has_user_token = bool(rec.user_token or rec.credential_id.user_access_token)
 
     def _is_inactive_warning(self):
-        return self.akahu_status == 'INACTIVE'
+        return self.akahu_status in ('INACTIVE', 'DISCONNECTED')
 
     # ── Actions ───────────────────────────────────────────────────────────────
+
+    def action_reconnect_akahu(self):
+        self.ensure_one()
+        return self.credential_id._build_oauth_start_action(flow_kind='reauthorize')
 
     def action_open_replace_user_token_wizard(self):
         if not self.env.user.has_group('base.group_erp_manager'):
@@ -228,6 +233,7 @@ class AkahuAccount(models.Model):
             # Known ID — find exact match
             matched = next((i for i in items if i.get('_id') == self.akahu_account_id), None)
             if not matched:
+                self.write({'akahu_status': 'DISCONNECTED'})
                 raise UserError(_(
                     'Akahu account ID "%s" was not found in the response from Akahu. '
                     'The account may have been disconnected.'
@@ -235,6 +241,7 @@ class AkahuAccount(models.Model):
         else:
             # First-time resolution
             if len(items) == 0:
+                self.write({'akahu_status': 'DISCONNECTED'})
                 raise UserError(_('No accounts found for this User Token on Akahu.'))
             if len(items) == 1:
                 # Unambiguous — safe to auto-select
@@ -267,7 +274,10 @@ class AkahuAccount(models.Model):
             )
         self.write(vals)
 
-        status_msg = '✅ Active' if vals['akahu_status'] == 'ACTIVE' else '⚠️ INACTIVE — reconnection required!'
+        status_msg = (
+            '✅ Active' if vals['akahu_status'] == 'ACTIVE'
+            else '⚠️ %s — reconnection required!' % (vals['akahu_status'] or 'Inactive')
+        )
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -277,7 +287,7 @@ class AkahuAccount(models.Model):
                     vals['bank_name'], vals['akahu_formatted_account'], status_msg
                 ),
                 'type': 'success' if vals['akahu_status'] == 'ACTIVE' else 'warning',
-                'sticky': vals['akahu_status'] == 'INACTIVE',
+                'sticky': vals['akahu_status'] in ('INACTIVE', 'DISCONNECTED'),
             }
         }
 
