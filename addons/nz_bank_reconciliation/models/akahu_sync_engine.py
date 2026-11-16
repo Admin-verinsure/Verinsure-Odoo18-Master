@@ -337,7 +337,7 @@ class AkahuSyncEngine(models.Model):
         # sudo(): cron technical user needs cross-company read access to akahu.account
         accounts = self.env['akahu.account'].sudo().search([
             ('active', '=', True),
-            ('akahu_status', '!=', 'INACTIVE'),
+            ('akahu_status', 'not in', ['INACTIVE', 'DISCONNECTED']),
             ('credential_id.active', '=', True),
         ])
         total_imported = 0
@@ -502,11 +502,11 @@ class AkahuSyncEngine(models.Model):
             if not account_id:
                 raise UserError(_('Could not determine Akahu Account ID for %s') % akahu_account.name)
 
-            if akahu_account.akahu_status == 'INACTIVE':
+            if akahu_account.akahu_status in ('INACTIVE', 'DISCONNECTED'):
                 raise UserError(_(
-                    'Account %s is INACTIVE on Akahu. '
+                    'Account %s is %s on Akahu. '
                     'The user must reconnect via the Akahu OAuth flow.'
-                ) % akahu_account.name)
+                ) % (akahu_account.name, akahu_account.akahu_status or 'INACTIVE'))
 
             path = '/accounts/%s/transactions' % account_id
             params = {}
@@ -648,8 +648,14 @@ class AkahuSyncEngine(models.Model):
                 try:
                     data = cred._api_get(akahu_account._get_user_token(), path, params=params)
                 except UserError as e:
-                    if '401' in str(e) or '403' in str(e):
-                        akahu_account.write({'akahu_status': 'INACTIVE'})
+                    if '404' in str(e):
+                        akahu_account.write({'akahu_status': 'DISCONNECTED'})
+                        return {
+                            'imported': 0,
+                            'fetched': 0,
+                            'failed': 0,
+                            'skipped_disconnected': True,
+                        }
                     raise
 
                 items = data.get('items', [])

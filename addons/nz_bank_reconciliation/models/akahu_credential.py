@@ -539,6 +539,133 @@ class AkahuCredential(models.Model):
             raise ValidationError(_('OAuth Redirect URI must use HTTPS in production.'))
         return redirect_uri
 
+    def _get_current_login_hint(self):
+        self.ensure_one()
+        user = self.env.user
+        email = (user.email or '').strip()
+        if email:
+            return email
+        partner_email = (user.partner_id.email or '').strip() if user.partner_id else ''
+        if partner_email:
+            return partner_email
+        return False
+
+    def _invalidate_user_access(self, reason):
+        self.ensure_one()
+        safe_reason = reason or _('Akahu access was revoked or expired. Reconnect to resume sync.')
+        self.sudo().write({
+            'user_access_token': '',
+            'connection_status': 'error',
+            'error_message': safe_reason,
+        })
+        linked_accounts = self.env['akahu.account'].sudo().search([
+            ('credential_id', '=', self.id),
+        ])
+        if linked_accounts:
+            linked_accounts.write({
+                'user_token': '',
+                'akahu_status': 'DISCONNECTED',
+            })
+        self.env['ir.config_parameter'].sudo().set_param(
+            'akahu.credential.%s.user_id' % self.id,
+            '',
+        )
+
+    def _set_known_akahu_user_id(self, user_id):
+        self.ensure_one()
+        if not user_id:
+            self.env['ir.config_parameter'].sudo().set_param(
+                'akahu.credential.%s.user_id' % self.id,
+                '',
+            )
+            return
+        self.env['ir.config_parameter'].sudo().set_param(
+            'akahu.credential.%s.user_id' % self.id,
+            str(user_id),
+        )
+
+    def _get_known_akahu_user_id(self):
+        self.ensure_one()
+        return self.env['ir.config_parameter'].sudo().get_param(
+            'akahu.credential.%s.user_id' % self.id,
+            False,
+        )
+
+    def _fetch_akahu_current_user(self, user_token_plain):
+        self.ensure_one()
+        for path in ('/me', '/user', '/users/me'):
+            try:
+                data = self._api_get(user_token_plain, path)
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                if data.get('user'):
+                    return data.get('user')
+                if data.get('_id') or data.get('id'):
+                    return data
+                if data.get('items'):
+                    item = data.get('items', [None])[0]
+                    if isinstance(item, dict):
+                        return item
+        return {}
+
+    def _revoke_user_token(self, user_token_plain):
+        self.ensure_one()
+        try:
+            resp = requests.delete(
+                '%s/token' % AKAHU_BASE_URL,
+                headers=self._get_headers(user_token_plain),
+                timeout=30,
+            )
+        except requests.exceptions.RequestException as e:
+            _logger.warning(
+                'Akahu revoke failed for credential_id=%s: %s',
+                self.id,
+                _redact_secret(str(e)[:256]),
+            )
+            return False
+
+        if resp.status_code in (200, 202, 204, 404):
+            return True
+        _logger.warning(
+            'Akahu revoke returned HTTP %s for credential_id=%s: %s',
+            resp.status_code,
+            self.id,
+            _redact_secret((resp.text or '')[:256]),
+        )
+        return False
+
+    def _check_akahu_user_identity(self, user_token_plain, user_payload=None):
+        self.ensure_one()
+        payload = user_payload or self._fetch_akahu_current_user(user_token_plain)
+        if not isinstance(payload, dict):
+            return
+        current_user_id = payload.get('_id') or payload.get('id') or payload.get('user_id')
+        if not current_user_id:
+            return
+        stored_user_id = self._get_known_akahu_user_id()
+        if stored_user_id and str(stored_user_id) != str(current_user_id):
+            old_token = False
+            try:
+                old_token = self._get_user_access_token()
+            except Exception:
+                old_token = False
+            if old_token and old_token != user_token_plain:
+                try:
+                    self._revoke_user_token(old_token)
+                except Exception:
+                    _logger.warning(
+                        'Akahu token revocation failed during identity change for credential_id=%s',
+                        self.id,
+                    )
+            self._invalidate_user_access(_(
+                'Akahu user identity changed. The prior access was revoked automatically. Reconnect to resume sync.'
+            ))
+            raise UserError(_(
+                'Akahu user identity changed. Please reconnect the integration using the same Akahu account.'
+            ))
+        self._set_known_akahu_user_id(current_user_id)
+
     def _build_oauth_authorization_url(self, state, redirect_uri=None):
         self.ensure_one()
         app_token = self._get_app_token()
@@ -556,6 +683,9 @@ class AkahuCredential(models.Model):
             'scope': 'ENDURING_CONSENT',
             'state': state,
         }
+        login_hint = self._get_current_login_hint()
+        if login_hint:
+            params['login_hint'] = login_hint
         return 'https://oauth.akahu.nz?%s' % urlencode(params)
 
     def _exchange_oauth_code(self, authorization_code, redirect_uri=None):
@@ -599,6 +729,7 @@ class AkahuCredential(models.Model):
         access_token = data.get('access_token') or data.get('token') or data.get('user_token')
         if not access_token:
             raise UserError(_('Akahu token exchange did not return a user access token.'))
+        self._check_akahu_user_identity(access_token)
         return access_token
 
     def _fetch_oauth_accounts(self, user_access_token):
@@ -659,9 +790,16 @@ class AkahuCredential(models.Model):
                 continue
 
             if resp.status_code == 401:
+                self._invalidate_user_access(_(
+                    'Akahu access was revoked or the user token expired. Reconnect to resume sync.'
+                ))
                 raise UserError(_(
                     'Akahu authentication failed (401). '
-                    'Check your App Token and User Token.'
+                    'The access was revoked or expired. Reconnect Akahu to continue.'
+                ))
+            if resp.status_code == 404:
+                raise UserError(_(
+                    'Akahu resource not found (404). The account may have been disconnected or removed.'
                 ))
             if resp.status_code == 403:
                 raise UserError(_(
@@ -733,9 +871,16 @@ class AkahuCredential(models.Model):
                 continue
 
             if resp.status_code == 401:
+                self._invalidate_user_access(_(
+                    'Akahu access was revoked or the user token expired. Reconnect to resume sync.'
+                ))
                 raise UserError(_(
                     'Akahu authentication failed (401). '
-                    'Check your App Token and User Token.'
+                    'The access was revoked or expired. Reconnect Akahu to continue.'
+                ))
+            if resp.status_code == 404:
+                raise UserError(_(
+                    'Akahu resource not found (404). The account may have been disconnected or removed.'
                 ))
             if resp.status_code == 403:
                 raise UserError(_(
@@ -793,6 +938,7 @@ class AkahuCredential(models.Model):
                 raise ValidationError(_('App Token must start with "app_token_"'))
 
             data = self._api_get(user_token, '/accounts')
+            self._check_akahu_user_identity(user_token)
             count = len(data.get('items', []))
             message = _('Connected! Found %d account(s) on Akahu.') % count
             notif_type = 'success'

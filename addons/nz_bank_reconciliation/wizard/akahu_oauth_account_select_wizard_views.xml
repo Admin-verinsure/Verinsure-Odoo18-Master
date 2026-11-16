@@ -11,24 +11,26 @@
                         <group>
                             <field name="credential_id" invisible="1"/>
                             <field name="company_id" readonly="1"/>
-                            <field name="journal_id"/>
-                            <field name="selected_option_id"/>
+                            <field name="selected_option_id" invisible="1"/>
                         </group>
                         <group string="Available Akahu Accounts">
                             <field name="option_ids" nolabel="1">
-                                <list>
-                                    <field name="display_name"/>
-                                    <field name="akahu_account_id"/>
-                                    <field name="bank_name"/>
-                                    <field name="formatted_account"/>
-                                    <field name="account_name"/>
+                                <list editable="bottom">
+                                    <field name="selected" widget="boolean_toggle"/>
+                                    <field name="display_name" readonly="1"/>
+                                    <field name="company_id"/>
+                                    <field name="journal_id"/>
+                                    <field name="akahu_account_id" readonly="1"/>
+                                    <field name="bank_name" readonly="1"/>
+                                    <field name="formatted_account" readonly="1"/>
+                                    <field name="account_name" readonly="1"/>
                                 </list>
                             </field>
                         </group>
                     </sheet>
                     <footer>
                         <button name="action_save"
-                                string="Save / Connect Account"
+                                string="Save Selected Accounts"
                                 type="object"
                                 class="btn-primary"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
